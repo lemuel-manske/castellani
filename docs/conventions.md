@@ -18,4 +18,24 @@ Prefer named constants for stable protocol and application values: HTTP endpoint
 
 Separate `require` and `assert` statements with a blank line whenever one follows the other.
 
-Apply these formatting conventions to production code and tests. Follow `docs/testing.md` for test organization and assertion behavior.
+### Organization and dependencies
+
+Keep entry points thin. Assemble concrete dependencies at the composition boundary; place application operations, transport handlers, and external adapters in packages with clear responsibilities, following the separation used in `chaosd`.
+
+Prefer explicit, meaningful package and concrete-type names. Avoid redundant names that repeat the package (such as `coordinator.CoordinatorClient`) and ambiguous abstractions that hide a real dependency.
+
+Do not introduce interfaces or shared libraries solely to satisfy a pattern. Define interfaces at the boundary that consumes them when they genuinely decouple a use case from a transport or external dependency.
+
+Keep HTTP paths, headers, and wire-format constants with their owning transport or contract package, not in domain models. Do not import sibling service implementation packages; consume documented language-neutral contracts.
+
+### Tests and fixture organization
+
+Test names and bodies must describe observable behavior rather than the mechanics of building a request or configuring dependencies. Use concise scenario → action → assertion flow.
+
+Move **reusable service-wide test setup** into a dedicated purpose-specific package such as `internal/gatewaytest/`, as in the `chaosd` test-support packages. Keep all common fixture construction, HTTP helpers, response decoding, and recording doubles together, organized into files by responsibility. Do not scatter equivalent `fixtures_test.go` or `test_helpers_test.go` files around the service.
+
+Avoid duplicating test fixture code across packages. Keep implementation-private lifecycle tests local where required by Go visibility rules rather than exporting internals just to share setup. Fixture helpers must expose intent, register cleanup, and leave behavioral assertions visible in the tests.
+
+Do not use `if` statements in tests to handle assertions; use `require` for prerequisites and `assert` for independent results. Do not use table-driven or dynamically generated test scenarios. Follow `docs/testing.md` for the full rules.
+
+Apply these formatting and organization conventions to production code and tests.
