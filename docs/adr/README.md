@@ -38,6 +38,6 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0028 — Interactive authentication execution and profile protection](0028-interactive-auth-infrastructure.md)
 - [0029 — Unified full-text search and historical replay navigation](0029-unified-search-replay.md)
 
-See [testing conventions](../testing.md) for behavioral test-writing rules and the [cross-ADR consistency review](REVIEW-2026-11-18.md) for resolved contradictions, ADR boundaries, and implementation risks.
+See [testing conventions](../testing.md) for behavioral test-writing rules.
 
 Concrete API and event schemas, DynamoDB key layouts, recording integration validation, retry/reconciliation algorithms, and site-specific crawling policies remain implementation work. Frontend experience and presentation are intentionally deferred.
