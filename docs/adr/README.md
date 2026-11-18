@@ -23,6 +23,7 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0013 — DynamoDB-backed distributed crawl frontier](0013-distributed-crawl-frontier.md)
 - [0014 — Archive lifecycle and orchestrated SAGA](0014-archive-lifecycle-saga.md)
 - [0015 — Interactive authentication and resumable capture](0015-interactive-authenticated-capture.md)
+- [0016 — Containerized deployment and horizontal scaling](0016-containerized-deployment-scaling.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
