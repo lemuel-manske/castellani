@@ -22,6 +22,7 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0012 — Explicit, language-neutral service contracts](0012-language-neutral-contracts.md)
 - [0013 — DynamoDB-backed distributed crawl frontier](0013-distributed-crawl-frontier.md)
 - [0014 — Archive lifecycle and orchestrated SAGA](0014-archive-lifecycle-saga.md)
+- [0015 — Interactive authentication and resumable capture](0015-interactive-authenticated-capture.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
