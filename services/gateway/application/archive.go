@@ -9,6 +9,8 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 )
 
+const archiveStatusPath = "/archives/"
+
 type ArchiveCoordinator interface {
 	Admit(context.Context, string, []byte) (archive.Accepted, error)
 	Status(context.Context, string) (json.RawMessage, error)
@@ -33,6 +35,7 @@ func NewApplication(coordinator ArchiveCoordinator) Application {
 }
 
 func (a Application) CreateArchive(ctx context.Context, key string, submission archive.Submission, raw []byte) (archive.Accepted, error) {
+
 	if err := submission.Validate(); err != nil {
 		return archive.Accepted{}, &ValidationError{Cause: err}
 	}
@@ -40,6 +43,7 @@ func (a Application) CreateArchive(ctx context.Context, key string, submission a
 }
 
 func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
+
 	if !archive.ValidID(id) {
 		return nil, ErrInvalidArchiveID
 	}
