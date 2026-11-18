@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
@@ -51,19 +50,15 @@ func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
 }
 
 func TestGateway_RepeatedArchiveSubmissionAlwaysReachesCoordinator(t *testing.T) {
-	var forwarded atomic.Int32
-
-	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		forwarded.Add(1)
-		coordinatorAcceptsArchive(w, r)
-	})
+	coordinator := &recordingCoordinator{}
+	gateway := startGateway(t, coordinator.accept)
 
 	first := gateway.submit(idempotencyKey, validSubmission)
 	second := gateway.submit(idempotencyKey, validSubmission)
 
 	assert.Equal(t, http.StatusAccepted, first.Status)
 	assert.Equal(t, http.StatusAccepted, second.Status)
-	assert.EqualValues(t, 2, forwarded.Load())
+	assert.EqualValues(t, 2, coordinator.callCount())
 }
 
 func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testing.T) {
@@ -77,62 +72,46 @@ func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testin
 }
 
 func TestGateway_ArchiveWithoutIdempotencyKeyIsRejectedBeforeForwarding(t *testing.T) {
-	var forwarded atomic.Int32
-
-	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		forwarded.Add(1)
-		coordinatorAcceptsArchive(w, r)
-	})
+	coordinator := &recordingCoordinator{}
+	gateway := startGateway(t, coordinator.accept)
 
 	result := gateway.submit("", validSubmission)
 
 	assert.Equal(t, http.StatusBadRequest, result.Status)
-	assert.Zero(t, forwarded.Load())
+	assert.Zero(t, coordinator.callCount())
 }
 
 func TestGateway_ArchiveWithUnknownFieldsIsRejectedBeforeForwarding(t *testing.T) {
-	var forwarded atomic.Int32
-
-	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		forwarded.Add(1)
-		coordinatorAcceptsArchive(w, r)
-	})
+	coordinator := &recordingCoordinator{}
+	gateway := startGateway(t, coordinator.accept)
 
 	body := `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1,"unsupported":true}`
 	result := gateway.submit(idempotencyKey, body)
 
 	assert.Equal(t, http.StatusBadRequest, result.Status)
-	assert.Zero(t, forwarded.Load())
+	assert.Zero(t, coordinator.callCount())
 }
 
 func TestGateway_ArchiveWithInvalidLimitsIsRejectedBeforeForwarding(t *testing.T) {
-	var forwarded atomic.Int32
-
-	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		forwarded.Add(1)
-		coordinatorAcceptsArchive(w, r)
-	})
+	coordinator := &recordingCoordinator{}
+	gateway := startGateway(t, coordinator.accept)
 
 	body := `{"seedUrl":"https://example.org/","maxDepth":-1,"maxPages":0}`
 	result := gateway.submit(idempotencyKey, body)
 
 	assert.Equal(t, http.StatusUnprocessableEntity, result.Status)
-	assert.Zero(t, forwarded.Load())
+	assert.Zero(t, coordinator.callCount())
 }
 
 func TestGateway_OversizedArchiveIsRejectedBeforeForwarding(t *testing.T) {
-	var forwarded atomic.Int32
-
-	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		forwarded.Add(1)
-		coordinatorAcceptsArchive(w, r)
-	})
+	coordinator := &recordingCoordinator{}
+	gateway := startGateway(t, coordinator.accept)
 
 	oversizedBody := validSubmission + strings.Repeat(" ", 70<<10)
 	result := gateway.submit(idempotencyKey, oversizedBody)
 
 	assert.Equal(t, http.StatusBadRequest, result.Status)
-	assert.Zero(t, forwarded.Load())
+	assert.Zero(t, coordinator.callCount())
 }
 
 func TestGateway_CoordinatorDisconnectLeavesArchiveAdmissionUnconfirmed(t *testing.T) {
