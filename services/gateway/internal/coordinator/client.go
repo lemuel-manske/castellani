@@ -15,7 +15,12 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
-const maxResponseBytes = 1 << 20
+const (
+	maxResponseBytes = 1 << 20
+	maxIdleConnections = 32
+	maxIdleConnectionsPerHost = 16
+	idleConnectionTimeout = 90 * time.Second
+)
 
 type Client struct {
 	baseURL url.URL
@@ -42,9 +47,9 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 			},
 			Transport: &http.Transport{
 				Proxy:                 http.ProxyFromEnvironment,
-				MaxIdleConns:          32,
-				MaxIdleConnsPerHost:   16,
-				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConns:          maxIdleConnections,
+				MaxIdleConnsPerHost:   maxIdleConnectionsPerHost,
+				IdleConnTimeout:       idleConnectionTimeout,
 				ResponseHeaderTimeout: timeout,
 			},
 		},
@@ -52,38 +57,46 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 }
 
 func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
-	request, err := c.request(ctx, http.MethodPost, "/archives", bytes.NewReader(raw))
+	request, err := c.request(ctx, http.MethodPost, archive.ArchivesPath, bytes.NewReader(raw))
+
 	if err != nil {
 		return archive.Accepted{}, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", key)
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(archive.IdempotencyHeader, key)
 
 	status, rawResponse, err := c.execute(request)
+
 	if err != nil {
 		return archive.Accepted{}, err
 	}
+
 	if status != http.StatusAccepted {
 		return archive.Accepted{}, parseFailure(status, rawResponse)
 	}
 
 	var accepted archive.Accepted
-	if err := json.Unmarshal(rawResponse, &accepted); err != nil ||
-		accepted.Status != "ACCEPTED" || !archive.ValidID(accepted.ArchiveID) {
+	decodeErr := json.Unmarshal(rawResponse, &accepted)
+	validAdmission := accepted.Status == archive.AcceptedStatus && archive.ValidID(accepted.ArchiveID)
+
+	if decodeErr != nil || !validAdmission {
 		return archive.Accepted{}, ErrInvalidResponse
 	}
 	return accepted, nil
 }
 
 func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error) {
-	request, err := c.request(ctx, http.MethodGet, "/archives/"+id, nil)
+	request, err := c.request(ctx, http.MethodGet, archive.ArchivePathPrefix+id, nil)
+
 	if err != nil {
 		return nil, err
 	}
 	status, data, err := c.execute(request)
+
 	if err != nil {
 		return nil, err
 	}
+
 	if status != http.StatusOK {
 		return nil, parseFailure(status, data)
 	}
@@ -94,9 +107,12 @@ func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error)
 		Replay    json.RawMessage `json:"replay"`
 		Search    json.RawMessage `json:"search"`
 	}
-	if err := json.Unmarshal(data, &document); err != nil ||
-		document.ArchiveID != id || document.Status == "" ||
-		len(document.Capture) == 0 || len(document.Replay) == 0 || len(document.Search) == 0 {
+	decodeErr := json.Unmarshal(data, &document)
+	matchingArchive := document.ArchiveID == id
+	completeStatus := document.Status != "" && len(document.Capture) != 0 &&
+		len(document.Replay) != 0 && len(document.Search) != 0
+
+	if decodeErr != nil || !matchingArchive || !completeStatus {
 		return nil, ErrInvalidResponse
 	}
 	return json.RawMessage(data), nil
@@ -111,15 +127,18 @@ func (c *Client) request(ctx context.Context, method, path string, body io.Reade
 
 func (c *Client) execute(request *http.Request) (int, []byte, error) {
 	response, err := c.http.Do(request)
+
 	if err != nil {
 		return 0, nil, fmt.Errorf("coordinator HTTP call: %w", err)
 	}
 	defer response.Body.Close()
 
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+
 	if err != nil {
 		return 0, nil, fmt.Errorf("read coordinator response: %w", err)
 	}
+
 	if len(data) > maxResponseBytes {
 		return 0, nil, ErrInvalidResponse
 	}
@@ -135,8 +154,10 @@ func parseFailure(status int, data []byte) error {
 	}
 
 	var p httpx.Problem
-	if err := json.Unmarshal(data, &p); err != nil ||
-		p.Status != status || p.Title == "" || p.Type == "" {
+	decodeErr := json.Unmarshal(data, &p)
+	validProblem := p.Status == status && p.Title != "" && p.Type != ""
+
+	if decodeErr != nil || !validProblem {
 		return ErrInvalidResponse
 	}
 	return &Failure{Problem: p}
