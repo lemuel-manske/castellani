@@ -33,6 +33,38 @@ Use **self-hosted ReplayWeb.page** as the historical page replay engine, loading
 
 Treat WACZ contents as potentially sensitive, especially authenticated page records. Isolate the replay execution origin from application credentials and APIs and ensure that staged/compensated archives cannot be downloaded or replayed. Detailed UI design is explicitly deferred.
 
+## Publication and search-visibility ordering
+
+```mermaid
+sequenceDiagram
+    participant Capture
+    participant S3
+    participant Coordinator
+    participant RabbitMQ
+    participant Search as Search and Index
+    Capture->>S3: Store immutable private WACZ
+    Capture->>Capture: Validate package and persist PREPARED + outbox
+    Capture->>RabbitMQ: ArchivePrepared (outbox dispatch)
+    RabbitMQ->>Coordinator: ArchivePrepared
+    Coordinator->>Coordinator: Conditionally commit PUBLISH + outbox
+    Coordinator->>RabbitMQ: ArchivePublicationDecided
+    par Capture activates replay
+        RabbitMQ->>Capture: ArchivePublicationDecided
+        Capture->>Capture: Persist decision and mark PUBLISHED
+        Capture->>RabbitMQ: ArchivePublished
+    and Search records authorization
+        RabbitMQ->>Search: ArchivePublicationDecided
+        Search->>Search: Persist authorization; do not expose yet
+    end
+    RabbitMQ->>Coordinator: ArchivePublished
+    Coordinator->>Coordinator: Mark COMPLETED or COMPLETED_WITH_ERRORS
+    RabbitMQ->>Search: ArchivePublished
+    Search->>Search: Match both facts and enable indexed results
+    Note over Capture,Search: Replay becomes available before or independently of search readiness
+```
+
+This is a **logical** sequence, not a guaranteed broker delivery order. Search can receive `ArchivePublished` before `ArchivePublicationDecided`; it stores both facts and requires a match before exposing results. Publication authorizes retrieval from the **same private S3 object**, without copying it to a public bucket. A failed Search service never blocks archive completion.
+
 ## Consequences
 
 The archive's authoritative deliverable is the preserved, validated WACZ; full-text search is a recoverable derivative. A client can access published archives while the Indexer is recovering. This intentionally supersedes the earlier assumption in ADR-0014/0019 that all indexing results must settle before archive publication.
