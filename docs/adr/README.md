@@ -17,8 +17,10 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0007 — OpenSearch for full-text retrieval](0007-opensearch-retrieval.md)
 - [0008 — Monorepo organization and service independence](0008-monorepo-organization.md)
 - [0009 — Go for cross-service integration and end-to-end tests](0009-cross-service-testing.md)
+- [0010 — Asynchronous HTTP API with durable admission](0010-asynchronous-http-api.md)
+- [0011 — Core domain model and archival semantics](0011-core-domain-model.md)
 - [0012 — Explicit, language-neutral service contracts](0012-language-neutral-contracts.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
-More involved decisions, including crawl-frontier consistency, concurrency limits, SAGA transitions, and delivery guarantees, will be documented separately.
+More involved decisions, including URL identity and normalization, crawl-frontier consistency, concurrency limits, SAGA transitions, and delivery guarantees, will be documented separately.
