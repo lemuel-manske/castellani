@@ -57,13 +57,13 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 }
 
 func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
-	request, err := c.request(ctx, http.MethodPost, archive.ArchivesPath, bytes.NewReader(raw))
+	request, err := c.request(ctx, http.MethodPost, httpx.ArchivesPath, bytes.NewReader(raw))
 
 	if err != nil {
 		return archive.Accepted{}, err
 	}
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-	request.Header.Set(archive.IdempotencyHeader, key)
+	request.Header.Set(httpx.IdempotencyHeader, key)
 
 	status, rawResponse, err := c.execute(request)
 
@@ -86,7 +86,7 @@ func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Acc
 }
 
 func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error) {
-	request, err := c.request(ctx, http.MethodGet, archive.ArchivePathPrefix+id, nil)
+	request, err := c.request(ctx, http.MethodGet, httpx.ArchivePathPrefix+id, nil)
 
 	if err != nil {
 		return nil, err
