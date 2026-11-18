@@ -15,6 +15,13 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 )
 
+const (
+	serverReadHeaderTimeout = 5 * time.Second
+	serverReadTimeout       = 15 * time.Second
+	serverIdleTimeout       = 60 * time.Second
+	serverMaxHeaderBytes    = 32 << 10
+)
+
 type gatewayServer struct {
 	http            *http.Server
 	ready           atomic.Bool
@@ -27,10 +34,10 @@ func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	app := application.NewApplication(coordinatorClient)
 	gateway.http = &http.Server{
 		Handler:           api.NewRouter(gateway.ready.Load, app, logger),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    32 << 10,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		ReadTimeout:       serverReadTimeout,
+		IdleTimeout:       serverIdleTimeout,
+		MaxHeaderBytes:    serverMaxHeaderBytes,
 	}
 	return gateway
 }
@@ -55,11 +62,13 @@ func (g *gatewayServer) serve(ctx context.Context, listener net.Listener) error 
 	defer cancel()
 
 	shutdownErr := g.http.Shutdown(shutdownCtx)
+
 	if shutdownErr != nil {
 		shutdownErr = errors.Join(shutdownErr, g.http.Close())
 	}
 
 	serveErr := <-stopped
+
 	if !errors.Is(serveErr, http.ErrServerClosed) {
 		return errors.Join(shutdownErr, fmt.Errorf("serve HTTP: %w", serveErr))
 	}
