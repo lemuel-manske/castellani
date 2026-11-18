@@ -27,7 +27,9 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0017 — Optional queue-based autoscaling of capture workers](0017-queue-based-autoscaling.md)
 - [0018 — Fault injection and failure verification](0018-fault-injection-verification.md)
 - [0019 — Incremental indexing and completion coordination](0019-incremental-indexing-completion.md)
+- [0020 — Reliable messaging and idempotent processing](0020-reliable-messaging.md)
+- [0021 — Distributed concurrency control and browser capacity reservations](0021-distributed-concurrency-browser-capacity.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
-More involved decisions, including URL identity and normalization, exact crawl depth semantics, concurrency limits, detailed SAGA protocols, and delivery guarantees, will be documented separately.
+Further decisions, including URL identity and normalization, exact crawl depth semantics, detailed SAGA publication protocols, and concrete storage/recovery algorithms, will be documented separately.
