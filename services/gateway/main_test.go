@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGateway_LivenessEndpointReturnsOK(t *testing.T) {
@@ -12,25 +15,15 @@ func TestGateway_LivenessEndpointReturnsOK(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Get(server.URL + "/health/live")
-	if err != nil {
-		t.Fatalf("request liveness: %v", err)
-	}
+	require.NoError(t, err)
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Fatalf("read liveness response: %v", err)
-	}
+	require.NoError(t, err)
 
-	if response.StatusCode != http.StatusOK {
-		t.Errorf("status = %d; want %d", response.StatusCode, http.StatusOK)
-	}
-	if response.Header.Get("Content-Type") != "text/plain; charset=utf-8" {
-		t.Errorf("content type = %q; want text/plain", response.Header.Get("Content-Type"))
-	}
-	if string(body) != "ok\n" {
-		t.Errorf("body = %q; want %q", body, "ok\n")
-	}
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "text/plain; charset=utf-8", response.Header.Get("Content-Type"))
+	assert.Equal(t, "ok\n", string(body))
 }
 
 func TestGateway_ReadinessEndpointReturnsOK(t *testing.T) {
@@ -38,14 +31,10 @@ func TestGateway_ReadinessEndpointReturnsOK(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Get(server.URL + "/health/ready")
-	if err != nil {
-		t.Fatalf("request readiness: %v", err)
-	}
+	require.NoError(t, err)
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
-		t.Errorf("status = %d; want %d", response.StatusCode, http.StatusOK)
-	}
+	assert.Equal(t, http.StatusOK, response.StatusCode)
 }
 
 func TestGateway_UnknownRouteIsNotFound(t *testing.T) {
@@ -53,14 +42,10 @@ func TestGateway_UnknownRouteIsNotFound(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Get(server.URL + "/archives")
-	if err != nil {
-		t.Fatalf("request unimplemented route: %v", err)
-	}
+	require.NoError(t, err)
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("status = %d; want %d", response.StatusCode, http.StatusNotFound)
-	}
+	assert.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestGateway_HealthEndpointRejectsUnsupportedMethod(t *testing.T) {
@@ -68,17 +53,11 @@ func TestGateway_HealthEndpointRejectsUnsupportedMethod(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	request, err := http.NewRequest(http.MethodPost, server.URL+"/health/live", nil)
-	if err != nil {
-		t.Fatalf("construct request: %v", err)
-	}
+	require.NoError(t, err)
 
 	response, err := server.Client().Do(request)
-	if err != nil {
-		t.Fatalf("request liveness with POST: %v", err)
-	}
+	require.NoError(t, err)
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusMethodNotAllowed {
-		t.Errorf("status = %d; want %d", response.StatusCode, http.StatusMethodNotAllowed)
-	}
+	assert.Equal(t, http.StatusMethodNotAllowed, response.StatusCode)
 }
