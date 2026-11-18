@@ -6,4 +6,5 @@ const (
 	ArchivePathPrefix  = "/archives/"
 	ArchiveIDParameter = "archiveId"
 	IdempotencyHeader  = "Idempotency-Key"
+	LocationHeader     = "Location"
 )
