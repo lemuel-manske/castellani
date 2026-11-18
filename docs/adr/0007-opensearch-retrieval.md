@@ -5,7 +5,7 @@
 
 ## Context
 
-The primary output of the system is the ability to search archived content, including historical captures. DynamoDB can store metadata but is not intended to provide the full-text retrieval capabilities needed for that workload.
+The primary deliverable is preserved, replayable historical content; a complementary derived capability is full-text search across archived snapshots. DynamoDB can store metadata but is not intended to provide the full-text retrieval capabilities needed for that workload.
 
 ## Decision
 
@@ -13,4 +13,4 @@ Use the AWS OpenSearch Service-compatible interface through MiniStack for the Se
 
 ## Consequences
 
-Full-text search can be developed separately from archive artifact storage and workflow state. Search projections must be rebuilt or repaired when indexing fails. A working OpenSearch data plane, not just successful domain-creation API calls, must be verified in the local environment. Exact index mappings, diff algorithms, and indexing consistency guarantees remain future decisions.
+Full-text search can be developed separately from archive artifact storage and workflow state. Search projections must be rebuilt or repaired when indexing fails. A working OpenSearch data plane, not just successful domain-creation API calls, must be verified in the local environment. Unified query ownership and result scope are addressed in ADR-0029; asynchronous indexing and repair are addressed in ADR-0019. Exact index mappings, diff algorithms, and query ranking remain implementation decisions.
