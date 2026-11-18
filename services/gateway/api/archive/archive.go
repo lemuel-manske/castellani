@@ -56,12 +56,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
 		return
 	}
-	if err := submission.Validate(); err != nil {
-		httpx.WriteProblem(w, r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", err.Error())
-		return
-	}
-
-	accepted, err := h.app.CreateArchive(r.Context(), key, data)
+	accepted, err := h.app.CreateArchive(r.Context(), key, submission, data)
 	if err != nil {
 		writeCoordinatorError(w, r, err, "Admission could not be confirmed. Retry with the same Idempotency-Key.")
 		return
@@ -73,10 +68,6 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "archiveId")
-	if !archive.ValidID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Archive ID must be a nonempty path segment.")
-		return
-	}
 	document, err := h.app.GetArchive(r.Context(), id)
 	if err != nil {
 		writeCoordinatorError(w, r, err, "Archive status is temporarily unavailable.")
@@ -87,7 +78,12 @@ func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 
 func writeCoordinatorError(w http.ResponseWriter, r *http.Request, err error, unavailableDetail string) {
 	var failure *coordinator.Failure
+	var validation *application.ValidationError
 	switch {
+	case errors.As(err, &validation):
+		httpx.WriteProblem(w, r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", validation.Error())
+	case errors.Is(err, application.ErrInvalidArchiveID):
+		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", err.Error())
 	case errors.As(err, &failure):
 		p := failure.Problem
 		p.Instance = r.URL.Path
