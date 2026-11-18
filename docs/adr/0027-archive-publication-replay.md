@@ -43,13 +43,13 @@ flowchart TD
     Decision -->|PUBLISH committed| PublishedDecision["ArchivePublicationDecided event"]
     Decision -->|Prepublication abort| Compensation["COMPENSATE path in ADR-0014"]
 
-    PublishedDecision --> CapturePublish["Capture validates decision and package digest"]
+    PublishedDecision -->|Event delivered| CapturePublish["Capture validates decision and package digest"]
     CapturePublish --> Replay["Capture commits PUBLISHED and ArchivePublished outbox"]
     Replay --> Access["Authorized WACZ byte-range retrieval"]
-    Replay --> CoordinatorDone["Coordinator records COMPLETED or COMPLETED_WITH_ERRORS"]
+    Replay -->|ArchivePublished delivered| CoordinatorDone["Coordinator records COMPLETED or COMPLETED_WITH_ERRORS"]
 
-    PublishedDecision --> SearchAuth["Search records publish authorization"]
-    Replay --> SearchReplay["Search records replay-published fact"]
+    PublishedDecision -->|Event delivered| SearchAuth["Search records publish authorization"]
+    Replay -->|ArchivePublished delivered| SearchReplay["Search records replay-published fact"]
     SearchAuth --> Gate{"Matching publication facts and indexed snapshot?"}
     SearchReplay --> Gate
     Indexed["PageCaptured and manifest reconciliation"] --> Gate
