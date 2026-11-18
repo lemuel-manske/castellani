@@ -76,7 +76,7 @@ func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Acc
 }
 
 func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error) {
-	request, err := c.request(ctx, http.MethodGet, "/archives/"+url.PathEscape(id), nil)
+	request, err := c.request(ctx, http.MethodGet, "/archives/"+id, nil)
 	if err != nil {
 		return nil, err
 	}
