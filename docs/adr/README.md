@@ -15,5 +15,9 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0005 — DynamoDB tables owned by individual services](0005-dynamodb-ownership.md)
 - [0006 — S3 for archive artifacts](0006-s3-artifact-storage.md)
 - [0007 — OpenSearch for full-text retrieval](0007-opensearch-retrieval.md)
+- [0008 — Monorepo organization and service independence](0008-monorepo-organization.md)
+- [0009 — Go for cross-service integration and end-to-end tests](0009-cross-service-testing.md)
+
+See [testing conventions](../testing.md) for behavioral test-writing rules.
 
 More involved decisions, including crawl-frontier consistency, concurrency limits, SAGA transitions, and delivery guarantees, will be documented separately.
