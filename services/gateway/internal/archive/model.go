@@ -22,7 +22,6 @@ type Accepted struct {
 }
 
 func (s Submission) Validate() error {
-
 	if !validURL(s.SeedURL) {
 		return errors.New("seedUrl must be an absolute HTTP(S) URL without credentials or fragment")
 	}
@@ -41,7 +40,6 @@ func (s Submission) Validate() error {
 
 	seen := make(map[string]struct{}, len(s.AllowedOrigins))
 	for _, origin := range s.AllowedOrigins {
-
 		if !validURL(origin) {
 			return errors.New("allowedOrigins entries must be absolute HTTP(S) URLs without credentials or fragment")
 		}
