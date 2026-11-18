@@ -10,6 +10,14 @@ For UI tests, prefer semantic queries and assertions (such as accessible role/na
 
 For backend tests, assertions against public APIs, message contracts, and domain outcomes are preferred. Infrastructure assertions are appropriate where infrastructure behavior itself is the requirement (for example, redelivery, queue isolation, or broker recovery); avoid relying on unrelated internal details.
 
+## The more integrated, the better
+
+Do not create so isolated tests that they fail to exercise the system's real behavior.
+
+Integration and end-to-end tests are preferred over the classic unit tests, and service-local tests are preferred over cross-service tests.
+
+Use **test doubles** only for isolated behavior tests, and prefer real infrastructure for integration and end-to-end tests.
+
 ## Readability and organization
 
 - Start test files with tests of primary, observable behavior; follow with exceptional, boundary, and recovery scenarios.
@@ -22,8 +30,8 @@ For backend tests, assertions against public APIs, message contracts, and domain
 
 ## Assertions and failures
 
-- Stop immediately when a prerequisite fails and subsequent assertions cannot be meaningful (for example, failure to create an archive or start a fixture). In Go, use `require` for these checks.
-- Use non-fatal assertions for independent properties that can be meaningfully evaluated together. In Go, use `assert`.
+- Stop immediately when a prerequisite fails and subsequent assertions cannot be meaningful (for example, failure to create an archive or start a fixture). In Go, use `github.com/stretchr/testify/require` for these checks.
+- Use non-fatal assertions for independent properties that can be meaningfully evaluated together. In Go, use `github.com/stretchr/testify/assert`.
 - Assert concrete results and invariants. A successful command response or event publication alone is not proof that a distributed operation completed correctly.
 - Prefer verifying both the presence of intended effects and the absence of prohibited effects, especially for idempotency, compensation, and concurrent processing.
 
