@@ -20,7 +20,16 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0010 — Asynchronous HTTP API with durable admission](0010-asynchronous-http-api.md)
 - [0011 — Core domain model and archival semantics](0011-core-domain-model.md)
 - [0012 — Explicit, language-neutral service contracts](0012-language-neutral-contracts.md)
+- [0013 — DynamoDB-backed distributed crawl frontier](0013-distributed-crawl-frontier.md)
+- [0014 — Archive lifecycle and orchestrated SAGA](0014-archive-lifecycle-saga.md)
+- [0015 — Interactive authentication and resumable capture](0015-interactive-authenticated-capture.md)
+- [0016 — Containerized deployment and horizontal scaling](0016-containerized-deployment-scaling.md)
+- [0017 — Optional queue-based autoscaling of capture workers](0017-queue-based-autoscaling.md)
+- [0018 — Fault injection and failure verification](0018-fault-injection-verification.md)
+- [0019 — Incremental indexing and completion coordination](0019-incremental-indexing-completion.md)
+- [0020 — Reliable messaging and idempotent processing](0020-reliable-messaging.md)
+- [0021 — Distributed concurrency control and browser capacity reservations](0021-distributed-concurrency-browser-capacity.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
-More involved decisions, including URL identity and normalization, crawl-frontier consistency, concurrency limits, SAGA transitions, and delivery guarantees, will be documented separately.
+Further decisions, including URL identity and normalization, exact crawl depth semantics, detailed SAGA publication protocols, and concrete storage/recovery algorithms, will be documented separately.
