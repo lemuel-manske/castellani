@@ -228,3 +228,29 @@ func TestGateway_UnsupportedMethodReturnsProblemDetails(t *testing.T) {
 	assert.Equal(t, http.StatusMethodNotAllowed, response.StatusCode)
 	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 }
+
+func TestGateway_LivenessDoesNotDependOnCoordinatorReadiness(t *testing.T) {
+	gateway := startGateway(t, func(http.ResponseWriter, *http.Request) {})
+
+	response, err := gateway.Client().Get(gateway.URL + "/health/live")
+	require.NoError(t, err)
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "ok\n", string(body))
+}
+
+func TestGateway_ReadinessRejectsTrafficBeforeServerIsReady(t *testing.T) {
+	app := application.Application{}
+	gateway := httptest.NewServer(api.NewRouter(func() bool { return false }, app, slog.Default()))
+	t.Cleanup(gateway.Close)
+
+	response, err := gateway.Client().Get(gateway.URL + "/health/ready")
+	require.NoError(t, err)
+	defer response.Body.Close()
+
+	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
+}
