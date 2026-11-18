@@ -17,6 +17,7 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0007 — OpenSearch for full-text retrieval](0007-opensearch-retrieval.md)
 - [0008 — Monorepo organization and service independence](0008-monorepo-organization.md)
 - [0009 — Go for cross-service integration and end-to-end tests](0009-cross-service-testing.md)
+- [0012 — Explicit, language-neutral service contracts](0012-language-neutral-contracts.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
