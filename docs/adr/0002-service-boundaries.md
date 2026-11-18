@@ -16,8 +16,12 @@ Use four logical microservices:
 - Capture (Python): page discovery, browser capture, and crawl-specific processing.
 - Search and Index (TypeScript): full-text indexing, querying, and historical retrieval.
 
-Each service is deployed independently and has its own health check. Replicas of the Capture service may execute page-level work concurrently.
+Each service is independently deployed and has its own health check. Start with one Gateway, one Coordinator, and one Search and Index replica; use multiple Capture replicas for page-level work distribution.
+
+Correctness must not depend on a service having exactly one running replica. The Gateway remains stateless, and the Coordinator's authoritative workflow state is durable rather than process-local. Concurrent Coordinator replicas must not produce invalid or duplicate state transitions when processing messages for the same archive. Replicas share only their own service's data, never another service's database.
 
 ## Consequences
 
-The gateway requires no application database. The coordinator need not implement crawler-specific URL rules. Service-to-service boundaries introduce event contracts and operational complexity, but allow failures and scaling to be demonstrated independently. Detailed state machines, internal module boundaries, and crawl-frontier algorithms remain separate decisions.
+The gateway requires no application database. The coordinator need not implement crawler-specific URL rules. Service-to-service boundaries introduce event contracts and operational complexity, but allow failures and scaling to be demonstrated independently.
+
+Initial replica counts are deployment defaults, not cardinality constraints. Making Coordinator transitions safe under concurrency requires atomic state changes and idempotency, whose mechanics will be specified in later ADRs. Replica safety does not imply high availability of shared infrastructure. Detailed state machines, internal module boundaries, and crawl-frontier algorithms remain separate decisions.
