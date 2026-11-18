@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "archive-manifest.v1.schema.json",
+  "title": "Immutable final crawl manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "archiveId",
+    "normalizerVersion",
+    "seedUrl",
+    "createdAt",
+    "snapshots",
+    "failedPages"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "archiveId": {
+      "type": "string"
+    },
+    "collectionId": {
+      "type": "string"
+    },
+    "normalizerVersion": {
+      "type": "string"
+    },
+    "seedUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SnapshotEntry"
+      }
+    },
+    "failedPages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "urlKey",
+          "reasonCode"
+        ],
+        "properties": {
+          "urlKey": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ArtifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bucket",
+        "key",
+        "sha256",
+        "sizeBytes"
+      ],
+      "properties": {
+        "bucket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "SnapshotEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshotId",
+        "urlKey",
+        "url",
+        "finalUrl",
+        "capturedAt",
+        "warcArtifacts"
+      ],
+      "properties": {
+        "snapshotId": {
+          "type": "string"
+        },
+        "urlKey": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "finalUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "capturedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "minDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "warcArtifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          }
+        }
+      }
+    }
+  }
+}
