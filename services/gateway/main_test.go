@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -14,7 +16,7 @@ import (
 )
 
 func TestGateway_LivenessEndpointReturnsOK(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return false }))
+	server := httptest.NewServer(newHandler(func() bool { return false }, nil, slog.Default()))
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Get(server.URL + "/health/live")
@@ -30,7 +32,7 @@ func TestGateway_LivenessEndpointReturnsOK(t *testing.T) {
 }
 
 func TestGateway_ReadinessEndpointReturnsOKWhenServing(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return true }))
+	server := httptest.NewServer(newHandler(func() bool { return true }, nil, slog.Default()))
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Get(server.URL + "/health/ready")
@@ -41,7 +43,7 @@ func TestGateway_ReadinessEndpointReturnsOKWhenServing(t *testing.T) {
 }
 
 func TestGateway_ReadinessEndpointReturnsUnavailableBeforeServing(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return false }))
+	server := httptest.NewServer(newHandler(func() bool { return false }, nil, slog.Default()))
 	t.Cleanup(server.Close)
 
 	response, err := server.Client().Get(server.URL + "/health/ready")
@@ -56,7 +58,14 @@ func TestGateway_ShutdownStopsServingAndClearsReadiness(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = listener.Close() })
 
-	gateway := newGatewayServer(config{shutdownTimeout: time.Second})
+	coordinatorURL, err := url.Parse("http://127.0.0.1:9999")
+	require.NoError(t, err)
+
+	gateway := newGatewayServer(config{
+		shutdownTimeout: time.Second,
+		upstreamTimeout: time.Second,
+		coordinatorURL: coordinatorURL,
+	}, slog.Default())
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
@@ -78,18 +87,19 @@ func TestGateway_ShutdownStopsServingAndClearsReadiness(t *testing.T) {
 }
 
 func TestGateway_UnknownRouteIsNotFound(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return true }))
+	server := httptest.NewServer(newHandler(func() bool { return true }, nil, slog.Default()))
 	t.Cleanup(server.Close)
 
-	response, err := server.Client().Get(server.URL + "/archives")
+	response, err := server.Client().Get(server.URL + "/unknown")
 	require.NoError(t, err)
 	defer response.Body.Close()
 
 	assert.Equal(t, http.StatusNotFound, response.StatusCode)
+	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 }
 
 func TestGateway_HealthEndpointRejectsUnsupportedMethod(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return true }))
+	server := httptest.NewServer(newHandler(func() bool { return true }, nil, slog.Default()))
 	t.Cleanup(server.Close)
 
 	request, err := http.NewRequest(http.MethodPost, server.URL+"/health/live", nil)
@@ -100,14 +110,33 @@ func TestGateway_HealthEndpointRejectsUnsupportedMethod(t *testing.T) {
 	defer response.Body.Close()
 
 	assert.Equal(t, http.StatusMethodNotAllowed, response.StatusCode)
+	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 }
 
 func TestGateway_ConfigUsesSafeDefaults(t *testing.T) {
-	cfg, err := loadConfig(func(string) string { return "" })
+	cfg, err := loadConfig(func(name string) string {
+		return map[string]string{"COORDINATOR_URL": "http://coordinator:8080"}[name]
+	})
 	require.NoError(t, err)
 
 	assert.Equal(t, ":8080", cfg.address)
 	assert.Equal(t, 10*time.Second, cfg.shutdownTimeout)
+	assert.Equal(t, 5*time.Second, cfg.upstreamTimeout)
+	assert.Equal(t, "http://coordinator:8080", cfg.coordinatorURL.String())
+}
+
+func TestGateway_ConfigRejectsMissingCoordinator(t *testing.T) {
+	_, err := loadConfig(func(string) string { return "" })
+
+	require.ErrorContains(t, err, "COORDINATOR_URL is required")
+}
+
+func TestGateway_ConfigRejectsCoordinatorCredentials(t *testing.T) {
+	_, err := loadConfig(func(name string) string {
+		return map[string]string{"COORDINATOR_URL": "http://user:password@coordinator:8080"}[name]
+	})
+
+	require.ErrorContains(t, err, "COORDINATOR_URL")
 }
 
 func TestGateway_ConfigRejectsInvalidAddress(t *testing.T) {
@@ -136,18 +165,17 @@ func TestGateway_ConfigRejectsInvalidShutdownTimeout(t *testing.T) {
 
 func TestGateway_ConfigAcceptsExplicitValues(t *testing.T) {
 	cfg, err := loadConfig(func(name string) string {
-		switch name {
-		case "GATEWAY_ADDR":
-			return "127.0.0.1:9090"
-		case "GATEWAY_SHUTDOWN_TIMEOUT":
-			return "3s"
-		default:
-			return ""
-		}
+		return map[string]string{
+			"GATEWAY_ADDR": "127.0.0.1:9090",
+			"GATEWAY_SHUTDOWN_TIMEOUT": "3s",
+			"GATEWAY_UPSTREAM_TIMEOUT": "2s",
+			"COORDINATOR_URL": "https://coordinator.internal:8443",
+		}[name]
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, "127.0.0.1:9090", cfg.address)
 	assert.Equal(t, 3*time.Second, cfg.shutdownTimeout)
+	assert.Equal(t, 2*time.Second, cfg.upstreamTimeout)
+	assert.Equal(t, "https://coordinator.internal:8443", cfg.coordinatorURL.String())
 }
-
