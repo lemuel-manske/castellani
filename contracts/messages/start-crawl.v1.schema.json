@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "start-crawl.v1.schema.json",
+  "title": "StartCrawl",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "correlationId",
+    "type",
+    "version",
+    "occurredAt",
+    "payload"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "const": "StartCrawl"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "seedUrl",
+        "maxDepth",
+        "maxPages"
+      ],
+      "properties": {
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seedUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxPages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "collectionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowedOrigins": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "authGeneration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "normalizerVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

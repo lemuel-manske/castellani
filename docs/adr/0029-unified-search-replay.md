@@ -23,4 +23,4 @@ Search never mutates immutable WARC/WACZ artifacts. Within-page match highlighti
 
 One query implementation supports global, per-collection, and per-archive search, reducing divergent behavior and maintenance overhead. All application search scopes depend on OpenSearch; there is deliberately no fallback to ReplayWeb.page local search when the index is unavailable.
 
-This ADR defines search ownership and result semantics, not exact HTTP query parameter names, OpenSearch mappings, analyzer selection, ranking weights, snippet format, or frontend presentation. Detailed public APIs and message schemas belong in `contracts/`.
+The unified `/search` API and filter/result contract are specified in [OpenAPI 3.1](../../contracts/openapi/api.yaml). OpenSearch mappings, analyzer selection, ranking weights, and frontend presentation remain implementation details. Search must not expose a result until the corresponding WACZ has been durably activated for replay under ADR-0027.

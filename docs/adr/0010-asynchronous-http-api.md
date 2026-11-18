@@ -17,7 +17,7 @@ Acceptance means that the operation is registered for asynchronous execution, no
 
 Clients query operation status through HTTP. The Gateway forwards status queries to the Coordinator rather than reading its database. Search queries likewise use HTTP to reach the owning service. HTTP polling is the initial progress mechanism; Server-Sent Events may be added later without replacing the authoritative status endpoint.
 
-The Gateway remains stateless. An admission failure must not be reported as successful acceptance. Exact endpoint paths, response bodies, idempotent submission semantics, and status representations belong to the API specification.
+The Gateway remains stateless. An admission failure must not be reported as successful acceptance. Public HTTP operations are specified in [OpenAPI 3.1](../../contracts/openapi/api.yaml). The client must supply an `Idempotency-Key` on `POST /archives`; the Coordinator durably maps a key and canonical request fingerprint to one accepted run. The same key with an identical request returns the same accepted archive; the same key with a different request fails with HTTP `409`. Keys are retained for at least 24 hours. Public errors follow RFC 9457 Problem Details, and collection/run status distinguishes archive completion from search readiness.
 
 ## Consequences
 

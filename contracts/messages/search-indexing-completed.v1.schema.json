@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "search-indexing-completed.v1.schema.json",
+  "title": "SearchIndexingCompleted",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "correlationId",
+    "type",
+    "version",
+    "occurredAt",
+    "payload"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "const": "SearchIndexingCompleted"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "manifestDigest",
+        "expected",
+        "indexed",
+        "failed",
+        "unsupported"
+      ],
+      "properties": {
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestDigest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "indexed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsupported": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

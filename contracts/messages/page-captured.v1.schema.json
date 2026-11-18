@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "page-captured.v1.schema.json",
+  "title": "PageCaptured",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "correlationId",
+    "type",
+    "version",
+    "occurredAt",
+    "payload"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "const": "PageCaptured"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "snapshotId",
+        "urlKey",
+        "url",
+        "capturedAt",
+        "warcArtifacts"
+      ],
+      "properties": {
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "urlKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "finalUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "capturedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "warcArtifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "../archive-manifest.v1.schema.json#/$defs/ArtifactRef"
+          }
+        }
+      }
+    }
+  }
+}

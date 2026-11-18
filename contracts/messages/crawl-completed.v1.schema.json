@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "crawl-completed.v1.schema.json",
+  "title": "CrawlCompleted",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "correlationId",
+    "type",
+    "version",
+    "occurredAt",
+    "payload"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "const": "CrawlCompleted"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "manifest",
+        "manifestDigest",
+        "seedSucceeded",
+        "capturedCount",
+        "failedCount"
+      ],
+      "properties": {
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest": {
+          "$ref": "../archive-manifest.v1.schema.json#/$defs/ArtifactRef"
+        },
+        "manifestDigest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seedSucceeded": {
+          "type": "boolean"
+        },
+        "capturedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failedCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

@@ -35,7 +35,7 @@ Transient indexing failures use bounded, configurable execution retries and dura
 
 ### Publication and subsequent repair
 
-Index documents are prepared incrementally but remain excluded from public search until the Coordinator's durable publication decision. The Indexer activates search visibility independently and may do so after archival replay is already available under ADR-0027. Document existence in OpenSearch alone is not sufficient proof of public visibility. Search activation acknowledgements must satisfy the agreed searchable-visibility guarantee, including any necessary index-refresh or query-consistency handling.
+Index documents are prepared incrementally but remain excluded from public search until the Coordinator's durable publication decision **and Capture's durable `ArchivePublished` replay acknowledgment** for the matching package. The Indexer activates search visibility independently and may do so after archival replay is already available under ADR-0027. Document existence in OpenSearch alone is not sufficient proof of public visibility. Search activation acknowledgements must satisfy the agreed searchable-visibility guarantee, including any necessary index-refresh or query-consistency handling.
 
 After an archive is committed, failed or outdated search projections may be repaired by reindexing existing immutable snapshots without recapturing the source page or creating a new historical snapshot. Repair must respect the run's publication authorization and cannot expose results from an aborted or compensated run. The detailed mechanism for updating client-facing indexing status after repair is specified separately.
 
