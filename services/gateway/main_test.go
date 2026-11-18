@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -14,44 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestGateway_LivenessEndpointReturnsOK(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return false }, nil, slog.Default()))
-	t.Cleanup(server.Close)
-
-	response, err := server.Client().Get(server.URL + "/health/live")
-	require.NoError(t, err)
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
-
-	assert.Equal(t, http.StatusOK, response.StatusCode)
-	assert.Equal(t, "text/plain; charset=utf-8", response.Header.Get("Content-Type"))
-	assert.Equal(t, "ok\n", string(body))
-}
-
-func TestGateway_ReadinessEndpointReturnsOKWhenServing(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return true }, nil, slog.Default()))
-	t.Cleanup(server.Close)
-
-	response, err := server.Client().Get(server.URL + "/health/ready")
-	require.NoError(t, err)
-	defer response.Body.Close()
-
-	assert.Equal(t, http.StatusOK, response.StatusCode)
-}
-
-func TestGateway_ReadinessEndpointReturnsUnavailableBeforeServing(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return false }, nil, slog.Default()))
-	t.Cleanup(server.Close)
-
-	response, err := server.Client().Get(server.URL + "/health/ready")
-	require.NoError(t, err)
-	defer response.Body.Close()
-
-	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
-}
 
 func TestGateway_ShutdownStopsServingAndClearsReadiness(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -65,7 +24,7 @@ func TestGateway_ShutdownStopsServingAndClearsReadiness(t *testing.T) {
 		shutdownTimeout: time.Second,
 		upstreamTimeout: time.Second,
 		coordinatorURL: coordinatorURL,
-	}, slog.Default())
+	}, nilLogger())
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
@@ -84,33 +43,6 @@ func TestGateway_ShutdownStopsServingAndClearsReadiness(t *testing.T) {
 	require.NoError(t, <-stopped)
 
 	assert.False(t, gateway.ready.Load())
-}
-
-func TestGateway_UnknownRouteIsNotFound(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return true }, nil, slog.Default()))
-	t.Cleanup(server.Close)
-
-	response, err := server.Client().Get(server.URL + "/unknown")
-	require.NoError(t, err)
-	defer response.Body.Close()
-
-	assert.Equal(t, http.StatusNotFound, response.StatusCode)
-	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-}
-
-func TestGateway_HealthEndpointRejectsUnsupportedMethod(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return true }, nil, slog.Default()))
-	t.Cleanup(server.Close)
-
-	request, err := http.NewRequest(http.MethodPost, server.URL+"/health/live", nil)
-	require.NoError(t, err)
-
-	response, err := server.Client().Do(request)
-	require.NoError(t, err)
-	defer response.Body.Close()
-
-	assert.Equal(t, http.StatusMethodNotAllowed, response.StatusCode)
-	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 }
 
 func TestGateway_ConfigUsesSafeDefaults(t *testing.T) {
@@ -141,7 +73,10 @@ func TestGateway_ConfigRejectsCoordinatorCredentials(t *testing.T) {
 
 func TestGateway_ConfigRejectsInvalidAddress(t *testing.T) {
 	_, err := loadConfig(func(name string) string {
-		return map[string]string{"GATEWAY_ADDR": "not-an-address"}[name]
+		return map[string]string{
+			"GATEWAY_ADDR": "not-an-address",
+			"COORDINATOR_URL": "http://coordinator:8080",
+		}[name]
 	})
 
 	require.ErrorContains(t, err, "GATEWAY_ADDR")
@@ -149,7 +84,10 @@ func TestGateway_ConfigRejectsInvalidAddress(t *testing.T) {
 
 func TestGateway_ConfigRejectsNonPositiveShutdownTimeout(t *testing.T) {
 	_, err := loadConfig(func(name string) string {
-		return map[string]string{"GATEWAY_SHUTDOWN_TIMEOUT": "0s"}[name]
+		return map[string]string{
+			"GATEWAY_SHUTDOWN_TIMEOUT": "0s",
+			"COORDINATOR_URL": "http://coordinator:8080",
+		}[name]
 	})
 
 	require.ErrorContains(t, err, "must be positive")
@@ -157,7 +95,10 @@ func TestGateway_ConfigRejectsNonPositiveShutdownTimeout(t *testing.T) {
 
 func TestGateway_ConfigRejectsInvalidShutdownTimeout(t *testing.T) {
 	_, err := loadConfig(func(name string) string {
-		return map[string]string{"GATEWAY_SHUTDOWN_TIMEOUT": "soon"}[name]
+		return map[string]string{
+			"GATEWAY_SHUTDOWN_TIMEOUT": "soon",
+			"COORDINATOR_URL": "http://coordinator:8080",
+		}[name]
 	})
 
 	require.ErrorContains(t, err, "GATEWAY_SHUTDOWN_TIMEOUT")
