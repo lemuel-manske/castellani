@@ -59,9 +59,9 @@ stateDiagram-v2
     RUNNING --> FINALIZING: Terminal crawl outcome
 
     state "Awaiting replay publication" as ReplayPending
-    FINALIZING --> ReplayPending: Seed succeeded and WACZ validated; commit PUBLISH
-    ReplayPending --> COMPLETED: Capture confirms replay; no archive errors
-    ReplayPending --> COMPLETED_WITH_ERRORS: Capture confirms replay; partial archive errors
+    FINALIZING --> ReplayPending: Validated WACZ and seed - commit PUBLISH
+    ReplayPending --> COMPLETED: Replay published - no archive errors
+    ReplayPending --> COMPLETED_WITH_ERRORS: Replay published - partial archive errors
 
     ACCEPTED --> COMPENSATING: Commit COMPENSATE
     RUNNING --> COMPENSATING: Commit COMPENSATE
