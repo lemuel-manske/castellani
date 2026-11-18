@@ -26,27 +26,30 @@ Correctness must not depend on a service having exactly one running replica. The
 flowchart LR
     Client[HTTP client] -->|HTTP| Gateway[Gateway - Go]
     Gateway -->|HTTP admission and status| Coordinator[Coordinator - Go]
-    Gateway -->|HTTP session and replay| Capture[Capture - Python]
+    Gateway -->|HTTP login sessions| Login[Login manager - Python]
+    Gateway -->|HTTP replay| Replay[Capture replay endpoint - Python]
     Gateway -->|HTTP search| Search[Search and Index - TypeScript]
 
-    Coordinator -->|Commands through RabbitMQ| Broker[(RabbitMQ)]
-    Capture <-->|Page work and events| Broker
-    Broker -->|Publication and capture events| Search
-    Broker -->|Capture and search outcomes| Coordinator
+    Coordinator -->|Commands and decisions| Broker[(RabbitMQ)]
+    Broker -->|Page and crawl work| Workers[Capture workers - Python]
+    Workers -->|Capture and indexing events| Broker
+    Broker -->|Archive outcomes| Coordinator
+    Broker -->|Snapshot and publication events| Search
 
     Coordinator --> CDB[(Coordinator-owned DynamoDB)]
-    Capture --> PDB[(Capture-owned DynamoDB)]
+    Login --> PDB[(Capture-owned DynamoDB)]
+    Replay --> PDB
+    Workers --> PDB
     Search --> SDB[(Search-owned DynamoDB)]
-    Capture --> S3[(Private S3 - WARC and WACZ)]
+    Workers --> S3[(Private S3 - WARC and WACZ)]
+    Replay --> S3
     Search --> OS[(OpenSearch)]
 
-    subgraph CaptureDeployment [Capture deployment]
-      Capture
-      Login[Login manager - separate process]
-      Workers[Scalable capture workers]
+    subgraph CaptureDeployment [Capture - one logical service]
+      Login
+      Replay
+      Workers
     end
-    Login --> Capture
-    Workers --> Capture
 ```
 
 The deployment has **four logical services**, although Capture runs separate login-manager and scalable worker processes. Each stateful service owns its DynamoDB tables; arrows represent logical dependencies, not direct access to another service's tables. This diagram intentionally omits retry queues and internal API endpoints.
