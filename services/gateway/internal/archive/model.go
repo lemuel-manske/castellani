@@ -54,8 +54,20 @@ func (s Submission) Validate() error {
 	return nil
 }
 
+const (
+	ArchivesPath = "/archives"
+	ArchivePath = "/archives/{archiveId}"
+	ArchivePathPrefix = "/archives/"
+	ArchiveIDParameter = "archiveId"
+	AcceptedStatus = "ACCEPTED"
+	IdempotencyHeader = "Idempotency-Key"
+)
+
 func ValidID(id string) bool {
-	return id != "" && id != "." && id != ".." && !strings.ContainsAny(id, "/\\")
+	reserved := id == "" || id == "." || id == ".."
+	containsSeparator := strings.ContainsAny(id, "/\\\\")
+	
+	return !reserved && !containsSeparator
 }
 
 func validURL(raw string) bool {
