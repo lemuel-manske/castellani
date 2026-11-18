@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
@@ -44,8 +43,8 @@ func NewRouter(ready func() bool, app application.Application, logger *slog.Logg
 	})
 
 	archives := archiveapi.NewHandler(app)
-	router.Post(archive.ArchivesPath, archives.Create)
-	router.Get(archive.ArchivePath, archives.Status)
+	router.Post(httpx.ArchivesPath, archives.Create)
+	router.Get(httpx.ArchivePath, archives.Status)
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist.")
