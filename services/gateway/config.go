@@ -43,11 +43,15 @@ func loadConfig(getenv func(string) string) (config, error) {
 
 	var err error
 
-	if cfg.shutdownTimeout, err = durationSetting(getenv, shutdownEnvironment, cfg.shutdownTimeout); err != nil {
+	cfg.shutdownTimeout, err = durationSetting(getenv, shutdownEnvironment, cfg.shutdownTimeout)
+
+	if err != nil {
 		return config{}, err
 	}
 
-	if cfg.upstreamTimeout, err = durationSetting(getenv, upstreamEnvironment, cfg.upstreamTimeout); err != nil {
+	cfg.upstreamTimeout, err = durationSetting(getenv, upstreamEnvironment, cfg.upstreamTimeout)
+
+	if err != nil {
 		return config{}, err
 	}
 
