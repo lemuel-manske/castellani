@@ -50,6 +50,27 @@ Compensation commands and their acknowledgements must be idempotent and resumabl
 
 Cancellation is not instantaneous. Late events, expired execution attempts, duplicated messages, and delayed workers must be prevented from restoring compensated state or reintroducing uncommitted artifacts after cleanup. Exact fencing, drain, and cleanup-order mechanisms are defined separately.
 
+## Irreversible SAGA choice
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACCEPTED
+    ACCEPTED --> RUNNING
+    RUNNING --> FINALIZING: Crawl reaches terminal outcome
+    FINALIZING --> PUBLISH_DECIDED: Seed succeeded; WACZ validated; atomic PUBLISH
+    ACCEPTED --> COMPENSATING: Prepublication run-wide failure; atomic COMPENSATE
+    RUNNING --> COMPENSATING: Prepublication run-wide failure; atomic COMPENSATE
+    FINALIZING --> COMPENSATING: Prepublication run-wide failure; atomic COMPENSATE
+    PUBLISH_DECIDED --> COMPLETED: Capture confirms replay; no archival errors
+    PUBLISH_DECIDED --> COMPLETED_WITH_ERRORS: Capture confirms replay; partial capture errors
+    COMPENSATING --> COMPENSATED: Capture and Search cleanup acknowledged
+    COMPLETED --> [*]
+    COMPLETED_WITH_ERRORS --> [*]
+    COMPENSATED --> [*]
+```
+
+The **decision** (`PUBLISH` or `COMPENSATE`) is stored separately from the public lifecycle status. Once `PUBLISH` is committed, recovery retries publication; it never takes the compensation path. `WAITING_FOR_AUTH` is a recoverable page-level blocking condition, not an irreversible run-wide SAGA decision. Indexing completion is not on the publication path.
+
 ## Consequences
 
 The design preserves successful page captures despite isolated failures and makes partial outcomes explicit to clients. It supports incremental indexing while avoiding prematurely published archives and distinguishes a completed rollback from a failed run with pending cleanup.
