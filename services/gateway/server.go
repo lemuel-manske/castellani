@@ -10,7 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/lemuel-manske/unnamed/services/gateway/api"
+	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 )
 
 type gatewayServer struct {
@@ -21,9 +23,10 @@ type gatewayServer struct {
 
 func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	gateway := &gatewayServer{shutdownTimeout: cfg.shutdownTimeout}
-	archives := newArchiveHandler(cfg.coordinatorURL, cfg.upstreamTimeout)
+	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
+	app := application.NewApplication(coordinatorClient)
 	gateway.http = &http.Server{
-		Handler:           newHandler(gateway.ready.Load, archives, logger),
+		Handler:           api.NewRouter(gateway.ready.Load, app, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		IdleTimeout:       60 * time.Second,
@@ -62,35 +65,4 @@ func (g *gatewayServer) serve(ctx context.Context, listener net.Listener) error 
 	}
 
 	return shutdownErr
-}
-
-func newHandler(ready func() bool, archives *archiveHandler, logger *slog.Logger) http.Handler {
-	router := chi.NewRouter()
-	router.Use(requestID)
-	router.Use(recoverPanics(logger))
-
-	router.Get("/health/live", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok\n"))
-	})
-	router.Get("/health/ready", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		if !ready() {
-			http.Error(w, "unavailable", http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok\n"))
-	})
-	router.Post("/archives", archives.create)
-	router.Get("/archives/{archiveId}", archives.status)
-
-	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		writeProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist.")
-	})
-	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		writeProblem(w, r, http.StatusMethodNotAllowed, "method-not-allowed", "Method Not Allowed", "The method is not supported for this resource.")
-	})
-	return router
 }
