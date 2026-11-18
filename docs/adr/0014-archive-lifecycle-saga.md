@@ -17,14 +17,14 @@ Use an orchestrated SAGA owned by the Go Archive Coordinator, with one durable S
 
 The run progresses through the conceptual states `ACCEPTED`, `RUNNING`, and `FINALIZING` before reaching `COMPLETED` or `COMPLETED_WITH_ERRORS`. A pre-publication run-wide failure transitions to `COMPENSATING` and reaches `COMPENSATED` only after all required cleanup is durably confirmed.
 
-- `COMPLETED`: the run was published without terminal page-level failures.
-- `COMPLETED_WITH_ERRORS`: the run was published, but at least one page failed capture or indexing.
+- `COMPLETED`: the run's validated archival package was published without terminal capture/preservation failures.
+- `COMPLETED_WITH_ERRORS`: the run's validated archival package was published, but one or more secondary pages or required resources had terminal capture/preservation failures. Search indexing failures are tracked separately and do not change the archive outcome.
 - `COMPENSATING`: cleanup is still in progress; the run is not terminal.
 - `COMPENSATED`: required rollback is complete; the archive run was unsuccessful, and no staged result remains publicly available.
 
 The public archive outcome and internal SAGA state are separate concepts. A compensated run is publicly `FAILED`, not `COMPLETED`. The specific public API status representation is defined separately.
 
-Crawling and indexing are concurrent activities, not mutually exclusive sequential SAGA states. The Coordinator transitions toward finalization only after Python has reported a terminal crawl outcome and TypeScript has durably accounted for all captured pages expected to be indexed, whether indexed successfully or terminally failed. A crawl-completed event alone does not prove indexing completion.
+Crawling and indexing are concurrent activities, not mutually exclusive sequential SAGA states. The Coordinator transitions toward archival finalization after Python reports a terminal crawl outcome and prepares a validated WACZ package. Indexer accounting and eventual search visibility are independent derived outcomes: a crawl-completed event does not prove indexing completion, but indexing completion is **not** a prerequisite for archive publication (ADR-0027).
 
 ### Page-level fault isolation
 
@@ -36,11 +36,11 @@ A failed seed capture or a run-wide integrity failure can cause compensation. Te
 
 ### Publication boundary
 
-Captured artifacts and index documents are staged while the run is active. Public historical retrieval and search must exclude staged versions until the run is committed. A run is eligible for publication only after the mandatory seed is captured and all admitted page tasks and required index attempts have reached terminal outcomes.
+Captured artifacts and index documents are staged while the run is active. Public historical retrieval and search must exclude staged versions until the run is committed. A run is eligible for publication only after the mandatory seed is captured, all admitted crawl tasks have terminal outcomes, and Capture has durably prepared and validated its WACZ package. OpenSearch availability and indexing completion are not publication gates.
 
-The Coordinator durably records an irreversible publication decision before requesting the participating services to publish their prepared results. Once this decision is recorded, transient publication failures are resolved by retrying/reconciling publication rather than by compensating already-authorized results. The Coordinator records `COMPLETED` or `COMPLETED_WITH_ERRORS` only after the required publication acknowledgements.
+The Coordinator durably records an irreversible publication decision before requesting replay publication and search activation. Once this decision is recorded, transient publication failures are resolved by retrying/reconciling rather than by compensating already-authorized results. The Coordinator records `COMPLETED` or `COMPLETED_WITH_ERRORS` after **Capture confirms archival replay publication**; Indexer search activation can converge later. Index progress and search health are exposed separately.
 
-The published-state check must be enforced by retrieval and search paths; the mere presence of an artifact in S3 or a document in OpenSearch must not make staged content publicly visible. The precise publication and visibility protocol is defined separately.
+The published-state check must be enforced by retrieval and search paths; the mere presence of an artifact in S3 or a document in OpenSearch must not make staged content publicly visible. The precise publication and visibility protocol is defined in ADR-0027; search API ownership is defined in ADR-0029.
 
 ### Compensation boundary
 

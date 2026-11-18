@@ -32,7 +32,12 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0022 — Custom distributed web crawler and page execution](0022-custom-distributed-crawler.md)
 - [0023 — Standard web archive recording, packaging, and replay](0023-web-archive-formats-replay.md)
 - [0024 — Application tooling and Terraform-first infrastructure](0024-application-tooling-terraform.md)
+- [0025 — URL identity, navigation scope, and crawl depth](0025-url-identity-scope-depth.md)
+- [0026 — Capture-local WARC recording and fidelity verification](0026-capture-local-warc-recording.md)
+- [0027 — Archive publication, WACZ packaging, and replay visibility](0027-archive-publication-replay.md)
+- [0028 — Interactive authentication execution and profile protection](0028-interactive-auth-infrastructure.md)
+- [0029 — Unified full-text search and historical replay navigation](0029-unified-search-replay.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
-Further decisions, including URL identity and normalization, exact crawl depth semantics, detailed SAGA publication protocols, and concrete storage/recovery algorithms, will be documented separately.
+Concrete API and event schemas, DynamoDB key layouts, recording integration validation, retry/reconciliation algorithms, and site-specific crawling policies remain implementation work. Frontend experience and presentation are intentionally deferred.

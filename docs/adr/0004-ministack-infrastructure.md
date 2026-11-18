@@ -9,10 +9,10 @@ The assignment permits local AWS emulation with MiniStack and requires reproduci
 
 ## Decision
 
-Use MiniStack as the local AWS-compatible infrastructure target. AWS resources will be created by version-controlled scripts or infrastructure as code, not manually. Docker Compose will start the complete local environment. Service endpoints, resource names, and credentials will come from configuration rather than hard-coded values.
+Use MiniStack as the local AWS-compatible infrastructure target. AWS resources will be created using Terraform from the beginning where supported (ADR-0024), with version-controlled provisioning fallbacks for emulator/provider gaps, never by undocumented manual setup. Docker Compose will start the complete local environment. Service endpoints, resource names, and credentials will come from configuration rather than hard-coded values.
 
 RabbitMQ will run as a separate container because it is not an AWS service.
 
 ## Consequences
 
-The application can use AWS SDKs while remaining locally deployable. MiniStack's service support and behavior must be tested for each selected API; emulation is not proof of full AWS feature parity. The choice of Terraform versus another provisioning mechanism and any container orchestration beyond Compose are independent decisions.
+The application can use AWS SDKs while remaining locally deployable. MiniStack's service support and behavior must be tested for each selected API; emulation is not proof of full AWS feature parity. Terraform-first provisioning is selected in ADR-0024. Emulator/provider parity must be checked using functional tests, and Docker Compose remains the reference orchestration choice in ADR-0016.

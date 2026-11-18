@@ -14,7 +14,7 @@ Use a monorepo with the following directory conventions:
 - `services/<name>/`: each uniquely named service owns its source code, tests, dependency manifests and lockfiles, and Dockerfile.
 - `contracts/`: language-neutral cross-service message and API contracts, not executable shared implementation.
 - `docker/`: Docker Compose files and deployment-specific Docker configuration.
-- `infra/`: cloud infrastructure provisioning, including Terraform if adopted.
+- `infra/`: cloud infrastructure provisioning, including the selected Terraform configuration (ADR-0024).
 - `docs/`: documentation and ADRs.
 - `scripts/`: repository-level development and automation commands.
 - `tests/`: cross-service integration and end-to-end tests; service-local tests remain in their services.
