@@ -29,6 +29,9 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0019 — Incremental indexing and completion coordination](0019-incremental-indexing-completion.md)
 - [0020 — Reliable messaging and idempotent processing](0020-reliable-messaging.md)
 - [0021 — Distributed concurrency control and browser capacity reservations](0021-distributed-concurrency-browser-capacity.md)
+- [0022 — Custom distributed web crawler and page execution](0022-custom-distributed-crawler.md)
+- [0023 — Standard web archive recording, packaging, and replay](0023-web-archive-formats-replay.md)
+- [0024 — Application tooling and Terraform-first infrastructure](0024-application-tooling-terraform.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
