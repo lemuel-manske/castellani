@@ -23,6 +23,31 @@ The Python Capture service owns a distributed crawl frontier. The frontier is a 
 - Crawl termination is derived from authoritative, durable accounting of admitted and terminal tasks, not RabbitMQ queue emptiness. The terminal decision must exclude subsequent admission of new work.
 - Capture and indexing progress independently: a durably captured page may be announced for indexing before the overall crawl terminates. Go observes the aggregate crawl outcome without owning individual page scheduling.
 
+## Work admission and termination
+
+```mermaid
+flowchart TD
+    Discover[Discovered navigation link] --> Normalize[Normalize navigation identity]
+    Normalize --> Admit{Conditional frontier operation}
+    Admit -->|New and within limits| Record[Create task and durable outbox entry]
+    Admit -->|Already admitted| Depth{Shorter discovered path?}
+    Depth -->|Yes| Reevaluate[Persist shorter depth and reevaluation work]
+    Depth -->|No| Duplicate[No additional capture task]
+    Record --> Queue[(RabbitMQ competing queue)]
+    Queue --> Workers[Independent Capture workers]
+    Workers --> Lease[Claim task lease and fencing generation]
+    Lease --> Capture[Capture page and discover outgoing links]
+    Capture --> Discover
+    Capture --> Commit[Conditionally commit capture and discovery accounting]
+    Reevaluate --> Accounting[Durable outstanding-work accounting]
+    Commit --> Accounting
+    Accounting --> Closed{No unfinished page, discovery, or reevaluation work?}
+    Closed -->|No| Continue[Keep admission open and continue processing]
+    Closed -->|Yes; atomic closure| Manifest[Close admission and write final manifest]
+```
+
+RabbitMQ only distributes notifications. **Capture-owned DynamoDB is authoritative** for unique task admission, page limits, leases, minimum-depth corrections, and whether the crawl can terminate. The closure condition includes unfinished discovery and re-evaluation, not merely an empty queue or zero active browsers. The loop is conceptual; completed work is never blindly requeued.
+
 ## Consequences
 
 Any Python replica can contribute work without a dedicated scheduler, and a crashed replica does not erase frontier state. Atomic admission prevents duplicate logical tasks and exceeding crawl limits. Shared DynamoDB state introduces write contention, particularly around crawl-wide limits and completion accounting; this is an accepted trade-off for the expected workload.

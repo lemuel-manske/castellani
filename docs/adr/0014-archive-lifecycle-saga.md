@@ -50,6 +50,37 @@ Compensation commands and their acknowledgements must be idempotent and resumabl
 
 Cancellation is not instantaneous. Late events, expired execution attempts, duplicated messages, and delayed workers must be prevented from restoring compensated state or reintroducing uncommitted artifacts after cleanup. Exact fencing, drain, and cleanup-order mechanisms are defined separately.
 
+## Irreversible SAGA choice
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACCEPTED
+    ACCEPTED --> RUNNING: Start crawl
+    RUNNING --> FINALIZING: Terminal crawl outcome
+
+    state "Awaiting replay publication" as ReplayPending
+    FINALIZING --> ReplayPending: Validated WACZ and seed - commit PUBLISH
+    ReplayPending --> COMPLETED: Replay published - no archive errors
+    ReplayPending --> COMPLETED_WITH_ERRORS: Replay published - partial archive errors
+
+    ACCEPTED --> COMPENSATING: Commit COMPENSATE
+    RUNNING --> COMPENSATING: Commit COMPENSATE
+    FINALIZING --> COMPENSATING: Commit COMPENSATE
+    COMPENSATING --> COMPENSATED: Capture and Search cleanup confirmed
+
+    note right of ReplayPending
+        Internal phase only
+        Public status remains FINALIZING
+        Decision PUBLISH is irreversible
+    end note
+
+    COMPLETED --> [*]
+    COMPLETED_WITH_ERRORS --> [*]
+    COMPENSATED --> [*]
+```
+
+The **decision** (`PUBLISH` or `COMPENSATE`) is stored separately from public lifecycle status. The diagram's **Awaiting replay publication** node represents `decision=PUBLISH` while the externally visible run remains `FINALIZING`; it is **not** an additional public status. Only `FINALIZING` with a terminal crawl and validated WACZ can choose publication. Once `PUBLISH` is committed, recovery retries publication; it never takes the compensation path. `WAITING_FOR_AUTH` is a recoverable page-level blocking condition, not a SAGA state. Indexing completion is not on the publication path.
+
 ## Consequences
 
 The design preserves successful page captures despite isolated failures and makes partial outcomes explicit to clients. It supports incremental indexing while avoiding prematurely published archives and distinguishes a completed rollback from a failed run with pending cleanup.

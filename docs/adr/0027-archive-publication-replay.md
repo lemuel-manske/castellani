@@ -33,6 +33,32 @@ Use **self-hosted ReplayWeb.page** as the historical page replay engine, loading
 
 Treat WACZ contents as potentially sensitive, especially authenticated page records. Isolate the replay execution origin from application credentials and APIs and ensure that staged/compensated archives cannot be downloaded or replayed. Detailed UI design is explicitly deferred.
 
+## Publication and search-visibility ordering
+
+```mermaid
+flowchart TD
+    WARC["Authorized WARC segments and terminal crawl"] --> WACZ["Capture builds and validates private WACZ"]
+    WACZ --> Prepared["Capture commits PREPARED and ArchivePrepared outbox"]
+    Prepared --> Decision{"Coordinator conditional SAGA decision"}
+    Decision -->|PUBLISH committed| PublishedDecision["ArchivePublicationDecided event"]
+    Decision -->|Prepublication abort| Compensation["COMPENSATE path in ADR-0014"]
+
+    PublishedDecision -->|Event delivered| CapturePublish["Capture validates decision and package digest"]
+    CapturePublish --> Replay["Capture commits PUBLISHED and ArchivePublished outbox"]
+    Replay --> Access["Authorized WACZ byte-range retrieval"]
+    Replay -->|ArchivePublished delivered| CoordinatorDone["Coordinator records COMPLETED or COMPLETED_WITH_ERRORS"]
+
+    PublishedDecision -->|Event delivered| SearchAuth["Search records publish authorization"]
+    Replay -->|ArchivePublished delivered| SearchReplay["Search records replay-published fact"]
+    SearchAuth --> Gate{"Matching publication facts and indexed snapshot?"}
+    SearchReplay --> Gate
+    Indexed["PageCaptured and manifest reconciliation"] --> Gate
+    Gate -->|Yes| Visible["Expose eligible search results"]
+    Gate -->|Not yet| Hidden["Keep results hidden and reconcile"]
+```
+
+This is a **dependency graph**, not a message-delivery timeline. All named cross-service events use the existing transactional outbox and RabbitMQ fan-out; the arrows denote logical prerequisites, not synchronous calls or delivery order. Search may receive `ArchivePublished` before `ArchivePublicationDecided` and must store both independently. Eligible indexed snapshots may become searchable after both matching publication facts are durable; **aggregate `SearchReady` can occur later**. Publication authorizes retrieval from the same private S3 object without copying it to a public bucket. A failed Search service never blocks archive completion.
+
 ## Consequences
 
 The archive's authoritative deliverable is the preserved, validated WACZ; full-text search is a recoverable derivative. A client can access published archives while the Indexer is recovering. This intentionally supersedes the earlier assumption in ADR-0014/0019 that all indexing results must settle before archive publication.
