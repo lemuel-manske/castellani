@@ -1,7 +1,5 @@
-# unnamed
+# Distributed Web Archive
 
-Some ideas:
+A self-hosted distributed system for crawling, preserving, and searching historical web content, including dynamic and authenticated pages. Go coordinates asynchronous archive runs, Python Capture workers discover and record pages into WARC/WACZ, and a TypeScript service indexes searchable snapshots. RabbitMQ distributes work; DynamoDB, S3, and OpenSearch provide durable state, archival storage, and retrieval.
 
-- OpenGrid - Distributed Computing: Independent computers cooperate to execute computationally expensive scientific workloads. The hardest problems are scheduling, load balancing, worker failures, and result correctness.
-- Continuum - Delay-Tolerant Networking: Nodes communicate without a continuously available network path. The hardest problems are decentralized routing, message persistence, intermittent connectivity, and eventual delivery.
-- SwarmVault - Decentralized Storage: Independent computers contribute storage to a fault-tolerant backup network. The hardest problems are data placement, replication, peer discovery, integrity, and recovery.
+Architecture and decisions: **[ADRs](docs/adr/README.md)**. Implementation-facing specifications: [backend invariants and recovery](docs/backend/README.md), [HTTP API](contracts/openapi/api.yaml), and [message contracts](contracts/messages/README.md).
