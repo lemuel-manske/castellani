@@ -184,6 +184,12 @@ paths:
       tags: [Sessions]
       operationId: createSession
       summary: Start short-lived target-site interactive authentication
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 200}
+          description: Repeated requests with the same key and body return the same session during the retention period.
       requestBody:
         required: true
         content:
@@ -197,7 +203,7 @@ paths:
                 targetUrl: {type: string, format: uri}
       responses:
         '201':
-          description: Session created; browser transport is implementation-defined
+          description: Session created or replay of the prior session-creation response; browser transport is implementation-defined
           headers:
             Location: {schema: {type: string}}
           content:
