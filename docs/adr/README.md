@@ -24,6 +24,8 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0014 — Archive lifecycle and orchestrated SAGA](0014-archive-lifecycle-saga.md)
 - [0015 — Interactive authentication and resumable capture](0015-interactive-authenticated-capture.md)
 - [0016 — Containerized deployment and horizontal scaling](0016-containerized-deployment-scaling.md)
+- [0017 — Optional queue-based autoscaling of capture workers](0017-queue-based-autoscaling.md)
+- [0018 — Fault injection and failure verification](0018-fault-injection-verification.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
