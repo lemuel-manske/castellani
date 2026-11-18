@@ -35,7 +35,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		httpx.WriteProblem(w, r, http.StatusUnsupportedMediaType, "content-type", "Unsupported Media Type", "Expected application/json.")
+		httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
 		return
 	}
 
