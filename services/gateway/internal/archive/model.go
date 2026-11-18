@@ -52,14 +52,7 @@ func (s Submission) Validate() error {
 	return nil
 }
 
-const (
-	ArchivesPath = "/archives"
-	ArchivePath = "/archives/{archiveId}"
-	ArchivePathPrefix = "/archives/"
-	ArchiveIDParameter = "archiveId"
-	AcceptedStatus = "ACCEPTED"
-	IdempotencyHeader = "Idempotency-Key"
-)
+const AcceptedStatus = "ACCEPTED"
 
 func ValidID(id string) bool {
 	reserved := id == "" || id == "." || id == ".."
