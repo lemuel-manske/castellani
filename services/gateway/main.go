@@ -33,5 +33,5 @@ func run(logger *slog.Logger) error {
 	defer stop()
 
 	logger.Info("gateway listening", "address", listener.Addr().String())
-	return newGatewayServer(cfg).serve(ctx, listener)
+	return newGatewayServer(cfg, logger).serve(ctx, listener)
 }
