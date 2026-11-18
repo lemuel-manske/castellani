@@ -19,6 +19,7 @@ These are configurable initial defaults, not claims of production-grade availabi
 - Public API is defined in `contracts/openapi/api.yaml`; any server-side internal HTTP endpoints must be documented when introduced, but are not a separate public API.
 - The `Idempotency-Key` header is required for `POST /archives`. The same key plus semantically identical canonical request creates one run. Same key with changed canonical request returns 409; missing key returns 400.
 - An accepted archive returns 202, `archiveId`, and a status URL. Retry of an already accepted request returns the same 202 representation during key retention.
+- `POST /sessions` requires a session-creation `Idempotency-Key`, with the same request-digest/conflict semantics as archive admission; the Capture login manager must not start a duplicate browser on HTTP retries.
 - `PUT /sessions/{sessionId}` performs an idempotent desired-state update, initially `COMPLETED` or `CANCELLED`. Completing the same session more than once returns its prior finalized result; terminally failed/expired sessions cannot be resurrected.
 - Public errors use `application/problem+json` (RFC 9457); validation, auth, conflict, not-found and dependency outages must have distinguishable status/error types.
 - Search accepts optional filters `collectionId`, `archiveId`, `snapshotId`, `capturedFrom`, and `capturedTo`; all scope forms use the same response contract, ordering and snippet behavior.
