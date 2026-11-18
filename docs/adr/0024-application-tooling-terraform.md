@@ -30,7 +30,7 @@ All application and development dependencies **must be pinned to exact resolved 
 - **Terraform:** Pin Terraform CLI and provider versions, constrain provider versions to explicit selections, and commit `.terraform.lock.hcl`. Pin referenced modules by immutable versions or commit SHAs.
 - **Containers and tooling:** Pin base/service images to immutable digests where practical (otherwise exact tags with controlled updates), as well as linters, formatters, test runners, and other build tools. Dependency updates must be intentional and verified by tests.
 
-The first infrastructure milestone must exercise real DynamoDB conditional transactions, S3 operations, and OpenSearch **document indexing and search** end to end; successfully creating an emulated domain alone is insufficient. Confirm MiniStack's supported OpenSearch data-plane setup before depending on it. The first infrastructure milestone must exercise real DynamoDB conditional transactions, S3 operations, and OpenSearch **document indexing and search** end to end; successfully creating an emulated domain alone is insufficient. Confirm MiniStack's supported OpenSearch data-plane setup before depending on it.
+The first infrastructure milestone must exercise real DynamoDB conditional transactions, S3 operations, and OpenSearch **document indexing and search** end to end; successfully creating an emulated domain alone is insufficient. Confirm MiniStack's supported OpenSearch data-plane setup before depending on it.
 
 Avoid adding Celery or Temporal: RabbitMQ, the custom frontier, and the Go Coordinator already own delivery and orchestration responsibilities. No separate frontend application is required initially; interactive authentication must still provide a usable remote browser access mechanism under ADR-0015, with its delivery technology chosen separately.
 
@@ -38,6 +38,6 @@ Avoid adding Celery or Temporal: RabbitMQ, the custom frontier, and the Go Coord
 
 The application uses lightweight frameworks and explicit SDKs to keep distributed algorithms visible and testable. Terraform adds setup and provider-compatibility work at the beginning but produces reproducible infrastructure and supports the assignment's infrastructure-as-code bonus.
 
-The local MiniStack environment is an emulation target, not proof of AWS parity. If a Terraform resource or API is unsupported, validate a documented provisioning fallback while retaining reproducibility; do not silently depend on manually provisioned state. Python browser execution, WARC recording, and replay remain governed by ADRs 0022–0023.
+The local MiniStack environment is an emulation target, not proof of AWS parity. If a Terraform resource or API is unsupported, validate a documented provisioning fallback while retaining reproducibility; do not silently depend on manually provisioned state. Python browser execution, WARC recording, archival formats, publication/replay, and authentication infrastructure remain governed by ADRs 0022–0023 and 0026–0028.
 
 This ADR fixes the reproducibility policy, while exact pinned version numbers are maintained and deliberately updated in the repository's manifests, lockfiles, and container definitions. Browser deployment, logging/trace exporters, and CI workflow details remain implementation choices.
