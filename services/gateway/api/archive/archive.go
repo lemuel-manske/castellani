@@ -17,7 +17,13 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
-const maxRequestBytes = 64 << 10
+const (
+	maxRequestBytes = 64 << 10
+	minIdempotencyKeyLength = 8
+	maxIdempotencyKeyLength = 200
+	contentTypeHeader = "Content-Type"
+	locationHeader = "Location"
+)
 
 type Handler struct {
 	app application.Application
@@ -27,19 +33,29 @@ func NewHandler(app application.Application) Handler {
 	return Handler{app: app}
 }
 
+func validIdempotencyKey(key string) bool {
+	validLength := len(key) >= minIdempotencyKeyLength && len(key) <= maxIdempotencyKeyLength
+	noOuterWhitespace := strings.TrimSpace(key) == key
+
+	return validLength && noOuterWhitespace
+}
+
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get("Idempotency-Key")
-	if len(key) < 8 || len(key) > 200 || strings.TrimSpace(key) != key {
+	key := r.Header.Get(archive.IdempotencyHeader)
+
+	if !validIdempotencyKey(key) {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
 		return
 	}
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get(contentTypeHeader))
+
+	if err != nil || mediaType != httpx.MediaTypeJSON {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
 		return
 	}
 
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+
 	if err != nil {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "The archive request is invalid or exceeds the size limit.")
 		return
@@ -47,28 +63,32 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var submission archive.Submission
+
 	if err := decoder.Decode(&submission); err != nil {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
 		return
 	}
 	var extra any
+
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
 		return
 	}
 	accepted, err := h.app.CreateArchive(r.Context(), key, submission, data)
+
 	if err != nil {
 		writeCoordinatorError(w, r, err, "Admission could not be confirmed. Retry with the same Idempotency-Key.")
 		return
 	}
-	accepted.StatusURL = "/archives/" + url.PathEscape(accepted.ArchiveID)
-	w.Header().Set("Location", accepted.StatusURL)
+	accepted.StatusURL = archive.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
+	w.Header().Set(locationHeader, accepted.StatusURL)
 	httpx.JSON(w, http.StatusAccepted, accepted)
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "archiveId")
+	id := chi.URLParam(r, archive.ArchiveIDParameter)
 	document, err := h.app.GetArchive(r.Context(), id)
+
 	if err != nil {
 		writeCoordinatorError(w, r, err, "Archive status is temporarily unavailable.")
 		return
