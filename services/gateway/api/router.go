@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
-	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
@@ -19,7 +19,7 @@ const (
 	healthReadyPath = "/health/ready"
 	requestIDHeader = "X-Request-ID"
 	healthMediaType = "text/plain; charset=utf-8"
-	healthResponse = "ok\\n"
+	healthResponse = "ok\n"
 )
 
 func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
