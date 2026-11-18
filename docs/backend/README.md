@@ -27,7 +27,7 @@ This specification makes ADRs 0010, 0012–0015, 0019–0021, and 0025–0029 ex
 | INV-13 | Archive status depends on archival outcomes and replay readiness, not on indexing failures or OpenSearch availability | ADR-0014/0027 |
 | INV-14 | Neither package creation nor publication requires moving/copying WACZ into public S3; objects remain private and immutable and retrieval is authorization-gated | Publication spec |
 | INV-15 | A committed snapshot is referenced by stable `snapshotId`; index reconciliation uses final manifest references without reading Capture-private tables | ADR-0019 |
-| INV-16 | Interactive login uses a dedicated Capture-owned manager; completed sessions create immutable encrypted auth generations, and repeating finalization never creates a new generation | ADR-0028; API |
+| INV-16 | Interactive login uses a dedicated Capture-owned manager; idempotent creation avoids duplicate browsers, completed sessions create immutable encrypted auth generations, and repeating finalization never creates a new generation | ADR-0028; API |
 | INV-17 | Compensated runs do not become replayable or searchable; stale events, late attempts and duplicated commands cannot reverse a committed decision | ADR-0014/0020/0021 |
 | INV-18 | Logs, messages, and API errors do not expose credentials; raw authenticated WARC may contain sensitive material and is always protected by restrictive retrieval policy | ADR-0015/0026 |
 
