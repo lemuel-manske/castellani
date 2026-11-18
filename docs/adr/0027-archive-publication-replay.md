@@ -36,34 +36,28 @@ Treat WACZ contents as potentially sensitive, especially authenticated page reco
 ## Publication and search-visibility ordering
 
 ```mermaid
-sequenceDiagram
-    participant Capture
-    participant S3
-    participant Coordinator
-    participant RabbitMQ
-    participant Search as Search and Index
-    Capture->>S3: Store immutable private WACZ
-    Capture->>Capture: Validate package and persist PREPARED + outbox
-    Capture->>RabbitMQ: ArchivePrepared (outbox dispatch)
-    RabbitMQ->>Coordinator: ArchivePrepared
-    Coordinator->>Coordinator: Conditionally commit PUBLISH + outbox
-    Coordinator->>RabbitMQ: ArchivePublicationDecided
-    par Capture activates replay
-        RabbitMQ->>Capture: ArchivePublicationDecided
-        Capture->>Capture: Persist decision and mark PUBLISHED
-        Capture->>RabbitMQ: ArchivePublished
-    and Search records authorization
-        RabbitMQ->>Search: ArchivePublicationDecided
-        Search->>Search: Persist authorization; do not expose yet
-    end
-    RabbitMQ->>Coordinator: ArchivePublished
-    Coordinator->>Coordinator: Mark COMPLETED or COMPLETED_WITH_ERRORS
-    RabbitMQ->>Search: ArchivePublished
-    Search->>Search: Match both facts and enable indexed results
-    Note over Capture,Search: Replay becomes available before or independently of search readiness
+flowchart TD
+    WARC["Authorized WARC segments and terminal crawl"] --> WACZ["Capture builds and validates private WACZ"]
+    WACZ --> Prepared["Capture commits PREPARED and ArchivePrepared outbox"]
+    Prepared --> Decision{"Coordinator conditional SAGA decision"}
+    Decision -->|PUBLISH committed| PublishedDecision["ArchivePublicationDecided event"]
+    Decision -->|Prepublication abort| Compensation["COMPENSATE path in ADR-0014"]
+
+    PublishedDecision --> CapturePublish["Capture validates decision and package digest"]
+    CapturePublish --> Replay["Capture commits PUBLISHED and ArchivePublished outbox"]
+    Replay --> Access["Authorized WACZ byte-range retrieval"]
+    Replay --> CoordinatorDone["Coordinator records COMPLETED or COMPLETED_WITH_ERRORS"]
+
+    PublishedDecision --> SearchAuth["Search records publish authorization"]
+    Replay --> SearchReplay["Search records replay-published fact"]
+    SearchAuth --> Gate{"Matching publication facts and indexed snapshot?"}
+    SearchReplay --> Gate
+    Indexed["PageCaptured and manifest reconciliation"] --> Gate
+    Gate -->|Yes| Visible["Expose eligible search results"]
+    Gate -->|Not yet| Hidden["Keep results hidden and reconcile"]
 ```
 
-This is a **logical** sequence, not a guaranteed broker delivery order. Search can receive `ArchivePublished` before `ArchivePublicationDecided`; it stores both facts and requires a match before exposing results. Publication authorizes retrieval from the **same private S3 object**, without copying it to a public bucket. A failed Search service never blocks archive completion.
+This is a **dependency graph**, not a message-delivery timeline. All named cross-service events use the existing transactional outbox and RabbitMQ fan-out; the arrows denote logical prerequisites, not synchronous calls or delivery order. Search may receive `ArchivePublished` before `ArchivePublicationDecided` and must store both independently. Eligible indexed snapshots may become searchable after both matching publication facts are durable; **aggregate `SearchReady` can occur later**. Publication authorizes retrieval from the same private S3 object without copying it to a public bucket. A failed Search service never blocks archive completion.
 
 ## Consequences
 
