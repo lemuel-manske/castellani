@@ -1,9 +1,10 @@
-// Package application orchestrates the gateway use cases independently of HTTP routing.
+// Package application orchestrates Gateway use cases independently of HTTP routing.
 package application
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 )
@@ -17,14 +18,30 @@ type Application struct {
 	Coordinator ArchiveCoordinator
 }
 
+type ValidationError struct {
+	Cause error
+}
+
+func (e *ValidationError) Error() string {
+	return e.Cause.Error()
+}
+
+var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
+
 func NewApplication(coordinator ArchiveCoordinator) Application {
 	return Application{Coordinator: coordinator}
 }
 
-func (a Application) CreateArchive(ctx context.Context, key string, request []byte) (archive.Accepted, error) {
-	return a.Coordinator.Admit(ctx, key, request)
+func (a Application) CreateArchive(ctx context.Context, key string, submission archive.Submission, raw []byte) (archive.Accepted, error) {
+	if err := submission.Validate(); err != nil {
+		return archive.Accepted{}, &ValidationError{Cause: err}
+	}
+	return a.Coordinator.Admit(ctx, key, raw)
 }
 
 func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
+	if !archive.ValidID(id) {
+		return nil, ErrInvalidArchiveID
+	}
 	return a.Coordinator.Status(ctx, id)
 }
