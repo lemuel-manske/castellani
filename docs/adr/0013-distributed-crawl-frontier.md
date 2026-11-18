@@ -27,23 +27,23 @@ The Python Capture service owns a distributed crawl frontier. The frontier is a 
 
 ```mermaid
 flowchart TD
-    Discover[Worker discovers navigation link] --> Normalize[Normalize navigation identity]
-    Normalize --> Admit{Atomic frontier admission}
-    Admit -->|New and within limits| Record[Create task, update counters, write outbox]
-    Admit -->|Already known| Depth{Shorter path discovered?}
-    Depth -->|Yes| Reevaluate[Persist min-depth update and descendant re-evaluation]
-    Depth -->|No| EndDuplicate[No new task]
+    Discover[Discovered navigation link] --> Normalize[Normalize navigation identity]
+    Normalize --> Admit{Conditional frontier operation}
+    Admit -->|New and within limits| Record[Create task and durable outbox entry]
+    Admit -->|Already admitted| Depth{Shorter discovered path?}
+    Depth -->|Yes| Reevaluate[Persist shorter depth and reevaluation work]
+    Depth -->|No| Duplicate[No additional capture task]
     Record --> Queue[(RabbitMQ competing queue)]
-    Queue --> Workers[Capture workers - multiple replicas]
-    Workers --> Lease[Conditionally claim lease and fencing generation]
-    Lease --> Capture[Capture page and discover links]
+    Queue --> Workers[Independent Capture workers]
+    Workers --> Lease[Claim task lease and fencing generation]
+    Lease --> Capture[Capture page and discover outgoing links]
     Capture --> Discover
-    Capture --> Commit[Commit fenced result and discovery accounting]
-    Reevaluate --> Accounting[Outstanding discovery and re-evaluation accounting]
+    Capture --> Commit[Conditionally commit capture and discovery accounting]
+    Reevaluate --> Accounting[Durable outstanding-work accounting]
     Commit --> Accounting
-    Accounting --> Closed{All outstanding work terminal?}
-    Closed -->|No| Queue
-    Closed -->|Yes, atomically close admission| Manifest[Immutable final crawl manifest]
+    Accounting --> Closed{No unfinished page, discovery, or reevaluation work?}
+    Closed -->|No| Continue[Keep admission open and continue processing]
+    Closed -->|Yes; atomic closure| Manifest[Close admission and write final manifest]
 ```
 
 RabbitMQ only distributes notifications. **Capture-owned DynamoDB is authoritative** for unique task admission, page limits, leases, minimum-depth corrections, and whether the crawl can terminate. The closure condition includes unfinished discovery and re-evaluation, not merely an empty queue or zero active browsers. The loop is conceptual; completed work is never blindly requeued.
