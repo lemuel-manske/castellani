@@ -7,7 +7,7 @@ run:
 	go run .
 
 fmt:
-	gofmt -w .
+	go fmt ./...
 
 test:
 	go test ./...
