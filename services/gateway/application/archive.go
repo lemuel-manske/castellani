@@ -9,8 +9,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 )
 
-const archiveStatusPath = "/archives/"
-
 type ArchiveCoordinator interface {
 	Admit(context.Context, string, []byte) (archive.Accepted, error)
 	Status(context.Context, string) (json.RawMessage, error)
