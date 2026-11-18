@@ -5,17 +5,17 @@
 
 ## Context
 
-The system has Go, Python, and TypeScript services that must communicate without importing each other's implementation or domain models. Long-running captures and indexing require asynchronous work, while clients need synchronous status and search queries. The assignment requires explicit message contracts and a common message envelope.
+The system has Go, Python, and TypeScript services that must communicate without importing each other's implementation or domain models. Long-running captures and indexing require asynchronous work, while clients need synchronous admission, status, and search operations. The assignment requires explicit message contracts and a common message envelope.
 
 ## Decision
 
 Define cross-service contracts in JSON Schema under `contracts/`, independently of any implementation language. Services may validate messages against these schemas but must not share private service models or implementation packages. Contracts describe observable communication, not internal storage layouts.
 
-Use RabbitMQ for asynchronous commands and events, and HTTP for synchronous queries:
+Use RabbitMQ for asynchronous commands and events, and HTTP for synchronous operations:
 
 - A command requests an action from one logical service; an event reports a fact that has occurred and may have multiple independent consumers.
-- Archive submission is asynchronous: the public API returns HTTP `202 Accepted` with an operation identifier, and clients query status separately.
-- The gateway forwards status and search queries to the owning service over HTTP; it does not query another service's database.
+- Archive admission is a synchronous HTTP call from the Gateway to the Coordinator. The Coordinator durably registers the operation before the Gateway returns `202 Accepted` to the client, as specified in [ADR-0010](0010-asynchronous-http-api.md). Subsequent crawl and indexing work is asynchronous.
+- The Gateway forwards status and search queries to the owning service over HTTP; it does not query another service's database.
 - No RPC framework is introduced.
 
 Every broker message uses this envelope:
@@ -33,6 +33,6 @@ Page indexing is incremental: once a page is durably captured, its completion ca
 
 ## Consequences
 
-Consumers can evolve independently around explicit contracts, and one event can be routed to multiple interested services. HTTP queries introduce direct availability dependencies, so clients require bounded timeouts and defined failure responses.
+Consumers can evolve independently around explicit contracts, and one event can be routed to multiple interested services. HTTP admission and queries introduce direct availability dependencies, so clients require bounded timeouts and defined failure responses.
 
 Schema validation and version-aware consumption are required. The specific message catalog, payload definitions, compatibility policy, queue topology, indexing completion protocol, and compensation messages will be defined separately as their workflows are finalized. This decision does not imply global event ordering or exactly-once processing.
