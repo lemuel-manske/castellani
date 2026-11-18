@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -11,19 +12,33 @@ import (
 )
 
 func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t *testing.T) {
-	var forwardedKey string
+	forwarded := make(chan struct {
+		key  string
+		body string
+	}, 1)
 
 	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		forwardedKey = r.Header.Get(httpx.IdempotencyHeader)
+		body, _ := io.ReadAll(r.Body)
+
+		forwarded <- struct {
+			key  string
+			body string
+		}{
+			key:  r.Header.Get(httpx.IdempotencyHeader),
+			body: string(body),
+		}
+
 		coordinatorAcceptsArchive(w, r)
 	})
 
 	result := gateway.submit(idempotencyKey, validSubmission)
+	request := <-forwarded
 
 	assert.Equal(t, http.StatusAccepted, result.Status)
 	assert.Equal(t, "/archives/run-1", result.Header.Get(httpx.LocationHeader))
 	assert.JSONEq(t, `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/archives/run-1"}`, result.Body)
-	assert.Equal(t, idempotencyKey, forwardedKey)
+	assert.Equal(t, idempotencyKey, request.key)
+	assert.JSONEq(t, validSubmission, request.body)
 }
 
 func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
