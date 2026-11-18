@@ -10,8 +10,14 @@ import (
 	"syscall"
 )
 
+const (
+	serviceName = "gateway"
+	networkType = "tcp"
+)
+
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "gateway")
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", serviceName)
+
 	if err := run(logger); err != nil {
 		logger.Error("gateway stopped", "error", err)
 		os.Exit(1)
@@ -20,11 +26,13 @@ func main() {
 
 func run(logger *slog.Logger) error {
 	cfg, err := loadConfig(os.Getenv)
+
 	if err != nil {
 		return err
 	}
 
-	listener, err := net.Listen("tcp", cfg.address)
+	listener, err := net.Listen(networkType, cfg.address)
+
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.address, err)
 	}
