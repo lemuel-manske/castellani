@@ -24,6 +24,7 @@ The publication decision is one conditional transaction: read the run's expected
 | `capture_snapshots` | PK `snapshotId` | Immutable successful capture metadata, run/urlKey, timestamp, redirect trail, attempt-scoped authorized WARC refs, content type and checksum; GSI by archive+capture time for listing |
 | `capture_packages` | PK `archiveId` | WACZ immutable object key/version/checksum, manifest digest, validation evidence, `PREPARED/PUBLISHED`, decisionVersion and publication ack |
 | `capture_auth_sessions` | PK `sessionId` | Login lifecycle, manager epoch, expiry, run, finalized generation reference, request idempotence revision |
+| `capture_auth_session_requests` | PK `idempotencyKey` | Canonical request fingerprint, session ID, recorded creation response, expiry |
 | `capture_auth_generations` | PK `archiveId`, SK `generation` | Immutable encrypted S3 state reference, creation, authorizing login, status |
 | `capture_browser_slots` | PK `slotId` | 0..N-1 slot identifiers, owner attempt, leaseUntil, fence; independent conditional acquisition |
 | `capture_outbox` / `capture_inbox` | PK `messageId` | Locally owned durable message delivery records |
@@ -38,7 +39,7 @@ Use a deterministic hash for `urlKey` derived from the **versioned** normalized 
 
 **Capacity:** initialize N identifiable slot rows (10 in F5). A logical acquire scans/retries conditional slot claims until it either acquires a free slot or establishes the pool is exhausted; transient DynamoDB write conflicts are **not** reported as capacity exhaustion. Each successful claim records attempt identity, lease, and monotonically increasing fence; renew/release verify all three. For F5, 100 contenders each perform one *logical, nonwaiting* acquire operation, resolving internal transaction conflicts while ten successful reservations are held through the measurement; exactly 10 succeed and 90 observe full capacity. Normal page execution may wait/retry for capacity. A fenced stale holder cannot commit capture even if its process continues. A hot-slot or bounded-contention implementation that spuriously returns fewer than 10 successes fails the F5 acceptance test.
 
-**Authentication:** finishing an active login is a conditional single transition `ACTIVE -> FINALIZING -> COMPLETED`, with a durable operation identity. The final encrypted profile write and generation metadata must be crash-reconciled; retrying the same PUT returns the existing result. An expired/failed session cannot be completed, and a new session cannot reuse an old generation ID. Never share mutable browser profile directories across workers.
+**Authentication:** creating a session atomically records its `Idempotency-Key` mapping and session state; retried same-key/same-body requests recover the original session, not another Chromium process. Finishing an active login is a conditional single transition `ACTIVE -> FINALIZING -> COMPLETED`, with a durable operation identity. The final encrypted profile write and generation metadata must be crash-reconciled; retrying the same PUT returns the existing result. An expired/failed session cannot be completed, and a new session cannot reuse an old generation ID. Never share mutable browser profile directories across workers.
 
 ## Search & Index (TypeScript)
 
