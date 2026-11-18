@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type gatewayServer struct {
@@ -16,10 +19,11 @@ type gatewayServer struct {
 	shutdownTimeout time.Duration
 }
 
-func newGatewayServer(cfg config) *gatewayServer {
+func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	gateway := &gatewayServer{shutdownTimeout: cfg.shutdownTimeout}
+	archives := newArchiveHandler(cfg.coordinatorURL, cfg.upstreamTimeout)
 	gateway.http = &http.Server{
-		Handler:           newHandler(gateway.ready.Load),
+		Handler:           newHandler(gateway.ready.Load, archives, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		IdleTimeout:       60 * time.Second,
@@ -49,8 +53,7 @@ func (g *gatewayServer) serve(ctx context.Context, listener net.Listener) error 
 
 	shutdownErr := g.http.Shutdown(shutdownCtx)
 	if shutdownErr != nil {
-		closeErr := g.http.Close()
-		shutdownErr = errors.Join(shutdownErr, closeErr)
+		shutdownErr = errors.Join(shutdownErr, g.http.Close())
 	}
 
 	serveErr := <-stopped
@@ -61,16 +64,17 @@ func (g *gatewayServer) serve(ctx context.Context, listener net.Listener) error 
 	return shutdownErr
 }
 
-func newHandler(ready func() bool) http.Handler {
-	mux := http.NewServeMux()
+func newHandler(ready func() bool, archives *archiveHandler, logger *slog.Logger) http.Handler {
+	router := chi.NewRouter()
+	router.Use(requestID)
+	router.Use(recoverPanics(logger))
 
-	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) {
+	router.Get("/health/live", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-
-	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, _ *http.Request) {
+	router.Get("/health/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if !ready() {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
@@ -79,6 +83,14 @@ func newHandler(ready func() bool) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
+	router.Post("/archives", archives.create)
+	router.Get("/archives/{archiveId}", archives.status)
 
-	return mux
+	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		writeProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist.")
+	})
+	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		writeProblem(w, r, http.StatusMethodNotAllowed, "method-not-allowed", "Method Not Allowed", "The method is not supported for this resource.")
+	})
+	return router
 }
