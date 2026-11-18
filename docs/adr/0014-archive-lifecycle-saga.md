@@ -55,21 +55,31 @@ Cancellation is not instantaneous. Late events, expired execution attempts, dupl
 ```mermaid
 stateDiagram-v2
     [*] --> ACCEPTED
-    ACCEPTED --> RUNNING
-    RUNNING --> FINALIZING: Crawl reaches terminal outcome
-    FINALIZING --> PUBLISH_DECIDED: Seed succeeded; WACZ validated; atomic PUBLISH
-    ACCEPTED --> COMPENSATING: Prepublication run-wide failure; atomic COMPENSATE
-    RUNNING --> COMPENSATING: Prepublication run-wide failure; atomic COMPENSATE
-    FINALIZING --> COMPENSATING: Prepublication run-wide failure; atomic COMPENSATE
-    PUBLISH_DECIDED --> COMPLETED: Capture confirms replay; no archival errors
-    PUBLISH_DECIDED --> COMPLETED_WITH_ERRORS: Capture confirms replay; partial capture errors
-    COMPENSATING --> COMPENSATED: Capture and Search cleanup acknowledged
+    ACCEPTED --> RUNNING: Start crawl
+    RUNNING --> FINALIZING: Terminal crawl outcome
+
+    state "Awaiting replay publication" as ReplayPending
+    FINALIZING --> ReplayPending: Seed succeeded and WACZ validated; commit PUBLISH
+    ReplayPending --> COMPLETED: Capture confirms replay; no archive errors
+    ReplayPending --> COMPLETED_WITH_ERRORS: Capture confirms replay; partial archive errors
+
+    ACCEPTED --> COMPENSATING: Commit COMPENSATE
+    RUNNING --> COMPENSATING: Commit COMPENSATE
+    FINALIZING --> COMPENSATING: Commit COMPENSATE
+    COMPENSATING --> COMPENSATED: Capture and Search cleanup confirmed
+
+    note right of ReplayPending
+        Internal phase only
+        Public status remains FINALIZING
+        Decision PUBLISH is irreversible
+    end note
+
     COMPLETED --> [*]
     COMPLETED_WITH_ERRORS --> [*]
     COMPENSATED --> [*]
 ```
 
-The **decision** (`PUBLISH` or `COMPENSATE`) is stored separately from the public lifecycle status. Once `PUBLISH` is committed, recovery retries publication; it never takes the compensation path. `WAITING_FOR_AUTH` is a recoverable page-level blocking condition, not an irreversible run-wide SAGA decision. Indexing completion is not on the publication path.
+The **decision** (`PUBLISH` or `COMPENSATE`) is stored separately from public lifecycle status. The diagram's **Awaiting replay publication** node represents `decision=PUBLISH` while the externally visible run remains `FINALIZING`; it is **not** an additional public status. Only `FINALIZING` with a terminal crawl and validated WACZ can choose publication. Once `PUBLISH` is committed, recovery retries publication; it never takes the compensation path. `WAITING_FOR_AUTH` is a recoverable page-level blocking condition, not a SAGA state. Indexing completion is not on the publication path.
 
 ## Consequences
 
