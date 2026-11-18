@@ -1,0 +1,19 @@
+# Architecture Decision Records
+
+Architectural decisions are recorded here in numbered Markdown files.
+
+Each ADR follows [template.md](template.md) and records one decision, its context, and its consequences. Decisions should be narrow enough to revisit independently.
+
+Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a decision, not a claim that its implementation is complete.
+
+## Accepted decisions
+
+- [0001 — Single-tenant, self-hosted deployment](0001-single-tenant-deployment.md)
+- [0002 — Service boundaries and implementation languages](0002-service-boundaries.md)
+- [0003 — RabbitMQ for asynchronous messaging](0003-rabbitmq-messaging.md)
+- [0004 — MiniStack for local AWS-compatible infrastructure](0004-ministack-infrastructure.md)
+- [0005 — DynamoDB tables owned by individual services](0005-dynamodb-ownership.md)
+- [0006 — S3 for archive artifacts](0006-s3-artifact-storage.md)
+- [0007 — OpenSearch for full-text retrieval](0007-opensearch-retrieval.md)
+
+More involved decisions, including crawl-frontier consistency, concurrency limits, SAGA transitions, and delivery guarantees, will be documented separately.
