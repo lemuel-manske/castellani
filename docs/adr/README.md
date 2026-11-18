@@ -26,6 +26,7 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0016 — Containerized deployment and horizontal scaling](0016-containerized-deployment-scaling.md)
 - [0017 — Optional queue-based autoscaling of capture workers](0017-queue-based-autoscaling.md)
 - [0018 — Fault injection and failure verification](0018-fault-injection-verification.md)
+- [0019 — Incremental indexing and completion coordination](0019-incremental-indexing-completion.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
