@@ -8,23 +8,34 @@ Tests must verify observable behavior, user interactions, documented contracts, 
 
 For UI tests, prefer semantic queries and assertions (such as accessible role/name, visibility, and enabled state) over selectors or matchers such as `toHaveClass` or `toHaveStyle`. Visual-regression and snapshot-based visual testing are out of scope for now.
 
-For backend tests, assertions against a public API, message contract, or domain outcome are preferred. Infrastructure assertions are appropriate where infrastructure behavior itself is the requirement (for example, redelivery, queue isolation, or broker recovery); avoid relying on unrelated internal details.
+For backend tests, assertions against public APIs, message contracts, and domain outcomes are preferred. Infrastructure assertions are appropriate where infrastructure behavior itself is the requirement (for example, redelivery, queue isolation, or broker recovery); avoid relying on unrelated internal details.
 
 ## Readability and organization
 
-- Start each test file with tests of primary, observable behavior. Follow with exceptional, boundary, and recovery cases.
-- Give each meaningful scenario its own explicitly named test. Do not use loops, tables, or dynamic generation to create parameterized test cases.
-- Ordinary loops inside a single scenario are allowed when exercising concurrency, workload size, or repeated actions, such as sending 100 competing requests.
-- Make setup, action, and assertions easy to identify. Prefer direct tests to generic abstractions that obscure intent.
-- Extract helpers for recurring fixture setup, cleanup, polling, and client calls; keep the behavior under test visible in the test body.
-- Use descriptive names that communicate the precondition and expected outcome. The `chaosd` test suite is the style reference, not a library dependency.
+- Start test files with tests of primary, observable behavior; follow with exceptional, boundary, and recovery scenarios.
+- Give each meaningful scenario its own explicitly named test. Name tests for the action or precondition and expected behavior, not the internal method being exercised. For example, `TestArchive_BrokerUnavailable_RecoversWithoutLosingWork`.
+- Do not generate test cases with loops, tables, or dynamic parameterization. Write each distinct test case explicitly. Ordinary loops within a single scenario are allowed for workloads such as 100 concurrent requests.
+- Keep a clear progression: establish a fixture and preconditions, perform the action, then verify the outcome. Use straightforward test bodies rather than deep nesting or helper abstractions that hide the behavior under test.
+- Prefer small, focused tests with direct, meaningful assertions. Assertions should explain the behavior being guaranteed, not merely check that execution did not panic.
+- Keep setup and teardown in focused helpers only where repetition warrants it. Helpers should expose intent (such as starting a test website or waiting for archive completion) and should not embed the test's behavioral assertions.
+- Use fixture builders or small test doubles where appropriate for isolated tests. Their purpose is to make preconditions explicit, not to reproduce implementation logic.
 
-## Determinism and isolation
+## Assertions and failures
+
+- Stop immediately when a prerequisite fails and subsequent assertions cannot be meaningful (for example, failure to create an archive or start a fixture). In Go, use `require` for these checks.
+- Use non-fatal assertions for independent properties that can be meaningfully evaluated together. In Go, use `assert`.
+- Assert concrete results and invariants. A successful command response or event publication alone is not proof that a distributed operation completed correctly.
+- Prefer verifying both the presence of intended effects and the absence of prohibited effects, especially for idempotency, compensation, and concurrent processing.
+
+## Determinism and lifecycle
 
 - Avoid arbitrary sleeps for synchronization. Wait for observable conditions using bounded polling, explicit readiness checks, and deadlines.
-- Tests must be isolated from one another, create uniquely identified fixtures where required, and clean up resources they own.
-- Failure tests should establish the baseline behavior, introduce a controlled failure, then assert the externally observable recovery or terminal state.
-- A passing test must establish the promised invariant, not merely verify that a message was published or a command returned without error.
+- Tests must be isolated, create unique identifiers or resources where necessary, and not depend on execution order.
+- Fixtures that create temporary files, containers, services, or network changes must register cleanup so it runs even if assertions fail. In Go, use `t.Cleanup` and mark reusable helpers with `t.Helper`.
+- Integration tests that require real dependencies should be distinguishable from fast unit tests; Go build tags such as `integration` are acceptable.
+- Prefer real infrastructure in integration and end-to-end tests. Test doubles are appropriate for isolated behavior tests, but must not replace the real broker or database when their failure or concurrency semantics are under test.
+- Failure tests should establish normal behavior, introduce a controlled fault, verify the degraded state where relevant, remove the fault, and assert recovery or a valid terminal state.
+- Ensure cleanup and recovery are verified rather than leaving hidden effects that can contaminate subsequent tests.
 
 ## Test placement
 
