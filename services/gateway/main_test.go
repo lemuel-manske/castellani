@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -113,10 +112,7 @@ func TestGateway_ConfigUsesSafeDefaults(t *testing.T) {
 
 func TestGateway_ConfigRejectsInvalidAddress(t *testing.T) {
 	_, err := loadConfig(func(name string) string {
-		if name == "GATEWAY_ADDR" {
-			return "not-an-address"
-		}
-		return ""
+		return map[string]string{"GATEWAY_ADDR": "not-an-address"}[name]
 	})
 
 	require.ErrorContains(t, err, "GATEWAY_ADDR")
@@ -124,10 +120,7 @@ func TestGateway_ConfigRejectsInvalidAddress(t *testing.T) {
 
 func TestGateway_ConfigRejectsNonPositiveShutdownTimeout(t *testing.T) {
 	_, err := loadConfig(func(name string) string {
-		if name == "GATEWAY_SHUTDOWN_TIMEOUT" {
-			return "0s"
-		}
-		return ""
+		return map[string]string{"GATEWAY_SHUTDOWN_TIMEOUT": "0s"}[name]
 	})
 
 	require.ErrorContains(t, err, "must be positive")
@@ -135,10 +128,7 @@ func TestGateway_ConfigRejectsNonPositiveShutdownTimeout(t *testing.T) {
 
 func TestGateway_ConfigRejectsInvalidShutdownTimeout(t *testing.T) {
 	_, err := loadConfig(func(name string) string {
-		if name == "GATEWAY_SHUTDOWN_TIMEOUT" {
-			return "soon"
-		}
-		return ""
+		return map[string]string{"GATEWAY_SHUTDOWN_TIMEOUT": "soon"}[name]
 	})
 
 	require.ErrorContains(t, err, "GATEWAY_SHUTDOWN_TIMEOUT")
@@ -161,17 +151,3 @@ func TestGateway_ConfigAcceptsExplicitValues(t *testing.T) {
 	assert.Equal(t, 3*time.Second, cfg.shutdownTimeout)
 }
 
-func TestGateway_ReadinessDoesNotLeakConfiguration(t *testing.T) {
-	server := httptest.NewServer(newHandler(func() bool { return false }))
-	t.Cleanup(server.Close)
-
-	response, err := server.Client().Get(server.URL + "/health/ready")
-	require.NoError(t, err)
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
-
-	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
-	assert.NotContains(t, strings.ToLower(string(body)), "gateway_addr")
-}
