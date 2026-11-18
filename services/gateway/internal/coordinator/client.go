@@ -62,6 +62,7 @@ func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Acc
 	if err != nil {
 		return archive.Accepted{}, err
 	}
+
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	request.Header.Set(httpx.IdempotencyHeader, key)
 
@@ -76,12 +77,15 @@ func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Acc
 	}
 
 	var accepted archive.Accepted
+
 	decodeErr := json.Unmarshal(rawResponse, &accepted)
+
 	validAdmission := accepted.Status == archive.AcceptedStatus && archive.ValidID(accepted.ArchiveID)
 
 	if decodeErr != nil || !validAdmission {
 		return archive.Accepted{}, ErrInvalidResponse
 	}
+
 	return accepted, nil
 }
 
@@ -91,6 +95,7 @@ func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error)
 	if err != nil {
 		return nil, err
 	}
+
 	status, data, err := c.execute(request)
 
 	if err != nil {
@@ -100,6 +105,7 @@ func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error)
 	if status != http.StatusOK {
 		return nil, parseFailure(status, data)
 	}
+
 	var document struct {
 		ArchiveID string          `json:"archiveId"`
 		Status    string          `json:"status"`
@@ -107,21 +113,27 @@ func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error)
 		Replay    json.RawMessage `json:"replay"`
 		Search    json.RawMessage `json:"search"`
 	}
+
 	decodeErr := json.Unmarshal(data, &document)
+
 	matchingArchive := document.ArchiveID == id
+
 	completeStatus := document.Status != "" && len(document.Capture) != 0 &&
 		len(document.Replay) != 0 && len(document.Search) != 0
 
 	if decodeErr != nil || !matchingArchive || !completeStatus {
 		return nil, ErrInvalidResponse
 	}
+
 	return json.RawMessage(data), nil
 }
 
 func (c *Client) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	target := c.baseURL
+
 	target.Path = path
 	target.RawPath = ""
+
 	return http.NewRequestWithContext(ctx, method, target.String(), body)
 }
 
@@ -131,6 +143,7 @@ func (c *Client) execute(request *http.Request) (int, []byte, error) {
 	if err != nil {
 		return 0, nil, fmt.Errorf("coordinator HTTP call: %w", err)
 	}
+
 	defer response.Body.Close()
 
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
@@ -142,6 +155,7 @@ func (c *Client) execute(request *http.Request) (int, []byte, error) {
 	if len(data) > maxResponseBytes {
 		return 0, nil, ErrInvalidResponse
 	}
+
 	return response.StatusCode, data, nil
 }
 
@@ -154,11 +168,14 @@ func parseFailure(status int, data []byte) error {
 	}
 
 	var p httpx.Problem
+
 	decodeErr := json.Unmarshal(data, &p)
+
 	validProblem := p.Status == status && p.Title != "" && p.Type != ""
 
 	if decodeErr != nil || !validProblem {
 		return ErrInvalidResponse
 	}
+
 	return &Failure{Problem: p}
 }

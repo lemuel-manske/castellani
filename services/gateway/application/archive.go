@@ -1,4 +1,3 @@
-// Package application orchestrates Gateway use cases independently of HTTP routing.
 package application
 
 import (
