@@ -21,8 +21,6 @@ const (
 	maxRequestBytes = 64 << 10
 	minIdempotencyKeyLength = 8
 	maxIdempotencyKeyLength = 200
-	contentTypeHeader = "Content-Type"
-	locationHeader = "Location"
 )
 
 type Handler struct {
@@ -47,7 +45,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
 		return
 	}
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get(contentTypeHeader))
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get(httpx.HeaderContentType))
 
 	if err != nil || mediaType != httpx.MediaTypeJSON {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
@@ -81,7 +79,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accepted.StatusURL = httpx.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
-	w.Header().Set(locationHeader, accepted.StatusURL)
+	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
 	httpx.JSON(w, http.StatusAccepted, accepted)
 }
 
