@@ -1,256 +1,184 @@
 package api_test
 
 import (
-	"encoding/json"
-	"io"
-	"log/slog"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/api"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-const validSubmission = `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1}`
+func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t *testing.T) {
+	var forwardedKey string
 
-func startGateway(t *testing.T, upstream http.HandlerFunc) *httptest.Server {
-	t.Helper()
-	coordinatorServer := httptest.NewServer(upstream)
-	t.Cleanup(coordinatorServer.Close)
-
-	origin, err := url.Parse(coordinatorServer.URL)
-	require.NoError(t, err)
-
-	app := application.NewApplication(coordinator.NewClient(*origin, time.Second))
-	gateway := httptest.NewServer(api.NewRouter(func() bool { return true }, app, slog.Default()))
-	t.Cleanup(gateway.Close)
-	return gateway
-}
-
-func submit(t *testing.T, gateway *httptest.Server, key, body string) *http.Response {
-	t.Helper()
-	request, err := http.NewRequest(http.MethodPost, gateway.URL+"/archives", strings.NewReader(body))
-	require.NoError(t, err)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", key)
-
-	response, err := gateway.Client().Do(request)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = response.Body.Close() })
-	return response
-}
-
-func TestGateway_ArchiveAdmissionForwardsIdempotencyAndReturnsStatusLocation(t *testing.T) {
-	requests := make(chan string, 1)
 	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		requests <- r.Header.Get("Idempotency-Key")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/internal/run-1"}`)
+		forwardedKey = r.Header.Get(httpx.IdempotencyHeader)
+		coordinatorAcceptsArchive(w, r)
 	})
 
-	response := submit(t, gateway, "sample-key-123", validSubmission)
-	data, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
+	result := gateway.submit(idempotencyKey, validSubmission)
 
-	assert.Equal(t, http.StatusAccepted, response.StatusCode)
-	assert.Equal(t, "/archives/run-1", response.Header.Get("Location"))
-	assert.JSONEq(t, `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/archives/run-1"}`, string(data))
-	assert.Equal(t, "sample-key-123", <-requests)
+	assert.Equal(t, http.StatusAccepted, result.Status)
+	assert.Equal(t, "/archives/run-1", result.Header.Get(httpx.LocationHeader))
+	assert.JSONEq(t, `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/archives/run-1"}`, result.Body)
+	assert.Equal(t, idempotencyKey, forwardedKey)
 }
 
-func TestGateway_ArchiveStatusReadsCoordinatorState(t *testing.T) {
-	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/archives/run-1", r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"archiveId":"run-1","status":"RUNNING","capture":{"captured":0,"failed":0,"pending":1},"replay":{"status":"NOT_READY"},"search":{"status":"PENDING"}}`)
-	})
+func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
+	gateway := startGateway(t, coordinatorReturnsArchiveStatus)
 
-	response, err := gateway.Client().Get(gateway.URL + "/archives/run-1")
-	require.NoError(t, err)
-	defer response.Body.Close()
+	result := gateway.get(httpx.ArchivePathPrefix + archiveID)
 
-	var result struct{ Status string `json:"status"` }
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&result))
-
-	assert.Equal(t, http.StatusOK, response.StatusCode)
-	assert.Equal(t, "RUNNING", result.Status)
+	assert.Equal(t, http.StatusOK, result.Status)
+	assert.JSONEq(t, runningArchive, result.Body)
 }
 
-func TestGateway_SameIdempotencyKeyCanBeRetriedWithoutGatewayState(t *testing.T) {
+func TestGateway_RepeatedArchiveSubmissionAlwaysReachesCoordinator(t *testing.T) {
 	var forwarded atomic.Int32
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
+
+	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
 		forwarded.Add(1)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/archives/run-1"}`)
+		coordinatorAcceptsArchive(w, r)
 	})
 
-	first := submit(t, gateway, "repeated-key-123", validSubmission)
-	second := submit(t, gateway, "repeated-key-123", validSubmission)
+	first := gateway.submit(idempotencyKey, validSubmission)
+	second := gateway.submit(idempotencyKey, validSubmission)
 
-	assert.Equal(t, http.StatusAccepted, first.StatusCode)
-	assert.Equal(t, http.StatusAccepted, second.StatusCode)
+	assert.Equal(t, http.StatusAccepted, first.Status)
+	assert.Equal(t, http.StatusAccepted, second.Status)
 	assert.EqualValues(t, 2, forwarded.Load())
 }
 
-func TestGateway_ArchiveAdmissionPreservesConflict(t *testing.T) {
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(http.StatusConflict)
-		_, _ = io.WriteString(w, `{"type":"urn:coordinator:idempotency-conflict","title":"Conflict","status":409,"detail":"Key was used for different content."}`)
-	})
+func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testing.T) {
+	gateway := startGateway(t, coordinatorRejectsConflictingKey)
 
-	response := submit(t, gateway, "repeated-key-123", validSubmission)
-	var result struct{ Type string `json:"type"` }
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&result))
+	result := gateway.submit(idempotencyKey, validSubmission)
 
-	assert.Equal(t, http.StatusConflict, response.StatusCode)
-	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-	assert.Equal(t, "urn:coordinator:idempotency-conflict", result.Type)
+	assert.Equal(t, http.StatusConflict, result.Status)
+	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.JSONEq(t, `{"type":"urn:coordinator:idempotency-conflict","title":"Conflict","status":409,"detail":"Key was used for different content.","instance":"/archives"}`, result.Body)
 }
 
-func TestGateway_MissingIdempotencyKeyNeverReachesCoordinator(t *testing.T) {
+func TestGateway_ArchiveWithoutIdempotencyKeyIsRejectedBeforeForwarding(t *testing.T) {
 	var forwarded atomic.Int32
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
+
+	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
 		forwarded.Add(1)
-		w.WriteHeader(http.StatusAccepted)
+		coordinatorAcceptsArchive(w, r)
 	})
 
-	response := submit(t, gateway, "", validSubmission)
+	result := gateway.submit("", validSubmission)
 
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, result.Status)
 	assert.Zero(t, forwarded.Load())
 }
 
-func TestGateway_ArchiveAdmissionRejectsUnknownFields(t *testing.T) {
+func TestGateway_ArchiveWithUnknownFieldsIsRejectedBeforeForwarding(t *testing.T) {
 	var forwarded atomic.Int32
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
+
+	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
 		forwarded.Add(1)
-		w.WriteHeader(http.StatusAccepted)
+		coordinatorAcceptsArchive(w, r)
 	})
 
-	response := submit(t, gateway, "sample-key-123", `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1,"unsupported":true}`)
+	body := `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1,"unsupported":true}`
+	result := gateway.submit(idempotencyKey, body)
 
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, result.Status)
 	assert.Zero(t, forwarded.Load())
 }
 
-func TestGateway_ArchiveAdmissionRejectsInvalidLimits(t *testing.T) {
+func TestGateway_ArchiveWithInvalidLimitsIsRejectedBeforeForwarding(t *testing.T) {
 	var forwarded atomic.Int32
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
+
+	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
 		forwarded.Add(1)
-		w.WriteHeader(http.StatusAccepted)
+		coordinatorAcceptsArchive(w, r)
 	})
 
-	response := submit(t, gateway, "sample-key-123", `{"seedUrl":"https://example.org/","maxDepth":-1,"maxPages":0}`)
+	body := `{"seedUrl":"https://example.org/","maxDepth":-1,"maxPages":0}`
+	result := gateway.submit(idempotencyKey, body)
 
-	assert.Equal(t, http.StatusUnprocessableEntity, response.StatusCode)
+	assert.Equal(t, http.StatusUnprocessableEntity, result.Status)
 	assert.Zero(t, forwarded.Load())
 }
 
-func TestGateway_ArchiveAdmissionRejectsOversizedBody(t *testing.T) {
+func TestGateway_OversizedArchiveIsRejectedBeforeForwarding(t *testing.T) {
 	var forwarded atomic.Int32
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
+
+	gateway := startGateway(t, func(w http.ResponseWriter, r *http.Request) {
 		forwarded.Add(1)
-		w.WriteHeader(http.StatusAccepted)
+		coordinatorAcceptsArchive(w, r)
 	})
 
-	response := submit(t, gateway, "sample-key-123", validSubmission+strings.Repeat(" ", 70<<10))
+	oversizedBody := validSubmission + strings.Repeat(" ", 70<<10)
+	result := gateway.submit(idempotencyKey, oversizedBody)
 
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, result.Status)
 	assert.Zero(t, forwarded.Load())
 }
 
-func TestGateway_ArchiveAdmissionReturnsUnavailableWhenCoordinatorDisconnects(t *testing.T) {
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
-		panic(http.ErrAbortHandler)
-	})
+func TestGateway_CoordinatorDisconnectLeavesArchiveAdmissionUnconfirmed(t *testing.T) {
+	gateway := startGateway(t, coordinatorDisconnects)
 
-	response := submit(t, gateway, "sample-key-123", validSubmission)
+	result := gateway.submit(idempotencyKey, validSubmission)
 
-	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
-	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
+	assert.Equal(t, http.StatusServiceUnavailable, result.Status)
+	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.Contains(t, result.Body, "Retry with the same Idempotency-Key")
 }
 
-func TestGateway_ArchiveAdmissionDoesNotAcceptMalformedCoordinatorResponse(t *testing.T) {
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"archiveId":"","status":"ACCEPTED"}`)
-	})
+func TestGateway_MalformedAdmissionIsNeverReportedAsAccepted(t *testing.T) {
+	gateway := startGateway(t, coordinatorReturnsMalformedAdmission)
 
-	response := submit(t, gateway, "sample-key-123", validSubmission)
+	result := gateway.submit(idempotencyKey, validSubmission)
 
-	assert.Equal(t, http.StatusBadGateway, response.StatusCode)
+	assert.Equal(t, http.StatusBadGateway, result.Status)
+	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
 }
 
-func TestGateway_StatusRejectsUnexpectedCoordinatorDocument(t *testing.T) {
-	gateway := startGateway(t, func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = io.WriteString(w, `{"archiveId":"different-run","status":"RUNNING","capture":{},"replay":{},"search":{}}`)
-	})
+func TestGateway_StatusForDifferentArchiveIsNotReturned(t *testing.T) {
+	gateway := startGateway(t, coordinatorReturnsMismatchedArchive)
 
-	response, err := gateway.Client().Get(gateway.URL + "/archives/run-1")
-	require.NoError(t, err)
-	defer response.Body.Close()
+	result := gateway.get(httpx.ArchivePathPrefix + archiveID)
 
-	assert.Equal(t, http.StatusBadGateway, response.StatusCode)
+	assert.Equal(t, http.StatusBadGateway, result.Status)
 }
 
 func TestGateway_UnknownRouteReturnsProblemDetails(t *testing.T) {
-	gateway := startGateway(t, func(http.ResponseWriter, *http.Request) {})
+	gateway := startGateway(t, coordinatorIsUnused)
 
-	response, err := gateway.Client().Get(gateway.URL + "/unknown")
-	require.NoError(t, err)
-	defer response.Body.Close()
+	result := gateway.get("/unknown")
 
-	assert.Equal(t, http.StatusNotFound, response.StatusCode)
-	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-	assert.NotEmpty(t, response.Header.Get("X-Request-ID"))
+	assert.Equal(t, http.StatusNotFound, result.Status)
+	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.NotEmpty(t, result.Header.Get("X-Request-ID"))
 }
 
 func TestGateway_UnsupportedMethodReturnsProblemDetails(t *testing.T) {
-	gateway := startGateway(t, func(http.ResponseWriter, *http.Request) {})
-	request, err := http.NewRequest(http.MethodPut, gateway.URL+"/archives/run-1", nil)
-	require.NoError(t, err)
+	gateway := startGateway(t, coordinatorIsUnused)
 
-	response, err := gateway.Client().Do(request)
-	require.NoError(t, err)
-	defer response.Body.Close()
+	result := gateway.put(httpx.ArchivePathPrefix + archiveID)
 
-	assert.Equal(t, http.StatusMethodNotAllowed, response.StatusCode)
-	assert.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
+	assert.Equal(t, http.StatusMethodNotAllowed, result.Status)
+	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
 }
 
-func TestGateway_LivenessDoesNotDependOnCoordinatorReadiness(t *testing.T) {
-	gateway := startGateway(t, func(http.ResponseWriter, *http.Request) {})
+func TestGateway_LivenessDoesNotDependOnCoordinator(t *testing.T) {
+	gateway := startGateway(t, coordinatorIsUnused)
 
-	response, err := gateway.Client().Get(gateway.URL + "/health/live")
-	require.NoError(t, err)
-	defer response.Body.Close()
+	result := gateway.get("/health/live")
 
-	body, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
-
-	assert.Equal(t, http.StatusOK, response.StatusCode)
-	assert.Equal(t, "ok\n", string(body))
+	assert.Equal(t, http.StatusOK, result.Status)
+	assert.Equal(t, "ok\n", result.Body)
 }
 
-func TestGateway_ReadinessRejectsTrafficBeforeServerIsReady(t *testing.T) {
-	app := application.Application{}
-	gateway := httptest.NewServer(api.NewRouter(func() bool { return false }, app, slog.Default()))
-	t.Cleanup(gateway.Close)
+func TestGateway_ReadinessRejectsRequestsBeforeServerIsReady(t *testing.T) {
+	gateway := startUnreadyGateway(t)
 
-	response, err := gateway.Client().Get(gateway.URL + "/health/ready")
-	require.NoError(t, err)
-	defer response.Body.Close()
+	result := gateway.get("/health/ready")
 
-	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
+	assert.Equal(t, http.StatusServiceUnavailable, result.Status)
 }
