@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -141,3 +142,16 @@ func coordinatorReturnsMismatchedArchive(w http.ResponseWriter, _ *http.Request)
 }
 
 func coordinatorIsUnused(http.ResponseWriter, *http.Request) {}
+
+type recordingCoordinator struct {
+	requests atomic.Int32
+}
+
+func (c *recordingCoordinator) accept(w http.ResponseWriter, r *http.Request) {
+	c.requests.Add(1)
+	coordinatorAcceptsArchive(w, r)
+}
+
+func (c *recordingCoordinator) callCount() int32 {
+	return c.requests.Load()
+}
