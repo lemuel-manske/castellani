@@ -41,7 +41,7 @@ func validIdempotencyKey(key string) bool {
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get(archive.IdempotencyHeader)
+	key := r.Header.Get(httpx.IdempotencyHeader)
 
 	if !validIdempotencyKey(key) {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
@@ -80,13 +80,13 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		writeCoordinatorError(w, r, err, "Admission could not be confirmed. Retry with the same Idempotency-Key.")
 		return
 	}
-	accepted.StatusURL = archive.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
+	accepted.StatusURL = httpx.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
 	w.Header().Set(locationHeader, accepted.StatusURL)
 	httpx.JSON(w, http.StatusAccepted, accepted)
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, archive.ArchiveIDParameter)
+	id := chi.URLParam(r, httpx.ArchiveIDParameter)
 	document, err := h.app.GetArchive(r.Context(), id)
 
 	if err != nil {
