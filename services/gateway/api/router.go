@@ -9,8 +9,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
+	searchapi "github.com/lemuel-manske/unnamed/services/gateway/api/search"
+	sessionapi "github.com/lemuel-manske/unnamed/services/gateway/api/session"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
 const (
@@ -22,6 +25,16 @@ const (
 )
 
 func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
+	return NewRouterWithServices(ready, app, nil, nil, logger)
+}
+
+func NewRouterWithServices(
+	ready func() bool,
+	app application.Application,
+	capture *upstream.Client,
+	search *upstream.Client,
+	logger *slog.Logger,
+) http.Handler {
 	router := chi.NewRouter()
 	router.Use(requestID)
 	router.Use(recoverPanics(logger))
@@ -45,6 +58,26 @@ func NewRouter(ready func() bool, app application.Application, logger *slog.Logg
 	archives := archiveapi.NewHandler(app)
 	router.Post(httpx.ArchivesPath, archives.Create)
 	router.Get(httpx.ArchivePath, archives.Status)
+
+	if capture != nil {
+		metadata := archiveapi.NewMetadataHandler(capture)
+		wacz := archiveapi.NewWACZHandler(capture)
+		sessions := sessionapi.NewHandler(capture)
+
+		router.Get(archiveapi.PagesPath, metadata.Pages)
+		router.Get(archiveapi.SnapshotPath, metadata.Snapshot)
+		router.Get(archiveapi.WACZPath, wacz.Get)
+		router.Head(archiveapi.WACZPath, wacz.Head)
+
+		router.Post(sessionapi.Path, sessions.Create)
+		router.Get(sessionapi.ResourcePath, sessions.Get)
+		router.Put(sessionapi.ResourcePath, sessions.Update)
+	}
+
+	if search != nil {
+		searchHandler := searchapi.NewHandler(search)
+		router.Get(searchapi.Path, searchHandler.Search)
+	}
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist.")
