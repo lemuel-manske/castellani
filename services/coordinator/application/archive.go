@@ -28,7 +28,7 @@ func (a *Application) SubmitArchive(
 		return AcceptedArchive{}, err
 	}
 
-	admission := Admission{
+	admission := persistence.Admission{
 		Key:         key,
 		Fingerprint: fingerprint,
 		Submission:  submission,
