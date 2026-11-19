@@ -1,13 +1,13 @@
 # ADR-0030: Gateway application and service-client boundaries
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-19
 
 ## Context
 
-Gateway currently uses two incompatible request paths. Archive admission and status go through `application.Application` and a Coordinator client. Pages, snapshots, WACZ, sessions, and search bypass the application and invoke `internal/upstream.Client` directly from API handlers.
+Previously, Gateway used two incompatible request paths. Archive admission and status go through `application.Application` and a Coordinator client. Pages, snapshots, WACZ, sessions, and search bypassed the application and invoked `internal/upstream.Client` directly from API handlers.
 
-The generic upstream client's `JSON(ctx, method, path, query, key, body)` and `Stream(ctx, method, path, byteRange, ifRange)` expose outbound HTTP mechanics to inbound adapters. They give Search an unnecessary streaming capability and force handlers to construct service paths, validate upstream responses, and interpret dependency failures. `common/proxy.go` likewise crosses boundaries by combining upstream result interpretation with public HTTP response writing.
+The former generic upstream client's `JSON(ctx, method, path, query, key, body)` and `Stream(ctx, method, path, byteRange, ifRange)` expose outbound HTTP mechanics to inbound adapters. They gave Search an unnecessary streaming capability and forced handlers to construct service paths, validate upstream responses, and interpret dependency failures. `common/proxy.go` likewise crossed boundaries by combining upstream result interpretation with public HTTP response writing.
 
 ## Decision
 
@@ -35,17 +35,17 @@ The application exposes operations grouped by responsibility, not by HTTP method
 | Session update | `UpdateSession` | Capture |
 | Unified search | `Search` | Search |
 
-The application uses typed, operation-specific inputs (including pagination and search filters) rather than raw query strings and arbitrary HTTP method/path/body parameters. Exact Go signatures and response types are established while implementing each operation; introduce only types justified by a current contract. Retain raw JSON only where the existing public contract intentionally treats content as opaque.
+The application uses typed, operation-specific inputs (including pagination and search filters) rather than raw query strings and arbitrary HTTP method/path/body parameters. Types should be introduced only where justified by a current contract. Retain raw JSON only where the existing public contract intentionally treats content as opaque.
 
 ### Outbound client capabilities
 
-Implement three service-specific client packages: `clients/coordinator`, `clients/capture`, and `clients/search`. Each exposes only the operations supported by its upstream service. No client exposes a general-purpose `JSON`, `Stream`, or `Request` method as its application-facing API.
+Three service-specific client packages are implemented: `clients/coordinator`, `clients/capture`, and `clients/search`. Each exposes only the operations supported by its upstream service. No client exposes a general-purpose `JSON`, `Stream`, or `Request` method as its application-facing API.
 
 - Coordinator: archive admission and status.
 - Capture: page listing, snapshot metadata, WACZ retrieval, and session creation/lookup/update.
 - Search: search only. No streaming API or streaming-specific transport configuration.
 
-The clients own route construction, HTTP methods, request encoding, service headers, response decoding, service-local DTOs and errors, upstream schema checks, timeouts, and transport errors. The assembly adapters translate their results and failures into application-owned representations; there is no common service-contract package. Use `net/http` directly; remove `internal/upstream` after callers have migrated. Do not create a replacement generic client layer. Shared helpers are justified only by proven meaningful reuse, never by a desire to eliminate small amounts of HTTP plumbing.
+The clients own route construction, HTTP methods, request encoding, service headers, response decoding, service-local DTOs and errors, upstream schema checks, timeouts, and transport errors. The assembly adapters translate their results and failures into application-owned representations; there is no common service-contract package. Use `net/http` directly; the former `internal/upstream` package has been removed. Do not create a replacement generic client layer. Shared helpers are justified only by proven meaningful reuse, never by a desire to eliminate small amounts of HTTP plumbing.
 
 ### Boundary-specific responsibilities
 
@@ -62,14 +62,12 @@ Keep a single application composition path in `server.go`, via `assembly.NewAppl
 
 Shared route definitions and cross-boundary types remain in an appropriately accessible owning package; do not put service-specific client logic or HTTP response writers in `common`. Interfaces are declared at the application boundary and implemented by assembly adapters; provider clients have no application-layer imports. Avoid re-export aliases and pass-through helpers.
 
-### Migration and verification
+### Verification
 
-Refactor incrementally, preserving existing externally observable API behavior and OpenAPI contracts. Update `gatewaytest` to construct and exercise the real API -> application -> client chain. Test through public behavior, including invalid upstream responses, problem forwarding, session validation, search, WACZ partial content/HEAD, cancellation and streaming. Enforce the no-client-import rule for API packages. Remove dead `internal/upstream` code and `common/proxy.go` when no longer needed.
-
-The migration is reviewed in stages: (1) contracts and ownership, (2) clients, (3) application, (4) handlers and router, (5) errors and streaming, (6) composition and fixtures, (7) final verification. Each stage requires explicit review before the next.
+`gatewaytest` assembles the production application and service-specific clients behind HTTP test services, exercising the actual API -> application -> assembly adapter -> client chain. Service-local tests cover archive admission, page and snapshot response validation, session behavior, search, error forwarding, and WACZ streaming, HEAD, and range requests. Import-boundary tests reject API imports of outbound clients and outbound-client imports of application or assembly. The Gateway's `make check` runs static analysis and race-enabled tests.
 
 ## Consequences
 
 The API has one dependency boundary and no knowledge of outbound service protocols. Each client exposes only relevant capabilities; Search never inherits WACZ streaming. Use-case and upstream validation have clear ownership, and tests can continue exercising end-to-end Gateway behavior. Some low-level HTTP code may appear in more than one client, which is preferable to a broad, leaky generic client abstraction.
 
-During the migration, the old and new paths may coexist temporarily, but the final architecture prohibits API-to-client calls and public HTTP writers in application or client code.
+The old generic upstream client, direct API-to-client paths, and the mixed-responsibility proxy helper have been removed. Public HTTP response writing remains exclusively in the inbound API.

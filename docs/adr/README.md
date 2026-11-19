@@ -37,9 +37,6 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0027 — Archive publication, WACZ packaging, and replay visibility](0027-archive-publication-replay.md)
 - [0028 — Interactive authentication execution and profile protection](0028-interactive-auth-infrastructure.md)
 - [0029 — Unified full-text search and historical replay navigation](0029-unified-search-replay.md)
-
-## Proposed decisions
-
 - [0030 — Gateway application and service-client boundaries](0030-gateway-layer-boundaries.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.

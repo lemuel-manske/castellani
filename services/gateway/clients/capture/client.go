@@ -299,8 +299,13 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	}
 
 	if response.StatusCode != success {
-		return nil, failureError(response.StatusCode, data)
-	}
+        // Range failures are part of the WACZ protocol, not JSON endpoints.
+        if response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+            return nil, ErrInvalidResponse
+        }
+
+        return nil, failureError(response.StatusCode, data)
+    }
 
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
 		return nil, ErrInvalidResponse

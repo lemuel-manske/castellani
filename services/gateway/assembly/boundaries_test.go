@@ -49,3 +49,26 @@ func TestOutboundClients_DoNotImportApplication(t *testing.T) {
 		}
 	}
 }
+
+func TestApplication_DoesNotImportOutboundClients(t *testing.T) {
+ files, err := filepath.Glob("../application/*.go")
+ require.NoError(t, err)
+ require.NotEmpty(t, files)
+
+ for _, path := range files {
+  if strings.HasSuffix(path, "_test.go") {
+   continue
+  }
+
+  source, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+  require.NoError(t, err)
+
+  for _, declaration := range source.Imports {
+   dependency, err := strconv.Unquote(declaration.Path.Value)
+   require.NoError(t, err)
+
+   assert.NotContains(t, dependency, "/clients/", path)
+   assert.NotContains(t, dependency, "/assembly", path)
+  }
+ }
+}
