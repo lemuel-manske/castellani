@@ -1,4 +1,3 @@
-// Package common define... Well, commons.
 package common
 
 const (

@@ -23,7 +23,15 @@ const (
 	idleConnectionTimeout     = 90 * time.Second
 )
 
+const acceptedStatus = "ACCEPTED"
+
 var ErrInvalidResponse = errors.New("invalid coordinator response")
+
+type Accepted struct {
+	ArchiveID string `json:"archiveId"`
+	Status    string `json:"status"`
+	StatusURL string `json:"statusUrl"`
+}
 
 type Client struct {
 	baseURL url.URL

@@ -2,8 +2,6 @@
 
 The API Gateway is the stateless public HTTP entry point for the application.
 
-It routes client requests to the services that own their operations and state.
-
 ## Development
 
 Requires Go 1.25.4. From `services/gateway`:

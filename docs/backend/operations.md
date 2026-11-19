@@ -11,6 +11,8 @@ These are configurable initial defaults, not claims of production-grade availabi
 | Browser slot capacity | 10 | F5 holds successful leases through the measurement |
 | Transient failure retry | Exponential backoff with jitter, bounded per operation | Reconciliation persists independently of a single retry budget |
 | RabbitMQ recovery | Automatic reconnect | Publisher confirms, durable queues, outbox re-dispatch |
+| Coordinator reconciliation interval | 30 seconds | Reissue stalled publish/compensation decisions after the stalled-workflow age |
+| Stalled workflow age | 2 minutes | Recovery command and cooldown are committed atomically |
 | Reconciliation frequency | Periodic plus event-triggered | Work cannot depend on receipt of the first notification |
 | DLQ | Bounded poison-message retries | A DLQ event is not a terminal business-work outcome |
 
@@ -45,3 +47,4 @@ Use the Go system integration harness from ADR-0009, independent service unit te
 12. Confirm credentials never appear in message envelopes or logs; authenticated WARC and protected profiles require explicit authorization for access.
 
 Implementation should validate MiniStack's DynamoDB transactional condition behavior, OpenSearch indexing/search visibility, Terraform resources, and S3 byte-range semantics against actual running services before treating provider emulation as complete.
+\n

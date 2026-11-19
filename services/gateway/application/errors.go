@@ -6,14 +6,13 @@ import (
 )
 
 var (
+	ErrInvalidUpstream       = errors.New("invalid upstream response")
 	ErrDependencyUnavailable = errors.New("dependency unavailable")
 	ErrInvalidPagination     = errors.New("invalid pagination")
 	ErrInvalidSearch         = errors.New("invalid search")
 	ErrInvalidSession        = errors.New("invalid session")
 	ErrInvalidSessionID      = errors.New("invalid session ID")
 	ErrInvalidSnapshotID     = errors.New("invalid snapshot ID")
-	ErrInvalidSubmission     = errors.New("invalid submission")
-	ErrInvalidUpstream       = errors.New("invalid upstream response")
 	ErrInvalidWACZRange      = errors.New("invalid WACZ range")
 )
 

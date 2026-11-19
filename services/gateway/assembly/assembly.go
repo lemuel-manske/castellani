@@ -15,9 +15,9 @@ func NewApplication(
 	captureClient *capture.Client,
 	searchClient *search.Client,
 ) application.Application {
-	var coordinatorPort application.Coordinator
-	var capturePort application.Capture
-	var searchPort application.Search
+	var coordinatorPort application.CoordinatorService
+	var capturePort application.CaptureService
+	var searchPort application.SearchService
 
 	if coordinatorClient != nil {
 		coordinatorPort = coordinatorAdapter{

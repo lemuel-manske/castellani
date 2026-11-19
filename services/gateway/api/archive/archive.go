@@ -10,6 +10,7 @@ import (
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 type Handler struct {
@@ -37,7 +38,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var submission application.Submission
+	var submission archive.Submission
 	data, err := httpx.DecodeJSONBytes(
 		w,
 		r,
