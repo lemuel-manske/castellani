@@ -24,7 +24,7 @@ func NewHandler(app application.Application) Handler {
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
-	if !httpx.ValidateIdempotencyKey(key) {
+	if !httpx.ValidIdempotencyKey(key) {
 		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,

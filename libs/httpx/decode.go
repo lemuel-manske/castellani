@@ -48,8 +48,3 @@ func DecodeJSONBytes(w http.ResponseWriter, r *http.Request, destination any) ([
 
 	return data, nil
 }
-
-func DecodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
-	_, err := DecodeJSONBytes(w, r, destination)
-	return err
-}

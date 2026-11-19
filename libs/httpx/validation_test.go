@@ -7,20 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateIdempotencyKey_AcceptsOpaqueKey(t *testing.T) {
-	assert.True(t, httpx.ValidateIdempotencyKey("archive-run-123"))
+func TestValidIdempotencyKey_AcceptsOpaqueKey(t *testing.T) {
+	assert.True(t, httpx.ValidIdempotencyKey("archive-run-123"))
 }
 
-func TestValidateIdempotencyKey_RejectsControlCharacters(t *testing.T) {
-	assert.False(t, httpx.ValidateIdempotencyKey("archive\nrun-123"))
+func TestValidIdempotencyKey_RejectsControlCharacters(t *testing.T) {
+	assert.False(t, httpx.ValidIdempotencyKey("archive\nrun-123"))
 }
 
-func TestValidateIdempotencyKey_RejectsOuterWhitespace(t *testing.T) {
-	assert.False(t, httpx.ValidateIdempotencyKey(" archive-run-123"))
+func TestValidIdempotencyKey_RejectsOuterWhitespace(t *testing.T) {
+	assert.False(t, httpx.ValidIdempotencyKey(" archive-run-123"))
 }
 
-func TestValidateIdempotencyKey_RejectsShortKey(t *testing.T) {
-	assert.False(t, httpx.ValidateIdempotencyKey("short"))
+func TestValidIdempotencyKey_RejectsShortKey(t *testing.T) {
+	assert.False(t, httpx.ValidIdempotencyKey("short"))
 }
 
 func TestValidPathSegment_RejectsReservedSegments(t *testing.T) {

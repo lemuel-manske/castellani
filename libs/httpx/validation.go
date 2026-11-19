@@ -10,7 +10,7 @@ const (
 	maxIdempotencyKeyLength = 200
 )
 
-func ValidateIdempotencyKey(key string) bool {
+func ValidIdempotencyKey(key string) bool {
 	validLength := len(key) >= minIdempotencyKeyLength && len(key) <= maxIdempotencyKeyLength
 	cleanWhitespace := strings.TrimSpace(key) == key
 	noControlCharacters := !strings.ContainsAny(key, "\r\n\x00")
