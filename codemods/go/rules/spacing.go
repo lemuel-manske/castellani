@@ -19,7 +19,7 @@ func IfSpacing(source []byte) ([]byte, error) {
 // block or switch/select clause. Leading comments remain attached to returns,
 // and the first statement in a block or clause is left unchanged.
 func ReturnSpacing(source []byte) ([]byte, error) {
-	return separateStatements(source, func(previous, current ast.Stmt) bool {
+	return separateStatements(source, true, func(previous, current ast.Stmt) bool {
 		_, ok := current.(*ast.ReturnStmt)
 		return ok
 	})
