@@ -98,7 +98,7 @@ func (c *Client) CreateArchive(
 
 	decodeErr := json.Unmarshal(rawResponse, &accepted)
 
-	validAdmission := accepted.Status == AcceptedStatus && httpx.ValidPathSegment(accepted.ArchiveID)
+	validAdmission := accepted.Status == acceptedStatus && httpx.ValidPathSegment(accepted.ArchiveID)
 
 	if decodeErr != nil || !validAdmission {
 		return Accepted{}, ErrInvalidResponse
