@@ -6,6 +6,8 @@ const CoordinatorURL = "http://coordinator:8080"
 func Environment(overrides map[string]string) func(string) string {
 	settings := map[string]string{
 		"COORDINATOR_URL": CoordinatorURL,
+		"CAPTURE_URL": "http://capture:8080",
+		"SEARCH_URL": "http://search:8080",
 	}
 
 	for name, value := range overrides {
