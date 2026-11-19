@@ -38,70 +38,90 @@ type Gateway struct {
 	server *httptest.Server
 }
 
-func Start(t *testing.T, coordinatorHandler http.HandlerFunc) Gateway {
-	t.Helper()
+type Option func(*serviceOptions)
 
-	upstream := httptest.NewServer(coordinatorHandler)
-	t.Cleanup(upstream.Close)
-
-	origin, err := url.Parse(upstream.URL)
-	require.NoError(t, err)
-
-	client := coordinator.NewHTTPClient(*origin, time.Second)
-	app := application.NewApplication(client)
-	router := api.NewRouter(func() bool { return true }, app, slog.Default())
-
-	return start(t, router)
+type serviceOptions struct {
+	coordinator http.HandlerFunc
+	capture     http.HandlerFunc
+	search      http.HandlerFunc
+	ready       bool
 }
 
-func StartWithServices(
-	t *testing.T,
-	coordinatorHandler http.HandlerFunc,
-	captureHandler http.HandlerFunc,
-	searchHandler http.HandlerFunc,
-) Gateway {
-	t.Helper()
-
-	coordinatorServer := httptest.NewServer(coordinatorHandler)
-	captureServer := httptest.NewServer(captureHandler)
-	searchServer := httptest.NewServer(searchHandler)
-
-	t.Cleanup(coordinatorServer.Close)
-	t.Cleanup(captureServer.Close)
-	t.Cleanup(searchServer.Close)
-
-	coordinatorOrigin, err := url.Parse(coordinatorServer.URL)
-	require.NoError(t, err)
-
-	captureOrigin, err := url.Parse(captureServer.URL)
-	require.NoError(t, err)
-
-	searchOrigin, err := url.Parse(searchServer.URL)
-	require.NoError(t, err)
-
-	app := application.NewApplication(coordinator.NewHTTPClient(*coordinatorOrigin, time.Second))
-	captureClient := upstream.NewClient(*captureOrigin, time.Second)
-	searchClient := upstream.NewClient(*searchOrigin, time.Second)
-	router := api.NewRouterWithServices(func() bool { return true }, app, captureClient, searchClient, slog.Default())
-
-	return start(t, router)
+func WithCoordinatorService(handler http.HandlerFunc) Option {
+	return func(options *serviceOptions) {
+		options.coordinator = handler
+	}
 }
 
-func StartUnready(t *testing.T) Gateway {
-	t.Helper()
-
-	router := api.NewRouter(func() bool { return false }, application.Application{}, slog.Default())
-
-	return start(t, router)
+func WithCaptureService(handler http.HandlerFunc) Option {
+	return func(options *serviceOptions) {
+		options.capture = handler
+	}
 }
 
-func start(t *testing.T, handler http.Handler) Gateway {
+func WithSearchService(handler http.HandlerFunc) Option {
+	return func(options *serviceOptions) {
+		options.search = handler
+	}
+}
+
+func WithReadiness(ready bool) Option {
+	return func(options *serviceOptions) {
+		options.ready = ready
+	}
+}
+
+func Start(t *testing.T, options ...Option) Gateway {
 	t.Helper()
+
+	services := serviceOptions{
+		ready: true,
+	}
+
+	for _, option := range options {
+		option(&services)
+	}
+
+	coordinatorOrigin := startService(t, "Coordinator", services.coordinator)
+	captureOrigin := startService(t, "Capture", services.capture)
+	searchOrigin := startService(t, "Search", services.search)
+
+	coordinatorClient := coordinator.NewHTTPClient(coordinatorOrigin, time.Second)
+	captureClient := upstream.NewClient(captureOrigin, time.Second)
+	searchClient := upstream.NewClient(searchOrigin, time.Second)
+	app := application.NewApplication(coordinatorClient)
+
+	router := api.NewRouterWithServices(
+		func() bool { return services.ready },
+		app,
+		captureClient,
+		searchClient,
+		slog.Default(),
+	)
+
+	server := httptest.NewServer(router)
+	t.Cleanup(server.Close)
+
+	return Gateway{t: t, server: server}
+}
+
+func startService(t *testing.T, name string, handler http.HandlerFunc) url.URL {
+	t.Helper()
+
+	if handler == nil {
+		handler = func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("unexpected %s service request: %s %s", name, r.Method, r.URL.RequestURI())
+			http.Error(w, "unexpected test dependency call", http.StatusInternalServerError)
+		}
+	}
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	return Gateway{t: t, server: server}
+	origin, err := url.Parse(server.URL)
+	require.NoError(t, err)
+
+	return *origin
 }
 
 func (g Gateway) Submit(key, body string) Response {
