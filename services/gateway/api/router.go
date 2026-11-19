@@ -14,7 +14,6 @@ import (
 	sessionapi "github.com/lemuel-manske/unnamed/services/gateway/api/session"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
 const (
@@ -22,27 +21,7 @@ const (
 	healthResponse  = "ok\n"
 )
 
-func NewRouter(
-	ready func() bool,
-	app application.Application,
-	logger *slog.Logger,
-) http.Handler {
-	return NewRouterWithServices(
-		ready,
-		app,
-		nil,
-		nil,
-		logger,
-	)
-}
-
-func NewRouterWithServices(
-	ready func() bool,
-	app application.Application,
-	capture *upstream.Client,
-	search *upstream.Client,
-	logger *slog.Logger,
-) http.Handler {
+func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
 	router := chi.NewRouter()
 
 	router.Use(requestID)
@@ -73,25 +52,19 @@ func NewRouterWithServices(
 	router.Post(common.ArchivesPath, archives.Create)
 	router.Get(common.ArchivePath, archives.Status)
 
-	if capture != nil {
-		metadata := archiveapi.NewMetadataHandler(capture)
-		wacz := archiveapi.NewWACZHandler(capture)
-		sessions := sessionapi.NewHandler(capture)
+	metadata := archiveapi.NewMetadataHandler(app)
+	wacz := archiveapi.NewWACZHandler(app)
+	sessions := sessionapi.NewHandler(app)
+	search := searchapi.NewHandler(app)
 
-		router.Get(common.PagesPath, metadata.Pages)
-		router.Get(common.SnapshotPath, metadata.Snapshot)
-		router.Get(common.WACZPath, wacz.Get)
-		router.Head(common.WACZPath, wacz.Head)
-
-		router.Post(common.SessionsPath, sessions.Create)
-		router.Get(common.SessionPath, sessions.Get)
-		router.Put(common.SessionPath, sessions.Update)
-	}
-
-	if search != nil {
-		searchHandler := searchapi.NewHandler(search)
-		router.Get(common.SearchPath, searchHandler.Search)
-	}
+	router.Get(common.PagesPath, metadata.Pages)
+	router.Get(common.SnapshotPath, metadata.Snapshot)
+	router.Get(common.WACZPath, wacz.Get)
+	router.Head(common.WACZPath, wacz.Head)
+	router.Post(common.SessionsPath, sessions.Create)
+	router.Get(common.SessionPath, sessions.Get)
+	router.Put(common.SessionPath, sessions.Update)
+	router.Get(common.SearchPath, search.Search)
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		responseProblem := httpx.NewProblem(

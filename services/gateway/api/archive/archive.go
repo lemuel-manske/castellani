@@ -11,7 +11,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 )
 
 type Handler struct {
@@ -143,7 +142,6 @@ func writeFailure(
 	err error,
 	unavailableDetail string,
 ) {
-	var failure *coordinator.Failure
 	var dependencyFailure *application.DependencyFailure
 
 	var validation *application.ValidationError
@@ -188,20 +186,7 @@ func writeFailure(
 		)
 		httpx.WriteProblem(w, responseProblem)
 
-	case errors.As(err, &failure):
-		p := failure.Problem
-		p.Instance = r.URL.Path
-		httpx.WriteProblem(w, p)
 
-	case errors.Is(err, coordinator.ErrInvalidResponse):
-		responseProblem := httpx.NewProblem(
-			r,
-			http.StatusBadGateway,
-			"invalid-upstream",
-			"Invalid Upstream Response",
-			"Coordinator returned an unexpected response.",
-		)
-		httpx.WriteProblem(w, responseProblem)
 
 	default:
 		responseProblem := httpx.NewProblem(
