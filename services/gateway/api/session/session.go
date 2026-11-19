@@ -92,6 +92,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(httpx.LocationHeader, common.SessionPathPrefix+url.PathEscape(result.SessionID))
+
 	httpx.JSON(
 		w,
 		http.StatusCreated,
@@ -127,6 +128,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	httpx.JSON(
 		w,
 		http.StatusOK,
@@ -198,6 +200,7 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	httpx.JSON(
 		w,
 		http.StatusOK,
