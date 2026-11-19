@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"io"
+	"net/url"
 	"net/http"
 	"testing"
 
@@ -13,10 +14,10 @@ import (
 const searchResults = `{"results":[{"archiveId":"run-1","snapshotId":"snap-1","url":"https://example.org/","capturedAt":"2026-11-18T12:00:00Z","snippet":"archived text"}]}`
 
 func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T) {
-	receivedQuery := make(chan string, 1)
+	receivedQuery := make(chan url.Values, 1)
 
 	gateway := gatewaytest.Start(t, gatewaytest.WithSearchService(func(w http.ResponseWriter, r *http.Request) {
-		receivedQuery <- r.URL.RawQuery
+		receivedQuery <- r.URL.Query()
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		_, _ = io.WriteString(w, searchResults)
 	}))
@@ -33,11 +34,7 @@ func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T)
 		searchResults,
 		result.Body,
 	)
-	assert.Equal(
-		t,
-		"q=historical&archiveId=run-1&limit=10",
-		<-receivedQuery,
-	)
+	assert.Equal(t, url.Values{"q": {"historical"}, "archiveId": {"run-1"}, "limit": {"10"}}, <-receivedQuery)
 }
 
 func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testing.T) {

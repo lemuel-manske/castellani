@@ -15,7 +15,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
 const (
@@ -55,31 +54,10 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		searchClient,
 	)
 
-	// Legacy API clients remain until the HTTP handlers migrate to the application.
-	var legacyCapture *upstream.Client
-	var legacySearch *upstream.Client
-
-	if cfg.captureURL != nil {
-		legacyCapture = upstream.NewClientWithStreamTimeout(
-			*cfg.captureURL,
-			cfg.upstreamTimeout,
-			cfg.streamTimeout,
-		)
-	}
-
-	if cfg.searchURL != nil {
-		legacySearch = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
-	}
 
 	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
 	gateway.http = &http.Server{
-		Handler: api.NewRouterWithServices(
-			gateway.ready.Load,
-			app,
-			legacyCapture,
-			legacySearch,
-			logger,
-		),
+		Handler: api.NewRouter(gateway.ready.Load, app, logger),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 		IdleTimeout:       serverIdleTimeout,

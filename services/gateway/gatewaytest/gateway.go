@@ -18,7 +18,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,16 +112,8 @@ func Start(t *testing.T, options ...Option) Gateway {
 		captureClient,
 		searchClient,
 	)
-	legacyCapture := upstream.NewClient(captureOrigin, time.Second)
-	legacySearch := upstream.NewClient(searchOrigin, time.Second)
 
-	router := api.NewRouterWithServices(
-		func() bool { return services.ready },
-		app,
-		legacyCapture,
-		legacySearch,
-		slog.Default(),
-	)
+	router := api.NewRouter(func() bool { return services.ready }, app, slog.Default())
 
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
