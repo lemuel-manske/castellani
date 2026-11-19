@@ -13,6 +13,8 @@ const (
 	shutdownEnvironment = "GATEWAY_SHUTDOWN_TIMEOUT"
 	upstreamEnvironment = "GATEWAY_UPSTREAM_TIMEOUT"
 	coordinatorEnvironment = "COORDINATOR_URL"
+	captureEnvironment = "CAPTURE_URL"
+	searchEnvironment = "SEARCH_URL"
 
 	defaultAddress         = ":8080"
 	defaultShutdownTimeout = 10 * time.Second
@@ -24,6 +26,8 @@ type config struct {
 	shutdownTimeout time.Duration
 	upstreamTimeout time.Duration
 	coordinatorURL  *url.URL
+	captureURL      *url.URL
+	searchURL       *url.URL
 }
 
 func loadConfig(getenv func(string) string) (config, error) {
@@ -70,6 +74,19 @@ func loadConfig(getenv func(string) string) (config, error) {
 		return config{}, fmt.Errorf("COORDINATOR_URL must be an absolute HTTP(S) origin without credentials, path, query or fragment")
 	}
 	cfg.coordinatorURL = parsed
+
+	cfg.captureURL, err = serviceOrigin(getenv, captureEnvironment)
+
+	if err != nil {
+		return config{}, err
+	}
+
+	cfg.searchURL, err = serviceOrigin(getenv, searchEnvironment)
+
+	if err != nil {
+		return config{}, err
+	}
+
 	return cfg, nil
 }
 
@@ -98,4 +115,24 @@ func durationSetting(getenv func(string) string, key string, fallback time.Durat
 		return 0, fmt.Errorf("%s must be positive", key)
 	}
 	return duration, nil
+}
+
+func serviceOrigin(getenv func(string) string, key string) (*url.URL, error) {
+	raw := getenv(key)
+
+	if raw == "" {
+		return nil, fmt.Errorf("%s is required", key)
+	}
+
+	origin, err := url.Parse(raw)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s: %w", key, err)
+	}
+
+	if !validCoordinatorOrigin(origin) {
+		return nil, fmt.Errorf("%s must be an absolute HTTP(S) origin without credentials, path, query or fragment", key)
+	}
+
+	return origin, nil
 }
