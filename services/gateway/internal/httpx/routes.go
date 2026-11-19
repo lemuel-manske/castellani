@@ -1,0 +1,10 @@
+package httpx
+
+const (
+	ArchivesPath       = "/archives"
+	ArchivePath        = "/archives/{archiveId}"
+	ArchivePathPrefix  = "/archives/"
+	ArchiveIDParameter = "archiveId"
+	IdempotencyHeader  = "Idempotency-Key"
+	LocationHeader     = "Location"
+)
