@@ -16,7 +16,7 @@ func TestWriteProblem_EmitsStandardProblemDocument(t *testing.T) {
 	response := httptest.NewRecorder()
 
 	problem := httpx.NewProblem(request, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist.")
-	httpx.WriteProblem(response, problem)
+	httpx.JSONProblem(response, problem)
 
 	assert.Equal(t, http.StatusNotFound, response.Code)
 	assert.Equal(t, httpx.MediaTypeProblem, response.Header().Get(httpx.HeaderContentType))

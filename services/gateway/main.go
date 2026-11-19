@@ -25,7 +25,7 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	cfg, err := loadConfig(os.Getenv)
+	cfg, err := LoadConfig(os.Getenv)
 
 	if err != nil {
 		return err
@@ -41,5 +41,8 @@ func run(logger *slog.Logger) error {
 	defer stop()
 
 	logger.Info("gateway listening", "address", listener.Addr().String())
-	return newGatewayServer(cfg, logger).serve(ctx, listener)
+
+	server := NewGatewayServer(cfg, logger)
+
+	return server.Serve(ctx, listener)
 }

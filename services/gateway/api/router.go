@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	requestIDHeader = "X-Request-ID"
 	healthMediaType = "text/plain; charset=utf-8"
 	healthResponse  = "ok\n"
 )
@@ -35,6 +34,7 @@ func NewRouterWithServices(
 	logger *slog.Logger,
 ) http.Handler {
 	router := chi.NewRouter()
+
 	router.Use(requestID)
 	router.Use(recoverPanics(logger))
 
@@ -43,6 +43,7 @@ func NewRouterWithServices(
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(healthResponse))
 	})
+
 	router.Get(common.HealthReadyPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", healthMediaType)
 
@@ -116,7 +117,7 @@ func requestID(next http.Handler) http.Handler {
 			httpx.WriteProblem(w, responseProblem)
 			return
 		}
-		w.Header().Set(requestIDHeader, hex.EncodeToString(random[:]))
+		w.Header().Set(httpx.HeaderRequestID, hex.EncodeToString(random[:]))
 		next.ServeHTTP(w, r)
 	})
 }

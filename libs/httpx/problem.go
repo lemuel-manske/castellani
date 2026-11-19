@@ -8,6 +8,7 @@ import (
 
 const (
 	MediaTypeProblem  = "application/problem+json"
+
 	ProblemTypePrefix = "urn:distributed-web-archive:problem:"
 )
 

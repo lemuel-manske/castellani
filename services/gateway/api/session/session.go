@@ -114,7 +114,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
-	h.forwardSession(w, r, http.MethodGet, nil)
+	h.forward(w, r, http.MethodGet, nil)
 }
 
 func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -147,10 +147,10 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.forwardSession(w, r, http.MethodPut, raw)
+	h.forward(w, r, http.MethodPut, raw)
 }
 
-func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method string, body []byte) {
+func (h Handler) forward(w http.ResponseWriter, r *http.Request, method string, body []byte) {
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {

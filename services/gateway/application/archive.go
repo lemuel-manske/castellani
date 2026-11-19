@@ -34,17 +34,17 @@ func NewApplication(coordinator ArchiveCoordinator) Application {
 }
 
 func (a Application) CreateArchive(ctx context.Context, key string, submission archive.Submission, raw []byte) (archive.Accepted, error) {
-
 	if err := submission.Validate(); err != nil {
 		return archive.Accepted{}, &ValidationError{Cause: err}
 	}
+
 	return a.Coordinator.CreateArchive(ctx, key, raw)
 }
 
 func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
-
 	if !httpx.ValidPathSegment(id) {
 		return nil, ErrInvalidArchiveID
 	}
+
 	return a.Coordinator.GetArchive(ctx, id)
 }

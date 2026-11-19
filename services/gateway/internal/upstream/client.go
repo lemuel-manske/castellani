@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	maxJSONBytes         = 1 << 20
+	maxJSONBytes = 1 << 20
+
 	idleTimeout          = 90 * time.Second
 	defaultStreamTimeout = 30 * time.Minute
 )

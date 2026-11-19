@@ -1,9 +1,11 @@
 package httpx
 
 const (
-	HeaderContentType  = "Content-Type"
 	HeaderCacheControl = "Cache-Control"
+	HeaderContentType  = "Content-Type"
+	HeaderRequestID		 = "X-Request-ID"
 	IdempotencyHeader  = "Idempotency-Key"
 	LocationHeader     = "Location"
+
 	CacheNoStore       = "no-store"
 )

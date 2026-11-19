@@ -50,6 +50,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 
 	byteRange := r.Header.Get("Range")
 	ifRange := r.Header.Get("If-Range")
+
 	invalidRange := len(byteRange) > maxRangeHeaderBytes || strings.ContainsAny(byteRange, "\r\n,")
 	invalidIfRange := len(ifRange) > maxRangeHeaderBytes || strings.ContainsAny(ifRange, "\r\n")
 
