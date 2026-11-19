@@ -13,7 +13,7 @@ func ForwardJSON(w http.ResponseWriter, r *http.Request, result upstream.Result,
 		var body any
 
 		if err := json.Unmarshal(result.Body, &body); err != nil || body == nil {
-			WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Upstream returned invalid JSON.")
+			WriteProblem(w, NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Upstream returned invalid JSON."))
 			return
 		}
 
@@ -31,11 +31,11 @@ func ForwardJSON(w http.ResponseWriter, r *http.Request, result upstream.Result,
 
 	if validProblem && allowedFailure(result.Status) {
 		problem.Instance = r.URL.Path
-		Write(w, problem)
+		WriteProblem(w, problem)
 		return
 	}
 
-	WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Upstream returned an unexpected response.")
+	WriteProblem(w, NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Upstream returned an unexpected response."))
 }
 
 func allowedFailure(status int) bool {
@@ -59,5 +59,5 @@ func UpstreamError(w http.ResponseWriter, r *http.Request, err error, service st
 		title = "Invalid Upstream Response"
 	}
 
-	WriteProblem(w, r, status, kind, title, service+" could not complete the request.")
+	WriteProblem(w, NewProblem(r, status, kind, title, service+" could not complete the request."))
 }
