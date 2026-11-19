@@ -9,8 +9,8 @@ import (
 )
 
 type ArchiveCoordinator interface {
-	Admit(context.Context, string, []byte) (archive.Accepted, error)
-	Status(context.Context, string) (json.RawMessage, error)
+	CreateArchive(context.Context, string, []byte) (archive.Accepted, error)
+	GetArchive(context.Context, string) (json.RawMessage, error)
 }
 
 type Application struct {
@@ -36,7 +36,7 @@ func (a Application) CreateArchive(ctx context.Context, key string, submission a
 	if err := submission.Validate(); err != nil {
 		return archive.Accepted{}, &ValidationError{Cause: err}
 	}
-	return a.Coordinator.Admit(ctx, key, raw)
+	return a.Coordinator.CreateArchive(ctx, key, raw)
 }
 
 func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
@@ -44,5 +44,5 @@ func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage
 	if !archive.ValidID(id) {
 		return nil, ErrInvalidArchiveID
 	}
-	return a.Coordinator.Status(ctx, id)
+	return a.Coordinator.GetArchive(ctx, id)
 }
