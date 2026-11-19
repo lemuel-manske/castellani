@@ -9,7 +9,7 @@ import (
 // IfSpacing separates an if statement from a preceding statement with exactly
 // one blank line, unless the if is first in its containing block.
 func IfSpacing(source []byte) ([]byte, error) {
-	return separateStatements(source, func(previous, current ast.Stmt) bool {
+	return separateStatements(source, false, func(previous, current ast.Stmt) bool {
 		_, ok := current.(*ast.IfStmt)
 		return ok
 	})
@@ -25,7 +25,7 @@ func ReturnSpacing(source []byte) ([]byte, error) {
 	})
 }
 
-func separateStatements(source []byte, matches func(ast.Stmt, ast.Stmt) bool) ([]byte, error) {
+func separateStatements(source []byte, includeClauses bool, matches func(ast.Stmt, ast.Stmt) bool) ([]byte, error) {
 	set := token.NewFileSet()
 	file, err := parser.ParseFile(set, "source.go", source, parser.ParseComments)
 	if err != nil {
@@ -41,8 +41,14 @@ func separateStatements(source []byte, matches func(ast.Stmt, ast.Stmt) bool) ([
 		case *ast.BlockStmt:
 			statements = block.List
 		case *ast.CaseClause:
+			if !includeClauses {
+				return true
+			}
 			statements = block.Body
 		case *ast.CommClause:
+			if !includeClauses {
+				return true
+			}
 			statements = block.Body
 		default:
 			return true
