@@ -14,6 +14,16 @@ const (
 	HeaderAttempt = "x-coordinator-attempt"
 )
 
+var EventTypes = []string{
+	domain.EventCrawlCompleted,
+	domain.EventArchivePrepared,
+	domain.EventArchivePublished,
+	domain.EventArchiveCompensated,
+	domain.EventSearchCompensated,
+	domain.EventSearchIndexingCompleted,
+	domain.EventSearchReady,
+}
+
 type RabbitConsumer struct {
 	url       string
 	exchange  string
@@ -23,16 +33,6 @@ type RabbitConsumer struct {
 type RabbitPublisher struct {
 	url      string
 	exchange string
-}
-
-var EventTypes = []string{
-	domain.EventCrawlCompleted,
-	domain.EventArchivePrepared,
-	domain.EventArchivePublished,
-	domain.EventArchiveCompensated,
-	domain.EventSearchCompensated,
-	domain.EventSearchIndexingCompleted,
-	domain.EventSearchReady,
 }
 
 type InboundEnvelope struct {

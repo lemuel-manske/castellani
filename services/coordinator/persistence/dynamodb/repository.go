@@ -330,7 +330,6 @@ func boolValue(value types.AttributeValue) bool {
 	return attribute.Value
 }
 
-
 func archiveFromItem(id string, item map[string]types.AttributeValue) domain.Archive {
 	updatedAt, _ := time.Parse(archiveTimestampLayout, stringValue(item["updatedAt"]))
 	decision := stringValue(item["decision"])
@@ -358,7 +357,9 @@ func archiveFromItem(id string, item map[string]types.AttributeValue) domain.Arc
 			Failed:   numberValue(item["failed"]),
 			Pending:  numberValue(item["pending"]),
 		},
-		Replay: domain.ReplayProgress{Status: stringValue(item["replayStatus"])},
+		Replay: domain.ReplayProgress{
+			Status: stringValue(item["replayStatus"]),
+		},
 		Search: domain.SearchProgress{
 			Status:   stringValue(item["searchStatus"]),
 			Indexed:  numberValue(item["indexed"]),

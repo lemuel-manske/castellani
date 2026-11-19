@@ -13,54 +13,54 @@ const (
 	endpointEnvironment           = "COORDINATOR_DYNAMODB_ENDPOINT"
 	archivesEnvironment           = "COORDINATOR_ARCHIVES_TABLE"
 	submissionsEnvironment        = "COORDINATOR_SUBMISSIONS_TABLE"
-	outboxEnvironment              = "COORDINATOR_OUTBOX_TABLE"
-	inboxEnvironment               = "COORDINATOR_INBOX_TABLE"
-	rabbitURLEnvironment           = "COORDINATOR_RABBITMQ_URL"
-	rabbitExchangeEnvironment      = "COORDINATOR_RABBITMQ_EXCHANGE"
-	reconcileIntervalEnvironment   = "COORDINATOR_RECONCILIATION_INTERVAL"
-	stalledWorkflowAgeEnvironment  = "COORDINATOR_STALLED_WORKFLOW_AGE"
+	outboxEnvironment             = "COORDINATOR_OUTBOX_TABLE"
+	inboxEnvironment              = "COORDINATOR_INBOX_TABLE"
+	rabbitURLEnvironment          = "COORDINATOR_RABBITMQ_URL"
+	rabbitExchangeEnvironment     = "COORDINATOR_RABBITMQ_EXCHANGE"
+	reconcileIntervalEnvironment  = "COORDINATOR_RECONCILIATION_INTERVAL"
+	stalledWorkflowAgeEnvironment = "COORDINATOR_STALLED_WORKFLOW_AGE"
 
-	defaultAddress             = ":8081"
-	defaultShutdownTimeout     = 10 * time.Second
-	defaultRegion              = "us-east-1"
-	defaultArchivesTable       = "coordinator_archive_runs"
-	defaultSubmissionsTable    = "coordinator_submission_keys"
-	defaultOutboxTable         = "coordinator_outbox"
-	defaultInboxTable          = "coordinator_inbox"
-	defaultRabbitURL           = "amqp://guest:guest@localhost:5672/"
-	defaultRabbitExchange      = "castellani.events"
-	defaultReconcileInterval   = 30 * time.Second
-	defaultStalledWorkflowAge  = 2 * time.Minute
+	defaultAddress            = ":8081"
+	defaultShutdownTimeout    = 10 * time.Second
+	defaultRegion             = "us-east-1"
+	defaultArchivesTable      = "coordinator_archive_runs"
+	defaultSubmissionsTable   = "coordinator_submission_keys"
+	defaultOutboxTable        = "coordinator_outbox"
+	defaultInboxTable         = "coordinator_inbox"
+	defaultRabbitURL          = "amqp://guest:guest@localhost:5672/"
+	defaultRabbitExchange     = "castellani.events"
+	defaultReconcileInterval  = 30 * time.Second
+	defaultStalledWorkflowAge = 2 * time.Minute
 )
 
 type Config struct {
-	address             string
-	shutdownTimeout     time.Duration
-	region              string
-	endpoint             string
-	archivesTable        string
-	submissionsTable     string
-	outboxTable           string
-	inboxTable            string
-	rabbitURL             string
-	rabbitExchange        string
-	reconcileInterval     time.Duration
-	stalledWorkflowAge    time.Duration
+	address            string
+	shutdownTimeout    time.Duration
+	region             string
+	endpoint           string
+	archivesTable      string
+	submissionsTable   string
+	outboxTable        string
+	inboxTable         string
+	rabbitURL          string
+	rabbitExchange     string
+	reconcileInterval  time.Duration
+	stalledWorkflowAge time.Duration
 }
 
 func LoadConfig(getenv func(string) string) (Config, error) {
 	config := Config{
 		address:            defaultAddress,
 		shutdownTimeout:    defaultShutdownTimeout,
-		region:              defaultRegion,
-		archivesTable:       defaultArchivesTable,
-		submissionsTable:    defaultSubmissionsTable,
-		outboxTable:         defaultOutboxTable,
-		inboxTable:          defaultInboxTable,
-		rabbitURL:           defaultRabbitURL,
-		rabbitExchange:      defaultRabbitExchange,
-		reconcileInterval:   defaultReconcileInterval,
-		stalledWorkflowAge:  defaultStalledWorkflowAge,
+		region:             defaultRegion,
+		archivesTable:      defaultArchivesTable,
+		submissionsTable:   defaultSubmissionsTable,
+		outboxTable:        defaultOutboxTable,
+		inboxTable:         defaultInboxTable,
+		rabbitURL:          defaultRabbitURL,
+		rabbitExchange:     defaultRabbitExchange,
+		reconcileInterval:  defaultReconcileInterval,
+		stalledWorkflowAge: defaultStalledWorkflowAge,
 	}
 
 	if address := getenv(addressEnvironment); address != "" {
@@ -68,22 +68,41 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	}
 
 	if _, _, err := net.SplitHostPort(config.address); err != nil {
-		return Config{}, fmt.Errorf("invalid %s: %w", addressEnvironment, err)
+		return Config{}, fmt.Errorf(
+			"invalid %s: %w",
+			addressEnvironment,
+			err,
+		)
 	}
 
 	var err error
 
-	config.shutdownTimeout, err = durationSetting(getenv, shutdownEnvironment, config.shutdownTimeout)
+	config.shutdownTimeout, err = durationSetting(
+		getenv,
+		shutdownEnvironment,
+		config.shutdownTimeout,
+	)
+
 	if err != nil {
 		return Config{}, err
 	}
 
-	config.reconcileInterval, err = durationSetting(getenv, reconcileIntervalEnvironment, config.reconcileInterval)
+	config.reconcileInterval, err = durationSetting(
+		getenv,
+		reconcileIntervalEnvironment,
+		config.reconcileInterval,
+	)
+
 	if err != nil {
 		return Config{}, err
 	}
 
-	config.stalledWorkflowAge, err = durationSetting(getenv, stalledWorkflowAgeEnvironment, config.stalledWorkflowAge)
+	config.stalledWorkflowAge, err = durationSetting(
+		getenv,
+		stalledWorkflowAgeEnvironment,
+		config.stalledWorkflowAge,
+	)
+
 	if err != nil {
 		return Config{}, err
 	}
@@ -121,7 +140,11 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	return config, nil
 }
 
-func durationSetting(getenv func(string) string, key string, fallback time.Duration) (time.Duration, error) {
+func durationSetting(
+	getenv func(string) string,
+	key string,
+	fallback time.Duration,
+) (time.Duration, error) {
 	value := getenv(key)
 
 	if value == "" {
@@ -131,7 +154,11 @@ func durationSetting(getenv func(string) string, key string, fallback time.Durat
 	duration, err := time.ParseDuration(value)
 
 	if err != nil {
-		return 0, fmt.Errorf("invalid %s: %w", key, err)
+		return 0, fmt.Errorf(
+			"invalid %s: %w",
+			key,
+			err,
+		)
 	}
 
 	if duration <= 0 {

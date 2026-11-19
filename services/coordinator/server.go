@@ -27,13 +27,21 @@ type CoordinatorServer struct {
 	shutdownTimeout time.Duration
 }
 
-func NewCoordinatorServer(config Config, app *application.Application, logger *slog.Logger) *CoordinatorServer {
+func NewCoordinatorServer(
+	config Config,
+	app *application.Application,
+	logger *slog.Logger,
+) *CoordinatorServer {
 	server := &CoordinatorServer{
 		shutdownTimeout: config.shutdownTimeout,
 	}
 
 	server.http = &http.Server{
-		Handler:           api.NewRouter(server.ready.Load, app, logger),
+		Handler:           api.NewRouter(
+			server.ready.Load,
+			app,
+			logger,
+		),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 		IdleTimeout:       serverIdleTimeout,

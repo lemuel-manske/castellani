@@ -70,11 +70,25 @@ type ArchiveRepository interface {
 type WorkflowRepository interface {
 	Find(context.Context, string) (domain.Archive, error)
 
-	CommitEvent(context.Context, domain.Archive, domain.Archive, domain.Event, []domain.Effect) error
+	CommitEvent(
+		context.Context,
+		domain.Archive,
+		domain.Archive,
+		domain.Event,
+		[]domain.Effect,
+	) error
 
-	ListStalled(context.Context, time.Time, int) ([]domain.Archive, error)
+	ListStalled(
+		context.Context,
+		time.Time,
+		int,
+	) ([]domain.Archive, error)
 
-	ScheduleRecovery(context.Context, domain.Archive, domain.Effect) error
+	ScheduleRecovery(
+		context.Context,
+		domain.Archive,
+		domain.Effect,
+	) error
 }
 
 func NewDispatcher(outbox Outbox, publisher Publisher) *Dispatcher {

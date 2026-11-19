@@ -102,7 +102,11 @@ func run(logger *slog.Logger) error {
 		config.stalledWorkflowAge,
 	)
 
-	server := NewCoordinatorServer(config, built.Application, logger)
+	server := NewCoordinatorServer(
+		config,
+		built.Application,
+		logger,
+	)
 
 	return server.Serve(ctx, listener)
 }

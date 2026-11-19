@@ -15,7 +15,11 @@ func (a *Application) ReconcileStalled(ctx context.Context, age time.Duration) (
 		return 0, errors.New("stalled workflow age must be positive")
 	}
 
-	stalled, err := a.workflow.ListStalled(ctx, time.Now().UTC().Add(-age), stalledArchiveLimit)
+	stalled, err := a.workflow.ListStalled(
+		ctx,
+		time.Now().UTC().Add(-age),
+		stalledArchiveLimit,
+	)
 
 	if err != nil {
 		return 0, err
@@ -30,7 +34,11 @@ func (a *Application) ReconcileStalled(ctx context.Context, age time.Duration) (
 			continue
 		}
 
-		err := a.workflow.ScheduleRecovery(ctx, archive, effect)
+		err := a.workflow.ScheduleRecovery(
+			ctx,
+			archive,
+			effect,
+		)
 
 		if errors.Is(err, ErrRevisionConflict) {
 			continue

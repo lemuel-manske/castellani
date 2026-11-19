@@ -34,7 +34,17 @@ func NewRouter(
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			started := time.Now()
 			next.ServeHTTP(w, r)
-			logger.Info("HTTP request", "request_id", r.Header.Get(httpx.HeaderRequestID), "method", r.Method, "path", r.URL.Path, "duration", time.Since(started))
+			logger.Info(
+				"HTTP request",
+				"request_id",
+				r.Header.Get(httpx.HeaderRequestID),
+				"method",
+				r.Method,
+				"path",
+				r.URL.Path,
+				"duration",
+				time.Since(started),
+			)
 		})
 	})
 
@@ -117,7 +127,11 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if value := recover(); value != nil {
-					logger.Error("HTTP handler panic", "path", r.URL.Path)
+					logger.Error(
+						"HTTP handler panic",
+						"path",
+						r.URL.Path,
+					)
 
 					httpx.WriteProblem(w, httpx.NewProblem(
 						r,

@@ -121,29 +121,51 @@ func (r *DynamoArchiveRepository) CommitEvent(
 			return err
 		}
 
-		envelope, err := encodeEffect(messageID, effect, now)
+		envelope, err := encodeEffect(
+			messageID,
+			effect,
+			now,
+		)
 
 		if err != nil {
 			return err
 		}
 
-		transaction = append(transaction, outboxPut(r.tables.Outbox, messageID, effect.Type, envelope, now))
+		transaction = append(transaction, outboxPut(
+			r.tables.Outbox,
+			messageID,
+			effect.Type,
+			envelope,
+			now,
+		))
 	}
 
 	// Build an update using attribute aliases: several state fields are
 	// reserved in DynamoDB's expression language.
-	names := map[string]string{"#revision": "revision"}
-	values := map[string]types.AttributeValue{
-		":expected": &types.AttributeValueMemberN{Value: strconv.Itoa(before.Revision)},
+	names := map[string]string{
+		"#revision": "revision",
 	}
-	keys := make([]string, 0, len(updates))
+	values := map[string]types.AttributeValue{
+		":expected": &types.AttributeValueMemberN{
+			Value: strconv.Itoa(before.Revision),
+		},
+	}
+	keys := make(
+		[]string,
+		0,
+		len(updates),
+	)
 
 	for key := range updates {
 		keys = append(keys, key)
 	}
 
 	sort.Strings(keys)
-	assignments := make([]string, 0, len(keys))
+	assignments := make(
+		[]string,
+		0,
+		len(keys),
+	)
 
 	for i, key := range keys {
 		name := fmt.Sprintf("#field%d", i)
@@ -157,7 +179,9 @@ func (r *DynamoArchiveRepository) CommitEvent(
 		Update: &types.Update{
 			TableName: aws.String(r.tables.Archives),
 			Key: map[string]types.AttributeValue{
-				"archiveId": &types.AttributeValueMemberS{Value: before.ID},
+				"archiveId": &types.AttributeValueMemberS{
+					Value: before.ID,
+				},
 			},
 			ConditionExpression:       aws.String("#revision = :expected"),
 			UpdateExpression:          aws.String("SET " + strings.Join(assignments, ", ")),
@@ -211,7 +235,11 @@ func (r *DynamoArchiveRepository) ListStalled(
 
 	recoveries := []string{"PUBLISH", "COMPENSATE"}
 
-	archives := make([]domain.Archive, 0, limit)
+	archives := make(
+		[]domain.Archive,
+		0,
+		limit,
+	)
 
 	for _, recovery := range recoveries {
 		var cursor map[string]types.AttributeValue
@@ -219,17 +247,21 @@ func (r *DynamoArchiveRepository) ListStalled(
 		for len(archives) < limit {
 			remaining := limit - len(archives)
 			page, err := r.client.Query(ctx, &dynamodb.QueryInput{
-				TableName:         aws.String(r.tables.Archives),
-				IndexName:          aws.String("recoveryKey-updatedAt-index"),
-				ExclusiveStartKey: cursor,
-				Limit:              aws.Int32(int32(remaining)),
+				TableName:              aws.String(r.tables.Archives),
+				IndexName:              aws.String("recoveryKey-updatedAt-index"),
+				ExclusiveStartKey:      cursor,
+				Limit:                  aws.Int32(int32(remaining)),
 				KeyConditionExpression: aws.String("#recoveryKey = :recoveryKey AND updatedAt <= :before"),
 				ExpressionAttributeNames: map[string]string{
 					"#recoveryKey": "recoveryKey",
 				},
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":recoveryKey": &types.AttributeValueMemberS{Value: recovery},
-					":before":      &types.AttributeValueMemberS{Value: before.UTC().Format(archiveTimestampLayout)},
+					":recoveryKey": &types.AttributeValueMemberS{
+						Value: recovery,
+					},
+					":before": &types.AttributeValueMemberS{
+						Value: before.UTC().Format(archiveTimestampLayout),
+					},
 				},
 			})
 
@@ -272,7 +304,11 @@ func (r *DynamoArchiveRepository) ScheduleRecovery(
 		return err
 	}
 
-	envelope, err := encodeEffect(messageID, effect, now)
+	envelope, err := encodeEffect(
+		messageID,
+		effect,
+		now,
+	)
 
 	if err != nil {
 		return err
@@ -280,29 +316,51 @@ func (r *DynamoArchiveRepository) ScheduleRecovery(
 
 	_, err = r.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
-			outboxPut(r.tables.Outbox, messageID, effect.Type, envelope, now),
+			outboxPut(
+				r.tables.Outbox,
+				messageID,
+				effect.Type,
+				envelope,
+				now,
+			),
 			{
 				Update: &types.Update{
 					TableName: aws.String(r.tables.Archives),
 					Key: map[string]types.AttributeValue{
-						"archiveId": &types.AttributeValueMemberS{Value: archive.ID},
+						"archiveId": &types.AttributeValueMemberS{
+							Value: archive.ID,
+						},
 					},
 					ConditionExpression: aws.String("#revision = :revision AND updatedAt = :updatedAt AND #status = :status AND #decision = :decision AND #recoveryKey = :recoveryKey"),
 					UpdateExpression:    aws.String("SET #revision = :nextRevision, updatedAt = :now"),
 					ExpressionAttributeNames: map[string]string{
-						"#revision": "revision",
-						"#status":   "status",
+						"#revision":    "revision",
+						"#status":      "status",
 						"#decision":    "decision",
 						"#recoveryKey": "recoveryKey",
 					},
 					ExpressionAttributeValues: map[string]types.AttributeValue{
-						":revision":     &types.AttributeValueMemberN{Value: strconv.Itoa(archive.Revision)},
-						":nextRevision": &types.AttributeValueMemberN{Value: strconv.Itoa(archive.Revision + 1)},
-						":updatedAt":    &types.AttributeValueMemberS{Value: archive.UpdatedAt.Format(archiveTimestampLayout)},
-						":status":       &types.AttributeValueMemberS{Value: archive.Status},
-						":decision":     &types.AttributeValueMemberS{Value: archive.Decision},
-						":recoveryKey":  &types.AttributeValueMemberS{Value: recoveryKey(archive)},
-						":now":          &types.AttributeValueMemberS{Value: now.Format(archiveTimestampLayout)},
+						":revision": &types.AttributeValueMemberN{
+							Value: strconv.Itoa(archive.Revision),
+						},
+						":nextRevision": &types.AttributeValueMemberN{
+							Value: strconv.Itoa(archive.Revision + 1),
+						},
+						":updatedAt": &types.AttributeValueMemberS{
+							Value: archive.UpdatedAt.Format(archiveTimestampLayout),
+						},
+						":status": &types.AttributeValueMemberS{
+							Value: archive.Status,
+						},
+						":decision": &types.AttributeValueMemberS{
+							Value: archive.Decision,
+						},
+						":recoveryKey": &types.AttributeValueMemberS{
+							Value: recoveryKey(archive),
+						},
+						":now": &types.AttributeValueMemberS{
+							Value: now.Format(archiveTimestampLayout),
+						},
 					},
 				},
 			},
@@ -322,7 +380,11 @@ func (r *DynamoArchiveRepository) ScheduleRecovery(
 	return fmt.Errorf("schedule archive recovery: %w", err)
 }
 
-func encodeEffect(messageID string, effect domain.Effect, now time.Time) ([]byte, error) {
+func encodeEffect(
+	messageID string,
+	effect domain.Effect,
+	now time.Time,
+) ([]byte, error) {
 	payload := map[string]any{
 		"archiveId":       effect.ArchiveID,
 		"decisionVersion": effect.DecisionVersion,
@@ -344,29 +406,48 @@ func encodeEffect(messageID string, effect domain.Effect, now time.Time) ([]byte
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("encode %s: %w", effect.Type, err)
+		return nil, fmt.Errorf(
+			"encode %s: %w",
+			effect.Type,
+			err,
+		)
 	}
 
 	return envelope, nil
 }
 
-func outboxPut(table, messageID, messageType string, envelope []byte, now time.Time) types.TransactWriteItem {
+func outboxPut(
+	table, messageID, messageType string,
+	envelope []byte,
+	now time.Time,
+) types.TransactWriteItem {
 	return types.TransactWriteItem{
 		Put: &types.Put{
 			TableName:           aws.String(table),
 			ConditionExpression: aws.String("attribute_not_exists(messageId)"),
 			Item: map[string]types.AttributeValue{
-				"messageId": &types.AttributeValueMemberS{Value: messageID},
-				"type":      &types.AttributeValueMemberS{Value: messageType},
-				"state":     &types.AttributeValueMemberS{Value: OutboxPending},
-				"envelope":  &types.AttributeValueMemberS{Value: string(envelope)},
-				"createdAt": &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
-				"attempts":  &types.AttributeValueMemberN{Value: "0"},
+				"messageId": &types.AttributeValueMemberS{
+					Value: messageID,
+				},
+				"type": &types.AttributeValueMemberS{
+					Value: messageType,
+				},
+				"state": &types.AttributeValueMemberS{
+					Value: OutboxPending,
+				},
+				"envelope": &types.AttributeValueMemberS{
+					Value: string(envelope),
+				},
+				"createdAt": &types.AttributeValueMemberS{
+					Value: now.Format(time.RFC3339Nano),
+				},
+				"attempts": &types.AttributeValueMemberN{
+					Value: "0",
+				},
 			},
 		},
 	}
 }
-
 
 func recoveryKey(archive domain.Archive) string {
 	if archive.Status == domain.StatusFinalizing && archive.Decision == domain.DecisionPublish {

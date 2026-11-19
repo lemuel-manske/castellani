@@ -28,7 +28,11 @@ func startWorkers(
 			found, err := dispatcher.Dispatch(ctx)
 
 			if err != nil && ctx.Err() == nil {
-				logger.Error("outbox dispatch failed", "error", err)
+				logger.Error(
+					"outbox dispatch failed",
+					"error",
+					err,
+				)
 			}
 
 			delay := dispatchInterval
@@ -50,7 +54,11 @@ func startWorkers(
 			err := consumer.Consume(ctx, app.HandleEvent)
 
 			if err != nil && ctx.Err() == nil {
-				logger.Error("event consumer stopped", "error", err)
+				logger.Error(
+					"event consumer stopped",
+					"error",
+					err,
+				)
 			}
 
 			if !sleep(ctx, workerRetryDelay) {
@@ -64,9 +72,17 @@ func startWorkers(
 			reconciled, err := app.ReconcileStalled(ctx, stalledWorkflowAge)
 
 			if err != nil && ctx.Err() == nil {
-				logger.Error("archive reconciliation failed", "error", err)
+				logger.Error(
+					"archive reconciliation failed",
+					"error",
+					err,
+				)
 			} else if reconciled > 0 {
-				logger.Info("stalled archive workflows rescheduled", "count", reconciled)
+				logger.Info(
+					"stalled archive workflows rescheduled",
+					"count",
+					reconciled,
+				)
 			}
 
 			if !sleep(ctx, reconcileInterval) {
