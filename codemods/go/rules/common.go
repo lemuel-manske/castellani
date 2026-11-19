@@ -1,4 +1,5 @@
-package codemods
+// Package rules define the formatting rules for the source code.
+package rules
 
 import (
 	"bytes"

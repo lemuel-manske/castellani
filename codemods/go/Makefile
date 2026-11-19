@@ -9,9 +9,3 @@ test:
 check:
 	go vet ./...
 	go test -race ./...
-
-style-check:
-	go run ./cmd/gofmtx ../../libs/httpx ../../services/gateway
-
-style-fix:
-	go run ./cmd/gofmtx -w ../../libs/httpx ../../services/gateway

@@ -9,12 +9,12 @@ import (
 	"sort"
 	"strings"
 
-	codemods "github.com/lemuel-manske/castellani/codemods/go"
+	"github.com/lemuel-manske/castellani/codemods/go/rules"
 )
 
 // Run formats the selected files. In check mode it reports changes without
 // writing. In write mode every changed file is replaced atomically.
-func Run(paths []string, write bool, rules ...codemods.Rule) ([]string, error) {
+func Run(paths []string, write bool, theRules ...rules.Rule) ([]string, error) {
 	files, err := collect(paths)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func Run(paths []string, write bool, rules ...codemods.Rule) ([]string, error) {
 			continue
 		}
 
-		formatted, err := codemods.Format(original, rules...)
+		formatted, err := rules.Format(original, theRules...)
 		if err != nil {
 			return changed, fmt.Errorf("format %s: %w", path, err)
 		}

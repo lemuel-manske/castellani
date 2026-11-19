@@ -1,4 +1,4 @@
-package codemods
+package rules
 
 import (
 	"go/ast"

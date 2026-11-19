@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	codemods "github.com/lemuel-manske/castellani/codemods/go"
 	"github.com/lemuel-manske/castellani/codemods/go/internal/runner"
+	"github.com/lemuel-manske/castellani/codemods/go/rules"
 )
 
 func main() {
@@ -25,13 +25,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	rules, err := selectRules(*ruleNames)
+	theRules, err := selectRules(*ruleNames)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
 
-	changed, err := runner.Run(flags.Args(), *write, rules...)
+	changed, err := runner.Run(flags.Args(), *write, theRules...)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -47,15 +47,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func selectRules(names string) ([]codemods.Rule, error) {
-	available := map[string]codemods.Rule{
-		"declarations": codemods.DeclarationsOrder,
-		"spacing":      codemods.IfSpacing,
-		"signatures":   codemods.MultilineSignatures,
-		"calls":        codemods.MultilineCalls,
+func selectRules(names string) ([]rules.Rule, error) {
+	available := map[string]rules.Rule{
+		"declarations": rules.DeclarationsOrder,
+		"spacing":      rules.IfSpacing,
+		"signatures":   rules.MultilineSignatures,
+		"calls":        rules.MultilineCalls,
 	}
 
-	var selected []codemods.Rule
+	var selected []rules.Rule
 	seen := make(map[string]bool)
 	for _, name := range strings.Split(names, ",") {
 		name = strings.TrimSpace(name)
