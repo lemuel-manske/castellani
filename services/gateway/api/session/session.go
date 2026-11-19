@@ -20,7 +20,11 @@ type updateRequest struct {
 	Status string `json:"status"`
 }
 
-func NewHandler(app application.Application) Handler { return Handler{app: app} }
+func NewHandler(app application.Application) Handler {
+	return Handler{
+		app: app,
+	}
+}
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
@@ -33,6 +37,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			"Invalid Idempotency Key",
 			"Idempotency-Key is required and must contain 8 to 200 characters.",
 		))
+
 		return
 	}
 
@@ -51,6 +56,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			"Invalid Session",
 			err.Error(),
 		))
+
 		return
 	}
 
@@ -62,6 +68,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			"Invalid Session",
 			"Expected archiveId and absolute HTTP(S) targetUrl.",
 		))
+
 		return
 	}
 
@@ -80,6 +87,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			"Capture",
 			"Capture returned invalid session metadata.",
 		)
+
 		return
 	}
 
@@ -102,6 +110,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 			"Invalid Session ID",
 			"Invalid session ID.",
 		))
+
 		return
 	}
 
@@ -115,6 +124,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 			"Capture",
 			"Capture returned invalid session metadata.",
 		)
+
 		return
 	}
 	httpx.JSON(
@@ -140,6 +150,7 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 			"Invalid Session",
 			err.Error(),
 		))
+
 		return
 	}
 
@@ -151,6 +162,7 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 			"Invalid Session",
 			"status must be COMPLETED or CANCELLED.",
 		))
+
 		return
 	}
 
@@ -164,6 +176,7 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 			"Invalid Session ID",
 			"Invalid session ID.",
 		))
+
 		return
 	}
 
@@ -182,6 +195,7 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 			"Capture",
 			"Capture returned invalid session metadata.",
 		)
+
 		return
 	}
 	httpx.JSON(

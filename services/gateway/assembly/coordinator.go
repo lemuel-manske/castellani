@@ -28,7 +28,11 @@ func (a coordinatorAdapter) CreateArchive(
 		return application.ArchiveAccepted{}, coordinatorError(err)
 	}
 
-	return application.ArchiveAccepted{ArchiveID: result.ArchiveID, Status: result.Status, StatusURL: result.StatusURL}, nil
+	return application.ArchiveAccepted{
+		ArchiveID: result.ArchiveID,
+		Status:    result.Status,
+		StatusURL: result.StatusURL,
+	}, nil
 }
 
 func (a coordinatorAdapter) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {

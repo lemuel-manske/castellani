@@ -20,7 +20,9 @@ func Pagination(values url.Values) (application.Pagination, error) {
 		return application.Pagination{}, errors.New("cursor must be supplied once")
 	}
 
-	pagination := application.Pagination{Cursor: values.Get("cursor")}
+	pagination := application.Pagination{
+		Cursor: values.Get("cursor"),
+	}
 
 	if len(limits) == 1 {
 		limit, err := strconv.Atoi(limits[0])

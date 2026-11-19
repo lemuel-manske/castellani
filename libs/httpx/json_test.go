@@ -15,7 +15,9 @@ func TestJSON_EmitsUncachedJSON(t *testing.T) {
 	httpx.JSON(
 		response,
 		http.StatusAccepted,
-		map[string]string{"status": "ACCEPTED"},
+		map[string]string{
+			"status": "ACCEPTED",
+		},
 	)
 
 	assert.Equal(

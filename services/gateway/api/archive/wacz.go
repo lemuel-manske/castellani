@@ -17,7 +17,9 @@ type WACZHandler struct {
 }
 
 func NewWACZHandler(app application.Application) WACZHandler {
-	return WACZHandler{app: app}
+	return WACZHandler{
+		app: app,
+	}
 }
 
 func (h WACZHandler) Get(w http.ResponseWriter, r *http.Request) {

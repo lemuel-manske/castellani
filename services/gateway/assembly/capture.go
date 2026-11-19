@@ -20,14 +20,20 @@ func (a captureAdapter) ListPages(
 	result, err := a.client.ListPages(
 		ctx,
 		archiveID,
-		capture.Pagination{Limit: page.Limit, Cursor: page.Cursor},
+		capture.Pagination{
+			Limit:  page.Limit,
+			Cursor: page.Cursor,
+		},
 	)
 
 	if err != nil {
 		return application.Pages{}, captureError(err)
 	}
 
-	return application.Pages{Items: result.Items, NextCursor: result.NextCursor}, nil
+	return application.Pages{
+		Items:      result.Items,
+		NextCursor: result.NextCursor,
+	}, nil
 }
 
 func (a captureAdapter) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (application.Snapshot, error) {
@@ -42,9 +48,12 @@ func (a captureAdapter) GetSnapshot(ctx context.Context, archiveID, snapshotID s
 	}
 
 	return application.Snapshot{
-		ArchiveID: result.ArchiveID, SnapshotID: result.SnapshotID,
-		URL: result.URL, FinalURL: result.FinalURL,
-		CapturedAt: result.CapturedAt, ContentType: result.ContentType,
+		ArchiveID:   result.ArchiveID,
+		SnapshotID:  result.SnapshotID,
+		URL:         result.URL,
+		FinalURL:    result.FinalURL,
+		CapturedAt:  result.CapturedAt,
+		ContentType: result.ContentType,
 	}, nil
 }
 
@@ -57,7 +66,9 @@ func (a captureAdapter) GetWACZ(
 		ctx,
 		archiveID,
 		capture.WACZOptions{
-			MetadataOnly: options.MetadataOnly, Range: options.Range, IfRange: options.IfRange,
+			MetadataOnly: options.MetadataOnly,
+			Range:        options.Range,
+			IfRange:      options.IfRange,
 		},
 	)
 
@@ -66,9 +77,13 @@ func (a captureAdapter) GetWACZ(
 	}
 
 	return application.WACZ{
-		Body: result.Body, Partial: result.Partial, AcceptRanges: result.AcceptRanges,
-		ContentRange: result.ContentRange, ETag: result.ETag,
-		LastModified: result.LastModified, ContentLength: result.ContentLength,
+		Body:          result.Body,
+		Partial:       result.Partial,
+		AcceptRanges:  result.AcceptRanges,
+		ContentRange:  result.ContentRange,
+		ETag:          result.ETag,
+		LastModified:  result.LastModified,
+		ContentLength: result.ContentLength,
 	}, nil
 }
 
@@ -81,7 +96,10 @@ func (a captureAdapter) CreateSession(
 	result, err := a.client.CreateSession(
 		ctx,
 		key,
-		capture.SessionRequest{ArchiveID: input.ArchiveID, TargetURL: input.TargetURL},
+		capture.SessionRequest{
+			ArchiveID: input.ArchiveID,
+			TargetURL: input.TargetURL,
+		},
 		raw,
 	)
 
@@ -122,8 +140,10 @@ func (a captureAdapter) UpdateSession(
 
 func mapSession(result capture.Session) application.Session {
 	return application.Session{
-		SessionID: result.SessionID, ArchiveID: result.ArchiveID,
-		Status: result.Status, ExpiresAt: result.ExpiresAt,
+		SessionID:      result.SessionID,
+		ArchiveID:      result.ArchiveID,
+		Status:         result.Status,
+		ExpiresAt:      result.ExpiresAt,
 		AuthGeneration: result.AuthGeneration,
 	}
 }
@@ -137,8 +157,11 @@ func captureError(err error) error {
 		return errUnavailable(err)
 	case errors.As(err, &failure):
 		return &application.DependencyFailure{
-			Status: failure.Status, Type: failure.Type, Title: failure.Title,
-			Detail: failure.Detail, ContentRange: failure.ContentRange,
+			Status:       failure.Status,
+			Type:         failure.Type,
+			Title:        failure.Title,
+			Detail:       failure.Detail,
+			ContentRange: failure.ContentRange,
 		}
 	default:
 		return errUnavailable(err)

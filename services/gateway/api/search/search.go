@@ -14,7 +14,11 @@ type Handler struct {
 	app application.Application
 }
 
-func NewHandler(app application.Application) Handler { return Handler{app: app} }
+func NewHandler(app application.Application) Handler {
+	return Handler{
+		app: app,
+	}
+}
 
 func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 	query, err := params.Search(r.URL.Query())
@@ -27,6 +31,7 @@ func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 			"Invalid Search",
 			err.Error(),
 		))
+
 		return
 	}
 
@@ -40,6 +45,7 @@ func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 			"Search",
 			"Search returned invalid results.",
 		)
+
 		return
 	}
 

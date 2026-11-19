@@ -23,11 +23,19 @@ type Client struct {
 }
 
 func NewClient(origin url.URL, timeout time.Duration) *Client {
-	return &Client{origin: origin, http: &http.Client{
-		Timeout:       timeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		Transport:     &http.Transport{Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: timeout, IdleConnTimeout: 90 * time.Second, MaxIdleConnsPerHost: 16},
-	}}
+	return &Client{
+		origin: origin,
+		http: &http.Client{
+			Timeout:       timeout,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+			Transport: &http.Transport{
+				Proxy:                 http.ProxyFromEnvironment,
+				ResponseHeaderTimeout: timeout,
+				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConnsPerHost:   16,
+			},
+		},
+	}
 }
 
 func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
@@ -112,7 +120,12 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 			return Results{}, ErrInvalidResponse
 		}
 
-		return Results{}, &Failure{Status: p.Status, Type: p.Type, Title: p.Title, Detail: p.Detail}
+		return Results{}, &Failure{
+			Status: p.Status,
+			Type:   p.Type,
+			Title:  p.Title,
+			Detail: p.Detail,
+		}
 	}
 	var result Results
 

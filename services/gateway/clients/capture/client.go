@@ -27,16 +27,30 @@ type Client struct {
 }
 
 func NewClient(origin url.URL, timeout, streamTimeout time.Duration) *Client {
-	transport := &http.Transport{Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: timeout, IdleConnTimeout: 90 * time.Second, MaxIdleConnsPerHost: 16}
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ResponseHeaderTimeout: timeout,
+		IdleConnTimeout:       90 * time.Second,
+		MaxIdleConnsPerHost:   16,
+	}
 	noRedirect := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 	if streamTimeout <= 0 {
 		streamTimeout = defaultStreamTimeout
 	}
 
-	return &Client{origin: origin,
-		http:   &http.Client{Timeout: timeout, CheckRedirect: noRedirect, Transport: transport},
-		stream: &http.Client{Timeout: streamTimeout, CheckRedirect: noRedirect, Transport: transport},
+	return &Client{
+		origin: origin,
+		http: &http.Client{
+			Timeout:       timeout,
+			CheckRedirect: noRedirect,
+			Transport:     transport,
+		},
+		stream: &http.Client{
+			Timeout:       streamTimeout,
+			CheckRedirect: noRedirect,
+			Transport:     transport,
+		},
 	}
 }
 
@@ -259,19 +273,26 @@ func (c *Client) GetWACZ(
 			return WACZ{}, err
 		}
 		failure.ContentRange = response.Header.Get("Content-Range")
+
 		return WACZ{}, failure
 	}
 	success := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
 	if !success || response.Header.Get(httpx.HeaderContentType) != httpx.WACZMediaType {
 		response.Body.Close()
+
 		return WACZ{}, ErrInvalidResponse
 	}
 
-	return WACZ{Body: response.Body, Partial: response.StatusCode == http.StatusPartialContent,
-		AcceptRanges: response.Header.Get("Accept-Ranges"), ContentRange: response.Header.Get("Content-Range"),
-		ETag: response.Header.Get("ETag"), LastModified: response.Header.Get("Last-Modified"),
-		ContentLength: response.Header.Get("Content-Length")}, nil
+	return WACZ{
+		Body:          response.Body,
+		Partial:       response.StatusCode == http.StatusPartialContent,
+		AcceptRanges:  response.Header.Get("Accept-Ranges"),
+		ContentRange:  response.Header.Get("Content-Range"),
+		ETag:          response.Header.Get("ETag"),
+		LastModified:  response.Header.Get("Last-Modified"),
+		ContentLength: response.Header.Get("Content-Length"),
+	}, nil
 }
 
 func (c *Client) execute(request *http.Request, success int) (json.RawMessage, error) {
@@ -325,6 +346,7 @@ func (c *Client) request(
 	target.Path = path
 	target.RawPath = ""
 	target.RawQuery = query
+
 	return http.NewRequestWithContext(
 		ctx,
 		method,
@@ -355,5 +377,10 @@ func parseFailure(status int, data []byte) (*Failure, error) {
 		return nil, ErrInvalidResponse
 	}
 
-	return &Failure{Status: status, Type: p.Type, Title: p.Title, Detail: p.Detail}, nil
+	return &Failure{
+		Status: status,
+		Type:   p.Type,
+		Title:  p.Title,
+		Detail: p.Detail,
+	}, nil
 }

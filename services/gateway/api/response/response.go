@@ -28,6 +28,7 @@ func WriteDependencyError(
 			Detail:   failure.Detail,
 			Instance: r.URL.Path,
 		})
+
 		return
 	}
 
@@ -39,6 +40,7 @@ func WriteDependencyError(
 			"Invalid Upstream Response",
 			invalidDetail,
 		))
+
 		return
 	}
 

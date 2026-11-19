@@ -49,7 +49,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 func selectRules(names string) ([]rules.Rule, error) {
 	available := map[string]rules.Rule{
-		"composites":  rules.MultilineCompositeLiterals,
+		"composites":   rules.MultilineCompositeLiterals,
 		"declarations": rules.DeclarationsOrder,
 		"spacing":      rules.IfSpacing,
 		"returns":      rules.ReturnSpacing,

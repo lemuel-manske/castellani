@@ -45,7 +45,11 @@ func NewApplication(
 	capture Capture,
 	search SearchService,
 ) Application {
-	return Application{coordinator: coordinator, capture: capture, search: search}
+	return Application{
+		coordinator: coordinator,
+		capture:     capture,
+		search:      search,
+	}
 }
 
 func (a Application) CreateArchive(
@@ -55,7 +59,9 @@ func (a Application) CreateArchive(
 	raw []byte,
 ) (ArchiveAccepted, error) {
 	if err := submission.Validate(); err != nil {
-		return ArchiveAccepted{}, &ValidationError{Cause: err}
+		return ArchiveAccepted{}, &ValidationError{
+			Cause: err,
+		}
 	}
 
 	return a.coordinator.CreateArchive(

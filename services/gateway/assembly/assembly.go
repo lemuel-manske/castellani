@@ -20,15 +20,21 @@ func NewApplication(
 	var searchPort application.SearchService
 
 	if coordinatorClient != nil {
-		coordinatorPort = coordinatorAdapter{client: coordinatorClient}
+		coordinatorPort = coordinatorAdapter{
+			client: coordinatorClient,
+		}
 	}
 
 	if captureClient != nil {
-		capturePort = captureAdapter{client: captureClient}
+		capturePort = captureAdapter{
+			client: captureClient,
+		}
 	}
 
 	if searchClient != nil {
-		searchPort = searchAdapter{client: searchClient}
+		searchPort = searchAdapter{
+			client: searchClient,
+		}
 	}
 
 	return application.NewApplication(

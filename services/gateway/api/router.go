@@ -47,6 +47,7 @@ func NewRouter(
 				"unavailable",
 				http.StatusServiceUnavailable,
 			)
+
 			return
 		}
 

@@ -209,5 +209,7 @@ func parseFailure(status int, data []byte) error {
 		return ErrInvalidResponse
 	}
 
-	return &Failure{Problem: p}
+	return &Failure{
+		Problem: p,
+	}
 }

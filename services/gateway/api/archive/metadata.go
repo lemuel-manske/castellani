@@ -16,7 +16,9 @@ type MetadataHandler struct {
 }
 
 func NewMetadataHandler(app application.Application) MetadataHandler {
-	return MetadataHandler{app: app}
+	return MetadataHandler{
+		app: app,
+	}
 }
 
 func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {

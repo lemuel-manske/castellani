@@ -18,7 +18,9 @@ type Handler struct {
 }
 
 func NewHandler(app application.Application) Handler {
-	return Handler{app: app}
+	return Handler{
+		app: app,
+	}
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +98,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			err,
 			"Admission could not be confirmed. Retry with the same Idempotency-Key.",
 		)
+
 		return
 	}
 
@@ -122,6 +125,7 @@ func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 			err,
 			"Archive status is temporarily unavailable.",
 		)
+
 		return
 	}
 

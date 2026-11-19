@@ -51,5 +51,6 @@ func (s Submission) Validate() error {
 		}
 		seen[origin] = struct{}{}
 	}
+
 	return nil
 }
