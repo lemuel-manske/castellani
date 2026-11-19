@@ -7,7 +7,6 @@ import (
 
  "github.com/lemuel-manske/unnamed/services/gateway/application"
  "github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
- "github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 type coordinatorAdapter struct { client *coordinator.Client }
