@@ -19,12 +19,32 @@ func TestGateway_PublishedWACZStreamsBytesWithoutRewriting(t *testing.T) {
 		_, _ = io.WriteString(w, "WACZ-PAYLOAD")
 	}))
 
-	result := gateway.WACZ("run-1", "", "")
+	result := gateway.WACZ(
+		"run-1",
+		"",
+		"",
+	)
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.Equal(t, "WACZ-PAYLOAD", result.Body)
-	assert.Equal(t, "bytes", result.Header.Get("Accept-Ranges"))
-	assert.Equal(t, `"digest-1"`, result.Header.Get("ETag"))
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		"WACZ-PAYLOAD",
+		result.Body,
+	)
+	assert.Equal(
+		t,
+		"bytes",
+		result.Header.Get("Accept-Ranges"),
+	)
+	assert.Equal(
+		t,
+		`"digest-1"`,
+		result.Header.Get("ETag"),
+	)
 }
 
 func TestGateway_WACZRangeRequestPreservesPartialContentSemantics(t *testing.T) {
@@ -38,12 +58,32 @@ func TestGateway_WACZRangeRequestPreservesPartialContentSemantics(t *testing.T) 
 		_, _ = io.WriteString(w, "WACZ")
 	}))
 
-	result := gateway.WACZ("run-1", "bytes=0-3", "")
+	result := gateway.WACZ(
+		"run-1",
+		"bytes=0-3",
+		"",
+	)
 
-	assert.Equal(t, http.StatusPartialContent, result.Status)
-	assert.Equal(t, "bytes=0-3", <-receivedRange)
-	assert.Equal(t, "bytes 0-3/8", result.Header.Get("Content-Range"))
-	assert.Equal(t, "WACZ", result.Body)
+	assert.Equal(
+		t,
+		http.StatusPartialContent,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		"bytes=0-3",
+		<-receivedRange,
+	)
+	assert.Equal(
+		t,
+		"bytes 0-3/8",
+		result.Header.Get("Content-Range"),
+	)
+	assert.Equal(
+		t,
+		"WACZ",
+		result.Body,
+	)
 }
 
 func TestGateway_WACZHeadReturnsMetadataWithoutReadingBytes(t *testing.T) {
@@ -56,9 +96,17 @@ func TestGateway_WACZHeadReturnsMetadataWithoutReadingBytes(t *testing.T) {
 
 	result := gateway.Head("/archives/run-1/wacz")
 
-	assert.Equal(t, http.StatusOK, result.Status)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
 	assert.Empty(t, result.Body)
-	assert.Equal(t, "900", result.Header.Get("Content-Length"))
+	assert.Equal(
+		t,
+		"900",
+		result.Header.Get("Content-Length"),
+	)
 }
 
 func TestGateway_UnpublishedWACZIsNotExposed(t *testing.T) {
@@ -68,11 +116,27 @@ func TestGateway_UnpublishedWACZIsNotExposed(t *testing.T) {
 		_, _ = io.WriteString(w, `{"type":"urn:capture:unpublished","title":"Not Found","status":404}`)
 	}))
 
-	result := gateway.WACZ("run-1", "", "")
+	result := gateway.WACZ(
+		"run-1",
+		"",
+		"",
+	)
 
-	assert.Equal(t, http.StatusNotFound, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
-	assert.NotContains(t, strings.ToLower(result.Body), "s3://")
+	assert.Equal(
+		t,
+		http.StatusNotFound,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
+	assert.NotContains(
+		t,
+		strings.ToLower(result.Body),
+		"s3://",
+	)
 }
 
 func TestGateway_WACZUnsatisfiableRangePreservesContentRange(t *testing.T) {
@@ -83,16 +147,36 @@ func TestGateway_WACZUnsatisfiableRangePreservesContentRange(t *testing.T) {
 		_, _ = io.WriteString(w, `{"type":"urn:capture:range","title":"Range Not Satisfiable","status":416}`)
 	}))
 
-	result := gateway.WACZ("run-1", "bytes=900-1000", "")
+	result := gateway.WACZ(
+		"run-1",
+		"bytes=900-1000",
+		"",
+	)
 
-	assert.Equal(t, http.StatusRequestedRangeNotSatisfiable, result.Status)
-	assert.Equal(t, "bytes */8", result.Header.Get("Content-Range"))
+	assert.Equal(
+		t,
+		http.StatusRequestedRangeNotSatisfiable,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		"bytes */8",
+		result.Header.Get("Content-Range"),
+	)
 }
 
 func TestGateway_MultipleWACZRangesAreRejectedBeforeCapture(t *testing.T) {
 	gateway := gatewaytest.Start(t)
 
-	result := gateway.WACZ("run-1", "bytes=0-1,3-4", "")
+	result := gateway.WACZ(
+		"run-1",
+		"bytes=0-1,3-4",
+		"",
+	)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 }

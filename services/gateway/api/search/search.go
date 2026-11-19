@@ -30,12 +30,30 @@ func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.client.JSON(r.Context(), http.MethodGet, common.SearchPath, r.URL.RawQuery, "", nil)
+	result, err := h.client.JSON(
+		r.Context(),
+		http.MethodGet,
+		common.SearchPath,
+		r.URL.RawQuery,
+		"",
+		nil,
+	)
 
 	if err != nil {
-		common.UpstreamError(w, r, err, "Search")
+		common.UpstreamError(
+			w,
+			r,
+			err,
+			"Search",
+		)
 		return
 	}
 
-	common.ForwardJSON(w, r, result, http.StatusOK, "Search")
+	common.ForwardJSON(
+		w,
+		r,
+		result,
+		http.StatusOK,
+		"Search",
+	)
 }

@@ -47,10 +47,22 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := common.ArchivePathPrefix + url.PathEscape(id) + common.PagesPathSuffix
-	result, err := h.client.JSON(r.Context(), http.MethodGet, path, r.URL.RawQuery, "", nil)
+	result, err := h.client.JSON(
+		r.Context(),
+		http.MethodGet,
+		path,
+		r.URL.RawQuery,
+		"",
+		nil,
+	)
 
 	if err != nil {
-		common.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(
+			w,
+			r,
+			err,
+			"Capture",
+		)
 		return
 	}
 
@@ -73,7 +85,13 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(
+		w,
+		r,
+		result,
+		http.StatusOK,
+		"Capture",
+	)
 }
 
 func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
@@ -94,10 +112,22 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := common.ArchivePathPrefix + url.PathEscape(id) + common.SnapshotPathSegment + url.PathEscape(snapshotID)
-	result, err := h.client.JSON(r.Context(), http.MethodGet, path, "", "", nil)
+	result, err := h.client.JSON(
+		r.Context(),
+		http.MethodGet,
+		path,
+		"",
+		"",
+		nil,
+	)
 
 	if err != nil {
-		common.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(
+			w,
+			r,
+			err,
+			"Capture",
+		)
 		return
 	}
 
@@ -125,5 +155,11 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(
+		w,
+		r,
+		result,
+		http.StatusOK,
+		"Capture",
+	)
 }

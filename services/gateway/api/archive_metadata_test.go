@@ -18,8 +18,16 @@ func TestGateway_PageListingReturnsCapturedOutcomes(t *testing.T) {
 
 	result := gateway.Get("/archives/run-1/pages?limit=10")
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.Contains(t, result.Body, `"snapshotId":"snap-1"`)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.Contains(
+		t,
+		result.Body,
+		`"snapshotId":"snap-1"`,
+	)
 }
 
 func TestGateway_SnapshotResolutionReturnsCommittedMetadata(t *testing.T) {
@@ -30,6 +38,14 @@ func TestGateway_SnapshotResolutionReturnsCommittedMetadata(t *testing.T) {
 
 	result := gateway.Get("/archives/run-1/snapshots/snap-1")
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.Contains(t, result.Body, `"snapshotId":"snap-1"`)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.Contains(
+		t,
+		result.Body,
+		`"snapshotId":"snap-1"`,
+	)
 }

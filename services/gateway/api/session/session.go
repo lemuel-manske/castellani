@@ -52,7 +52,11 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input createRequest
-	raw, err := httpx.DecodeJSONBytes(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(
+		w,
+		r,
+		&input,
+	)
 
 	if err != nil {
 		responseProblem := httpx.NewProblem(
@@ -78,15 +82,33 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.client.JSON(r.Context(), http.MethodPost, common.SessionsPath, "", key, raw)
+	result, err := h.client.JSON(
+		r.Context(),
+		http.MethodPost,
+		common.SessionsPath,
+		"",
+		key,
+		raw,
+	)
 
 	if err != nil {
-		common.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(
+			w,
+			r,
+			err,
+			"Capture",
+		)
 		return
 	}
 
 	if result.Status != http.StatusCreated {
-		common.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
+		common.ForwardJSON(
+			w,
+			r,
+			result,
+			http.StatusCreated,
+			"Capture",
+		)
 		return
 	}
 
@@ -110,16 +132,31 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	location := common.SessionPathPrefix + url.PathEscape(created.SessionID)
 
 	w.Header().Set(httpx.LocationHeader, location)
-	common.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
+	common.ForwardJSON(
+		w,
+		r,
+		result,
+		http.StatusCreated,
+		"Capture",
+	)
 }
 
 func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
-	h.forward(w, r, http.MethodGet, nil)
+	h.forward(
+		w,
+		r,
+		http.MethodGet,
+		nil,
+	)
 }
 
 func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	var input updateRequest
-	raw, err := httpx.DecodeJSONBytes(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(
+		w,
+		r,
+		&input,
+	)
 
 	if err != nil {
 		responseProblem := httpx.NewProblem(
@@ -147,10 +184,20 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.forward(w, r, http.MethodPut, raw)
+	h.forward(
+		w,
+		r,
+		http.MethodPut,
+		raw,
+	)
 }
 
-func (h Handler) forward(w http.ResponseWriter, r *http.Request, method string, body []byte) {
+func (h Handler) forward(
+	w http.ResponseWriter,
+	r *http.Request,
+	method string,
+	body []byte,
+) {
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
@@ -166,10 +213,22 @@ func (h Handler) forward(w http.ResponseWriter, r *http.Request, method string, 
 	}
 
 	path := common.SessionPathPrefix + url.PathEscape(id)
-	result, err := h.client.JSON(r.Context(), method, path, "", "", body)
+	result, err := h.client.JSON(
+		r.Context(),
+		method,
+		path,
+		"",
+		"",
+		body,
+	)
 
 	if err != nil {
-		common.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(
+			w,
+			r,
+			err,
+			"Capture",
+		)
 		return
 	}
 
@@ -192,5 +251,11 @@ func (h Handler) forward(w http.ResponseWriter, r *http.Request, method string, 
 		}
 	}
 
-	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(
+		w,
+		r,
+		result,
+		http.StatusOK,
+		"Capture",
+	)
 }

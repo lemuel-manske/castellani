@@ -83,9 +83,21 @@ func Start(t *testing.T, options ...Option) Gateway {
 		option(&services)
 	}
 
-	coordinatorOrigin := startService(t, "Coordinator", services.coordinator)
-	captureOrigin := startService(t, "Capture", services.capture)
-	searchOrigin := startService(t, "Search", services.search)
+	coordinatorOrigin := startService(
+		t,
+		"Coordinator",
+		services.coordinator,
+	)
+	captureOrigin := startService(
+		t,
+		"Capture",
+		services.capture,
+	)
+	searchOrigin := startService(
+		t,
+		"Search",
+		services.search,
+	)
 
 	coordinatorClient := coordinator.NewClient(coordinatorOrigin, time.Second)
 	captureClient := upstream.NewClient(captureOrigin, time.Second)
@@ -106,13 +118,26 @@ func Start(t *testing.T, options ...Option) Gateway {
 	return Gateway{t: t, server: server}
 }
 
-func startService(t *testing.T, name string, handler http.HandlerFunc) url.URL {
+func startService(
+	t *testing.T,
+	name string,
+	handler http.HandlerFunc,
+) url.URL {
 	t.Helper()
 
 	if handler == nil {
 		handler = func(w http.ResponseWriter, r *http.Request) {
-			t.Errorf("unexpected %s service request: %s %s", name, r.Method, r.URL.RequestURI())
-			http.Error(w, "unexpected test dependency call", http.StatusInternalServerError)
+			t.Errorf(
+				"unexpected %s service request: %s %s",
+				name,
+				r.Method,
+				r.URL.RequestURI(),
+			)
+			http.Error(
+				w,
+				"unexpected test dependency call",
+				http.StatusInternalServerError,
+			)
 		}
 	}
 
@@ -128,7 +153,11 @@ func startService(t *testing.T, name string, handler http.HandlerFunc) url.URL {
 func (g Gateway) Submit(key, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPost, g.server.URL+common.ArchivesPath, strings.NewReader(body))
+	request, err := http.NewRequest(
+		http.MethodPost,
+		g.server.URL+common.ArchivesPath,
+		strings.NewReader(body),
+	)
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -140,7 +169,11 @@ func (g Gateway) Submit(key, body string) Response {
 func (g Gateway) CreateSession(key, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPost, g.server.URL+common.SessionsPath, strings.NewReader(body))
+	request, err := http.NewRequest(
+		http.MethodPost,
+		g.server.URL+common.SessionsPath,
+		strings.NewReader(body),
+	)
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -152,7 +185,11 @@ func (g Gateway) CreateSession(key, body string) Response {
 func (g Gateway) UpdateSession(id, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPut, g.server.URL+common.SessionPathPrefix+id, strings.NewReader(body))
+	request, err := http.NewRequest(
+		http.MethodPut,
+		g.server.URL+common.SessionPathPrefix+id,
+		strings.NewReader(body),
+	)
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -163,7 +200,11 @@ func (g Gateway) UpdateSession(id, body string) Response {
 func (g Gateway) WACZ(id, byteRange, ifRange string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodGet, g.server.URL+common.ArchivePathPrefix+id+common.WACZPathSuffix, nil)
+	request, err := http.NewRequest(
+		http.MethodGet,
+		g.server.URL+common.ArchivePathPrefix+id+common.WACZPathSuffix,
+		nil,
+	)
 	require.NoError(g.t, err)
 
 	if byteRange != "" {
@@ -198,7 +239,11 @@ func (g Gateway) Put(path string) Response {
 func (g Gateway) request(method, path string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(method, g.server.URL+path, nil)
+	request, err := http.NewRequest(
+		method,
+		g.server.URL+path,
+		nil,
+	)
 	require.NoError(g.t, err)
 
 	return g.send(request)

@@ -67,10 +67,21 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := common.ArchivePathPrefix + url.PathEscape(id) + common.WACZPathSuffix
-	response, err := h.client.Stream(r.Context(), r.Method, path, byteRange, ifRange)
+	response, err := h.client.Stream(
+		r.Context(),
+		r.Method,
+		path,
+		byteRange,
+		ifRange,
+	)
 
 	if err != nil {
-		common.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(
+			w,
+			r,
+			err,
+			"Capture",
+		)
 		return
 	}
 
@@ -79,7 +90,11 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	if response.StatusCode == http.StatusNotFound ||
 		response.StatusCode == http.StatusServiceUnavailable ||
 		response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
-		h.writeFailure(w, r, response)
+		h.writeFailure(
+			w,
+			r,
+			response,
+		)
 		return
 	}
 
@@ -118,7 +133,11 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, response.Body)
 }
 
-func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, response *http.Response) {
+func (h WACZHandler) writeFailure(
+	w http.ResponseWriter,
+	r *http.Request,
+	response *http.Response,
+) {
 	data, err := io.ReadAll(io.LimitReader(response.Body, httpx.MaxJSONRequestBytes+1))
 
 	if err != nil || len(data) > httpx.MaxJSONRequestBytes {

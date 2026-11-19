@@ -27,10 +27,26 @@ func TestGateway_CreateSessionRetainsIdempotencyKeyAndPublicLocation(t *testing.
 
 	result := gateway.CreateSession(gatewaytest.IdempotencyKey, sessionRequest)
 
-	assert.Equal(t, http.StatusCreated, result.Status)
-	assert.JSONEq(t, sessionCreated, result.Body)
-	assert.Equal(t, "/sessions/sess-1", result.Header.Get(httpx.LocationHeader))
-	assert.Equal(t, gatewaytest.IdempotencyKey, <-keys)
+	assert.Equal(
+		t,
+		http.StatusCreated,
+		result.Status,
+	)
+	assert.JSONEq(
+		t,
+		sessionCreated,
+		result.Body,
+	)
+	assert.Equal(
+		t,
+		"/sessions/sess-1",
+		result.Header.Get(httpx.LocationHeader),
+	)
+	assert.Equal(
+		t,
+		gatewaytest.IdempotencyKey,
+		<-keys,
+	)
 }
 
 func TestGateway_CreateSessionWithoutIdempotencyKeyIsRejected(t *testing.T) {
@@ -38,7 +54,11 @@ func TestGateway_CreateSessionWithoutIdempotencyKeyIsRejected(t *testing.T) {
 
 	result := gateway.CreateSession("", sessionRequest)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 }
 
 func TestGateway_CreateSessionRejectsNonHTTPSTarget(t *testing.T) {
@@ -46,7 +66,11 @@ func TestGateway_CreateSessionRejectsNonHTTPSTarget(t *testing.T) {
 
 	result := gateway.CreateSession(gatewaytest.IdempotencyKey, `{"archiveId":"run-1","targetUrl":"file:///etc/passwd"}`)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 }
 
 func TestGateway_SessionFinalizationForwardsDesiredState(t *testing.T) {
@@ -60,9 +84,21 @@ func TestGateway_SessionFinalizationForwardsDesiredState(t *testing.T) {
 
 	result := gateway.UpdateSession("sess-1", `{"status":"COMPLETED"}`)
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.JSONEq(t, `{"status":"COMPLETED"}`, <-received)
-	assert.Contains(t, result.Body, `"authGeneration":1`)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.JSONEq(
+		t,
+		`{"status":"COMPLETED"}`,
+		<-received,
+	)
+	assert.Contains(
+		t,
+		result.Body,
+		`"authGeneration":1`,
+	)
 }
 
 func TestGateway_SessionFinalizationRejectsInvalidTransition(t *testing.T) {
@@ -70,5 +106,9 @@ func TestGateway_SessionFinalizationRejectsInvalidTransition(t *testing.T) {
 
 	result := gateway.UpdateSession("sess-1", `{"status":"ACTIVE"}`)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 }

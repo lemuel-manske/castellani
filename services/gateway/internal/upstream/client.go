@@ -35,7 +35,11 @@ type Client struct {
 }
 
 func NewClient(origin url.URL, timeout time.Duration) *Client {
-	return NewClientWithStreamTimeout(origin, timeout, defaultStreamTimeout)
+	return NewClientWithStreamTimeout(
+		origin,
+		timeout,
+		defaultStreamTimeout,
+	)
 }
 
 func NewClientWithStreamTimeout(origin url.URL, timeout, streamTimeout time.Duration) *Client {
@@ -65,8 +69,18 @@ func NewClientWithStreamTimeout(origin url.URL, timeout, streamTimeout time.Dura
 	}
 }
 
-func (c *Client) JSON(ctx context.Context, method, path, query, key string, body []byte) (Result, error) {
-	request, err := c.request(ctx, method, path, query, bytes.NewReader(body))
+func (c *Client) JSON(
+	ctx context.Context,
+	method, path, query, key string,
+	body []byte,
+) (Result, error) {
+	request, err := c.request(
+		ctx,
+		method,
+		path,
+		query,
+		bytes.NewReader(body),
+	)
 
 	if err != nil {
 		return Result{}, err
@@ -104,7 +118,13 @@ func (c *Client) JSON(ctx context.Context, method, path, query, key string, body
 // Stream uses a separate bounded transfer deadline and caller cancellation.
 // The caller must close the response body.
 func (c *Client) Stream(ctx context.Context, method, path, byteRange, ifRange string) (*http.Response, error) {
-	request, err := c.request(ctx, method, path, "", nil)
+	request, err := c.request(
+		ctx,
+		method,
+		path,
+		"",
+		nil,
+	)
 
 	if err != nil {
 		return nil, err
@@ -127,11 +147,20 @@ func (c *Client) Stream(ctx context.Context, method, path, byteRange, ifRange st
 	return response, nil
 }
 
-func (c *Client) request(ctx context.Context, method, path, query string, body io.Reader) (*http.Request, error) {
+func (c *Client) request(
+	ctx context.Context,
+	method, path, query string,
+	body io.Reader,
+) (*http.Request, error) {
 	target := c.baseURL
 	target.Path = path
 	target.RawPath = ""
 	target.RawQuery = query
 
-	return http.NewRequestWithContext(ctx, method, target.String(), body)
+	return http.NewRequestWithContext(
+		ctx,
+		method,
+		target.String(),
+		body,
+	)
 }

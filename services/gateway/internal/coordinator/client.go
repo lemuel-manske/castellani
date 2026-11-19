@@ -24,6 +24,8 @@ const (
 	idleConnectionTimeout     = 90 * time.Second
 )
 
+var ErrInvalidResponse = errors.New("invalid coordinator response")
+
 type Client struct {
 	baseURL url.URL
 	http    *http.Client
@@ -36,8 +38,6 @@ type Failure struct {
 func (f *Failure) Error() string {
 	return fmt.Sprintf("coordinator returned HTTP %d", f.Problem.Status)
 }
-
-var ErrInvalidResponse = errors.New("invalid coordinator response")
 
 func NewClient(origin url.URL, timeout time.Duration) *Client {
 	return &Client{
@@ -58,8 +58,17 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 	}
 }
 
-func (c *Client) CreateArchive(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
-	request, err := c.request(ctx, http.MethodPost, common.ArchivesPath, bytes.NewReader(raw))
+func (c *Client) CreateArchive(
+	ctx context.Context,
+	key string,
+	raw []byte,
+) (archive.Accepted, error) {
+	request, err := c.request(
+		ctx,
+		http.MethodPost,
+		common.ArchivesPath,
+		bytes.NewReader(raw),
+	)
 
 	if err != nil {
 		return archive.Accepted{}, err
@@ -92,7 +101,12 @@ func (c *Client) CreateArchive(ctx context.Context, key string, raw []byte) (arc
 }
 
 func (c *Client) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
-	request, err := c.request(ctx, http.MethodGet, common.ArchivePathPrefix+id, nil)
+	request, err := c.request(
+		ctx,
+		http.MethodGet,
+		common.ArchivePathPrefix+id,
+		nil,
+	)
 
 	if err != nil {
 		return nil, err
@@ -130,13 +144,22 @@ func (c *Client) GetArchive(ctx context.Context, id string) (json.RawMessage, er
 	return json.RawMessage(data), nil
 }
 
-func (c *Client) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
+func (c *Client) request(
+	ctx context.Context,
+	method, path string,
+	body io.Reader,
+) (*http.Request, error) {
 	target := c.baseURL
 
 	target.Path = path
 	target.RawPath = ""
 
-	return http.NewRequestWithContext(ctx, method, target.String(), body)
+	return http.NewRequestWithContext(
+		ctx,
+		method,
+		target.String(),
+		body,
+	)
 }
 
 func (c *Client) execute(request *http.Request) (int, []byte, error) {
