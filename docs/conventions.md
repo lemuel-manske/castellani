@@ -18,7 +18,7 @@ Let actual requirements and complexity determine the implementation. Neither the
 
 ### Architecture and organization
 
-Keep process entry points thin. Assemble dependencies at clear composition boundaries. Separate domain semantics, application use cases, inbound transports, and outbound adapters according to their actual responsibilities. The structure of [chaosd](https://github.com/lemuel-manske/chaosd) is a useful reference, not a layout to copy mechanically.
+Keep process entry points thin. Assemble dependencies at clear composition boundaries. Separate domain semantics, application use cases, inbound transports, and outbound adapters according to their actual responsibilities.
 
 Choose precise, context-aware names that reveal purpose and dependencies. Avoid redundant names repeating their namespace, and vague names that obscure what a component does.
 
