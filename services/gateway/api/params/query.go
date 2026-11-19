@@ -41,14 +41,14 @@ func Pagination(values url.Values) (application.Pagination, error) {
 
 func Search(values url.Values) (application.SearchQuery, error) {
 	allowed := map[string]bool{
-		"q": true,
-		"limit": true,
-		"cursor": true,
+		"q":            true,
+		"limit":        true,
+		"cursor":       true,
 		"collectionId": true,
-		"archiveId": true,
-		"snapshotId": true,
+		"archiveId":    true,
+		"snapshotId":   true,
 		"capturedFrom": true,
-		"capturedTo": true,
+		"capturedTo":   true,
 	}
 
 	for name, entries := range values {
