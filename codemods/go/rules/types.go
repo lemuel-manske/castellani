@@ -57,17 +57,3 @@ func isTypeDeclaration(decl ast.Decl) bool {
 	gen, ok := decl.(*ast.GenDecl)
 	return ok && gen.Tok == token.TYPE
 }
-
-func addBlankLine(source []byte, set *token.FileSet, previousEnd, nextStart token.Pos, edits *[]sourceEdit) {
-	start := set.Position(previousEnd).Offset
-	end := set.Position(nextStart).Offset
-	if start < 0 || end > len(source) || start > end || !whitespaceOnly(source[start:end]) {
-		return
-	}
-
-	indent := lineIndent(source, end)
-	replacement := "\n\n" + indent
-	if string(source[start:end]) != replacement {
-		*edits = append(*edits, sourceEdit{start: start, end: end, text: replacement})
-	}
-}
