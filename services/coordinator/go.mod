@@ -3,6 +3,7 @@ module github.com/lemuel-manske/unnamed/services/coordinator
 go 1.25.0
 
 require (
+	github.com/lemuel-manske/castellani/libs/httpx v0.0.0
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.44.0
@@ -27,3 +28,5 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/lemuel-manske/castellani/libs/httpx => ../../libs/httpx

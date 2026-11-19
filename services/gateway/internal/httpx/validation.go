@@ -1,53 +1,30 @@
 package httpx
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	shared "github.com/lemuel-manske/castellani/libs/httpx"
 )
 
 const (
-	MaxJSONRequestBytes = 64 << 10
+	MaxJSONRequestBytes = shared.MaxJSONRequestBytes
 	DefaultLimit        = 25
 	MaxLimit            = 100
 	MaxQueryLength      = 500
 )
 
 func DecodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get(HeaderContentType))
+	return shared.DecodeJSON(w, r, destination)
+}
 
-	if err != nil || mediaType != MediaTypeJSON {
-		return errors.New("Content-Type must be application/json")
-	}
-
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxJSONRequestBytes))
-
-	if err != nil {
-		return fmt.Errorf("read JSON request: %w", err)
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(destination); err != nil {
-		return fmt.Errorf("decode JSON request: %w", err)
-	}
-
-	var extra any
-
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return errors.New("expected exactly one JSON object")
-	}
-
-	return nil
+func DecodeJSONBytes(w http.ResponseWriter, r *http.Request, destination any) ([]byte, error) {
+	return shared.DecodeJSONBytes(w, r, destination)
 }
 
 func ValidatePagination(values url.Values) error {
@@ -84,11 +61,7 @@ func ValidateID(id string) bool {
 }
 
 func ValidateIdempotencyKey(key string) bool {
-	validLength := len(key) >= 8 && len(key) <= 200
-	cleanWhitespace := strings.TrimSpace(key) == key
-	noControl := !strings.ContainsAny(key, "\r\n\x00")
-
-	return validLength && cleanWhitespace && noControl
+	return shared.ValidateIdempotencyKey(key)
 }
 
 func ValidateTargetURL(raw string) bool {

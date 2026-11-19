@@ -2,10 +2,8 @@ package sessionapi
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
@@ -147,19 +145,5 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) ([]byte, error) {
-	// Decode once for strict validation, while retaining bytes for idempotency.
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, httpx.MaxJSONRequestBytes))
-
-	if err != nil {
-		return nil, err
-	}
-
-	clone := r.Clone(r.Context())
-	clone.Body = io.NopCloser(strings.NewReader(string(data)))
-
-	if err := httpx.DecodeJSON(w, clone, destination); err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return httpx.DecodeJSONBytes(w, r, destination)
 }

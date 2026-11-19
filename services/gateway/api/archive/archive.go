@@ -1,26 +1,15 @@
 package archiveapi
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
-	"mime"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
-)
-
-const (
-	maxRequestBytes         = 64 << 10
-	minIdempotencyKeyLength = 8
-	maxIdempotencyKeyLength = 200
 )
 
 type Handler struct {
@@ -31,49 +20,29 @@ func NewHandler(app application.Application) Handler {
 	return Handler{app: app}
 }
 
-func validIdempotencyKey(key string) bool {
-	validLength := len(key) >= minIdempotencyKeyLength && len(key) <= maxIdempotencyKeyLength
-	noOuterWhitespace := strings.TrimSpace(key) == key
-
-	return validLength && noOuterWhitespace
-}
-
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
-	if !validIdempotencyKey(key) {
+	if !httpx.ValidateIdempotencyKey(key) {
 		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
 		return
 	}
 
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get(httpx.HeaderContentType))
-
-	if err != nil || mediaType != httpx.MediaTypeJSON {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
-		return
-	}
-
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+	var submission archive.Submission
+	data, err := httpx.DecodeJSONBytes(w, r, &submission)
 
 	if err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "The archive request is invalid or exceeds the size limit.")
-		return
-	}
+		switch {
+		case errors.Is(err, httpx.ErrContentType):
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
+		case errors.Is(err, httpx.ErrExtraJSON):
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
+		case errors.Is(err, httpx.ErrInvalidJSON):
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
+		default:
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "The archive request is invalid or exceeds the size limit.")
+		}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-
-	var submission archive.Submission
-
-	if err = decoder.Decode(&submission); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
-		return
-	}
-
-	var extra any
-
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
 		return
 	}
 

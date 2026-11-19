@@ -1,7 +1,6 @@
 package httpx_test
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -74,5 +73,3 @@ func TestValidateIdempotencyKey_RejectsOuterWhitespace(t *testing.T) {
 func TestValidateIdempotencyKey_RejectsShortKey(t *testing.T) {
 	assert.False(t, httpx.ValidateIdempotencyKey("short"))
 }
-
-var _ = errors.Is

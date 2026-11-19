@@ -1,25 +1,17 @@
 package api
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
-	"mime"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/coordinator/application"
 	"github.com/lemuel-manske/unnamed/services/coordinator/internal/archive"
 )
 
 const (
-	maxRequestBytes         = 64 << 10
-	minIdempotencyKeyLength = 8
-	maxIdempotencyKeyLength = 200
-
 	archivesPath  = "/archives"
 	archivePath   = "/archives/{archiveId}"
 	archiveIDPath = "archiveId"
@@ -27,12 +19,8 @@ const (
 	healthReady   = "/health/ready"
 
 	idempotencyHeader = "Idempotency-Key"
-	contentTypeHeader = "Content-Type"
-	mediaTypeJSON     = "application/json"
-	mediaTypeProblem  = "application/problem+json"
 	healthMediaType   = "text/plain; charset=utf-8"
-	healthResponse    = "ok\n"
-	problemTypePrefix = "urn:distributed-web-archive:problem:"
+	healthResponse    = "ok\\n"
 )
 
 type Archives interface {
@@ -89,7 +77,7 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					logger.Error("coordinator handler panic", "path", r.URL.Path)
-					problem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
+					httpx.WriteProblem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
 				}
 			}()
 
@@ -99,54 +87,34 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 }
 
 func health(w http.ResponseWriter, status int) {
-	w.Header().Set(contentTypeHeader, healthMediaType)
+	w.Header().Set(httpx.HeaderContentType, healthMediaType)
 	w.WriteHeader(status)
-	_, _ = io.WriteString(w, healthResponse)
-}
-
-func validIdempotencyKey(key string) bool {
-	validLength := len(key) >= minIdempotencyKeyLength && len(key) <= maxIdempotencyKeyLength
-	noOuterWhitespace := strings.TrimSpace(key) == key
-
-	return validLength && noOuterWhitespace
+	_, _ = w.Write([]byte(healthResponse))
 }
 
 func create(w http.ResponseWriter, r *http.Request, service Archives) {
 	key := r.Header.Get(idempotencyHeader)
 
-	if !validIdempotencyKey(key) {
-		problem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
+	if !httpx.ValidateIdempotencyKey(key) {
+		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
 		return
 	}
-
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get(contentTypeHeader))
-
-	if err != nil || mediaType != mediaTypeJSON {
-		problem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
-		return
-	}
-
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
-
-	if err != nil {
-		problem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Invalid or oversized request.")
-		return
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
 
 	var submission archive.Submission
+	_, err := httpx.DecodeJSONBytes(w, r, &submission)
 
-	if err := decoder.Decode(&submission); err != nil {
-		problem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
-		return
-	}
+	if err != nil {
+		switch {
+		case errors.Is(err, httpx.ErrContentType):
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
+		case errors.Is(err, httpx.ErrExtraJSON):
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
+		case errors.Is(err, httpx.ErrInvalidJSON):
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
+		default:
+			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Invalid or oversized request.")
+		}
 
-	var extra any
-
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		problem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
 		return
 	}
 
@@ -158,7 +126,7 @@ func create(w http.ResponseWriter, r *http.Request, service Archives) {
 	}
 
 	w.Header().Set("Location", accepted.StatusURL)
-	respond(w, http.StatusAccepted, accepted)
+	httpx.JSON(w, http.StatusAccepted, accepted)
 }
 
 func status(w http.ResponseWriter, r *http.Request, service Archives, id string) {
@@ -169,48 +137,19 @@ func status(w http.ResponseWriter, r *http.Request, service Archives, id string)
 		return
 	}
 
-	respond(w, http.StatusOK, record)
+	httpx.JSON(w, http.StatusOK, record)
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, application.ErrInvalid):
-		problem(w, r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", err.Error())
+		httpx.WriteProblem(w, r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", err.Error())
 	case errors.Is(err, application.ErrConflict):
-		problem(w, r, http.StatusConflict, "idempotency-conflict", "Conflict", "Idempotency-Key was used for a different archive request.")
+		httpx.WriteProblem(w, r, http.StatusConflict, "idempotency-conflict", "Conflict", "Idempotency-Key was used for a different archive request.")
 	case errors.Is(err, application.ErrNotFound):
-		problem(w, r, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist.")
+		httpx.WriteProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist.")
 	default:
-		problem(w, r, http.StatusServiceUnavailable, "coordinator-unavailable", "Coordinator Unavailable", "The operation could not be confirmed. Retry with the same Idempotency-Key.")
+		httpx.WriteProblem(w, r, http.StatusServiceUnavailable, "coordinator-unavailable", "Coordinator Unavailable", "The operation could not be confirmed. Retry with the same Idempotency-Key.")
 	}
 }
 
-type problemDocument struct {
-	Type     string `json:"type"`
-	Title    string `json:"title"`
-	Status   int    `json:"status"`
-	Detail   string `json:"detail,omitempty"`
-	Instance string `json:"instance,omitempty"`
-}
-
-func problem(w http.ResponseWriter, r *http.Request, status int, kind, title, detail string) {
-	document := problemDocument{
-		Type:     problemTypePrefix + kind,
-		Title:    title,
-		Status:   status,
-		Detail:   detail,
-		Instance: r.URL.Path,
-	}
-
-	w.Header().Set(contentTypeHeader, mediaTypeProblem)
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(document)
-}
-
-func respond(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set(contentTypeHeader, mediaTypeJSON)
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
-}
