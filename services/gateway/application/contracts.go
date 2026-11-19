@@ -27,17 +27,44 @@ type WACZ struct {
 	Partial                                                       bool
 	AcceptRanges, ContentRange, ETag, LastModified, ContentLength string
 }
+type Pages struct {
+ Items []json.RawMessage `json:"items"`
+ NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+type Snapshot struct {
+ ArchiveID string `json:"archiveId"`
+ SnapshotID string `json:"snapshotId"`
+ URL string `json:"url"`
+ FinalURL string `json:"finalUrl,omitempty"`
+ CapturedAt string `json:"capturedAt"`
+ ContentType string `json:"contentType,omitempty"`
+}
+
+type Session struct {
+ SessionID string `json:"sessionId"`
+ ArchiveID string `json:"archiveId"`
+ Status string `json:"status"`
+ ExpiresAt string `json:"expiresAt"`
+ AuthGeneration *int `json:"authGeneration,omitempty"`
+}
+
+type SearchResults struct {
+ Results []json.RawMessage `json:"results"`
+ NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 type Capture interface {
 	ListPages(
 		context.Context,
 		string,
 		Pagination,
-	) (json.RawMessage, error)
+	) (Pages, error)
 	GetSnapshot(
 		context.Context,
 		string,
 		string,
-	) (json.RawMessage, error)
+	) (Snapshot, error)
 	GetWACZ(
 		context.Context,
 		string,
@@ -48,14 +75,14 @@ type Capture interface {
 		string,
 		SessionRequest,
 		[]byte,
-	) (json.RawMessage, error)
-	GetSession(context.Context, string) (json.RawMessage, error)
+	) (Session, error)
+	GetSession(context.Context, string) (Session, error)
 	UpdateSession(
 		context.Context,
 		string,
 		[]byte,
-	) (json.RawMessage, error)
+	) (Session, error)
 }
 type SearchService interface {
-	Search(context.Context, SearchQuery) (json.RawMessage, error)
+	Search(context.Context, SearchQuery) (SearchResults, error)
 }

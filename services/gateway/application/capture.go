@@ -9,13 +9,13 @@ func (a Application) ListPages(
 	ctx context.Context,
 	archiveID string,
 	pagination Pagination,
-) (json.RawMessage, error) {
+) (Pages, error) {
 	if err := validateArchiveID(archiveID); err != nil {
-		return nil, err
+		return Pages{}, err
 	}
 
 	if err := pagination.Validate(); err != nil {
-		return nil, err
+		return Pages{}, err
 	}
 
 	if a.capture == nil {
@@ -28,13 +28,13 @@ func (a Application) ListPages(
 	)
 }
 
-func (a Application) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (json.RawMessage, error) {
+func (a Application) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (Snapshot, error) {
 	if err := validateArchiveID(archiveID); err != nil {
-		return nil, err
+		return Snapshot{}, err
 	}
 
 	if err := validateSnapshotID(snapshotID); err != nil {
-		return nil, err
+		return Snapshot{}, err
 	}
 
 	if a.capture == nil {

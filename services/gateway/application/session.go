@@ -18,17 +18,17 @@ func (a Application) CreateSession(
 	key string,
 	input SessionRequest,
 	raw []byte,
-) (json.RawMessage, error) {
+) (Session, error) {
 	if !httpx.ValidIdempotencyKey(key) {
-		return nil, fmt.Errorf("%w: invalid idempotency key", ErrInvalidSession)
+		return Session{}, fmt.Errorf("%w: invalid idempotency key", ErrInvalidSession)
 	}
 
 	if err := input.Validate(); err != nil {
-		return nil, err
+		return Session{}, err
 	}
 
 	if a.capture == nil {
-		return nil, ErrDependencyUnavailable
+		return Session{}, ErrDependencyUnavailable
 	}
 	return a.capture.CreateSession(
 		ctx,
@@ -38,13 +38,13 @@ func (a Application) CreateSession(
 	)
 }
 
-func (a Application) GetSession(ctx context.Context, sessionID string) (json.RawMessage, error) {
+func (a Application) GetSession(ctx context.Context, sessionID string) (Session, error) {
 	if err := validateSessionID(sessionID); err != nil {
-		return nil, err
+		return Session{}, err
 	}
 
 	if a.capture == nil {
-		return nil, ErrDependencyUnavailable
+		return Session{}, ErrDependencyUnavailable
 	}
 	return a.capture.GetSession(ctx, sessionID)
 }
@@ -53,17 +53,17 @@ func (a Application) UpdateSession(
 	ctx context.Context,
 	sessionID, status string,
 	raw []byte,
-) (json.RawMessage, error) {
+) (Session, error) {
 	if err := validateSessionID(sessionID); err != nil {
-		return nil, err
+		return Session{}, err
 	}
 
 	if status != SessionCompleted && status != SessionCancelled {
-		return nil, fmt.Errorf("%w: status must be COMPLETED or CANCELLED", ErrInvalidSession)
+		return Session{}, fmt.Errorf("%w: status must be COMPLETED or CANCELLED", ErrInvalidSession)
 	}
 
 	if a.capture == nil {
-		return nil, ErrDependencyUnavailable
+		return Session{}, ErrDependencyUnavailable
 	}
 	return a.capture.UpdateSession(
 		ctx,

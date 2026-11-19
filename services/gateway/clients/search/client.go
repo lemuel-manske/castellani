@@ -12,13 +12,11 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
 )
 
 const maxJSONBytes = 1 << 20
 
-var _ application.SearchService = (*Client)(nil)
 
 type Client struct {
 	origin url.URL
@@ -33,7 +31,7 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 	}}
 }
 
-func (c *Client) Search(ctx context.Context, query application.SearchQuery) (json.RawMessage, error) {
+func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	values := url.Values{}
 	values.Set("q", query.Text)
 
@@ -76,14 +74,14 @@ func (c *Client) Search(ctx context.Context, query application.SearchQuery) (jso
 	)
 
 	if err != nil {
-		return nil, err
+		return Results{}, err
 	}
 	response, err := c.http.Do(request)
 
 	if err != nil {
-		return nil, fmt.Errorf(
+		return Results{}, fmt.Errorf(
 			"%w: search request: %v",
-			application.ErrDependencyUnavailable,
+			ErrUnavailable,
 			err,
 		)
 	}
@@ -91,36 +89,34 @@ func (c *Client) Search(ctx context.Context, query application.SearchQuery) (jso
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 	if err != nil {
-		return nil, fmt.Errorf(
+		return Results{}, fmt.Errorf(
 			"%w: read search: %v",
-			application.ErrDependencyUnavailable,
+			ErrUnavailable,
 			err,
 		)
 	}
 
 	if len(data) > maxJSONBytes {
-		return nil, application.ErrInvalidUpstream
+		return Results{}, ErrInvalidResponse
 	}
 
 	if response.StatusCode != http.StatusOK {
 		switch response.StatusCode {
 		case 400, 401, 403, 404, 409, 422, 503:
 		default:
-			return nil, application.ErrInvalidUpstream
+			return Results{}, ErrInvalidResponse
 		}
 		var p httpx.Problem
 
 		if json.Unmarshal(data, &p) != nil || p.Status != response.StatusCode || p.Title == "" || p.Type == "" {
-			return nil, application.ErrInvalidUpstream
+			return Results{}, ErrInvalidResponse
 		}
-		return nil, &application.DependencyFailure{Status: p.Status, Type: p.Type, Title: p.Title, Detail: p.Detail}
+		return Results{}, &Failure{Status: p.Status, Type: p.Type, Title: p.Title, Detail: p.Detail}
 	}
-	var result struct {
-		Results []json.RawMessage `json:"results"`
-	}
+	var result Results
 
 	if json.Unmarshal(data, &result) != nil || result.Results == nil {
-		return nil, application.ErrInvalidUpstream
+		return Results{}, ErrInvalidResponse
 	}
-	return data, nil
+	return result, nil
 }

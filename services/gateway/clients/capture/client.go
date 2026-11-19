@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
 )
 
@@ -22,7 +21,6 @@ const (
 	defaultStreamTimeout = 30 * time.Minute
 )
 
-var _ application.Capture = (*Client)(nil)
 
 type Client struct {
 	origin       url.URL
@@ -45,8 +43,8 @@ func NewClient(origin url.URL, timeout, streamTimeout time.Duration) *Client {
 func (c *Client) ListPages(
 	ctx context.Context,
 	archiveID string,
-	page application.Pagination,
-) (json.RawMessage, error) {
+	page Pagination,
+ ) (Pages, error) {
 	query := url.Values{}
 
 	if page.Limit != nil {
@@ -66,24 +64,22 @@ func (c *Client) ListPages(
 	)
 
 	if err != nil {
-		return nil, err
+		return Pages{}, err
 	}
 	data, err := c.execute(request, http.StatusOK)
 
 	if err != nil {
-		return nil, err
+		return Pages{}, err
 	}
-	var v struct {
-		Items []json.RawMessage `json:"items"`
-	}
+	var v Pages
 
 	if json.Unmarshal(data, &v) != nil || v.Items == nil {
-		return nil, application.ErrInvalidUpstream
+		return Pages{}, ErrInvalidResponse
 	}
-	return data, nil
+	return v, nil
 }
 
-func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (json.RawMessage, error) {
+func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (Snapshot, error) {
 	path := common.ArchivePathPrefix + url.PathEscape(archiveID) + common.SnapshotPathSegment + url.PathEscape(snapshotID)
 	request, err := c.request(
 		ctx,
@@ -94,32 +90,27 @@ func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) 
 	)
 
 	if err != nil {
-		return nil, err
+		return Snapshot{}, err
 	}
 	data, err := c.execute(request, http.StatusOK)
 
 	if err != nil {
-		return nil, err
+		return Snapshot{}, err
 	}
-	var v struct {
-		ArchiveID  string `json:"archiveId"`
-		SnapshotID string `json:"snapshotId"`
-		URL        string `json:"url"`
-		CapturedAt string `json:"capturedAt"`
-	}
+	var v Snapshot
 
 	if json.Unmarshal(data, &v) != nil || v.ArchiveID != archiveID || v.SnapshotID != snapshotID || v.URL == "" || v.CapturedAt == "" {
-		return nil, application.ErrInvalidUpstream
+		return Snapshot{}, ErrInvalidResponse
 	}
-	return data, nil
+	return v, nil
 }
 
 func (c *Client) CreateSession(
 	ctx context.Context,
 	key string,
-	session application.SessionRequest,
+	session SessionRequest,
 	raw []byte,
-) (json.RawMessage, error) {
+) (Session, error) {
 	request, err := c.request(
 		ctx,
 		http.MethodPost,
@@ -129,27 +120,20 @@ func (c *Client) CreateSession(
 	)
 
 	if err != nil {
-		return nil, err
+		return Session{}, err
 	}
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	request.Header.Set(httpx.IdempotencyHeader, key)
 	data, err := c.execute(request, http.StatusCreated)
 
 	if err != nil {
-		return nil, err
+		return Session{}, err
 	}
 
-	if err := validateSession(
-		data,
-		"",
-		session.ArchiveID,
-	); err != nil {
-		return nil, err
-	}
-	return data, nil
+	return validateSession(data, "", session.ArchiveID)
 }
 
-func (c *Client) GetSession(ctx context.Context, id string) (json.RawMessage, error) {
+func (c *Client) GetSession(ctx context.Context, id string) (Session, error) {
 	return c.session(
 		ctx,
 		http.MethodGet,
@@ -162,7 +146,7 @@ func (c *Client) UpdateSession(
 	ctx context.Context,
 	id string,
 	raw []byte,
-) (json.RawMessage, error) {
+) (Session, error) {
 	return c.session(
 		ctx,
 		http.MethodPut,
@@ -175,7 +159,7 @@ func (c *Client) session(
 	ctx context.Context,
 	method, id string,
 	raw []byte,
-) (json.RawMessage, error) {
+) (Session, error) {
 	request, err := c.request(
 		ctx,
 		method,
@@ -185,7 +169,7 @@ func (c *Client) session(
 	)
 
 	if err != nil {
-		return nil, err
+		return Session{}, err
 	}
 
 	if raw != nil {
@@ -194,39 +178,27 @@ func (c *Client) session(
 	data, err := c.execute(request, http.StatusOK)
 
 	if err != nil {
-		return nil, err
+		return Session{}, err
 	}
 
-	if err := validateSession(
-		data,
-		id,
-		"",
-	); err != nil {
-		return nil, err
-	}
-	return data, nil
+	return validateSession(data, id, "")
 }
 
-func validateSession(data []byte, id, archiveID string) error {
-	var v struct {
-		SessionID string `json:"sessionId"`
-		ArchiveID string `json:"archiveId"`
-		Status    string `json:"status"`
-		ExpiresAt string `json:"expiresAt"`
-	}
+func validateSession(data []byte, id, archiveID string) (Session, error) {
+	var v Session
 
 	if json.Unmarshal(data, &v) != nil || !httpx.ValidPathSegment(v.SessionID) || !httpx.ValidPathSegment(v.ArchiveID) ||
 		v.Status == "" || v.ExpiresAt == "" || (id != "" && v.SessionID != id) || (archiveID != "" && v.ArchiveID != archiveID) {
-		return application.ErrInvalidUpstream
+		return Session{}, ErrInvalidResponse
 	}
-	return nil
+	return v, nil
 }
 
 func (c *Client) GetWACZ(
 	ctx context.Context,
 	id string,
-	options application.WACZOptions,
-) (application.WACZ, error) {
+	options WACZOptions,
+) (WACZ, error) {
 	method := http.MethodGet
 
 	if options.MetadataOnly {
@@ -242,7 +214,7 @@ func (c *Client) GetWACZ(
 	)
 
 	if err != nil {
-		return application.WACZ{}, err
+		return WACZ{}, err
 	}
 
 	if options.Range != "" {
@@ -255,9 +227,9 @@ func (c *Client) GetWACZ(
 	response, err := c.stream.Do(request)
 
 	if err != nil {
-		return application.WACZ{}, fmt.Errorf(
+		return WACZ{}, fmt.Errorf(
 			"%w: capture WACZ: %v",
-			application.ErrDependencyUnavailable,
+			ErrUnavailable,
 			err,
 		)
 	}
@@ -267,23 +239,23 @@ func (c *Client) GetWACZ(
 		data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 		if err != nil || len(data) > maxJSONBytes {
-			return application.WACZ{}, application.ErrInvalidUpstream
+			return WACZ{}, ErrInvalidResponse
 		}
 		failure, err := parseFailure(response.StatusCode, data)
 
 		if err != nil {
-			return application.WACZ{}, err
+			return WACZ{}, err
 		}
 		failure.ContentRange = response.Header.Get("Content-Range")
-		return application.WACZ{}, failure
+		return WACZ{}, failure
 	}
 	success := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
 	if !success || response.Header.Get(httpx.HeaderContentType) != httpx.WACZMediaType {
 		response.Body.Close()
-		return application.WACZ{}, application.ErrInvalidUpstream
+		return WACZ{}, ErrInvalidResponse
 	}
-	return application.WACZ{Body: response.Body, Partial: response.StatusCode == http.StatusPartialContent,
+	return WACZ{Body: response.Body, Partial: response.StatusCode == http.StatusPartialContent,
 		AcceptRanges: response.Header.Get("Accept-Ranges"), ContentRange: response.Header.Get("Content-Range"),
 		ETag: response.Header.Get("ETag"), LastModified: response.Header.Get("Last-Modified"),
 		ContentLength: response.Header.Get("Content-Length")}, nil
@@ -295,7 +267,7 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: capture request: %v",
-			application.ErrDependencyUnavailable,
+			ErrUnavailable,
 			err,
 		)
 	}
@@ -305,13 +277,13 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: read capture: %v",
-			application.ErrDependencyUnavailable,
+			ErrUnavailable,
 			err,
 		)
 	}
 
 	if len(data) > maxJSONBytes {
-		return nil, application.ErrInvalidUpstream
+		return nil, ErrInvalidResponse
 	}
 
 	if response.StatusCode != success {
@@ -319,7 +291,7 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	}
 
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
-		return nil, application.ErrInvalidUpstream
+		return nil, ErrInvalidResponse
 	}
 	return data, nil
 }
@@ -350,16 +322,16 @@ func failureError(status int, data []byte) error {
 	return failure
 }
 
-func parseFailure(status int, data []byte) (*application.DependencyFailure, error) {
+func parseFailure(status int, data []byte) (*Failure, error) {
 	switch status {
 	case 400, 401, 403, 404, 409, 416, 422, 503:
 	default:
-		return nil, application.ErrInvalidUpstream
+		return nil, ErrInvalidResponse
 	}
 	var p httpx.Problem
 
 	if json.Unmarshal(data, &p) != nil || p.Status != status || p.Type == "" || p.Title == "" {
-		return nil, application.ErrInvalidUpstream
+		return nil, ErrInvalidResponse
 	}
-	return &application.DependencyFailure{Status: status, Type: p.Type, Title: p.Title, Detail: p.Detail}, nil
+	return &Failure{Status: status, Type: p.Type, Title: p.Title, Detail: p.Detail}, nil
 }

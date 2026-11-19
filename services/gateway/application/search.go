@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 )
 
-func (a Application) Search(ctx context.Context, query SearchQuery) (json.RawMessage, error) {
+func (a Application) Search(ctx context.Context, query SearchQuery) (SearchResults, error) {
 	if err := query.Validate(); err != nil {
-		return nil, err
+		return SearchResults{}, err
 	}
 
 	if a.search == nil {
-		return nil, ErrDependencyUnavailable
+		return SearchResults{}, ErrDependencyUnavailable
 	}
 	return a.search.Search(ctx, query)
 }
