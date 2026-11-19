@@ -12,7 +12,7 @@ run:
 	go run .
 
 fmt:
-	go fmt ./...
+	$(MAKE) -C ../../codemods/go apply TARGET=../../services/gateway
 
 test:
 	go test ./...
