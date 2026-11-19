@@ -2,7 +2,6 @@ package archiveapi
 
 import (
  "net/http"
- "net/url"
  "strconv"
 
  "github.com/go-chi/chi/v5"
