@@ -13,6 +13,7 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
 const (
@@ -32,8 +33,19 @@ func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	gateway := &gatewayServer{shutdownTimeout: cfg.shutdownTimeout}
 	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
 	app := application.NewApplication(coordinatorClient)
+	var captureClient *upstream.Client
+	var searchClient *upstream.Client
+
+	if cfg.captureURL != nil {
+		captureClient = upstream.NewClient(*cfg.captureURL, cfg.upstreamTimeout)
+	}
+
+	if cfg.searchURL != nil {
+		searchClient = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
+	}
+
 	gateway.http = &http.Server{
-		Handler:           api.NewRouter(gateway.ready.Load, app, logger),
+		Handler:           api.NewRouterWithServices(gateway.ready.Load, app, captureClient, searchClient, logger),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 		IdleTimeout:       serverIdleTimeout,
