@@ -74,7 +74,17 @@ type Capture interface {
 }
 `
 
-	assertFormat(t, source, source, TypeSpacing)
+	expected := `package example
+
+type WACZ struct{}
+
+// Capture describes the reader.
+type Capture interface {
+	GetSnapshot() error
+}
+`
+
+	assertFormat(t, source, expected, TypeSpacing)
 }
 
 func TestFormat_CombinedTypeAndInterfaceSpacing(t *testing.T) {
