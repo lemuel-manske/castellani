@@ -60,7 +60,7 @@ These rules apply only to Go source and Go tests.
 - Use Go package boundaries and `internal/` visibility for implementation isolation. Shared contract types and widely consumed test infrastructure should not be buried under `internal/` merely because they originate in one package.
 - Apply a consistent constructor vocabulary across packages: `NewClient` for clients and `NewHandler` for handlers, distinguishing constructors only when they genuinely initialize different types or configurations. Favor package-contextual naming over unnecessary qualifiers.
 - Keep meaningful calls readable by assigning intermediate results rather than nesting lengthy constructor or helper calls inside other calls.
-- Keep reusable Go service fixtures in a dedicated purpose-specific package such as `internal/gatewaytest/`; organize fixture files by responsibility. Do not export production internals only to reuse test setup.
+- Keep reusable Go service fixtures in a dedicated purpose-specific package such as `gatewaytest/` at the service root; organize fixture files by responsibility. Do not export production internals only to reuse test setup.
 - Mark reusable test helpers with `t.Helper`, and register cleanup with `t.Cleanup`.
 
 See [testing.md](testing.md) for further Go-specific testing guidance.
