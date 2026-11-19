@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	waczMediaType       = "application/wacz"
 	maxRangeHeaderBytes = 256
 )
 
@@ -85,7 +84,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 
 	isSuccess := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
-	if !isSuccess || response.Header.Get("Content-Type") != waczMediaType {
+	if !isSuccess || response.Header.Get("Content-Type") != httpx.WACZMediaType {
 		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadGateway,
@@ -105,7 +104,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", waczMediaType)
+	w.Header().Set("Content-Type", httpx.WACZMediaType)
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(response.StatusCode)

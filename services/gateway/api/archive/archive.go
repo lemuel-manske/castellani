@@ -1,3 +1,4 @@
+// Package archiveapi provides HTTP handlers for the Archiving API
 package archiveapi
 
 import (

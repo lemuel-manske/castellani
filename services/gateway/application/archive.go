@@ -1,3 +1,4 @@
+// Package application provides the application layer for the Gateway service.
 package application
 
 import (

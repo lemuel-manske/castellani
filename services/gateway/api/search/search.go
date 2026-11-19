@@ -1,3 +1,4 @@
+// Package searchapi provides HTTP handlers for the Searching API
 package searchapi
 
 import (

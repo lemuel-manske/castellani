@@ -1,3 +1,4 @@
+// Package coordinator provides a client for communicating with the coordinator service
 package coordinator
 
 import (

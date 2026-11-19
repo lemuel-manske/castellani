@@ -1,3 +1,4 @@
+// Package sessionapi provides HTTP handlers for the Sessions API
 package sessionapi
 
 import (

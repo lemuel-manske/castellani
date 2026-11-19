@@ -1,3 +1,4 @@
+// Package archive provides data structures for archive manipulation.
 package archive
 
 import (

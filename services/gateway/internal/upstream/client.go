@@ -1,3 +1,4 @@
+// Package upstream provides a client for communicating with upstream services.
 package upstream
 
 import (
