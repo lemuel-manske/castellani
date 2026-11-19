@@ -22,5 +22,9 @@ type DependencyFailure struct {
 }
 
 func (e *DependencyFailure) Error() string {
-	return fmt.Sprintf("dependency returned HTTP %d: %s", e.Status, e.Title)
+	return fmt.Sprintf(
+		"dependency returned HTTP %d: %s",
+		e.Status,
+		e.Title,
+	)
 }

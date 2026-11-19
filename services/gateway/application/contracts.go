@@ -28,12 +28,33 @@ type WACZ struct {
 	AcceptRanges, ContentRange, ETag, LastModified, ContentLength string
 }
 type Capture interface {
-	ListPages(context.Context, string, Pagination) (json.RawMessage, error)
-	GetSnapshot(context.Context, string, string) (json.RawMessage, error)
-	GetWACZ(context.Context, string, WACZOptions) (WACZ, error)
-	CreateSession(context.Context, string, SessionRequest, []byte) (json.RawMessage, error)
+	ListPages(
+		context.Context,
+		string,
+		Pagination,
+	) (json.RawMessage, error)
+	GetSnapshot(
+		context.Context,
+		string,
+		string,
+	) (json.RawMessage, error)
+	GetWACZ(
+		context.Context,
+		string,
+		WACZOptions,
+	) (WACZ, error)
+	CreateSession(
+		context.Context,
+		string,
+		SessionRequest,
+		[]byte,
+	) (json.RawMessage, error)
 	GetSession(context.Context, string) (json.RawMessage, error)
-	UpdateSession(context.Context, string, []byte) (json.RawMessage, error)
+	UpdateSession(
+		context.Context,
+		string,
+		[]byte,
+	) (json.RawMessage, error)
 }
 type SearchService interface {
 	Search(context.Context, SearchQuery) (json.RawMessage, error)

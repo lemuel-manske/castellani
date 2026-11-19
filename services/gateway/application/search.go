@@ -9,6 +9,7 @@ func (a Application) Search(ctx context.Context, query SearchQuery) (json.RawMes
 	if err := query.Validate(); err != nil {
 		return nil, err
 	}
+
 	if a.search == nil {
 		return nil, ErrDependencyUnavailable
 	}

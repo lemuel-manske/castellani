@@ -25,8 +25,13 @@ func (q SearchQuery) Validate() error {
 	if len(q.Text) == 0 || len(q.Text) > maxQueryLength || strings.TrimSpace(q.Text) == "" {
 		return fmt.Errorf("%w: q must contain between 1 and 500 characters", ErrInvalidSearch)
 	}
+
 	if err := q.Pagination.Validate(); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidSearch, err)
+		return fmt.Errorf(
+			"%w: %v",
+			ErrInvalidSearch,
+			err,
+		)
 	}
 
 	var from, to time.Time
@@ -39,9 +44,15 @@ func (q SearchQuery) Validate() error {
 			continue
 		}
 		parsed, err := time.Parse(time.RFC3339, v.raw)
+
 		if err != nil {
-			return fmt.Errorf("%w: %s must be RFC3339", ErrInvalidSearch, v.name)
+			return fmt.Errorf(
+				"%w: %s must be RFC3339",
+				ErrInvalidSearch,
+				v.name,
+			)
 		}
+
 		if v.name == "capturedFrom" {
 			from = parsed
 			hasFrom = true
@@ -50,6 +61,7 @@ func (q SearchQuery) Validate() error {
 			hasTo = true
 		}
 	}
+
 	if hasFrom && hasTo && from.After(to) {
 		return fmt.Errorf("%w: capturedFrom must not exceed capturedTo", ErrInvalidSearch)
 	}
@@ -66,6 +78,7 @@ func (s SessionRequest) Validate() error {
 func (o WACZOptions) Validate() error {
 	invalidRange := len(o.Range) > maxRangeHeaderBytes || strings.ContainsAny(o.Range, "\r\n,")
 	invalidIfRange := len(o.IfRange) > maxRangeHeaderBytes || strings.ContainsAny(o.IfRange, "\r\n")
+
 	if invalidRange || invalidIfRange {
 		return fmt.Errorf("%w: only one valid byte range is supported", ErrInvalidWACZRange)
 	}

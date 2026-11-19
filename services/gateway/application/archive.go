@@ -32,10 +32,18 @@ type ValidationError struct{ Cause error }
 func (e *ValidationError) Error() string { return e.Cause.Error() }
 
 func NewApplication(coordinator ArchiveCoordinator) Application {
-	return NewApplicationWithServices(coordinator, nil, nil)
+	return NewApplicationWithServices(
+		coordinator,
+		nil,
+		nil,
+	)
 }
 
-func NewApplicationWithServices(coordinator ArchiveCoordinator, capture Capture, search SearchService) Application {
+func NewApplicationWithServices(
+	coordinator ArchiveCoordinator,
+	capture Capture,
+	search SearchService,
+) Application {
 	return Application{Coordinator: coordinator, capture: capture, search: search}
 }
 
