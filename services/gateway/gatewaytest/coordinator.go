@@ -8,6 +8,11 @@ import (
 	"github.com/lemuel-manske/castellani/libs/httpx"
 )
 
+type RecordingCoordinator struct {
+	requests atomic.Int32
+}
+
+
 func AcceptArchive(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	w.WriteHeader(http.StatusAccepted)
@@ -40,9 +45,6 @@ func ReturnMismatchedArchive(w http.ResponseWriter, _ *http.Request) {
 
 func Unused(http.ResponseWriter, *http.Request) {}
 
-type RecordingCoordinator struct {
-	requests atomic.Int32
-}
 
 func (c *RecordingCoordinator) Accept(w http.ResponseWriter, r *http.Request) {
 	c.requests.Add(1)

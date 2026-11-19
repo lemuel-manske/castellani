@@ -140,7 +140,7 @@ func (g Gateway) Submit(key, body string) Response {
 func (g Gateway) CreateSession(key, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPost, g.server.URL+"/sessions", strings.NewReader(body))
+	request, err := http.NewRequest(http.MethodPost, g.server.URL+common.SessionsPath, strings.NewReader(body))
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -152,7 +152,7 @@ func (g Gateway) CreateSession(key, body string) Response {
 func (g Gateway) UpdateSession(id, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPut, g.server.URL+"/sessions/"+id, strings.NewReader(body))
+	request, err := http.NewRequest(http.MethodPut, g.server.URL+common.SessionPathPrefix+id, strings.NewReader(body))
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -163,7 +163,7 @@ func (g Gateway) UpdateSession(id, body string) Response {
 func (g Gateway) WACZ(id, byteRange, ifRange string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodGet, g.server.URL+"/archives/"+id+"/wacz", nil)
+	request, err := http.NewRequest(http.MethodGet, g.server.URL+common.ArchivePathPrefix+id+common.WACZPathSuffix, nil)
 	require.NoError(g.t, err)
 
 	if byteRange != "" {

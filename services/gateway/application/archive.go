@@ -9,6 +9,8 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
+var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
+
 type ArchiveCoordinator interface {
 	CreateArchive(context.Context, string, []byte) (archive.Accepted, error)
 	GetArchive(context.Context, string) (json.RawMessage, error)
@@ -25,8 +27,6 @@ type ValidationError struct {
 func (e *ValidationError) Error() string {
 	return e.Cause.Error()
 }
-
-var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
 
 func NewApplication(coordinator ArchiveCoordinator) Application {
 	return Application{Coordinator: coordinator}
