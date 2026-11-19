@@ -37,7 +37,7 @@ func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	var searchClient *upstream.Client
 
 	if cfg.captureURL != nil {
-		captureClient = upstream.NewClient(*cfg.captureURL, cfg.upstreamTimeout)
+		captureClient = upstream.NewClientWithStreamTimeout(*cfg.captureURL, cfg.upstreamTimeout, cfg.streamTimeout)
 	}
 
 	if cfg.searchURL != nil {
