@@ -30,10 +30,6 @@ type ArchiveRepository interface {
 	Admit(context.Context, Admission) (AcceptedArchive, error)
 
 	Find(context.Context, string) (domain.Archive, error)
-}
-
-type WorkflowRepository interface {
-	Find(context.Context, string) (domain.Archive, error)
 
 	CommitEvent(
 		context.Context,
