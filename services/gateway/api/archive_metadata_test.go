@@ -7,7 +7,6 @@ import (
 
 	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/gatewaytest"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/stretchr/testify/assert"
 )
 

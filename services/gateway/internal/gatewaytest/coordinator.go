@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
 func AcceptArchive(w http.ResponseWriter, _ *http.Request) {
