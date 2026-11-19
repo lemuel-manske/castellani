@@ -1,6 +1,8 @@
-# Contributing — AI agents
+# Contributing
 
-This document defines the workflow for agents making changes to Castellani. These rules are mandatory for every task, regardless of language or service. Follow them alongside the repository's engineering and testing conventions.
+This document defines the workflow for making changes to Castellani.
+
+These rules are mandatory for every task, regardless of language or service. Follow them alongside the repository's engineering and testing conventions.
 
 ## 1. Start from `main`
 
