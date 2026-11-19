@@ -65,17 +65,9 @@ type Result struct {
 }
 
 func TestFormat_CompactStruct_WithFieldTag(t *testing.T) {
-	source := `package example
+	source := "package example\n\ntype Item struct{ Name string `json:\"name\"` }\n"
 
-type Item struct{ Name string \`json:"name"\` }
-`
-
-	expected := `package example
-
-type Item struct {
-	Name string \`json:"name"\`
-}
-`
+	expected := "package example\n\ntype Item struct {\n\tName string `json:\"name\"`\n}\n"
 
 	assertFormat(t, source, expected, MultilineStructs)
 }
