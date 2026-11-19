@@ -17,13 +17,13 @@ const (
 
 func TestGateway_CreateSessionRetainsIdempotencyKeyAndPublicLocation(t *testing.T) {
 	keys := make(chan string, 1)
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, r *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, r *http.Request) {
 		keys <- r.Header.Get(httpx.IdempotencyHeader)
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		w.Header().Set(httpx.LocationHeader, "http://capture.internal/private/sess-1")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, sessionCreated)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.CreateSession(gatewaytest.IdempotencyKey, sessionRequest)
 
@@ -34,7 +34,7 @@ func TestGateway_CreateSessionRetainsIdempotencyKeyAndPublicLocation(t *testing.
 }
 
 func TestGateway_CreateSessionWithoutIdempotencyKeyIsRejected(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t)
 
 	result := gateway.CreateSession("", sessionRequest)
 
@@ -42,7 +42,7 @@ func TestGateway_CreateSessionWithoutIdempotencyKeyIsRejected(t *testing.T) {
 }
 
 func TestGateway_CreateSessionRejectsNonHTTPSTarget(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t)
 
 	result := gateway.CreateSession(gatewaytest.IdempotencyKey, `{"archiveId":"run-1","targetUrl":"file:///etc/passwd"}`)
 
@@ -51,12 +51,12 @@ func TestGateway_CreateSessionRejectsNonHTTPSTarget(t *testing.T) {
 
 func TestGateway_SessionFinalizationForwardsDesiredState(t *testing.T) {
 	received := make(chan string, 1)
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, r *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		received <- string(body)
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		_, _ = io.WriteString(w, `{"sessionId":"sess-1","archiveId":"run-1","status":"COMPLETED","expiresAt":"2026-11-18T23:00:00Z","authGeneration":1}`)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.UpdateSession("sess-1", `{"status":"COMPLETED"}`)
 
@@ -66,7 +66,7 @@ func TestGateway_SessionFinalizationForwardsDesiredState(t *testing.T) {
 }
 
 func TestGateway_SessionFinalizationRejectsInvalidTransition(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t)
 
 	result := gateway.UpdateSession("sess-1", `{"status":"ACTIVE"}`)
 
