@@ -17,7 +17,7 @@ func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t 
 		body string
 	}, 1)
 
-	gateway := gatewaytest.Start(t, func(w http.ResponseWriter, r *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 
 		forwarded <- struct {
@@ -29,7 +29,7 @@ func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t 
 		}
 
 		gatewaytest.AcceptArchive(w, r)
-	})
+	}))
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 	request := <-forwarded
