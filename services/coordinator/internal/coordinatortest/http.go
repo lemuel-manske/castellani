@@ -63,6 +63,7 @@ func Accepted(t *testing.T, response *http.Response) archive.AcceptedResponse {
 
 	var document archive.AcceptedResponse
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&document))
+
 	require.NotEmpty(t, document.ArchiveID)
 
 	return document
