@@ -1,6 +1,7 @@
 package archiveapi
 
 import (
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -29,13 +30,27 @@ func NewMetadataHandler(client *upstream.Client) MetadataHandler {
 func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, httpx.ArchiveIDParameter)
 
-	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID.")
+	if !sharedhttp.ValidPathSegment(id) {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
 	if err := httpx.ValidatePagination(r.URL.Query()); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-pagination", "Invalid Pagination", err.Error())
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-pagination",
+			"Invalid Pagination",
+			err.Error(),
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -52,7 +67,14 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 		decodeErr := json.Unmarshal(result.Body, &document)
 
 		if decodeErr != nil || document.Items == nil {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid page metadata.")
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadGateway,
+				"invalid-upstream",
+				"Invalid Upstream Response",
+				"Capture returned invalid page metadata.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
 			return
 		}
 	}
@@ -63,10 +85,17 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, httpx.ArchiveIDParameter)
 	snapshotID := chi.URLParam(r, snapshotParam)
-	validIDs := httpx.ValidateID(id) && httpx.ValidateID(snapshotID)
+	validIDs := sharedhttp.ValidPathSegment(id) && sharedhttp.ValidPathSegment(snapshotID)
 
 	if !validIDs {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-snapshot-id", "Invalid Snapshot ID", "Invalid archive or snapshot ID.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-snapshot-id",
+			"Invalid Snapshot ID",
+			"Invalid archive or snapshot ID.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -90,7 +119,14 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			document.URL != "" && document.CapturedAt != ""
 
 		if decodeErr != nil || !validSnapshot {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid snapshot metadata.")
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadGateway,
+				"invalid-upstream",
+				"Invalid Upstream Response",
+				"Capture returned invalid snapshot metadata.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
 			return
 		}
 	}

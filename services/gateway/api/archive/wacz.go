@@ -1,6 +1,7 @@
 package archiveapi
 
 import (
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -38,8 +39,15 @@ func (h WACZHandler) Head(w http.ResponseWriter, r *http.Request) {
 func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, httpx.ArchiveIDParameter)
 
-	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID.")
+	if !sharedhttp.ValidPathSegment(id) {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -49,7 +57,14 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	invalidIfRange := len(ifRange) > maxRangeHeaderBytes || strings.ContainsAny(ifRange, "\r\n")
 
 	if invalidRange || invalidIfRange {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-range", "Invalid Range", "Only one valid byte range is supported.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-range",
+			"Invalid Range",
+			"Only one valid byte range is supported.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -73,7 +88,14 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	isSuccess := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
 	if !isSuccess || response.Header.Get("Content-Type") != waczMediaType {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned unexpected WACZ metadata.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned unexpected WACZ metadata.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -99,20 +121,34 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, response *http.Response) {
-	data, err := io.ReadAll(io.LimitReader(response.Body, httpx.MaxJSONRequestBytes+1))
+	data, err := io.ReadAll(io.LimitReader(response.Body, sharedhttp.MaxJSONRequestBytes+1))
 
-	if err != nil || len(data) > httpx.MaxJSONRequestBytes {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid WACZ error metadata.")
+	if err != nil || len(data) > sharedhttp.MaxJSONRequestBytes {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned invalid WACZ error metadata.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
-	var problem httpx.Problem
+	var problem sharedhttp.Problem
 	decodeErr := json.Unmarshal(data, &problem)
 	validProblem := decodeErr == nil && problem.Status == response.StatusCode &&
 		problem.Title != "" && problem.Type != ""
 
 	if !validProblem {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid WACZ error metadata.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned invalid WACZ error metadata.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -125,5 +161,5 @@ func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, respon
 	}
 
 	problem.Instance = r.URL.Path
-	httpx.Write(w, problem)
+	sharedhttp.WriteProblem(w, problem)
 }

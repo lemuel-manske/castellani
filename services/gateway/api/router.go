@@ -2,6 +2,7 @@
 package api
 
 import (
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
@@ -80,10 +81,24 @@ func NewRouterWithServices(
 	}
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		httpx.WriteProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusNotFound,
+			"not-found",
+			"Not Found",
+			"The requested resource does not exist.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 	})
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		httpx.WriteProblem(w, r, http.StatusMethodNotAllowed, "method-not-allowed", "Method Not Allowed", "The method is not supported for this resource.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusMethodNotAllowed,
+			"method-not-allowed",
+			"Method Not Allowed",
+			"The method is not supported for this resource.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 	})
 	return router
 }
@@ -93,7 +108,14 @@ func requestID(next http.Handler) http.Handler {
 		var random [16]byte
 
 		if _, err := rand.Read(random[:]); err != nil {
-			httpx.WriteProblem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Unable to create a request identifier.")
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusInternalServerError,
+				"internal",
+				"Internal Server Error",
+				"Unable to create a request identifier.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
 			return
 		}
 		w.Header().Set(requestIDHeader, hex.EncodeToString(random[:]))
@@ -108,7 +130,14 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 
 				if value := recover(); value != nil {
 					logger.Error("HTTP handler panic", "path", r.URL.Path)
-					httpx.WriteProblem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
+					responseProblem := sharedhttp.NewProblem(
+						r,
+						http.StatusInternalServerError,
+						"internal",
+						"Internal Server Error",
+						"Request handling failed.",
+					)
+					sharedhttp.WriteProblem(w, responseProblem)
 				}
 			}()
 			next.ServeHTTP(w, r)

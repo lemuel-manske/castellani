@@ -1,26 +1,16 @@
 package archiveapi
 
 import (
-	"bytes"
-	"encoding/json"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"errors"
-	"io"
-	"mime"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
-)
-
-const (
-	maxRequestBytes         = 64 << 10
-	minIdempotencyKeyLength = 8
-	maxIdempotencyKeyLength = 200
 )
 
 type Handler struct {
@@ -31,49 +21,64 @@ func NewHandler(app application.Application) Handler {
 	return Handler{app: app}
 }
 
-func validIdempotencyKey(key string) bool {
-	validLength := len(key) >= minIdempotencyKeyLength && len(key) <= maxIdempotencyKeyLength
-	noOuterWhitespace := strings.TrimSpace(key) == key
-
-	return validLength && noOuterWhitespace
-}
-
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
-	if !validIdempotencyKey(key) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
+	if !sharedhttp.ValidateIdempotencyKey(key) {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"idempotency-key",
+			"Invalid Idempotency Key",
+			"Idempotency-Key must be 8 to 200 characters without surrounding whitespace.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
-
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get(httpx.HeaderContentType))
-
-	if err != nil || mediaType != httpx.MediaTypeJSON {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
-		return
-	}
-
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
-
-	if err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "The archive request is invalid or exceeds the size limit.")
-		return
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
 
 	var submission archive.Submission
+	data, err := sharedhttp.DecodeJSONBytes(w, r, &submission)
 
-	if err = decoder.Decode(&submission); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
-		return
-	}
+	if err != nil {
+		switch {
+		case errors.Is(err, sharedhttp.ErrContentType):
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"content-type",
+				"Invalid Content Type",
+				"Expected application/json.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
+		case errors.Is(err, sharedhttp.ErrExtraJSON):
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"invalid-json",
+				"Invalid Request",
+				"Expected exactly one JSON object.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
+		case errors.Is(err, sharedhttp.ErrInvalidJSON):
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"invalid-json",
+				"Invalid Request",
+				"Expected a valid archive JSON object.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
+		default:
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"invalid-json",
+				"Invalid Request",
+				"The archive request is invalid or exceeds the size limit.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
+		}
 
-	var extra any
-
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
 		return
 	}
 
@@ -88,7 +93,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
 
-	httpx.JSON(w, http.StatusAccepted, accepted)
+	sharedhttp.JSON(w, http.StatusAccepted, accepted)
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +106,7 @@ func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.JSON(w, http.StatusOK, document)
+	sharedhttp.JSON(w, http.StatusOK, document)
 }
 
 func writeCoordinatorError(w http.ResponseWriter, r *http.Request, err error, unavailableDetail string) {
@@ -111,20 +116,48 @@ func writeCoordinatorError(w http.ResponseWriter, r *http.Request, err error, un
 
 	switch {
 	case errors.As(err, &validation):
-		httpx.WriteProblem(w, r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", validation.Error())
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusUnprocessableEntity,
+			"invalid-archive",
+			"Invalid Archive",
+			validation.Error(),
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 
 	case errors.Is(err, application.ErrInvalidArchiveID):
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", err.Error())
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			err.Error(),
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 
 	case errors.As(err, &failure):
 		p := failure.Problem
 		p.Instance = r.URL.Path
-		httpx.Write(w, p)
+		sharedhttp.WriteProblem(w, p)
 
 	case errors.Is(err, coordinator.ErrInvalidResponse):
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Coordinator returned an unexpected response.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Coordinator returned an unexpected response.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 
 	default:
-		httpx.WriteProblem(w, r, http.StatusServiceUnavailable, "coordinator-unavailable", "Coordinator Unavailable", unavailableDetail)
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusServiceUnavailable,
+			"coordinator-unavailable",
+			"Coordinator Unavailable",
+			unavailableDetail,
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 	}
 }
