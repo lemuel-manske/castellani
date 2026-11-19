@@ -39,6 +39,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 			"Invalid Archive ID",
 			"Invalid archive ID.",
 		))
+
 		return
 	}
 
@@ -63,8 +64,10 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 				"Invalid Range",
 				"Only one valid byte range is supported.",
 			))
+
 			return
 		}
+
 		response.WriteDependencyError(
 			w,
 			r,
@@ -72,8 +75,10 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 			"Capture",
 			"Capture returned unexpected WACZ metadata.",
 		)
+
 		return
 	}
+
 	defer result.Body.Close()
 
 	for name, value := range map[string]string{
@@ -97,12 +102,12 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	if result.Partial {
 		status = http.StatusPartialContent
 	}
+
 	w.WriteHeader(status)
 
 	if options.MetadataOnly {
 		return
 	}
 
-	// Avoid buffering entire published archives in Gateway memory.
 	_, _ = io.Copy(w, result.Body)
 }

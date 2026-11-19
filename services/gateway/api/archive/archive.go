@@ -25,14 +25,14 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
 	if !httpx.ValidIdempotencyKey(key) {
-		responseProblem := httpx.NewProblem(
+		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"idempotency-key",
 			"Invalid Idempotency Key",
 			"Idempotency-Key must be 8 to 200 characters without surrounding whitespace.",
-		)
-		httpx.WriteProblem(w, responseProblem)
+		))
+
 		return
 	}
 
@@ -46,41 +46,37 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, httpx.ErrContentType):
-			responseProblem := httpx.NewProblem(
+			httpx.WriteProblem(w, httpx.NewProblem(
 				r,
 				http.StatusBadRequest,
 				"content-type",
 				"Invalid Content Type",
 				"Expected application/json.",
-			)
-			httpx.WriteProblem(w, responseProblem)
+			))
 		case errors.Is(err, httpx.ErrExtraJSON):
-			responseProblem := httpx.NewProblem(
+			httpx.WriteProblem(w, httpx.NewProblem(
 				r,
 				http.StatusBadRequest,
 				"invalid-json",
 				"Invalid Request",
 				"Expected exactly one JSON object.",
-			)
-			httpx.WriteProblem(w, responseProblem)
+			))
 		case errors.Is(err, httpx.ErrInvalidJSON):
-			responseProblem := httpx.NewProblem(
+			httpx.WriteProblem(w, httpx.NewProblem(
 				r,
 				http.StatusBadRequest,
 				"invalid-json",
 				"Invalid Request",
 				"Expected a valid archive JSON object.",
-			)
-			httpx.WriteProblem(w, responseProblem)
+			))
 		default:
-			responseProblem := httpx.NewProblem(
+			httpx.WriteProblem(w, httpx.NewProblem(
 				r,
 				http.StatusBadRequest,
 				"invalid-json",
 				"Invalid Request",
 				"The archive request is invalid or exceeds the size limit.",
-			)
-			httpx.WriteProblem(w, responseProblem)
+			))
 		}
 
 		return
@@ -148,24 +144,22 @@ func writeFailure(
 
 	switch {
 	case errors.As(err, &validation):
-		responseProblem := httpx.NewProblem(
+		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
 			http.StatusUnprocessableEntity,
 			"invalid-archive",
 			"Invalid Archive",
 			validation.Error(),
-		)
-		httpx.WriteProblem(w, responseProblem)
+		))
 
 	case errors.Is(err, application.ErrInvalidArchiveID):
-		responseProblem := httpx.NewProblem(
+		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-archive-id",
 			"Invalid Archive ID",
 			err.Error(),
-		)
-		httpx.WriteProblem(w, responseProblem)
+		))
 
 	case errors.As(err, &dependencyFailure):
 		httpx.WriteProblem(w, httpx.Problem{
@@ -177,23 +171,21 @@ func writeFailure(
 		})
 
 	case errors.Is(err, application.ErrInvalidUpstream):
-		responseProblem := httpx.NewProblem(
+		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
 			http.StatusBadGateway,
 			"invalid-upstream",
 			"Invalid Upstream Response",
 			"Coordinator returned an unexpected response.",
-		)
-		httpx.WriteProblem(w, responseProblem)
+		))
 
 	default:
-		responseProblem := httpx.NewProblem(
+		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
 			http.StatusServiceUnavailable,
 			"coordinator-unavailable",
 			"Coordinator Unavailable",
 			unavailableDetail,
-		)
-		httpx.WriteProblem(w, responseProblem)
+		))
 	}
 }

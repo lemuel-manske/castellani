@@ -30,6 +30,7 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 			"Invalid Archive ID",
 			"Invalid archive ID.",
 		))
+
 		return
 	}
 
@@ -43,6 +44,7 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 			"Invalid Pagination",
 			err.Error(),
 		))
+
 		return
 	}
 
@@ -60,6 +62,7 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 			"Capture",
 			"Capture returned invalid page metadata.",
 		)
+
 		return
 	}
 
@@ -82,6 +85,7 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			"Invalid Snapshot ID",
 			"Invalid archive or snapshot ID.",
 		))
+
 		return
 	}
 
@@ -99,6 +103,7 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			"Capture",
 			"Capture returned invalid snapshot metadata.",
 		)
+
 		return
 	}
 
