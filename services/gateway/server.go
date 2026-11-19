@@ -34,7 +34,6 @@ type GatewayServer struct {
 func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
 
-
 	var captureClient *capture.Client
 	var searchClient *search.Client
 
@@ -50,13 +49,27 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		searchClient = search.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
 	}
 
-	app := assembly.NewApplication(coordinatorClient, captureClient, searchClient)
+	app := assembly.NewApplication(
+		coordinatorClient,
+		captureClient,
+		searchClient,
+	)
 
 	// Legacy API clients remain until the HTTP handlers migrate to the application.
 	var legacyCapture *upstream.Client
 	var legacySearch *upstream.Client
-	if cfg.captureURL != nil { legacyCapture = upstream.NewClientWithStreamTimeout(*cfg.captureURL, cfg.upstreamTimeout, cfg.streamTimeout) }
-	if cfg.searchURL != nil { legacySearch = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout) }
+
+	if cfg.captureURL != nil {
+		legacyCapture = upstream.NewClientWithStreamTimeout(
+			*cfg.captureURL,
+			cfg.upstreamTimeout,
+			cfg.streamTimeout,
+		)
+	}
+
+	if cfg.searchURL != nil {
+		legacySearch = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
+	}
 
 	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
 	gateway.http = &http.Server{

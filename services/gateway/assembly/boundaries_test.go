@@ -22,15 +22,30 @@ func TestOutboundClients_DoNotImportApplication(t *testing.T) {
 			continue
 		}
 
-		source, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		source, err := parser.ParseFile(
+			token.NewFileSet(),
+			path,
+			nil,
+			parser.ImportsOnly,
+		)
 		require.NoError(t, err)
 
 		for _, declaration := range source.Imports {
 			importPath, err := strconv.Unquote(declaration.Path.Value)
 			require.NoError(t, err)
 
-			assert.NotContains(t, importPath, "/application", path)
-			assert.NotContains(t, importPath, "/assembly", path)
+			assert.NotContains(
+				t,
+				importPath,
+				"/application",
+				path,
+			)
+			assert.NotContains(
+				t,
+				importPath,
+				"/assembly",
+				path,
+			)
 		}
 	}
 }

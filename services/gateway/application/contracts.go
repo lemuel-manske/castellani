@@ -28,30 +28,30 @@ type WACZ struct {
 	AcceptRanges, ContentRange, ETag, LastModified, ContentLength string
 }
 type Pages struct {
- Items []json.RawMessage `json:"items"`
- NextCursor *string `json:"nextCursor,omitempty"`
+	Items      []json.RawMessage `json:"items"`
+	NextCursor *string           `json:"nextCursor,omitempty"`
 }
 
 type Snapshot struct {
- ArchiveID string `json:"archiveId"`
- SnapshotID string `json:"snapshotId"`
- URL string `json:"url"`
- FinalURL string `json:"finalUrl,omitempty"`
- CapturedAt string `json:"capturedAt"`
- ContentType string `json:"contentType,omitempty"`
+	ArchiveID   string `json:"archiveId"`
+	SnapshotID  string `json:"snapshotId"`
+	URL         string `json:"url"`
+	FinalURL    string `json:"finalUrl,omitempty"`
+	CapturedAt  string `json:"capturedAt"`
+	ContentType string `json:"contentType,omitempty"`
 }
 
 type Session struct {
- SessionID string `json:"sessionId"`
- ArchiveID string `json:"archiveId"`
- Status string `json:"status"`
- ExpiresAt string `json:"expiresAt"`
- AuthGeneration *int `json:"authGeneration,omitempty"`
+	SessionID      string `json:"sessionId"`
+	ArchiveID      string `json:"archiveId"`
+	Status         string `json:"status"`
+	ExpiresAt      string `json:"expiresAt"`
+	AuthGeneration *int   `json:"authGeneration,omitempty"`
 }
 
 type SearchResults struct {
- Results []json.RawMessage `json:"results"`
- NextCursor *string `json:"nextCursor,omitempty"`
+	Results    []json.RawMessage `json:"results"`
+	NextCursor *string           `json:"nextCursor,omitempty"`
 }
 
 type Capture interface {

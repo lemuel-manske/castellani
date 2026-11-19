@@ -17,7 +17,6 @@ import (
 
 const maxJSONBytes = 1 << 20
 
-
 type Client struct {
 	origin url.URL
 	http   *http.Client

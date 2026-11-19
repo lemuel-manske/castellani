@@ -30,7 +30,11 @@ func TestSearch_ValidQueryCallsSearchService(t *testing.T) {
 	origin, err := url.Parse(service.URL)
 	require.NoError(t, err)
 
-	app := assembly.NewApplication(nil, nil, search.NewClient(*origin, time.Second))
+	app := assembly.NewApplication(
+		nil,
+		nil,
+		search.NewClient(*origin, time.Second),
+	)
 	limit := 10
 	result, err := app.Search(context.Background(), application.SearchQuery{
 		Text: "archive", ArchiveID: "run-1", Pagination: application.Pagination{Limit: &limit},
@@ -76,7 +80,11 @@ func TestSnapshot_MismatchedServiceResponseIsRejected(t *testing.T) {
 		time.Second,
 		time.Second,
 	)
-	app := assembly.NewApplication(nil, client, nil)
+	app := assembly.NewApplication(
+		nil,
+		client,
+		nil,
+	)
 
 	_, err = app.GetSnapshot(
 		context.Background(),
@@ -134,7 +142,11 @@ func TestWACZ_PartialContentIsStreamedByCapture(t *testing.T) {
 		time.Second,
 		time.Second,
 	)
-	app := assembly.NewApplication(nil, client, nil)
+	app := assembly.NewApplication(
+		nil,
+		client,
+		nil,
+	)
 
 	response, err := app.GetWACZ(
 		context.Background(),
@@ -187,14 +199,30 @@ func TestSearch_ServiceFailureIsMappedToApplicationError(t *testing.T) {
 	origin, err := url.Parse(service.URL)
 	require.NoError(t, err)
 
-	app := assembly.NewApplication(nil, nil, search.NewClient(*origin, time.Second))
+	app := assembly.NewApplication(
+		nil,
+		nil,
+		search.NewClient(*origin, time.Second),
+	)
 	_, err = app.Search(context.Background(), application.SearchQuery{Text: "archive"})
 
 	var failure *application.DependencyFailure
-	require.ErrorAs(t, err, &failure)
+	require.ErrorAs(
+		t,
+		err,
+		&failure,
+	)
 
-	assert.Equal(t, http.StatusServiceUnavailable, failure.Status)
-	assert.Equal(t, "urn:search:unavailable", failure.Type)
+	assert.Equal(
+		t,
+		http.StatusServiceUnavailable,
+		failure.Status,
+	)
+	assert.Equal(
+		t,
+		"urn:search:unavailable",
+		failure.Type,
+	)
 }
 
 func TestSession_CreateMapsCaptureResponseIntoApplicationSession(t *testing.T) {
@@ -208,7 +236,15 @@ func TestSession_CreateMapsCaptureResponseIntoApplicationSession(t *testing.T) {
 	origin, err := url.Parse(service.URL)
 	require.NoError(t, err)
 
-	app := assembly.NewApplication(nil, capture.NewClient(*origin, time.Second, time.Second), nil)
+	app := assembly.NewApplication(
+		nil,
+		capture.NewClient(
+			*origin,
+			time.Second,
+			time.Second,
+		),
+		nil,
+	)
 	session, err := app.CreateSession(
 		context.Background(),
 		"sample-key-123",
@@ -218,7 +254,19 @@ func TestSession_CreateMapsCaptureResponseIntoApplicationSession(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, session.AuthGeneration)
 
-	assert.Equal(t, "sess-1", session.SessionID)
-	assert.Equal(t, "run-1", session.ArchiveID)
-	assert.Equal(t, 3, *session.AuthGeneration)
+	assert.Equal(
+		t,
+		"sess-1",
+		session.SessionID,
+	)
+	assert.Equal(
+		t,
+		"run-1",
+		session.ArchiveID,
+	)
+	assert.Equal(
+		t,
+		3,
+		*session.AuthGeneration,
+	)
 }

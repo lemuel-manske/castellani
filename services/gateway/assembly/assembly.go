@@ -2,26 +2,46 @@
 package assembly
 
 import (
- "fmt"
+	"fmt"
 
- "github.com/lemuel-manske/unnamed/services/gateway/application"
- "github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
- "github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
- "github.com/lemuel-manske/unnamed/services/gateway/clients/search"
+	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 )
 
-func NewApplication(coordinatorClient *coordinator.Client, captureClient *capture.Client, searchClient *search.Client) application.Application {
- var coordinatorPort application.ArchiveCoordinator
- var capturePort application.Capture
- var searchPort application.SearchService
+func NewApplication(
+	coordinatorClient *coordinator.Client,
+	captureClient *capture.Client,
+	searchClient *search.Client,
+) application.Application {
+	var coordinatorPort application.ArchiveCoordinator
+	var capturePort application.Capture
+	var searchPort application.SearchService
 
- if coordinatorClient != nil { coordinatorPort = coordinatorAdapter{client: coordinatorClient} }
- if captureClient != nil { capturePort = captureAdapter{client: captureClient} }
- if searchClient != nil { searchPort = searchAdapter{client: searchClient} }
+	if coordinatorClient != nil {
+		coordinatorPort = coordinatorAdapter{client: coordinatorClient}
+	}
 
- return application.NewApplicationWithServices(coordinatorPort, capturePort, searchPort)
+	if captureClient != nil {
+		capturePort = captureAdapter{client: captureClient}
+	}
+
+	if searchClient != nil {
+		searchPort = searchAdapter{client: searchClient}
+	}
+
+	return application.NewApplicationWithServices(
+		coordinatorPort,
+		capturePort,
+		searchPort,
+	)
 }
 
 func errUnavailable(err error) error {
- return fmt.Errorf("%w: %v", application.ErrDependencyUnavailable, err)
+	return fmt.Errorf(
+		"%w: %v",
+		application.ErrDependencyUnavailable,
+		err,
+	)
 }

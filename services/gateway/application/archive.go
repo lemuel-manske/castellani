@@ -13,9 +13,9 @@ import (
 var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
 
 type ArchiveAccepted struct {
- ArchiveID string `json:"archiveId"`
- Status string `json:"status"`
- StatusURL string `json:"statusUrl"`
+	ArchiveID string `json:"archiveId"`
+	Status    string `json:"status"`
+	StatusURL string `json:"statusUrl"`
 }
 
 type ArchiveCoordinator interface {

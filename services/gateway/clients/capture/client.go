@@ -21,7 +21,6 @@ const (
 	defaultStreamTimeout = 30 * time.Minute
 )
 
-
 type Client struct {
 	origin       url.URL
 	http, stream *http.Client
@@ -44,7 +43,7 @@ func (c *Client) ListPages(
 	ctx context.Context,
 	archiveID string,
 	page Pagination,
- ) (Pages, error) {
+) (Pages, error) {
 	query := url.Values{}
 
 	if page.Limit != nil {
@@ -130,7 +129,11 @@ func (c *Client) CreateSession(
 		return Session{}, err
 	}
 
-	return validateSession(data, "", session.ArchiveID)
+	return validateSession(
+		data,
+		"",
+		session.ArchiveID,
+	)
 }
 
 func (c *Client) GetSession(ctx context.Context, id string) (Session, error) {
@@ -181,7 +184,11 @@ func (c *Client) session(
 		return Session{}, err
 	}
 
-	return validateSession(data, id, "")
+	return validateSession(
+		data,
+		id,
+		"",
+	)
 }
 
 func validateSession(data []byte, id, archiveID string) (Session, error) {

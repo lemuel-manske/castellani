@@ -102,9 +102,17 @@ func Start(t *testing.T, options ...Option) Gateway {
 	)
 
 	coordinatorClient := coordinator.NewClient(coordinatorOrigin, time.Second)
-	captureClient := capture.NewClient(captureOrigin, time.Second, time.Second)
+	captureClient := capture.NewClient(
+		captureOrigin,
+		time.Second,
+		time.Second,
+	)
 	searchClient := search.NewClient(searchOrigin, time.Second)
-	app := assembly.NewApplication(coordinatorClient, captureClient, searchClient)
+	app := assembly.NewApplication(
+		coordinatorClient,
+		captureClient,
+		searchClient,
+	)
 	legacyCapture := upstream.NewClient(captureOrigin, time.Second)
 	legacySearch := upstream.NewClient(searchOrigin, time.Second)
 
