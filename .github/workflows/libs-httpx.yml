@@ -1,4 +1,4 @@
-name: HTTP library
+name: go @ libs/httpx
 
 on:
   push:

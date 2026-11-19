@@ -14,18 +14,18 @@ import (
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	ArchiveID        = "run-1"
-	IdempotencyKey   = "sample-key-123"
-	ValidSubmission  = `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1}`
-	AcceptedArchive  = `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/internal/run-1"}`
-	RunningArchive   = `{"archiveId":"run-1","status":"RUNNING","capture":{"captured":0,"failed":0,"pending":1},"replay":{"status":"NOT_READY"},"search":{"status":"PENDING"}}`
+	ArchiveID       = "run-1"
+	IdempotencyKey  = "sample-key-123"
+	ValidSubmission = `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1}`
+	AcceptedArchive = `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/internal/run-1"}`
+	RunningArchive  = `{"archiveId":"run-1","status":"RUNNING","capture":{"captured":0,"failed":0,"pending":1},"replay":{"status":"NOT_READY"},"search":{"status":"PENDING"}}`
 )
 
 type Response struct {

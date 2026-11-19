@@ -8,9 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
-	"github.com/lemuel-manske/unnamed/services/gateway/common"
 )
 
 type Handler struct {

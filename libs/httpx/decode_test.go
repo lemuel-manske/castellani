@@ -57,4 +57,3 @@ func TestDecodeJSONBytes_RejectsWrongContentType(t *testing.T) {
 
 	require.ErrorIs(t, err, httpx.ErrContentType)
 }
-

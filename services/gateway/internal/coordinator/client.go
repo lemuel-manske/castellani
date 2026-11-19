@@ -11,16 +11,16 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 )
 
 const (
-	maxResponseBytes = 1 << 20
-	maxIdleConnections = 32
+	maxResponseBytes          = 1 << 20
+	maxIdleConnections        = 32
 	maxIdleConnectionsPerHost = 16
-	idleConnectionTimeout = 90 * time.Second
+	idleConnectionTimeout     = 90 * time.Second
 )
 
 type HTTPClient struct {

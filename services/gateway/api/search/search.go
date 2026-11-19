@@ -3,8 +3,8 @@ package searchapi
 import (
 	"net/http"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 

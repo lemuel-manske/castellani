@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	maxJSONBytes       = 1 << 20
-	idleTimeout        = 90 * time.Second
+	maxJSONBytes         = 1 << 20
+	idleTimeout          = 90 * time.Second
 	defaultStreamTimeout = 30 * time.Minute
 )
 
@@ -54,7 +54,7 @@ func NewClientWithStreamTimeout(origin url.URL, timeout, streamTimeout time.Dura
 			Transport:     transport,
 		},
 		stream: &http.Client{
-			Timeout: streamTimeout,
+			Timeout:       streamTimeout,
 			CheckRedirect: noRedirect,
 			Transport:     transport,
 		},

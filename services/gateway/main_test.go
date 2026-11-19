@@ -27,7 +27,7 @@ func TestGateway_ShutdownStopsServingAndClearsReadiness(t *testing.T) {
 	server := newGatewayServer(config{
 		shutdownTimeout: time.Second,
 		upstreamTimeout: time.Second,
-		coordinatorURL: coordinatorURL,
+		coordinatorURL:  coordinatorURL,
 	}, logger)
 
 	ctx, stop := context.WithCancel(context.Background())

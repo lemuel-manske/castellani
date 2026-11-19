@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	healthLivePath = "/health/live"
+	healthLivePath  = "/health/live"
 	healthReadyPath = "/health/ready"
 	requestIDHeader = "X-Request-ID"
 	healthMediaType = "text/plain; charset=utf-8"
-	healthResponse = "ok\n"
+	healthResponse  = "ok\n"
 )
 
 func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {

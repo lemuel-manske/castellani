@@ -53,4 +53,3 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
 	_, err := DecodeJSONBytes(w, r, destination)
 	return err
 }
-

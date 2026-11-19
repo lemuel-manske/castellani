@@ -57,7 +57,7 @@ const AcceptedStatus = "ACCEPTED"
 func ValidID(id string) bool {
 	reserved := id == "" || id == "." || id == ".."
 	containsSeparator := strings.ContainsAny(id, "/\\\\")
-	
+
 	return !reserved && !containsSeparator
 }
 

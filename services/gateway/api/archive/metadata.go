@@ -63,7 +63,9 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if result.Status == http.StatusOK {
-		var document struct { Items []json.RawMessage `json:"items"` }
+		var document struct {
+			Items []json.RawMessage `json:"items"`
+		}
 		decodeErr := json.Unmarshal(result.Body, &document)
 
 		if decodeErr != nil || document.Items == nil {

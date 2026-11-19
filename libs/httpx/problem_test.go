@@ -28,4 +28,3 @@ func TestWriteProblem_EmitsStandardProblemDocument(t *testing.T) {
 	assert.Equal(t, httpx.ProblemTypePrefix+"not-found", document.Type)
 	assert.Equal(t, "/archives/missing", document.Instance)
 }
-

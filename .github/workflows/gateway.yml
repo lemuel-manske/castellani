@@ -1,4 +1,4 @@
-name: Gateway
+name: go @ API gateway
 
 on:
   push:
