@@ -42,7 +42,7 @@ func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t 
 }
 
 func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.ReturnArchiveStatus)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.ReturnArchiveStatus))
 
 	result := gateway.Get(httpx.ArchivePathPrefix + gatewaytest.ArchiveID)
 
@@ -52,7 +52,7 @@ func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
 
 func TestGateway_RepeatedArchiveSubmissionAlwaysReachesCoordinator(t *testing.T) {
 	coordinator := &gatewaytest.RecordingCoordinator{}
-	gateway := gatewaytest.Start(t, coordinator.Accept)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(coordinator.Accept))
 
 	first := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 	second := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
@@ -63,7 +63,7 @@ func TestGateway_RepeatedArchiveSubmissionAlwaysReachesCoordinator(t *testing.T)
 }
 
 func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.RejectConflictingKey)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.RejectConflictingKey))
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
@@ -74,7 +74,7 @@ func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testin
 
 func TestGateway_ArchiveWithoutIdempotencyKeyIsRejectedBeforeForwarding(t *testing.T) {
 	coordinator := &gatewaytest.RecordingCoordinator{}
-	gateway := gatewaytest.Start(t, coordinator.Accept)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(coordinator.Accept))
 
 	result := gateway.Submit("", gatewaytest.ValidSubmission)
 
@@ -84,7 +84,7 @@ func TestGateway_ArchiveWithoutIdempotencyKeyIsRejectedBeforeForwarding(t *testi
 
 func TestGateway_ArchiveWithUnknownFieldsIsRejectedBeforeForwarding(t *testing.T) {
 	coordinator := &gatewaytest.RecordingCoordinator{}
-	gateway := gatewaytest.Start(t, coordinator.Accept)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(coordinator.Accept))
 
 	body := `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1,"unsupported":true}`
 	result := gateway.Submit(gatewaytest.IdempotencyKey, body)
@@ -95,7 +95,7 @@ func TestGateway_ArchiveWithUnknownFieldsIsRejectedBeforeForwarding(t *testing.T
 
 func TestGateway_ArchiveWithInvalidLimitsIsRejectedBeforeForwarding(t *testing.T) {
 	coordinator := &gatewaytest.RecordingCoordinator{}
-	gateway := gatewaytest.Start(t, coordinator.Accept)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(coordinator.Accept))
 
 	body := `{"seedUrl":"https://example.org/","maxDepth":-1,"maxPages":0}`
 	result := gateway.Submit(gatewaytest.IdempotencyKey, body)
@@ -106,7 +106,7 @@ func TestGateway_ArchiveWithInvalidLimitsIsRejectedBeforeForwarding(t *testing.T
 
 func TestGateway_OversizedArchiveIsRejectedBeforeForwarding(t *testing.T) {
 	coordinator := &gatewaytest.RecordingCoordinator{}
-	gateway := gatewaytest.Start(t, coordinator.Accept)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(coordinator.Accept))
 
 	oversizedBody := gatewaytest.ValidSubmission + strings.Repeat(" ", 70<<10)
 	result := gateway.Submit(gatewaytest.IdempotencyKey, oversizedBody)
@@ -116,7 +116,7 @@ func TestGateway_OversizedArchiveIsRejectedBeforeForwarding(t *testing.T) {
 }
 
 func TestGateway_CoordinatorDisconnectLeavesArchiveAdmissionUnconfirmed(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.Disconnect)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.Disconnect))
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
@@ -126,7 +126,7 @@ func TestGateway_CoordinatorDisconnectLeavesArchiveAdmissionUnconfirmed(t *testi
 }
 
 func TestGateway_MalformedAdmissionIsNeverReportedAsAccepted(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.ReturnMalformedAdmission)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.ReturnMalformedAdmission))
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
@@ -135,7 +135,7 @@ func TestGateway_MalformedAdmissionIsNeverReportedAsAccepted(t *testing.T) {
 }
 
 func TestGateway_StatusForDifferentArchiveIsNotReturned(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.ReturnMismatchedArchive)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.ReturnMismatchedArchive))
 
 	result := gateway.Get(httpx.ArchivePathPrefix + gatewaytest.ArchiveID)
 
@@ -143,7 +143,7 @@ func TestGateway_StatusForDifferentArchiveIsNotReturned(t *testing.T) {
 }
 
 func TestGateway_UnknownRouteReturnsProblemDetails(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.Unused))
 
 	result := gateway.Get("/unknown")
 
@@ -153,7 +153,7 @@ func TestGateway_UnknownRouteReturnsProblemDetails(t *testing.T) {
 }
 
 func TestGateway_UnsupportedMethodReturnsProblemDetails(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.Unused))
 
 	result := gateway.Put(httpx.ArchivePathPrefix + gatewaytest.ArchiveID)
 
@@ -162,7 +162,7 @@ func TestGateway_UnsupportedMethodReturnsProblemDetails(t *testing.T) {
 }
 
 func TestGateway_LivenessDoesNotDependOnCoordinator(t *testing.T) {
-	gateway := gatewaytest.Start(t, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.Unused))
 
 	result := gateway.Get("/health/live")
 
@@ -171,7 +171,7 @@ func TestGateway_LivenessDoesNotDependOnCoordinator(t *testing.T) {
 }
 
 func TestGateway_ReadinessRejectsRequestsBeforeServerIsReady(t *testing.T) {
-	gateway := gatewaytest.StartUnready(t)
+	gateway := gatewaytest.Start(t, gatewaytest.WithReadiness(false))
 
 	result := gateway.Get("/health/ready")
 
