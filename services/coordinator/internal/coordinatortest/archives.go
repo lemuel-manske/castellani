@@ -12,10 +12,10 @@ import (
 // Archives records admitted archives for isolated HTTP behavior tests.
 // It does not model DynamoDB transaction semantics.
 type Archives struct {
-	mu        sync.Mutex
-	byKey     map[string]admission
-	byID      map[string]archive.Status
-	admitted  int
+	mu       sync.Mutex
+	byKey    map[string]admission
+	byID     map[string]archive.Status
+	admitted int
 }
 
 type admission struct {

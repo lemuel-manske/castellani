@@ -15,15 +15,15 @@ import (
 )
 
 const (
-	retention            = 24 * time.Hour
-	runsTable            = "coordinator_archive_runs"
-	submissionsTable     = "coordinator_submission_keys"
-	outboxTable          = "coordinator_outbox"
-	startMessageType     = "StartCrawl"
-	startDestination     = "capture.start-crawl"
-	outboxPending        = "PENDING"
-	initialDecision      = "NONE"
-	messageVersion       = 1
+	retention        = 24 * time.Hour
+	runsTable        = "coordinator_archive_runs"
+	submissionsTable = "coordinator_submission_keys"
+	outboxTable      = "coordinator_outbox"
+	startMessageType = "StartCrawl"
+	startDestination = "capture.start-crawl"
+	outboxPending    = "PENDING"
+	initialDecision  = "NONE"
+	messageVersion   = 1
 )
 
 type Client interface {

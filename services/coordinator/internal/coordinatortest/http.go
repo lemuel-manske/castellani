@@ -21,8 +21,8 @@ const (
 )
 
 type HTTP struct {
-	URL     string
-	Client  *http.Client
+	URL      string
+	Client   *http.Client
 	Archives *Archives
 }
 
