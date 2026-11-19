@@ -1,0 +1,27 @@
+name: Coordinator formatting (temporary)
+on:
+  push:
+    branches: [feat/coordinator-service]
+    paths: [.github/workflows/coordinator-format-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Format only Coordinator Go sources
+        run: |
+          find services/coordinator -type f -name '*.go' -exec gofmt -w {} +
+          git add services/coordinator
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'style(coordinator): format Go sources'
+            git push origin HEAD:feat/coordinator-service
+          fi
