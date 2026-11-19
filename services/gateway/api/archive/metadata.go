@@ -6,16 +6,9 @@ import (
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
-)
-
-const (
-	PagesPath       = "/archives/{archiveId}/pages"
-	SnapshotPath    = "/archives/{archiveId}/snapshots/{snapshotId}"
-	pagesSuffix     = "/pages"
-	snapshotSegment = "/snapshots/"
-	snapshotParam   = "snapshotId"
 )
 
 type MetadataHandler struct {
@@ -27,54 +20,84 @@ func NewMetadataHandler(client *upstream.Client) MetadataHandler {
 }
 
 func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, httpx.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
 
-	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID.")
+	if !httpx.ValidPathSegment(id) {
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	if err := httpx.ValidatePagination(r.URL.Query()); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-pagination", "Invalid Pagination", err.Error())
+	if err := common.ValidatePagination(r.URL.Query()); err != nil {
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-pagination",
+			"Invalid Pagination",
+			err.Error(),
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	path := httpx.ArchivePathPrefix + url.PathEscape(id) + pagesSuffix
+	path := common.ArchivePathPrefix + url.PathEscape(id) + common.PagesPathSuffix
 	result, err := h.client.JSON(r.Context(), http.MethodGet, path, r.URL.RawQuery, "", nil)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
 	if result.Status == http.StatusOK {
-		var document struct { Items []json.RawMessage `json:"items"` }
+		var document struct {
+			Items []json.RawMessage `json:"items"`
+		}
 		decodeErr := json.Unmarshal(result.Body, &document)
 
 		if decodeErr != nil || document.Items == nil {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid page metadata.")
+			responseProblem := httpx.NewProblem(
+				r,
+				http.StatusBadGateway,
+				"invalid-upstream",
+				"Invalid Upstream Response",
+				"Capture returned invalid page metadata.",
+			)
+			httpx.WriteProblem(w, responseProblem)
 			return
 		}
 	}
 
-	httpx.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
 }
 
 func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, httpx.ArchiveIDParameter)
-	snapshotID := chi.URLParam(r, snapshotParam)
-	validIDs := httpx.ValidateID(id) && httpx.ValidateID(snapshotID)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
+	snapshotID := chi.URLParam(r, common.SnapshotIDParameter)
+	validIDs := httpx.ValidPathSegment(id) && httpx.ValidPathSegment(snapshotID)
 
 	if !validIDs {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-snapshot-id", "Invalid Snapshot ID", "Invalid archive or snapshot ID.")
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-snapshot-id",
+			"Invalid Snapshot ID",
+			"Invalid archive or snapshot ID.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	path := httpx.ArchivePathPrefix + url.PathEscape(id) + snapshotSegment + url.PathEscape(snapshotID)
+	path := common.ArchivePathPrefix + url.PathEscape(id) + common.SnapshotPathSegment + url.PathEscape(snapshotID)
 	result, err := h.client.JSON(r.Context(), http.MethodGet, path, "", "", nil)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
@@ -90,10 +113,17 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			document.URL != "" && document.CapturedAt != ""
 
 		if decodeErr != nil || !validSnapshot {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid snapshot metadata.")
+			responseProblem := httpx.NewProblem(
+				r,
+				http.StatusBadGateway,
+				"invalid-upstream",
+				"Invalid Upstream Response",
+				"Capture returned invalid snapshot metadata.",
+			)
+			httpx.WriteProblem(w, responseProblem)
 			return
 		}
 	}
 
-	httpx.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
 }

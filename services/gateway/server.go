@@ -23,16 +23,17 @@ const (
 	serverMaxHeaderBytes    = 32 << 10
 )
 
-type gatewayServer struct {
+type GatewayServer struct {
 	http            *http.Server
 	ready           atomic.Bool
 	shutdownTimeout time.Duration
 }
 
-func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
-	gateway := &gatewayServer{shutdownTimeout: cfg.shutdownTimeout}
-	coordinatorClient := coordinator.NewHTTPClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
+func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
+	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
+
 	app := application.NewApplication(coordinatorClient)
+
 	var captureClient *upstream.Client
 	var searchClient *upstream.Client
 
@@ -44,6 +45,7 @@ func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 		searchClient = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
 	}
 
+	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
 	gateway.http = &http.Server{
 		Handler:           api.NewRouterWithServices(gateway.ready.Load, app, captureClient, searchClient, logger),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
@@ -54,7 +56,7 @@ func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	return gateway
 }
 
-func (g *gatewayServer) serve(ctx context.Context, listener net.Listener) error {
+func (g *GatewayServer) Serve(ctx context.Context, listener net.Listener) error {
 	defer listener.Close()
 
 	stopped := make(chan error, 1)

@@ -1,10 +1,12 @@
+// Package archive provides data structures for archive manipulation.
 package archive
 
 import (
 	"errors"
-	"net/url"
-	"strings"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 )
+
+const AcceptedStatus = "ACCEPTED"
 
 type Submission struct {
 	SeedURL        string   `json:"seedUrl"`
@@ -22,7 +24,7 @@ type Accepted struct {
 }
 
 func (s Submission) Validate() error {
-	if !validURL(s.SeedURL) {
+	if !httpx.ValidHTTPURL(s.SeedURL) {
 		return errors.New("seedUrl must be an absolute HTTP(S) URL without credentials or fragment")
 	}
 
@@ -40,7 +42,7 @@ func (s Submission) Validate() error {
 
 	seen := make(map[string]struct{}, len(s.AllowedOrigins))
 	for _, origin := range s.AllowedOrigins {
-		if !validURL(origin) {
+		if !httpx.ValidHTTPURL(origin) {
 			return errors.New("allowedOrigins entries must be absolute HTTP(S) URLs without credentials or fragment")
 		}
 
@@ -50,28 +52,4 @@ func (s Submission) Validate() error {
 		seen[origin] = struct{}{}
 	}
 	return nil
-}
-
-const AcceptedStatus = "ACCEPTED"
-
-func ValidID(id string) bool {
-	reserved := id == "" || id == "." || id == ".."
-	containsSeparator := strings.ContainsAny(id, "/\\\\")
-	
-	return !reserved && !containsSeparator
-}
-
-func validURL(raw string) bool {
-	u, err := url.Parse(raw)
-
-	if err != nil {
-		return false
-	}
-
-	httpScheme := u.Scheme == "http" || u.Scheme == "https"
-	hasHost := u.Hostname() != ""
-	noCredentials := u.User == nil
-	noFragment := u.Fragment == ""
-
-	return httpScheme && hasHost && noCredentials && noFragment
 }

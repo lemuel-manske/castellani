@@ -1,3 +1,4 @@
+// Package upstream provides a client for communicating with upstream services.
 package upstream
 
 import (
@@ -9,11 +10,14 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/lemuel-manske/castellani/libs/httpx"
 )
 
 const (
-	maxJSONBytes       = 1 << 20
-	idleTimeout        = 90 * time.Second
+	maxJSONBytes = 1 << 20
+
+	idleTimeout          = 90 * time.Second
 	defaultStreamTimeout = 30 * time.Minute
 )
 
@@ -54,7 +58,7 @@ func NewClientWithStreamTimeout(origin url.URL, timeout, streamTimeout time.Dura
 			Transport:     transport,
 		},
 		stream: &http.Client{
-			Timeout: streamTimeout,
+			Timeout:       streamTimeout,
 			CheckRedirect: noRedirect,
 			Transport:     transport,
 		},
@@ -69,11 +73,11 @@ func (c *Client) JSON(ctx context.Context, method, path, query, key string, body
 	}
 
 	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	}
 
 	if key != "" {
-		request.Header.Set("Idempotency-Key", key)
+		request.Header.Set(httpx.IdempotencyHeader, key)
 	}
 
 	response, err := c.http.Do(request)

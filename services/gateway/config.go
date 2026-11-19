@@ -9,36 +9,36 @@ import (
 )
 
 const (
-	addressEnvironment = "GATEWAY_ADDR"
-	shutdownEnvironment = "GATEWAY_SHUTDOWN_TIMEOUT"
-	upstreamEnvironment = "GATEWAY_UPSTREAM_TIMEOUT"
-	coordinatorEnvironment = "COORDINATOR_URL"
-	captureEnvironment = "CAPTURE_URL"
-	searchEnvironment = "SEARCH_URL"
+	addressEnvironment       = "GATEWAY_ADDR"
+	shutdownEnvironment      = "GATEWAY_SHUTDOWN_TIMEOUT"
+	upstreamEnvironment      = "GATEWAY_UPSTREAM_TIMEOUT"
+	coordinatorEnvironment   = "COORDINATOR_URL"
+	captureEnvironment       = "CAPTURE_URL"
+	searchEnvironment        = "SEARCH_URL"
 	streamTimeoutEnvironment = "GATEWAY_STREAM_TIMEOUT"
 
 	defaultAddress         = ":8080"
 	defaultShutdownTimeout = 10 * time.Second
 	defaultUpstreamTimeout = 5 * time.Second
-	defaultStreamTimeout = 30 * time.Minute
+	defaultStreamTimeout   = 30 * time.Minute
 )
 
-type config struct {
+type Config struct {
 	address         string
 	shutdownTimeout time.Duration
 	upstreamTimeout time.Duration
-	streamTimeout time.Duration
+	streamTimeout   time.Duration
 	coordinatorURL  *url.URL
 	captureURL      *url.URL
 	searchURL       *url.URL
 }
 
-func loadConfig(getenv func(string) string) (config, error) {
-	cfg := config{
+func LoadConfig(getenv func(string) string) (Config, error) {
+	cfg := Config{
 		address:         defaultAddress,
 		shutdownTimeout: defaultShutdownTimeout,
 		upstreamTimeout: defaultUpstreamTimeout,
-		streamTimeout: defaultStreamTimeout,
+		streamTimeout:   defaultStreamTimeout,
 	}
 
 	if address := getenv(addressEnvironment); address != "" {
@@ -46,7 +46,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 	}
 
 	if _, _, err := net.SplitHostPort(cfg.address); err != nil {
-		return config{}, fmt.Errorf("invalid GATEWAY_ADDR: %w", err)
+		return Config{}, fmt.Errorf("invalid GATEWAY_ADDR: %w", err)
 	}
 
 	var err error
@@ -54,47 +54,47 @@ func loadConfig(getenv func(string) string) (config, error) {
 	cfg.shutdownTimeout, err = durationSetting(getenv, shutdownEnvironment, cfg.shutdownTimeout)
 
 	if err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	cfg.upstreamTimeout, err = durationSetting(getenv, upstreamEnvironment, cfg.upstreamTimeout)
 
 	if err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	cfg.streamTimeout, err = durationSetting(getenv, streamTimeoutEnvironment, cfg.streamTimeout)
 
 	if err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	rawURL := getenv(coordinatorEnvironment)
 
 	if rawURL == "" {
-		return config{}, fmt.Errorf("COORDINATOR_URL is required")
+		return Config{}, fmt.Errorf("COORDINATOR_URL is required")
 	}
 	parsed, err := url.Parse(rawURL)
 
 	if err != nil {
-		return config{}, fmt.Errorf("invalid COORDINATOR_URL: %w", err)
+		return Config{}, fmt.Errorf("invalid COORDINATOR_URL: %w", err)
 	}
 
 	if !validCoordinatorOrigin(parsed) {
-		return config{}, fmt.Errorf("COORDINATOR_URL must be an absolute HTTP(S) origin without credentials, path, query or fragment")
+		return Config{}, fmt.Errorf("COORDINATOR_URL must be an absolute HTTP(S) origin without credentials, path, query or fragment")
 	}
 	cfg.coordinatorURL = parsed
 
 	cfg.captureURL, err = serviceOrigin(getenv, captureEnvironment)
 
 	if err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	cfg.searchURL, err = serviceOrigin(getenv, searchEnvironment)
 
 	if err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	return cfg, nil

@@ -1,13 +1,9 @@
-package httpx
+// Package common provides common functionality for the gateway service.
+package common
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"mime"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,40 +11,10 @@ import (
 )
 
 const (
-	MaxJSONRequestBytes = 64 << 10
-	DefaultLimit        = 25
-	MaxLimit            = 100
-	MaxQueryLength      = 500
+	DefaultLimit   = 25
+	MaxLimit       = 100
+	MaxQueryLength = 500
 )
-
-func DecodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get(HeaderContentType))
-
-	if err != nil || mediaType != MediaTypeJSON {
-		return errors.New("Content-Type must be application/json")
-	}
-
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxJSONRequestBytes))
-
-	if err != nil {
-		return fmt.Errorf("read JSON request: %w", err)
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(destination); err != nil {
-		return fmt.Errorf("decode JSON request: %w", err)
-	}
-
-	var extra any
-
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return errors.New("expected exactly one JSON object")
-	}
-
-	return nil
-}
 
 func ValidatePagination(values url.Values) error {
 	limits := values["limit"]
@@ -74,35 +40,6 @@ func ValidatePagination(values url.Values) error {
 	}
 
 	return nil
-}
-
-func ValidateID(id string) bool {
-	reserved := id == "" || id == "." || id == ".."
-	forbidden := strings.ContainsAny(id, "/\\?#")
-
-	return !reserved && !forbidden
-}
-
-func ValidateIdempotencyKey(key string) bool {
-	validLength := len(key) >= 8 && len(key) <= 200
-	cleanWhitespace := strings.TrimSpace(key) == key
-	noControl := !strings.ContainsAny(key, "\r\n\x00")
-
-	return validLength && cleanWhitespace && noControl
-}
-
-func ValidateTargetURL(raw string) bool {
-	target, err := url.Parse(raw)
-
-	if err != nil {
-		return false
-	}
-
-	scheme := target.Scheme == "http" || target.Scheme == "https"
-	authority := target.Hostname() != "" && target.User == nil
-	noFragment := target.Fragment == ""
-
-	return scheme && authority && noFragment
 }
 
 func ValidateSearch(values url.Values) error {

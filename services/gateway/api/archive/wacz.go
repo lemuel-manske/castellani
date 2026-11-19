@@ -8,14 +8,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
 const (
-	WACZPath            = "/archives/{archiveId}/wacz"
-	waczSuffix          = "/wacz"
-	waczMediaType       = "application/wacz"
 	maxRangeHeaderBytes = 256
 )
 
@@ -36,28 +34,43 @@ func (h WACZHandler) Head(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, httpx.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
 
-	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID.")
+	if !httpx.ValidPathSegment(id) {
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
 	byteRange := r.Header.Get("Range")
 	ifRange := r.Header.Get("If-Range")
+
 	invalidRange := len(byteRange) > maxRangeHeaderBytes || strings.ContainsAny(byteRange, "\r\n,")
 	invalidIfRange := len(ifRange) > maxRangeHeaderBytes || strings.ContainsAny(ifRange, "\r\n")
 
 	if invalidRange || invalidIfRange {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-range", "Invalid Range", "Only one valid byte range is supported.")
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-range",
+			"Invalid Range",
+			"Only one valid byte range is supported.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	path := httpx.ArchivePathPrefix + url.PathEscape(id) + waczSuffix
+	path := common.ArchivePathPrefix + url.PathEscape(id) + common.WACZPathSuffix
 	response, err := h.client.Stream(r.Context(), r.Method, path, byteRange, ifRange)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
@@ -72,8 +85,15 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 
 	isSuccess := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
-	if !isSuccess || response.Header.Get("Content-Type") != waczMediaType {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned unexpected WACZ metadata.")
+	if !isSuccess || response.Header.Get("Content-Type") != httpx.WACZMediaType {
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned unexpected WACZ metadata.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -85,7 +105,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", waczMediaType)
+	w.Header().Set("Content-Type", httpx.WACZMediaType)
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(response.StatusCode)
@@ -102,7 +122,14 @@ func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, respon
 	data, err := io.ReadAll(io.LimitReader(response.Body, httpx.MaxJSONRequestBytes+1))
 
 	if err != nil || len(data) > httpx.MaxJSONRequestBytes {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid WACZ error metadata.")
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned invalid WACZ error metadata.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -112,7 +139,14 @@ func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, respon
 		problem.Title != "" && problem.Type != ""
 
 	if !validProblem {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid WACZ error metadata.")
+		responseProblem := httpx.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned invalid WACZ error metadata.",
+		)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -125,5 +159,5 @@ func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, respon
 	}
 
 	problem.Instance = r.URL.Path
-	httpx.Write(w, problem)
+	httpx.WriteProblem(w, problem)
 }

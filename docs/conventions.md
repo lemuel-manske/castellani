@@ -10,6 +10,8 @@ Separate code blocks with different responsibilities or contexts using one empty
 
 Put exactly one empty line immediately before an `if` statement unless it is the first statement in its containing block. Apply the equivalent visual separation to conditional constructs in other languages, using idiomatic syntax.
 
+Declare constants before types and functions in source files. Group related constants by purpose so a reader can find them without searching through implementation code.
+
 Never write long or hard-to-scan conditional expressions. Name intermediate predicates to clarify the decision; extract a helper when the predicate represents a meaningful concept or supports reuse. Avoid creating helpers that merely hide complexity.
 
 Prefer named constants for meaningful stable values: endpoints, route templates, header names, content types, defaults, limits, timeouts, and configuration keys. Keep them near the code that owns them and share them across boundaries only when needed. Do not turn changing data or arbitrary one-off literals into constants.
@@ -24,7 +26,11 @@ Choose precise, context-aware names that reveal purpose and dependencies. Avoid 
 
 Introduce interfaces and shared packages only where they represent meaningful, consumed boundaries. Do not add them solely for architectural symmetry.
 
-Keep transport-specific data and protocol constants in the transport/contract layer, not in domain models. Communicate between services through documented contracts rather than importing their private implementations.
+Avoid pass-through wrappers and re-exported constants or types that merely mirror another library. Import the owning package and call its API directly. Extract a wrapper only when it contributes meaningful behavior, policy, or adaptation.
+
+Place reusable code and contracts at a boundary accessible to their intended consumers; reserve implementation-private directories for code that is genuinely private to that scope. Prefer dependency-light, broadly applicable functionality for shared libraries rather than moving service-specific logic into them.
+
+Keep transport-specific data and protocol constants in the transport/contract layer, not in domain models. Keep each service's route templates, path prefixes, and route parameter names together rather than duplicating them across handlers and clients. Communicate between services through documented contracts rather than importing their private implementations.
 
 ### Documentation
 
@@ -51,8 +57,10 @@ These rules apply only to Go source and Go tests.
 - Follow the general whitespace rules for Go `if` statements: exactly one preceding empty line, except at the beginning of a containing block.
 - Separate adjacent `require` and `assert` assertions with one empty line. Use `github.com/stretchr/testify/require` for prerequisites and `github.com/stretchr/testify/assert` for independent outcomes.
 - Do not use `if` statements in Go tests for prerequisite or assertion handling. Write distinct named scenarios rather than table-driven or dynamically generated test cases.
-- Use Go package boundaries and `internal/` visibility for implementation isolation. Prefer names readable in their package context, such as `coordinator.HTTPClient` over `coordinator.CoordinatorClient`.
-- Keep reusable Go service fixtures in a dedicated purpose-specific package such as `internal/gatewaytest/`; organize fixture files by responsibility. Do not export production internals only to reuse test setup.
+- Use Go package boundaries and `internal/` visibility for implementation isolation. Shared contract types and widely consumed test infrastructure should not be buried under `internal/` merely because they originate in one package.
+- Apply a consistent constructor vocabulary across packages: `NewClient` for clients and `NewHandler` for handlers, distinguishing constructors only when they genuinely initialize different types or configurations. Favor package-contextual naming over unnecessary qualifiers.
+- Keep meaningful calls readable by assigning intermediate results rather than nesting lengthy constructor or helper calls inside other calls.
+- Keep reusable Go service fixtures in a dedicated purpose-specific package such as `gatewaytest/` at the service root; organize fixture files by responsibility. Do not export production internals only to reuse test setup.
 - Mark reusable test helpers with `t.Helper`, and register cleanup with `t.Cleanup`.
 
 See [testing.md](testing.md) for further Go-specific testing guidance.

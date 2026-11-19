@@ -1,3 +1,4 @@
+// Package coordinator provides a client for communicating with the coordinator service
 package coordinator
 
 import (
@@ -11,18 +12,19 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 const (
-	maxResponseBytes = 1 << 20
-	maxIdleConnections = 32
+	maxResponseBytes          = 1 << 20
+	maxIdleConnections        = 32
 	maxIdleConnectionsPerHost = 16
-	idleConnectionTimeout = 90 * time.Second
+	idleConnectionTimeout     = 90 * time.Second
 )
 
-type HTTPClient struct {
+type Client struct {
 	baseURL url.URL
 	http    *http.Client
 }
@@ -37,8 +39,8 @@ func (f *Failure) Error() string {
 
 var ErrInvalidResponse = errors.New("invalid coordinator response")
 
-func NewHTTPClient(origin url.URL, timeout time.Duration) *HTTPClient {
-	return &HTTPClient{
+func NewClient(origin url.URL, timeout time.Duration) *Client {
+	return &Client{
 		baseURL: origin,
 		http: &http.Client{
 			Timeout: timeout,
@@ -56,8 +58,8 @@ func NewHTTPClient(origin url.URL, timeout time.Duration) *HTTPClient {
 	}
 }
 
-func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
-	request, err := c.request(ctx, http.MethodPost, httpx.ArchivesPath, bytes.NewReader(raw))
+func (c *Client) CreateArchive(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
+	request, err := c.request(ctx, http.MethodPost, common.ArchivesPath, bytes.NewReader(raw))
 
 	if err != nil {
 		return archive.Accepted{}, err
@@ -80,7 +82,7 @@ func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) 
 
 	decodeErr := json.Unmarshal(rawResponse, &accepted)
 
-	validAdmission := accepted.Status == archive.AcceptedStatus && archive.ValidID(accepted.ArchiveID)
+	validAdmission := accepted.Status == archive.AcceptedStatus && httpx.ValidPathSegment(accepted.ArchiveID)
 
 	if decodeErr != nil || !validAdmission {
 		return archive.Accepted{}, ErrInvalidResponse
@@ -89,8 +91,8 @@ func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) 
 	return accepted, nil
 }
 
-func (c *HTTPClient) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
-	request, err := c.request(ctx, http.MethodGet, httpx.ArchivePathPrefix+id, nil)
+func (c *Client) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
+	request, err := c.request(ctx, http.MethodGet, common.ArchivePathPrefix+id, nil)
 
 	if err != nil {
 		return nil, err
@@ -128,7 +130,7 @@ func (c *HTTPClient) GetArchive(ctx context.Context, id string) (json.RawMessage
 	return json.RawMessage(data), nil
 }
 
-func (c *HTTPClient) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
+func (c *Client) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	target := c.baseURL
 
 	target.Path = path
@@ -137,7 +139,7 @@ func (c *HTTPClient) request(ctx context.Context, method, path string, body io.R
 	return http.NewRequestWithContext(ctx, method, target.String(), body)
 }
 
-func (c *HTTPClient) execute(request *http.Request) (int, []byte, error) {
+func (c *Client) execute(request *http.Request) (int, []byte, error) {
 	response, err := c.http.Do(request)
 
 	if err != nil {

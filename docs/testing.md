@@ -70,7 +70,7 @@ Use **test doubles** only for isolated behavior tests, and prefer real infrastru
 - Use `github.com/stretchr/testify/require` for failed prerequisites and `github.com/stretchr/testify/assert` for independent properties. Separate adjacent `require` and `assert` calls with one empty line.
 - Do not use `if` statements in Go tests for prerequisite or assertion handling. Do not use table-driven or dynamically generated test scenarios.
 - Use `t.Helper` for reusable helpers and `t.Cleanup` for fixture teardown.
-- Organize reusable Go fixtures in a purpose-specific service-local package such as `internal/gatewaytest/`, following the `chaosd` `*test` packages. Split source files by responsibility; avoid scattered `fixtures_test.go` files.
+- Organize reusable Go fixtures in a purpose-specific service-local package such as `gatewaytest/` at the service root, following the `chaosd` `*test` packages. Split source files by responsibility; avoid scattered `fixtures_test.go` files.
 - Use build tags such as `//go:build integration` to distinguish infrastructure-dependent suites when appropriate.
 - Cross-service integration and end-to-end tests under `tests/` use their own Go module and access documented service contracts.
 

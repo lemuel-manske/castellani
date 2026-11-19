@@ -1,25 +1,22 @@
-name: Gateway
+name: go @ API gateway
 
 on:
   push:
     paths:
       - "services/gateway/**"
       - ".github/workflows/gateway.yml"
+      - ".github/actions/go-verify/**"
   pull_request:
     paths:
       - "services/gateway/**"
       - ".github/workflows/gateway.yml"
+      - ".github/actions/go-verify/**"
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/gateway
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: ./.github/actions/go-verify
         with:
-          go-version-file: services/gateway/go.mod
-          cache-dependency-path: services/gateway/go.sum
-      - run: make check
+          module: services/gateway

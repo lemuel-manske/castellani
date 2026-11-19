@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/gatewaytest"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/unnamed/services/gateway/gatewaytest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +45,7 @@ func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t 
 func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.ReturnArchiveStatus))
 
-	result := gateway.Get(httpx.ArchivePathPrefix + gatewaytest.ArchiveID)
+	result := gateway.Get(common.ArchivePathPrefix + gatewaytest.ArchiveID)
 
 	assert.Equal(t, http.StatusOK, result.Status)
 	assert.JSONEq(t, gatewaytest.RunningArchive, result.Body)
@@ -137,7 +138,7 @@ func TestGateway_MalformedAdmissionIsNeverReportedAsAccepted(t *testing.T) {
 func TestGateway_StatusForDifferentArchiveIsNotReturned(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.ReturnMismatchedArchive))
 
-	result := gateway.Get(httpx.ArchivePathPrefix + gatewaytest.ArchiveID)
+	result := gateway.Get(common.ArchivePathPrefix + gatewaytest.ArchiveID)
 
 	assert.Equal(t, http.StatusBadGateway, result.Status)
 }
@@ -155,7 +156,7 @@ func TestGateway_UnknownRouteReturnsProblemDetails(t *testing.T) {
 func TestGateway_UnsupportedMethodReturnsProblemDetails(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(gatewaytest.Unused))
 
-	result := gateway.Put(httpx.ArchivePathPrefix + gatewaytest.ArchiveID)
+	result := gateway.Put(common.ArchivePathPrefix + gatewaytest.ArchiveID)
 
 	assert.Equal(t, http.StatusMethodNotAllowed, result.Status)
 	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))

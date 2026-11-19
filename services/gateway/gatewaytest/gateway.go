@@ -11,20 +11,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	ArchiveID        = "run-1"
-	IdempotencyKey   = "sample-key-123"
-	ValidSubmission  = `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1}`
-	AcceptedArchive  = `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/internal/run-1"}`
-	RunningArchive   = `{"archiveId":"run-1","status":"RUNNING","capture":{"captured":0,"failed":0,"pending":1},"replay":{"status":"NOT_READY"},"search":{"status":"PENDING"}}`
+	ArchiveID       = "run-1"
+	IdempotencyKey  = "sample-key-123"
+	ValidSubmission = `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1}`
+	AcceptedArchive = `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/internal/run-1"}`
+	RunningArchive  = `{"archiveId":"run-1","status":"RUNNING","capture":{"captured":0,"failed":0,"pending":1},"replay":{"status":"NOT_READY"},"search":{"status":"PENDING"}}`
 )
 
 type Response struct {
@@ -86,7 +87,7 @@ func Start(t *testing.T, options ...Option) Gateway {
 	captureOrigin := startService(t, "Capture", services.capture)
 	searchOrigin := startService(t, "Search", services.search)
 
-	coordinatorClient := coordinator.NewHTTPClient(coordinatorOrigin, time.Second)
+	coordinatorClient := coordinator.NewClient(coordinatorOrigin, time.Second)
 	captureClient := upstream.NewClient(captureOrigin, time.Second)
 	searchClient := upstream.NewClient(searchOrigin, time.Second)
 	app := application.NewApplication(coordinatorClient)
@@ -127,7 +128,7 @@ func startService(t *testing.T, name string, handler http.HandlerFunc) url.URL {
 func (g Gateway) Submit(key, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPost, g.server.URL+httpx.ArchivesPath, strings.NewReader(body))
+	request, err := http.NewRequest(http.MethodPost, g.server.URL+common.ArchivesPath, strings.NewReader(body))
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -139,7 +140,7 @@ func (g Gateway) Submit(key, body string) Response {
 func (g Gateway) CreateSession(key, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPost, g.server.URL+"/sessions", strings.NewReader(body))
+	request, err := http.NewRequest(http.MethodPost, g.server.URL+common.SessionsPath, strings.NewReader(body))
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -151,7 +152,7 @@ func (g Gateway) CreateSession(key, body string) Response {
 func (g Gateway) UpdateSession(id, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPut, g.server.URL+"/sessions/"+id, strings.NewReader(body))
+	request, err := http.NewRequest(http.MethodPut, g.server.URL+common.SessionPathPrefix+id, strings.NewReader(body))
 	require.NoError(g.t, err)
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -162,7 +163,7 @@ func (g Gateway) UpdateSession(id, body string) Response {
 func (g Gateway) WACZ(id, byteRange, ifRange string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodGet, g.server.URL+"/archives/"+id+"/wacz", nil)
+	request, err := http.NewRequest(http.MethodGet, g.server.URL+common.ArchivePathPrefix+id+common.WACZPathSuffix, nil)
 	require.NoError(g.t, err)
 
 	if byteRange != "" {
