@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -28,7 +29,7 @@ type HTTPClient struct {
 }
 
 type Failure struct {
-	Problem httpx.Problem
+	Problem sharedhttp.Problem
 }
 
 func (f *Failure) Error() string {
@@ -63,7 +64,7 @@ func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) 
 		return archive.Accepted{}, err
 	}
 
-	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 	request.Header.Set(httpx.IdempotencyHeader, key)
 
 	status, rawResponse, err := c.execute(request)
@@ -167,7 +168,7 @@ func parseFailure(status int, data []byte) error {
 		return ErrInvalidResponse
 	}
 
-	var p httpx.Problem
+	var p sharedhttp.Problem
 
 	decodeErr := json.Unmarshal(data, &p)
 

@@ -1,11 +1,10 @@
 package sessionapi
 
 import (
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
@@ -46,8 +45,15 @@ func NewHandler(client *upstream.Client) Handler {
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
-	if !httpx.ValidateIdempotencyKey(key) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-idempotency-key", "Invalid Idempotency Key", "Idempotency-Key is required and must contain 8 to 200 characters.")
+	if !sharedhttp.ValidateIdempotencyKey(key) {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-idempotency-key",
+			"Invalid Idempotency Key",
+			"Idempotency-Key is required and must contain 8 to 200 characters.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -55,12 +61,26 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	raw, err := readJSON(w, r, &input)
 
 	if err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error())
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session",
+			"Invalid Session",
+			err.Error(),
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
-	if !httpx.ValidateID(input.ArchiveID) || !httpx.ValidateTargetURL(input.TargetURL) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", "Expected archiveId and absolute HTTP(S) targetUrl.")
+	if !sharedhttp.ValidPathSegment(input.ArchiveID) || !sharedhttp.ValidHTTPURL(input.TargetURL) {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session",
+			"Invalid Session",
+			"Expected archiveId and absolute HTTP(S) targetUrl.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -78,11 +98,18 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var created sessionResponse
 	decodeErr := json.Unmarshal(result.Body, &created)
-	validSession := httpx.ValidateID(created.SessionID) && created.ArchiveID == input.ArchiveID &&
+	validSession := sharedhttp.ValidPathSegment(created.SessionID) && created.ArchiveID == input.ArchiveID &&
 		created.Status != "" && created.ExpiresAt != ""
 
 	if decodeErr != nil || !validSession {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid session metadata.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Capture returned invalid session metadata.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -101,14 +128,28 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	raw, err := readJSON(w, r, &input)
 
 	if err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error())
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session",
+			"Invalid Session",
+			err.Error(),
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
 	validStatus := input.Status == "COMPLETED" || input.Status == "CANCELLED"
 
 	if !validStatus {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", "status must be COMPLETED or CANCELLED.")
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session",
+			"Invalid Session",
+			"status must be COMPLETED or CANCELLED.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -118,8 +159,15 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method string, body []byte) {
 	id := chi.URLParam(r, idParameter)
 
-	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID.")
+	if !sharedhttp.ValidPathSegment(id) {
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session-id",
+			"Invalid Session ID",
+			"Invalid session ID.",
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -138,7 +186,14 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 			session.Status != "" && session.ExpiresAt != ""
 
 		if decodeErr != nil || !validSession {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid session metadata.")
+			responseProblem := sharedhttp.NewProblem(
+				r,
+				http.StatusBadGateway,
+				"invalid-upstream",
+				"Invalid Upstream Response",
+				"Capture returned invalid session metadata.",
+			)
+			sharedhttp.WriteProblem(w, responseProblem)
 			return
 		}
 	}
@@ -147,19 +202,5 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) ([]byte, error) {
-	// Decode once for strict validation, while retaining bytes for idempotency.
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, httpx.MaxJSONRequestBytes))
-
-	if err != nil {
-		return nil, err
-	}
-
-	clone := r.Clone(r.Context())
-	clone.Body = io.NopCloser(strings.NewReader(string(data)))
-
-	if err := httpx.DecodeJSON(w, clone, destination); err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return sharedhttp.DecodeJSONBytes(w, r, destination)
 }

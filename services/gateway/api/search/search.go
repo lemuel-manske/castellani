@@ -1,6 +1,7 @@
 package searchapi
 
 import (
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"net/http"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
@@ -19,7 +20,14 @@ func NewHandler(client *upstream.Client) Handler {
 
 func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 	if err := httpx.ValidateSearch(r.URL.Query()); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-search", "Invalid Search", err.Error())
+		responseProblem := sharedhttp.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-search",
+			"Invalid Search",
+			err.Error(),
+		)
+		sharedhttp.WriteProblem(w, responseProblem)
 		return
 	}
 
