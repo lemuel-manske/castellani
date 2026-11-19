@@ -15,16 +15,19 @@ const (
 	coordinatorEnvironment = "COORDINATOR_URL"
 	captureEnvironment = "CAPTURE_URL"
 	searchEnvironment = "SEARCH_URL"
+	streamTimeoutEnvironment = "GATEWAY_STREAM_TIMEOUT"
 
 	defaultAddress         = ":8080"
 	defaultShutdownTimeout = 10 * time.Second
 	defaultUpstreamTimeout = 5 * time.Second
+	defaultStreamTimeout = 30 * time.Minute
 )
 
 type config struct {
 	address         string
 	shutdownTimeout time.Duration
 	upstreamTimeout time.Duration
+	streamTimeout time.Duration
 	coordinatorURL  *url.URL
 	captureURL      *url.URL
 	searchURL       *url.URL
@@ -35,6 +38,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		address:         defaultAddress,
 		shutdownTimeout: defaultShutdownTimeout,
 		upstreamTimeout: defaultUpstreamTimeout,
+		streamTimeout: defaultStreamTimeout,
 	}
 
 	if address := getenv(addressEnvironment); address != "" {
@@ -54,6 +58,12 @@ func loadConfig(getenv func(string) string) (config, error) {
 	}
 
 	cfg.upstreamTimeout, err = durationSetting(getenv, upstreamEnvironment, cfg.upstreamTimeout)
+
+	if err != nil {
+		return config{}, err
+	}
+
+	cfg.streamTimeout, err = durationSetting(getenv, streamTimeoutEnvironment, cfg.streamTimeout)
 
 	if err != nil {
 		return config{}, err
