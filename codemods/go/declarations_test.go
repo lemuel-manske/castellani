@@ -159,3 +159,51 @@ func initialize(n int) int { return n }
 
 	assertFormat(t, source, expected, DeclarationsOrder)
 }
+
+func TestFormat_MultipleInitFunctions_PreserveOrder(t *testing.T) {
+	source := `package example
+
+func init() { println("first") }
+
+type Service struct{}
+
+const Name = "example"
+
+func init() { println("second") }
+`
+
+	expected := `package example
+
+const Name = "example"
+
+func init() { println("first") }
+
+type Service struct{}
+
+func init() { println("second") }
+`
+
+	assertFormat(t, source, expected, DeclarationsOrder)
+}
+
+func TestFormat_DeclarationOrdering_PreservesBuildConstraints(t *testing.T) {
+	source := `//go:build linux
+
+package example
+
+type Service struct{}
+
+const Name = "example"
+`
+
+	expected := `//go:build linux
+
+package example
+
+const Name = "example"
+
+type Service struct{}
+`
+
+	assertFormat(t, source, expected, DeclarationsOrder)
+}
