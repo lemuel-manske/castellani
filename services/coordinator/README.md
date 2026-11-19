@@ -1,6 +1,6 @@
 # Archive Coordinator
 
-The Archive Coordinator durably admits archive runs and owns workflow coordination across Capture and Search. The API Gateway forwards archive submissions and status requests to it.
+The Archive Coordinator durably admits archive runs and owns workflow coordination across Capture and Search.
 
 ## Development
 
@@ -27,11 +27,3 @@ Requires Go 1.25.4. From `services/coordinator`:
 | `COORDINATOR_RABBITMQ_EXCHANGE` | `castellani.events` | Durable topic exchange |
 | `COORDINATOR_RECONCILIATION_INTERVAL` | `30s` | Delay between stalled-workflow reconciliation passes |
 | `COORDINATOR_STALLED_WORKFLOW_AGE` | `2m` | Minimum time without a state update before a SAGA decision is reissued |
-
-## Recovery
-
-The outbox dispatcher reclaims expired leases and republishes messages that were not confirmed by RabbitMQ. The consumer reconnects after failures and uses bounded delayed retries and dead-letter routing.
-
-The reconciliation worker queries only recoverable archive decisions through the `recoveryKey-updatedAt-index`. It reissues `ArchivePublicationDecided` for stalled `PUBLISH` runs and `ArchiveCompensationDecided` for stalled `COMPENSATE` runs. The outbox insert and archive revision/cooldown update are one DynamoDB transaction, preventing multiple Coordinator replicas from continually scheduling the same recovery command.
-
-Recovery is intentionally limited to decisions already committed by the Coordinator. It does not infer crawl completion, recreate a missing crawl frontier, or repair Search's index. Capture and Search must reconcile their own durable side effects, and their command handlers must be idempotent by archive ID and decision version.
