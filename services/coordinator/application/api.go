@@ -20,13 +20,11 @@ type AcceptedArchive struct {
 }
 
 type Application struct {
-	archives persistence.ArchiveRepository
-	workflow persistence.WorkflowRepository
+	repository persistence.ArchiveRepository
 }
 
-func NewApplication(archives persistence.ArchiveRepository, workflow persistence.WorkflowRepository) *Application {
+func NewApplication(repository persistence.ArchiveRepository) *Application {
 	return &Application{
-		archives: archives,
-		workflow: workflow,
+		repository: repository,
 	}
 }
