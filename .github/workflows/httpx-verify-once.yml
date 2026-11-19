@@ -1,4 +1,4 @@
-name: Shared HTTP one-time verification
+name: Shared HTTP one-time verification (split)
 on:
   push:
     branches: [feat/coordinator-service]
