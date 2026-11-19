@@ -31,7 +31,7 @@ type gatewayServer struct {
 
 func newGatewayServer(cfg config, logger *slog.Logger) *gatewayServer {
 	gateway := &gatewayServer{shutdownTimeout: cfg.shutdownTimeout}
-	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
+	coordinatorClient := coordinator.NewHTTPClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
 	app := application.NewApplication(coordinatorClient)
 	var captureClient *upstream.Client
 	var searchClient *upstream.Client
