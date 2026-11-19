@@ -19,7 +19,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("gofmtx", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	write := flags.Bool("w", false, "write changes to files")
-	ruleNames := flags.String("rules", "declarations,types,spacing,returns,signatures,calls,structs,interfaces,grouping", "comma-separated rules")
+	ruleNames := flags.String("rules", "composites,declarations,types,spacing,returns,signatures,calls,structs,interfaces,grouping", "comma-separated rules")
 
 	if err := flags.Parse(args); err != nil {
 		return 2
@@ -49,6 +49,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 func selectRules(names string) ([]rules.Rule, error) {
 	available := map[string]rules.Rule{
+		"composites":  rules.MultilineCompositeLiterals,
 		"declarations": rules.DeclarationsOrder,
 		"spacing":      rules.IfSpacing,
 		"returns":      rules.ReturnSpacing,
