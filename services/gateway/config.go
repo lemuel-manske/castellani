@@ -51,19 +51,31 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 
 	var err error
 
-	cfg.shutdownTimeout, err = durationSetting(getenv, shutdownEnvironment, cfg.shutdownTimeout)
+	cfg.shutdownTimeout, err = durationSetting(
+		getenv,
+		shutdownEnvironment,
+		cfg.shutdownTimeout,
+	)
 
 	if err != nil {
 		return Config{}, err
 	}
 
-	cfg.upstreamTimeout, err = durationSetting(getenv, upstreamEnvironment, cfg.upstreamTimeout)
+	cfg.upstreamTimeout, err = durationSetting(
+		getenv,
+		upstreamEnvironment,
+		cfg.upstreamTimeout,
+	)
 
 	if err != nil {
 		return Config{}, err
 	}
 
-	cfg.streamTimeout, err = durationSetting(getenv, streamTimeoutEnvironment, cfg.streamTimeout)
+	cfg.streamTimeout, err = durationSetting(
+		getenv,
+		streamTimeoutEnvironment,
+		cfg.streamTimeout,
+	)
 
 	if err != nil {
 		return Config{}, err
@@ -109,7 +121,11 @@ func validCoordinatorOrigin(parsed *url.URL) bool {
 	return httpScheme && validAuthority && cleanPath && noAdditionalParts && !strings.HasSuffix(parsed.Host, "@")
 }
 
-func durationSetting(getenv func(string) string, key string, fallback time.Duration) (time.Duration, error) {
+func durationSetting(
+	getenv func(string) string,
+	key string,
+	fallback time.Duration,
+) (time.Duration, error) {
 	value := getenv(key)
 
 	if value == "" {
@@ -118,7 +134,11 @@ func durationSetting(getenv func(string) string, key string, fallback time.Durat
 	duration, err := time.ParseDuration(value)
 
 	if err != nil {
-		return 0, fmt.Errorf("invalid %s: %w", key, err)
+		return 0, fmt.Errorf(
+			"invalid %s: %w",
+			key,
+			err,
+		)
 	}
 
 	if duration <= 0 {
@@ -137,7 +157,11 @@ func serviceOrigin(getenv func(string) string, key string) (*url.URL, error) {
 	origin, err := url.Parse(raw)
 
 	if err != nil {
-		return nil, fmt.Errorf("invalid %s: %w", key, err)
+		return nil, fmt.Errorf(
+			"invalid %s: %w",
+			key,
+			err,
+		)
 	}
 
 	if !validCoordinatorOrigin(origin) {

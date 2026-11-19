@@ -23,9 +23,21 @@ func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T)
 
 	result := gateway.Get("/search?q=historical&archiveId=run-1&limit=10")
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.JSONEq(t, searchResults, result.Body)
-	assert.Equal(t, "q=historical&archiveId=run-1&limit=10", <-receivedQuery)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.JSONEq(
+		t,
+		searchResults,
+		result.Body,
+	)
+	assert.Equal(
+		t,
+		"q=historical&archiveId=run-1&limit=10",
+		<-receivedQuery,
+	)
 }
 
 func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testing.T) {
@@ -34,8 +46,16 @@ func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testi
 
 	result := gateway.Get("/search?limit=10")
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
 }
 
 func TestGateway_SearchWithInvalidLimitReturnsValidationError(t *testing.T) {
@@ -43,7 +63,11 @@ func TestGateway_SearchWithInvalidLimitReturnsValidationError(t *testing.T) {
 
 	result := gateway.Get("/search?q=archive&limit=101")
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 }
 
 func TestGateway_SearchOutageDoesNotDisableLiveness(t *testing.T) {
@@ -52,6 +76,14 @@ func TestGateway_SearchOutageDoesNotDisableLiveness(t *testing.T) {
 	search := gateway.Get("/search?q=archive")
 	health := gateway.Get("/health/live")
 
-	assert.Equal(t, http.StatusServiceUnavailable, search.Status)
-	assert.Equal(t, http.StatusOK, health.Status)
+	assert.Equal(
+		t,
+		http.StatusServiceUnavailable,
+		search.Status,
+	)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		health.Status,
+	)
 }

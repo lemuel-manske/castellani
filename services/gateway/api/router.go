@@ -22,8 +22,18 @@ const (
 	healthResponse  = "ok\n"
 )
 
-func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
-	return NewRouterWithServices(ready, app, nil, nil, logger)
+func NewRouter(
+	ready func() bool,
+	app application.Application,
+	logger *slog.Logger,
+) http.Handler {
+	return NewRouterWithServices(
+		ready,
+		app,
+		nil,
+		nil,
+		logger,
+	)
 }
 
 func NewRouterWithServices(
@@ -48,7 +58,11 @@ func NewRouterWithServices(
 		w.Header().Set("Content-Type", healthMediaType)
 
 		if !ready() {
-			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			http.Error(
+				w,
+				"unavailable",
+				http.StatusServiceUnavailable,
+			)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -128,7 +142,11 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 
 				if value := recover(); value != nil {
-					logger.Error("HTTP handler panic", "path", r.URL.Path)
+					logger.Error(
+						"HTTP handler panic",
+						"path",
+						r.URL.Path,
+					)
 					responseProblem := httpx.NewProblem(
 						r,
 						http.StatusInternalServerError,

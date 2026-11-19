@@ -20,14 +20,22 @@ var (
 
 // DecodeJSONBytes decodes one strict JSON value and returns the original bytes.
 // Callers that forward the request can preserve its original representation.
-func DecodeJSONBytes(w http.ResponseWriter, r *http.Request, destination any) ([]byte, error) {
+func DecodeJSONBytes(
+	w http.ResponseWriter,
+	r *http.Request,
+	destination any,
+) ([]byte, error) {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get(HeaderContentType))
 
 	if err != nil || mediaType != MediaTypeJSON {
 		return nil, ErrContentType
 	}
 
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxJSONRequestBytes))
+	data, err := io.ReadAll(http.MaxBytesReader(
+		w,
+		r.Body,
+		MaxJSONRequestBytes,
+	))
 
 	if err != nil {
 		return nil, fmt.Errorf("read JSON request: %w", err)
@@ -37,7 +45,11 @@ func DecodeJSONBytes(w http.ResponseWriter, r *http.Request, destination any) ([
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(destination); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidJSON, err)
+		return nil, fmt.Errorf(
+			"%w: %v",
+			ErrInvalidJSON,
+			err,
+		)
 	}
 
 	var extra any

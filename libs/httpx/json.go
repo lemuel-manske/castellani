@@ -7,7 +7,11 @@ import (
 
 const MediaTypeJSON = "application/json"
 
-func JSON(w http.ResponseWriter, status int, body any) {
+func JSON(
+	w http.ResponseWriter,
+	status int,
+	body any,
+) {
 	w.Header().Set(HeaderContentType, MediaTypeJSON)
 	w.Header().Set(HeaderCacheControl, CacheNoStore)
 	w.WriteHeader(status)

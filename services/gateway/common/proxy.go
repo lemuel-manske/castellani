@@ -9,7 +9,13 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
-func ForwardJSON(w http.ResponseWriter, r *http.Request, result upstream.Result, success int, unavailable string) {
+func ForwardJSON(
+	w http.ResponseWriter,
+	r *http.Request,
+	result upstream.Result,
+	success int,
+	unavailable string,
+) {
 	if result.Status == success {
 		var body any
 
@@ -63,7 +69,12 @@ func allowedFailure(status int) bool {
 	}
 }
 
-func UpstreamError(w http.ResponseWriter, r *http.Request, err error, service string) {
+func UpstreamError(
+	w http.ResponseWriter,
+	r *http.Request,
+	err error,
+	service string,
+) {
 	status := http.StatusServiceUnavailable
 	kind := "dependency-unavailable"
 	title := "Dependency Unavailable"

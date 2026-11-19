@@ -38,7 +38,11 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var submission archive.Submission
-	data, err := httpx.DecodeJSONBytes(w, r, &submission)
+	data, err := httpx.DecodeJSONBytes(
+		w,
+		r,
+		&submission,
+	)
 
 	if err != nil {
 		switch {
@@ -83,10 +87,20 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accepted, err := h.app.CreateArchive(r.Context(), key, submission, data)
+	accepted, err := h.app.CreateArchive(
+		r.Context(),
+		key,
+		submission,
+		data,
+	)
 
 	if err != nil {
-		writeFailure(w, r, err, "Admission could not be confirmed. Retry with the same Idempotency-Key.")
+		writeFailure(
+			w,
+			r,
+			err,
+			"Admission could not be confirmed. Retry with the same Idempotency-Key.",
+		)
 		return
 	}
 
@@ -94,7 +108,11 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
 
-	httpx.JSON(w, http.StatusAccepted, accepted)
+	httpx.JSON(
+		w,
+		http.StatusAccepted,
+		accepted,
+	)
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
@@ -103,14 +121,28 @@ func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	document, err := h.app.GetArchive(r.Context(), id)
 
 	if err != nil {
-		writeFailure(w, r, err, "Archive status is temporarily unavailable.")
+		writeFailure(
+			w,
+			r,
+			err,
+			"Archive status is temporarily unavailable.",
+		)
 		return
 	}
 
-	httpx.JSON(w, http.StatusOK, document)
+	httpx.JSON(
+		w,
+		http.StatusOK,
+		document,
+	)
 }
 
-func writeFailure(w http.ResponseWriter, r *http.Request, err error, unavailableDetail string) {
+func writeFailure(
+	w http.ResponseWriter,
+	r *http.Request,
+	err error,
+	unavailableDetail string,
+) {
 	var failure *coordinator.Failure
 
 	var validation *application.ValidationError

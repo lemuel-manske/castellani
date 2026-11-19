@@ -38,7 +38,11 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	var searchClient *upstream.Client
 
 	if cfg.captureURL != nil {
-		captureClient = upstream.NewClientWithStreamTimeout(*cfg.captureURL, cfg.upstreamTimeout, cfg.streamTimeout)
+		captureClient = upstream.NewClientWithStreamTimeout(
+			*cfg.captureURL,
+			cfg.upstreamTimeout,
+			cfg.streamTimeout,
+		)
 	}
 
 	if cfg.searchURL != nil {
@@ -47,7 +51,13 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 
 	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
 	gateway.http = &http.Server{
-		Handler:           api.NewRouterWithServices(gateway.ready.Load, app, captureClient, searchClient, logger),
+		Handler:           api.NewRouterWithServices(
+			gateway.ready.Load,
+			app,
+			captureClient,
+			searchClient,
+			logger,
+		),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 		IdleTimeout:       serverIdleTimeout,

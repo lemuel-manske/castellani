@@ -20,7 +20,11 @@ type Problem struct {
 	Instance string `json:"instance,omitempty"`
 }
 
-func NewProblem(r *http.Request, status int, kind, title, detail string) Problem {
+func NewProblem(
+	r *http.Request,
+	status int,
+	kind, title, detail string,
+) Problem {
 	return Problem{
 		Type:     ProblemTypePrefix + kind,
 		Title:    title,

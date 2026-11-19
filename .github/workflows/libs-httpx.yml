@@ -2,21 +2,17 @@ name: go @ libs/httpx
 
 on:
   push:
-    paths:
-      - "libs/httpx/**"
-      - ".github/workflows/libs-httpx.yml"
-      - ".github/actions/go-verify/**"
+    branches:
+      - main
+
   pull_request:
-    paths:
-      - "libs/httpx/**"
-      - ".github/workflows/libs-httpx.yml"
-      - ".github/actions/go-verify/**"
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: ./.github/actions/go-verify
         with:
           module: libs/httpx

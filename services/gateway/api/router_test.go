@@ -35,11 +35,31 @@ func TestGateway_ArchiveSubmissionIsAcceptedAfterCoordinatorConfirmsAdmission(t 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 	request := <-forwarded
 
-	assert.Equal(t, http.StatusAccepted, result.Status)
-	assert.Equal(t, "/archives/run-1", result.Header.Get(httpx.LocationHeader))
-	assert.JSONEq(t, `{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/archives/run-1"}`, result.Body)
-	assert.Equal(t, gatewaytest.IdempotencyKey, request.key)
-	assert.JSONEq(t, gatewaytest.ValidSubmission, request.body)
+	assert.Equal(
+		t,
+		http.StatusAccepted,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		"/archives/run-1",
+		result.Header.Get(httpx.LocationHeader),
+	)
+	assert.JSONEq(
+		t,
+		`{"archiveId":"run-1","status":"ACCEPTED","statusUrl":"/archives/run-1"}`,
+		result.Body,
+	)
+	assert.Equal(
+		t,
+		gatewaytest.IdempotencyKey,
+		request.key,
+	)
+	assert.JSONEq(
+		t,
+		gatewaytest.ValidSubmission,
+		request.body,
+	)
 }
 
 func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
@@ -47,8 +67,16 @@ func TestGateway_ArchiveStatusReflectsCoordinatorState(t *testing.T) {
 
 	result := gateway.Get(common.ArchivePathPrefix + gatewaytest.ArchiveID)
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.JSONEq(t, gatewaytest.RunningArchive, result.Body)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.JSONEq(
+		t,
+		gatewaytest.RunningArchive,
+		result.Body,
+	)
 }
 
 func TestGateway_RepeatedArchiveSubmissionAlwaysReachesCoordinator(t *testing.T) {
@@ -58,9 +86,21 @@ func TestGateway_RepeatedArchiveSubmissionAlwaysReachesCoordinator(t *testing.T)
 	first := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 	second := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
-	assert.Equal(t, http.StatusAccepted, first.Status)
-	assert.Equal(t, http.StatusAccepted, second.Status)
-	assert.EqualValues(t, 2, coordinator.CallCount())
+	assert.Equal(
+		t,
+		http.StatusAccepted,
+		first.Status,
+	)
+	assert.Equal(
+		t,
+		http.StatusAccepted,
+		second.Status,
+	)
+	assert.EqualValues(
+		t,
+		2,
+		coordinator.CallCount(),
+	)
 }
 
 func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testing.T) {
@@ -68,9 +108,21 @@ func TestGateway_ConflictingArchiveSubmissionPreservesCoordinatorError(t *testin
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
-	assert.Equal(t, http.StatusConflict, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
-	assert.JSONEq(t, `{"type":"urn:coordinator:idempotency-conflict","title":"Conflict","status":409,"detail":"Key was used for different content.","instance":"/archives"}`, result.Body)
+	assert.Equal(
+		t,
+		http.StatusConflict,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
+	assert.JSONEq(
+		t,
+		`{"type":"urn:coordinator:idempotency-conflict","title":"Conflict","status":409,"detail":"Key was used for different content.","instance":"/archives"}`,
+		result.Body,
+	)
 }
 
 func TestGateway_ArchiveWithoutIdempotencyKeyIsRejectedBeforeForwarding(t *testing.T) {
@@ -79,7 +131,11 @@ func TestGateway_ArchiveWithoutIdempotencyKeyIsRejectedBeforeForwarding(t *testi
 
 	result := gateway.Submit("", gatewaytest.ValidSubmission)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 	assert.Zero(t, coordinator.CallCount())
 }
 
@@ -90,7 +146,11 @@ func TestGateway_ArchiveWithUnknownFieldsIsRejectedBeforeForwarding(t *testing.T
 	body := `{"seedUrl":"https://example.org/","maxDepth":0,"maxPages":1,"unsupported":true}`
 	result := gateway.Submit(gatewaytest.IdempotencyKey, body)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 	assert.Zero(t, coordinator.CallCount())
 }
 
@@ -101,7 +161,11 @@ func TestGateway_ArchiveWithInvalidLimitsIsRejectedBeforeForwarding(t *testing.T
 	body := `{"seedUrl":"https://example.org/","maxDepth":-1,"maxPages":0}`
 	result := gateway.Submit(gatewaytest.IdempotencyKey, body)
 
-	assert.Equal(t, http.StatusUnprocessableEntity, result.Status)
+	assert.Equal(
+		t,
+		http.StatusUnprocessableEntity,
+		result.Status,
+	)
 	assert.Zero(t, coordinator.CallCount())
 }
 
@@ -112,7 +176,11 @@ func TestGateway_OversizedArchiveIsRejectedBeforeForwarding(t *testing.T) {
 	oversizedBody := gatewaytest.ValidSubmission + strings.Repeat(" ", 70<<10)
 	result := gateway.Submit(gatewaytest.IdempotencyKey, oversizedBody)
 
-	assert.Equal(t, http.StatusBadRequest, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		result.Status,
+	)
 	assert.Zero(t, coordinator.CallCount())
 }
 
@@ -121,9 +189,21 @@ func TestGateway_CoordinatorDisconnectLeavesArchiveAdmissionUnconfirmed(t *testi
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
-	assert.Equal(t, http.StatusServiceUnavailable, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
-	assert.Contains(t, result.Body, "Retry with the same Idempotency-Key")
+	assert.Equal(
+		t,
+		http.StatusServiceUnavailable,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
+	assert.Contains(
+		t,
+		result.Body,
+		"Retry with the same Idempotency-Key",
+	)
 }
 
 func TestGateway_MalformedAdmissionIsNeverReportedAsAccepted(t *testing.T) {
@@ -131,8 +211,16 @@ func TestGateway_MalformedAdmissionIsNeverReportedAsAccepted(t *testing.T) {
 
 	result := gateway.Submit(gatewaytest.IdempotencyKey, gatewaytest.ValidSubmission)
 
-	assert.Equal(t, http.StatusBadGateway, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.Equal(
+		t,
+		http.StatusBadGateway,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
 }
 
 func TestGateway_StatusForDifferentArchiveIsNotReturned(t *testing.T) {
@@ -140,7 +228,11 @@ func TestGateway_StatusForDifferentArchiveIsNotReturned(t *testing.T) {
 
 	result := gateway.Get(common.ArchivePathPrefix + gatewaytest.ArchiveID)
 
-	assert.Equal(t, http.StatusBadGateway, result.Status)
+	assert.Equal(
+		t,
+		http.StatusBadGateway,
+		result.Status,
+	)
 }
 
 func TestGateway_UnknownRouteReturnsProblemDetails(t *testing.T) {
@@ -148,8 +240,16 @@ func TestGateway_UnknownRouteReturnsProblemDetails(t *testing.T) {
 
 	result := gateway.Get("/unknown")
 
-	assert.Equal(t, http.StatusNotFound, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.Equal(
+		t,
+		http.StatusNotFound,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
 	assert.NotEmpty(t, result.Header.Get("X-Request-ID"))
 }
 
@@ -158,8 +258,16 @@ func TestGateway_UnsupportedMethodReturnsProblemDetails(t *testing.T) {
 
 	result := gateway.Put(common.ArchivePathPrefix + gatewaytest.ArchiveID)
 
-	assert.Equal(t, http.StatusMethodNotAllowed, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.Equal(
+		t,
+		http.StatusMethodNotAllowed,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		httpx.MediaTypeProblem,
+		result.Header.Get(httpx.HeaderContentType),
+	)
 }
 
 func TestGateway_LivenessDoesNotDependOnCoordinator(t *testing.T) {
@@ -167,8 +275,16 @@ func TestGateway_LivenessDoesNotDependOnCoordinator(t *testing.T) {
 
 	result := gateway.Get("/health/live")
 
-	assert.Equal(t, http.StatusOK, result.Status)
-	assert.Equal(t, "ok\n", result.Body)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		result.Status,
+	)
+	assert.Equal(
+		t,
+		"ok\n",
+		result.Body,
+	)
 }
 
 func TestGateway_ReadinessRejectsRequestsBeforeServerIsReady(t *testing.T) {
@@ -176,5 +292,9 @@ func TestGateway_ReadinessRejectsRequestsBeforeServerIsReady(t *testing.T) {
 
 	result := gateway.Get("/health/ready")
 
-	assert.Equal(t, http.StatusServiceUnavailable, result.Status)
+	assert.Equal(
+		t,
+		http.StatusServiceUnavailable,
+		result.Status,
+	)
 }

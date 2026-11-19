@@ -23,9 +23,11 @@ These rules are mandatory for every task, regardless of language or service. Fol
 1. Before implementation, break the task into **no more than 10 ordered steps**. Each step must have a concrete outcome that the user can review. Prefer fewer steps for small changes; a task may consist of one step.
 2. Share the proposed plan with the user **and obtain explicit approval before starting the first implementation step**.
 3. Implement **only the currently approved step**. Keep its scope narrow; do not silently start the next step or bundle future work into it.
-4. At the end of **every step**, report what changed, the relevant files, verification performed and its results, and any open questions or deviations. Provide a commit reference or diff when available.
-5. **Stop and return control to the user for review.** Continue to the next step **only after explicit user approval**. Silence, lack of objections, or a previous approval does not authorize later steps.
-6. If new discoveries materially change the plan, present a revised plan (still at most 10 steps) and get approval before following it.
+4. **Refactor before declaring a step complete.** Review all code touched by the step for duplicated logic, unclear or crossed boundaries, misplaced public/shared functionality, unnecessary wrappers, inconsistent APIs and names, and package/module organization. Consolidate genuinely reusable code at the correct ownership boundary without introducing speculative abstractions. Check that tests exercise the behavior through the intended public API. Resolve issues discovered within the approved scope before proceeding; raise architectural changes beyond that scope for review.
+5. Run the relevant formatter, tests, static checks, and integration checks after this refactoring pass. If refactoring reveals a regression, fix it before ending the step.
+6. At the end of **every step**, report what changed, the relevant files, verification performed and its results, the refactoring review (duplication, boundaries, and package/module layout), and any open questions or deviations. Provide a commit reference or diff when available.
+7. **Stop and return control to the user for review.** Continue to the next step **only after explicit user approval**. Silence, lack of objections, or a previous approval does not authorize later steps.
+8. If new discoveries materially change the plan, present a revised plan (still at most 10 steps) and get approval before following it.
 
 For documentation-only changes, a single reviewable step is usually sufficient. Do not invent extra steps to reach a quota.
 

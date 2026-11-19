@@ -4,7 +4,7 @@ install:
 	go mod download
 
 fmt:
-	go fmt ./...
+	$(MAKE) -C ../../codemods/go apply TARGET=../../libs/httpx
 
 test:
 	go test ./...
