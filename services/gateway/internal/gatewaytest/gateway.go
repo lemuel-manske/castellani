@@ -15,6 +15,7 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,6 +54,39 @@ func Start(t *testing.T, coordinatorHandler http.HandlerFunc) Gateway {
 	return start(t, router)
 }
 
+func StartWithServices(
+	t *testing.T,
+	coordinatorHandler http.HandlerFunc,
+	captureHandler http.HandlerFunc,
+	searchHandler http.HandlerFunc,
+) Gateway {
+	t.Helper()
+
+	coordinatorServer := httptest.NewServer(coordinatorHandler)
+	captureServer := httptest.NewServer(captureHandler)
+	searchServer := httptest.NewServer(searchHandler)
+
+	t.Cleanup(coordinatorServer.Close)
+	t.Cleanup(captureServer.Close)
+	t.Cleanup(searchServer.Close)
+
+	coordinatorOrigin, err := url.Parse(coordinatorServer.URL)
+	require.NoError(t, err)
+
+	captureOrigin, err := url.Parse(captureServer.URL)
+	require.NoError(t, err)
+
+	searchOrigin, err := url.Parse(searchServer.URL)
+	require.NoError(t, err)
+
+	app := application.NewApplication(coordinator.NewClient(*coordinatorOrigin, time.Second))
+	captureClient := upstream.NewClient(*captureOrigin, time.Second)
+	searchClient := upstream.NewClient(*searchOrigin, time.Second)
+	router := api.NewRouterWithServices(func() bool { return true }, app, captureClient, searchClient, slog.Default())
+
+	return start(t, router)
+}
+
 func StartUnready(t *testing.T) Gateway {
 	t.Helper()
 
@@ -80,6 +114,52 @@ func (g Gateway) Submit(key, body string) Response {
 	request.Header.Set(httpx.IdempotencyHeader, key)
 
 	return g.send(request)
+}
+
+func (g Gateway) CreateSession(key, body string) Response {
+	g.t.Helper()
+
+	request, err := http.NewRequest(http.MethodPost, g.server.URL+"/sessions", strings.NewReader(body))
+	require.NoError(g.t, err)
+
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(httpx.IdempotencyHeader, key)
+
+	return g.send(request)
+}
+
+func (g Gateway) UpdateSession(id, body string) Response {
+	g.t.Helper()
+
+	request, err := http.NewRequest(http.MethodPut, g.server.URL+"/sessions/"+id, strings.NewReader(body))
+	require.NoError(g.t, err)
+
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+
+	return g.send(request)
+}
+
+func (g Gateway) WACZ(id, byteRange, ifRange string) Response {
+	g.t.Helper()
+
+	request, err := http.NewRequest(http.MethodGet, g.server.URL+"/archives/"+id+"/wacz", nil)
+	require.NoError(g.t, err)
+
+	if byteRange != "" {
+		request.Header.Set("Range", byteRange)
+	}
+
+	if ifRange != "" {
+		request.Header.Set("If-Range", ifRange)
+	}
+
+	return g.send(request)
+}
+
+func (g Gateway) Head(path string) Response {
+	g.t.Helper()
+
+	return g.request(http.MethodHead, path)
 }
 
 func (g Gateway) Get(path string) Response {
