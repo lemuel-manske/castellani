@@ -54,9 +54,12 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		searchClient,
 	)
 
-	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
+	gateway := &GatewayServer{
+		shutdownTimeout: cfg.shutdownTimeout,
+	}
+
 	gateway.http = &http.Server{
-		Handler:           api.NewRouter(
+		Handler: api.NewRouter(
 			gateway.ready.Load,
 			app,
 			logger,
@@ -66,6 +69,7 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		IdleTimeout:       serverIdleTimeout,
 		MaxHeaderBytes:    serverMaxHeaderBytes,
 	}
+
 	return gateway
 }
 
