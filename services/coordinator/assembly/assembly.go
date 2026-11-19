@@ -21,7 +21,7 @@ func NewComponents(
 	publisher := rabbitmq.NewRabbitPublisher(rabbitURL, rabbitExchange)
 
 	return Components{
-		Application: application.NewApplication(repository, repository),
+		Application: application.NewApplication(repository),
 		Dispatcher:  application.NewDispatcher(repository, publisher),
 		Consumer: rabbitmq.NewRabbitConsumer(
 			rabbitURL,
