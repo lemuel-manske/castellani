@@ -77,7 +77,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 
 	var err error
 
-	config.shutdownTimeout, err = durationSetting(
+	config.shutdownTimeout, err = getDurationSetting(
 		getenv,
 		shutdownEnvironment,
 		config.shutdownTimeout,
@@ -87,7 +87,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	config.reconcileInterval, err = durationSetting(
+	config.reconcileInterval, err = getDurationSetting(
 		getenv,
 		reconcileIntervalEnvironment,
 		config.reconcileInterval,
@@ -97,7 +97,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	config.stalledWorkflowAge, err = durationSetting(
+	config.stalledWorkflowAge, err = getDurationSetting(
 		getenv,
 		stalledWorkflowAgeEnvironment,
 		config.stalledWorkflowAge,
@@ -140,7 +140,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	return config, nil
 }
 
-func durationSetting(
+func getDurationSetting(
 	getenv func(string) string,
 	key string,
 	fallback time.Duration,

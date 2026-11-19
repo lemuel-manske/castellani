@@ -92,7 +92,7 @@ func run(logger *slog.Logger) error {
 		config.rabbitExchange,
 	)
 
-	startWorkers(
+	StartWorkers(
 		ctx,
 		logger,
 		built.Dispatcher,

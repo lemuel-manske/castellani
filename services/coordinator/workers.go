@@ -14,7 +14,7 @@ const (
 	workerRetryDelay = 2 * time.Second
 )
 
-func startWorkers(
+func StartWorkers(
 	ctx context.Context,
 	logger *slog.Logger,
 	dispatcher *application.Dispatcher,
