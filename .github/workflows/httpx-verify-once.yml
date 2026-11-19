@@ -26,6 +26,7 @@ jobs:
             (
               cd "$module"
               GOWORK=off go mod tidy &&
+              gofmt -w $(find . -type f -name '*.go') &&
               test -z "$(gofmt -l $(find . -type f -name '*.go'))" &&
               GOWORK=off go vet ./... &&
               GOWORK=off go test -race ./...
