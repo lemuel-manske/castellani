@@ -12,12 +12,12 @@ import (
 )
 
 func TestGateway_PublishedWACZStreamsBytesWithoutRewriting(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, _ *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Accept-Ranges", "bytes")
 		w.Header().Set("ETag", `"digest-1"`)
 		_, _ = io.WriteString(w, "WACZ-PAYLOAD")
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.WACZ("run-1", "", "")
 
@@ -29,14 +29,14 @@ func TestGateway_PublishedWACZStreamsBytesWithoutRewriting(t *testing.T) {
 
 func TestGateway_WACZRangeRequestPreservesPartialContentSemantics(t *testing.T) {
 	receivedRange := make(chan string, 1)
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, r *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, r *http.Request) {
 		receivedRange <- r.Header.Get("Range")
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Accept-Ranges", "bytes")
 		w.Header().Set("Content-Range", "bytes 0-3/8")
 		w.WriteHeader(http.StatusPartialContent)
 		_, _ = io.WriteString(w, "WACZ")
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.WACZ("run-1", "bytes=0-3", "")
 
@@ -47,12 +47,12 @@ func TestGateway_WACZRangeRequestPreservesPartialContentSemantics(t *testing.T) 
 }
 
 func TestGateway_WACZHeadReturnsMetadataWithoutReadingBytes(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, _ *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Content-Length", "900")
 		w.Header().Set("ETag", `"digest-1"`)
 		w.WriteHeader(http.StatusOK)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.Head("/archives/run-1/wacz")
 
@@ -62,11 +62,11 @@ func TestGateway_WACZHeadReturnsMetadataWithoutReadingBytes(t *testing.T) {
 }
 
 func TestGateway_UnpublishedWACZIsNotExposed(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, _ *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeProblem)
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `{"type":"urn:capture:unpublished","title":"Not Found","status":404}`)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.WACZ("run-1", "", "")
 
@@ -76,12 +76,12 @@ func TestGateway_UnpublishedWACZIsNotExposed(t *testing.T) {
 }
 
 func TestGateway_WACZUnsatisfiableRangePreservesContentRange(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, _ *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeProblem)
 		w.Header().Set("Content-Range", "bytes */8")
 		w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
 		_, _ = io.WriteString(w, `{"type":"urn:capture:range","title":"Range Not Satisfiable","status":416}`)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.WACZ("run-1", "bytes=900-1000", "")
 
@@ -90,7 +90,7 @@ func TestGateway_WACZUnsatisfiableRangePreservesContentRange(t *testing.T) {
 }
 
 func TestGateway_MultipleWACZRangesAreRejectedBeforeCapture(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t)
 
 	result := gateway.WACZ("run-1", "bytes=0-1,3-4", "")
 
