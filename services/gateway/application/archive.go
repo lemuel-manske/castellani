@@ -2,10 +2,10 @@
 package application
 
 import (
-	"github.com/lemuel-manske/castellani/libs/httpx"
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
