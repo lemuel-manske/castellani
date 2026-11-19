@@ -12,6 +12,7 @@ import (
  "syscall"
  "time"
 
+ "github.com/aws/aws-sdk-go-v2/aws"
  "github.com/aws/aws-sdk-go-v2/config"
  "github.com/aws/aws-sdk-go-v2/service/dynamodb"
  "github.com/lemuel-manske/unnamed/services/coordinator/api"
@@ -38,7 +39,9 @@ func run(logger *slog.Logger) error {
  defer stop()
  awsConfig,err:=config.LoadDefaultConfig(ctx)
  if err!=nil {return fmt.Errorf("load DynamoDB config: %w",err)}
- db:=dynamodb.NewFromConfig(awsConfig)
+ db:=dynamodb.NewFromConfig(awsConfig,func(options *dynamodb.Options){
+  if endpoint:=os.Getenv("DYNAMODB_ENDPOINT");endpoint!="" {options.BaseEndpoint=aws.String(endpoint)}
+ })
  store:=persistence.New(db,os.Getenv("COORDINATOR_TABLE_PREFIX"))
  listener,err:=net.Listen("tcp",address)
  if err!=nil {return fmt.Errorf("listen: %w",err)}
