@@ -27,28 +27,41 @@ type Service struct {
 	now   func() time.Time
 }
 
-func New(store Store) Service { return Service{store: store, now: time.Now} }
+func New(store Store) Service {
+	return Service{store: store, now: time.Now}
+}
 
 func (s Service) Create(ctx context.Context, key string, submission archive.Submission) (archive.AcceptedResponse, error) {
 	if err := submission.Validate(); err != nil {
 		return archive.AcceptedResponse{}, fmt.Errorf("%w: %v", ErrInvalid, err)
 	}
-	raw, err := submission.Canonical()
+
+	canonical, err := submission.Canonical()
+
 	if err != nil {
 		return archive.AcceptedResponse{}, fmt.Errorf("canonicalize submission: %w", err)
 	}
+
 	var random [16]byte
+
 	if _, err := rand.Read(random[:]); err != nil {
 		return archive.AcceptedResponse{}, fmt.Errorf("generate archive ID: %w", err)
 	}
+
 	id := hex.EncodeToString(random[:])
-	accepted := archive.AcceptedResponse{ArchiveID: id, Status: archive.Accepted, StatusURL: "/archives/" + id}
-	return s.store.Admit(ctx, key, archive.Digest(raw), accepted, submission, s.now().UTC())
+	accepted := archive.AcceptedResponse{
+		ArchiveID: id,
+		Status:    archive.Accepted,
+		StatusURL: "/archives/" + id,
+	}
+
+	return s.store.Admit(ctx, key, archive.Digest(canonical), accepted, submission, s.now().UTC())
 }
 
 func (s Service) Get(ctx context.Context, id string) (archive.Status, error) {
 	if !archive.ValidID(id) {
 		return archive.Status{}, ErrNotFound
 	}
+
 	return s.store.Status(ctx, id)
 }

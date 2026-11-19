@@ -43,6 +43,7 @@ type Counts struct {
 type Replay struct {
 	Status string `json:"status"`
 }
+
 type Search struct {
 	Status   string `json:"status"`
 	Indexed  int    `json:"indexed"`
@@ -61,32 +62,41 @@ func (s Submission) Validate() error {
 	if !validURL(s.SeedURL) {
 		return errors.New("seedUrl must be an absolute HTTP(S) URL without credentials or fragment")
 	}
+
 	if s.MaxDepth == nil || *s.MaxDepth < 0 {
 		return errors.New("maxDepth must be a nonnegative integer")
 	}
+
 	if s.MaxPages == nil || *s.MaxPages < 1 {
 		return errors.New("maxPages must be a positive integer")
 	}
+
 	if s.AuthGeneration != nil && *s.AuthGeneration < 1 {
 		return errors.New("authGeneration must be positive")
 	}
-	if len(s.AllowedOrigins) > 0 {
-		seen := make(map[string]bool, len(s.AllowedOrigins))
-		for _, origin := range s.AllowedOrigins {
-			if !validURL(origin) || seen[origin] {
-				return errors.New("allowedOrigins must contain unique absolute HTTP(S) URLs")
-			}
-			seen[origin] = true
+
+	seen := make(map[string]bool, len(s.AllowedOrigins))
+
+	for _, origin := range s.AllowedOrigins {
+		invalidOrigin := !validURL(origin)
+		duplicateOrigin := seen[origin]
+
+		if invalidOrigin || duplicateOrigin {
+			return errors.New("allowedOrigins must contain unique absolute HTTP(S) URLs")
 		}
+
+		seen[origin] = true
 	}
+
 	return nil
 }
 
 func (s Submission) Canonical() ([]byte, error) {
-	// Normalizing absent and empty optional fields ensures equivalent JSON encodings share an identity.
+	// Absent and empty optional origins have the same request identity.
 	if s.AllowedOrigins == nil {
 		s.AllowedOrigins = []string{}
 	}
+
 	return json.Marshal(s)
 }
 
@@ -96,13 +106,23 @@ func Digest(canonical []byte) string {
 }
 
 func ValidID(id string) bool {
-	return id != "" && id != "." && id != ".." && !strings.ContainsAny(id, "/\\")
+	reserved := id == "" || id == "." || id == ".."
+	hasSeparator := strings.ContainsAny(id, "/\\")
+
+	return !reserved && !hasSeparator
 }
 
 func validURL(raw string) bool {
-	u, err := url.Parse(raw)
+	parsed, err := url.Parse(raw)
+
 	if err != nil {
 		return false
 	}
-	return (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil && u.Fragment == ""
+
+	httpScheme := parsed.Scheme == "http" || parsed.Scheme == "https"
+	hasHostname := parsed.Hostname() != ""
+	noCredentials := parsed.User == nil
+	noFragment := parsed.Fragment == ""
+
+	return httpScheme && hasHostname && noCredentials && noFragment
 }

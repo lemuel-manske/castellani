@@ -21,13 +21,20 @@ import (
 )
 
 const (
+	serviceName         = "coordinator"
+	addressEnvironment  = "COORDINATOR_ADDR"
+	endpointEnvironment = "DYNAMODB_ENDPOINT"
+	tablesEnvironment   = "COORDINATOR_TABLE_PREFIX"
+
 	defaultAddress  = ":8081"
+	networkType     = "tcp"
 	shutdownTimeout = 10 * time.Second
 	headerTimeout   = 5 * time.Second
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "coordinator")
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", serviceName)
+
 	if err := run(logger); err != nil {
 		logger.Error("coordinator stopped", "error", err)
 		os.Exit(1)
@@ -35,48 +42,75 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	address := os.Getenv("COORDINATOR_ADDR")
+	address := os.Getenv(addressEnvironment)
+
 	if address == "" {
 		address = defaultAddress
 	}
+
 	if _, _, err := net.SplitHostPort(address); err != nil {
-		return fmt.Errorf("invalid COORDINATOR_ADDR: %w", err)
+		return fmt.Errorf("invalid %s: %w", addressEnvironment, err)
 	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
 	awsConfig, err := config.LoadDefaultConfig(ctx)
+
 	if err != nil {
 		return fmt.Errorf("load DynamoDB config: %w", err)
 	}
+
 	db := dynamodb.NewFromConfig(awsConfig, func(options *dynamodb.Options) {
-		if endpoint := os.Getenv("DYNAMODB_ENDPOINT"); endpoint != "" {
+		endpoint := os.Getenv(endpointEnvironment)
+
+		if endpoint != "" {
 			options.BaseEndpoint = aws.String(endpoint)
 		}
 	})
-	store := persistence.New(db, os.Getenv("COORDINATOR_TABLE_PREFIX"))
-	listener, err := net.Listen("tcp", address)
+
+	store := persistence.New(db, os.Getenv(tablesEnvironment))
+	app := application.New(store)
+
+	listener, err := net.Listen(networkType, address)
+
 	if err != nil {
-		return fmt.Errorf("listen: %w", err)
+		return fmt.Errorf("listen on %s: %w", address, err)
 	}
 	defer listener.Close()
-	server := &http.Server{Handler: api.NewRouter(application.New(store), func() bool { return ctx.Err() == nil }, logger), ReadHeaderTimeout: headerTimeout}
+
+	server := &http.Server{
+		Handler:           api.NewRouter(app, func() bool { return ctx.Err() == nil }, logger),
+		ReadHeaderTimeout: headerTimeout,
+	}
+
 	stopped := make(chan error, 1)
-	go func() { stopped <- server.Serve(listener) }()
+	go func() {
+		stopped <- server.Serve(listener)
+	}()
+
 	logger.Info("coordinator listening", "address", listener.Addr().String())
+
 	select {
 	case err := <-stopped:
 		return fmt.Errorf("HTTP listener stopped: %w", err)
 	case <-ctx.Done():
 	}
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
 	shutdownErr := server.Shutdown(shutdownCtx)
+
 	if shutdownErr != nil {
 		shutdownErr = errors.Join(shutdownErr, server.Close())
 	}
+
 	serveErr := <-stopped
+
 	if !errors.Is(serveErr, http.ErrServerClosed) {
 		return errors.Join(shutdownErr, serveErr)
 	}
+
 	return shutdownErr
 }
