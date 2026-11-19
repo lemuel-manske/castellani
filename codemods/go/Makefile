@@ -1,4 +1,4 @@
-.PHONY: fmt test check style-check style-fix
+.PHONY: fmt test check apply
 
 fmt:
 	go fmt ./...
@@ -9,3 +9,6 @@ test:
 check:
 	go vet ./...
 	go test -race ./...
+
+apply:
+	go run ./cmd/gofmtx -w $(TARGET)
