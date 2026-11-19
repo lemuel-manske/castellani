@@ -144,6 +144,7 @@ func writeFailure(
 	unavailableDetail string,
 ) {
 	var failure *coordinator.Failure
+	var dependencyFailure *application.DependencyFailure
 
 	var validation *application.ValidationError
 
@@ -168,7 +169,26 @@ func writeFailure(
 		)
 		httpx.WriteProblem(w, responseProblem)
 
-	case errors.As(err, &failure):
+	case errors.As(err, &dependencyFailure):
+        httpx.WriteProblem(w, httpx.Problem{
+            Type: dependencyFailure.Type,
+            Title: dependencyFailure.Title,
+            Status: dependencyFailure.Status,
+            Detail: dependencyFailure.Detail,
+            Instance: r.URL.Path,
+        })
+
+    case errors.Is(err, application.ErrInvalidUpstream):
+        responseProblem := httpx.NewProblem(
+            r,
+            http.StatusBadGateway,
+            "invalid-upstream",
+            "Invalid Upstream Response",
+            "Coordinator returned an unexpected response.",
+        )
+        httpx.WriteProblem(w, responseProblem)
+
+    case errors.As(err, &failure):
 		p := failure.Problem
 		p.Instance = r.URL.Path
 		httpx.WriteProblem(w, p)
