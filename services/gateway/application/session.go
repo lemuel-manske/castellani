@@ -34,5 +34,5 @@ func (a Application) UpdateSession(ctx context.Context, sessionID, status string
   return nil, fmt.Errorf("%w: status must be COMPLETED or CANCELLED", ErrInvalidSession)
  }
  if a.capture == nil { return nil, ErrDependencyUnavailable }
- return a.capture.UpdateSession(ctx, sessionID, status, raw)
+ return a.capture.UpdateSession(ctx, sessionID, raw)
 }
