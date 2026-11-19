@@ -34,7 +34,7 @@ func (a *Application) SubmitArchive(
 		Submission:  submission,
 	}
 
-	accepted, err := a.archives.Admit(ctx, admission)
+	accepted, err := a.repository.Admit(ctx, admission)
 
 	if errors.Is(err, persistence.ErrIdempotencyConflict) {
 		return AcceptedArchive{}, ErrIdempotencyConflict
@@ -48,7 +48,7 @@ func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive
 		return domain.Archive{}, ErrInvalidArchiveID
 	}
 
-	archive, err := a.archives.Find(ctx, id)
+	archive, err := a.repository.Find(ctx, id)
 
 	if errors.Is(err, persistence.ErrArchiveNotFound) {
 		return domain.Archive{}, ErrArchiveNotFound
