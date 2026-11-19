@@ -16,7 +16,7 @@ func (a *Application) HandleEvent(ctx context.Context, event domain.Event) error
 	}
 
 	for range eventCommitAttempts {
-		current, err := a.workflow.Find(ctx, event.ArchiveID)
+		current, err := a.repository.Find(ctx, event.ArchiveID)
 
 		if err != nil {
 			return err
@@ -28,7 +28,7 @@ func (a *Application) HandleEvent(ctx context.Context, event domain.Event) error
 			return err
 		}
 
-		err = a.workflow.CommitEvent(
+		err = a.repository.CommitEvent(
 			ctx,
 			current,
 			next,
