@@ -6,10 +6,26 @@ import (
 	"go/token"
 )
 
-// IfSpacing separates an if statement from the preceding statement with
-// exactly one blank line, unless the if is first in its block. Comments are
-// left untouched rather than being moved away from the statement they explain.
+// IfSpacing separates an if statement from a preceding statement with exactly
+// one blank line, unless the if is first in its containing block.
 func IfSpacing(source []byte) ([]byte, error) {
+	return separateStatements(source, func(previous, current ast.Stmt) bool {
+		_, ok := current.(*ast.IfStmt)
+		return ok
+	})
+}
+
+// ReturnSpacing separates a return from a preceding if statement. Returns
+// inside the if body and returns following comments are left unchanged.
+func ReturnSpacing(source []byte) ([]byte, error) {
+	return separateStatements(source, func(previous, current ast.Stmt) bool {
+		_, isIf := previous.(*ast.IfStmt)
+		_, isReturn := current.(*ast.ReturnStmt)
+		return isIf && isReturn
+	})
+}
+
+func separateStatements(source []byte, matches func(ast.Stmt, ast.Stmt) bool) ([]byte, error) {
 	set := token.NewFileSet()
 	file, err := parser.ParseFile(set, "source.go", source, parser.ParseComments)
 	if err != nil {
@@ -25,37 +41,30 @@ func IfSpacing(source []byte) ([]byte, error) {
 		}
 
 		for i := 1; i < len(block.List); i++ {
-			statement, ok := block.List[i].(*ast.IfStmt)
-			if !ok {
+			previous, current := block.List[i-1], block.List[i]
+			if !matches(previous, current) {
 				continue
 			}
 
-			previous := block.List[i-1]
-			start := set.Position(previous.End()).Offset
-			end := set.Position(statement.Pos()).Offset
-			between := source[start:end]
-			if !whitespaceOnly(between) {
-				continue
-			}
-
-			// Match the indentation of the existing if statement.
-			indentStart := end
-			for indentStart > 0 && source[indentStart-1] != '\n' {
-				indentStart--
-			}
-			indent := source[indentStart:end]
-			if !whitespaceOnly(indent) {
-				continue
-			}
-
-			replacement := "\n\n" + string(indent)
-			if string(between) != replacement {
-				edits = append(edits, sourceEdit{start: start, end: end, text: replacement})
-			}
+			addBlankLine(source, set, previous.End(), current.Pos(), &edits)
 		}
 
 		return true
 	})
 
 	return applyEdits(source, edits)
+}
+
+func addBlankLine(source []byte, set *token.FileSet, previousEnd, nextStart token.Pos, edits *[]sourceEdit) {
+	start := set.Position(previousEnd).Offset
+	end := set.Position(nextStart).Offset
+	if start < 0 || end > len(source) || start > end || !whitespaceOnly(source[start:end]) {
+		return
+	}
+
+	indent := lineIndent(source, end)
+	replacement := "\n\n" + indent
+	if string(source[start:end]) != replacement {
+		*edits = append(*edits, sourceEdit{start: start, end: end, text: replacement})
+	}
 }
