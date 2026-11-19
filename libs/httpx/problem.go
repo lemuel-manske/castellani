@@ -7,12 +7,8 @@ import (
 )
 
 const (
-	HeaderContentType  = "Content-Type"
-	HeaderCacheControl = "Cache-Control"
-	MediaTypeProblem    = "application/problem+json"
-	MediaTypeJSON       = "application/json"
-	CacheNoStore        = "no-store"
-	ProblemTypePrefix  = "urn:distributed-web-archive:problem:"
+	MediaTypeProblem   = "application/problem+json"
+	ProblemTypePrefix = "urn:distributed-web-archive:problem:"
 )
 
 type Problem struct {
@@ -40,9 +36,3 @@ func Write(w http.ResponseWriter, problem Problem) {
 	_ = json.NewEncoder(w).Encode(problem)
 }
 
-func JSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set(HeaderContentType, MediaTypeJSON)
-	w.Header().Set(HeaderCacheControl, CacheNoStore)
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
-}
