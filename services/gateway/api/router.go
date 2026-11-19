@@ -20,7 +20,7 @@ import (
 const (
 	requestIDHeader = "X-Request-ID"
 	healthMediaType = "text/plain; charset=utf-8"
-	healthResponse  = "ok\\n"
+	healthResponse  = "ok\n"
 )
 
 func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
