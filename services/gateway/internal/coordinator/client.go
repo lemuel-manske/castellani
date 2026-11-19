@@ -22,7 +22,7 @@ const (
 	idleConnectionTimeout = 90 * time.Second
 )
 
-type Client struct {
+type HTTPClient struct {
 	baseURL url.URL
 	http    *http.Client
 }
@@ -37,8 +37,8 @@ func (f *Failure) Error() string {
 
 var ErrInvalidResponse = errors.New("invalid coordinator response")
 
-func NewClient(origin url.URL, timeout time.Duration) *Client {
-	return &Client{
+func NewHTTPClient(origin url.URL, timeout time.Duration) *HTTPClient {
+	return &HTTPClient{
 		baseURL: origin,
 		http: &http.Client{
 			Timeout: timeout,
@@ -56,7 +56,7 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 	}
 }
 
-func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
+func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
 	request, err := c.request(ctx, http.MethodPost, httpx.ArchivesPath, bytes.NewReader(raw))
 
 	if err != nil {
@@ -89,7 +89,7 @@ func (c *Client) Admit(ctx context.Context, key string, raw []byte) (archive.Acc
 	return accepted, nil
 }
 
-func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error) {
+func (c *HTTPClient) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
 	request, err := c.request(ctx, http.MethodGet, httpx.ArchivePathPrefix+id, nil)
 
 	if err != nil {
@@ -128,7 +128,7 @@ func (c *Client) Status(ctx context.Context, id string) (json.RawMessage, error)
 	return json.RawMessage(data), nil
 }
 
-func (c *Client) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
+func (c *HTTPClient) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	target := c.baseURL
 
 	target.Path = path
@@ -137,7 +137,7 @@ func (c *Client) request(ctx context.Context, method, path string, body io.Reade
 	return http.NewRequestWithContext(ctx, method, target.String(), body)
 }
 
-func (c *Client) execute(request *http.Request) (int, []byte, error) {
+func (c *HTTPClient) execute(request *http.Request) (int, []byte, error) {
 	response, err := c.http.Do(request)
 
 	if err != nil {
