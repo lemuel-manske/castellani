@@ -32,7 +32,10 @@ type Pagination struct {
 	Limit  *int
 	Cursor string
 }
-type SessionRequest struct{ ArchiveID, TargetURL string }
+
+type SessionRequest struct {
+	ArchiveID, TargetURL string
+}
 
 type Pages struct {
 	Items      []json.RawMessage `json:"items"`
@@ -60,6 +63,7 @@ type WACZOptions struct {
 	MetadataOnly   bool
 	Range, IfRange string
 }
+
 type WACZ struct {
 	Body                                                          io.ReadCloser
 	Partial                                                       bool

@@ -8,7 +8,9 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 )
 
-type searchAdapter struct{ client *search.Client }
+type searchAdapter struct {
+	client *search.Client
+}
 
 func (a searchAdapter) Search(ctx context.Context, query application.SearchQuery) (application.SearchResults, error) {
 	result, err := a.client.Search(ctx, search.Query{
@@ -21,6 +23,7 @@ func (a searchAdapter) Search(ctx context.Context, query application.SearchQuery
 	if err != nil {
 		return application.SearchResults{}, searchError(err)
 	}
+
 	return application.SearchResults{Results: result.Results, NextCursor: result.NextCursor}, nil
 }
 

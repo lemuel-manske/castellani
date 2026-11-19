@@ -24,6 +24,7 @@ type ArchiveCoordinator interface {
 		string,
 		[]byte,
 	) (ArchiveAccepted, error)
+
 	GetArchive(context.Context, string) (json.RawMessage, error)
 }
 
@@ -33,7 +34,9 @@ type Application struct {
 	search      SearchService
 }
 
-type ValidationError struct{ Cause error }
+type ValidationError struct {
+	Cause error
+}
 
 func (e *ValidationError) Error() string { return e.Cause.Error() }
 
@@ -74,5 +77,6 @@ func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage
 	if !httpx.ValidPathSegment(id) {
 		return nil, ErrInvalidArchiveID
 	}
+
 	return a.Coordinator.GetArchive(ctx, id)
 }

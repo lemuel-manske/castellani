@@ -9,7 +9,9 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
 )
 
-type coordinatorAdapter struct{ client *coordinator.Client }
+type coordinatorAdapter struct {
+	client *coordinator.Client
+}
 
 func (a coordinatorAdapter) CreateArchive(
 	ctx context.Context,
@@ -25,6 +27,7 @@ func (a coordinatorAdapter) CreateArchive(
 	if err != nil {
 		return application.ArchiveAccepted{}, coordinatorError(err)
 	}
+
 	return application.ArchiveAccepted{ArchiveID: result.ArchiveID, Status: result.Status, StatusURL: result.StatusURL}, nil
 }
 
@@ -34,6 +37,7 @@ func (a coordinatorAdapter) GetArchive(ctx context.Context, id string) (json.Raw
 	if err != nil {
 		return nil, coordinatorError(err)
 	}
+
 	return json.RawMessage(result), nil
 }
 

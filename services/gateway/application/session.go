@@ -29,6 +29,7 @@ func (a Application) CreateSession(
 	if a.capture == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
+
 	return a.capture.CreateSession(
 		ctx,
 		key,
@@ -45,6 +46,7 @@ func (a Application) GetSession(ctx context.Context, sessionID string) (Session,
 	if a.capture == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
+
 	return a.capture.GetSession(ctx, sessionID)
 }
 
@@ -64,6 +66,7 @@ func (a Application) UpdateSession(
 	if a.capture == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
+
 	return a.capture.UpdateSession(
 		ctx,
 		sessionID,

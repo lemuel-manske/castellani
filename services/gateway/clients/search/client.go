@@ -110,6 +110,7 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 		if json.Unmarshal(data, &p) != nil || p.Status != response.StatusCode || p.Title == "" || p.Type == "" {
 			return Results{}, ErrInvalidResponse
 		}
+
 		return Results{}, &Failure{Status: p.Status, Type: p.Type, Title: p.Title, Detail: p.Detail}
 	}
 	var result Results
@@ -117,5 +118,6 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	if json.Unmarshal(data, &result) != nil || result.Results == nil {
 		return Results{}, ErrInvalidResponse
 	}
+
 	return result, nil
 }

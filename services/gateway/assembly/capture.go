@@ -8,7 +8,9 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
 )
 
-type captureAdapter struct{ client *capture.Client }
+type captureAdapter struct {
+	client *capture.Client
+}
 
 func (a captureAdapter) ListPages(
 	ctx context.Context,
@@ -24,6 +26,7 @@ func (a captureAdapter) ListPages(
 	if err != nil {
 		return application.Pages{}, captureError(err)
 	}
+
 	return application.Pages{Items: result.Items, NextCursor: result.NextCursor}, nil
 }
 
@@ -37,6 +40,7 @@ func (a captureAdapter) GetSnapshot(ctx context.Context, archiveID, snapshotID s
 	if err != nil {
 		return application.Snapshot{}, captureError(err)
 	}
+
 	return application.Snapshot{
 		ArchiveID: result.ArchiveID, SnapshotID: result.SnapshotID,
 		URL: result.URL, FinalURL: result.FinalURL,
@@ -53,13 +57,14 @@ func (a captureAdapter) GetWACZ(
 		ctx,
 		archiveID,
 		capture.WACZOptions{
-		MetadataOnly: options.MetadataOnly, Range: options.Range, IfRange: options.IfRange,
-	},
+			MetadataOnly: options.MetadataOnly, Range: options.Range, IfRange: options.IfRange,
+		},
 	)
 
 	if err != nil {
 		return application.WACZ{}, captureError(err)
 	}
+
 	return application.WACZ{
 		Body: result.Body, Partial: result.Partial, AcceptRanges: result.AcceptRanges,
 		ContentRange: result.ContentRange, ETag: result.ETag,
@@ -83,6 +88,7 @@ func (a captureAdapter) CreateSession(
 	if err != nil {
 		return application.Session{}, captureError(err)
 	}
+
 	return mapSession(result), nil
 }
 
@@ -92,6 +98,7 @@ func (a captureAdapter) GetSession(ctx context.Context, sessionID string) (appli
 	if err != nil {
 		return application.Session{}, captureError(err)
 	}
+
 	return mapSession(result), nil
 }
 
@@ -109,6 +116,7 @@ func (a captureAdapter) UpdateSession(
 	if err != nil {
 		return application.Session{}, captureError(err)
 	}
+
 	return mapSession(result), nil
 }
 

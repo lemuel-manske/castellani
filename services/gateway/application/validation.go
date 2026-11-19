@@ -18,6 +18,7 @@ func (p Pagination) Validate() error {
 	if p.Limit != nil && (*p.Limit < 1 || *p.Limit > maxLimit) {
 		return fmt.Errorf("%w: limit must be between 1 and 100", ErrInvalidPagination)
 	}
+
 	return nil
 }
 
@@ -36,7 +37,9 @@ func (q SearchQuery) Validate() error {
 
 	var from, to time.Time
 	var hasFrom, hasTo bool
-	for _, v := range []struct{ name, raw string }{
+	for _, v := range []struct {
+		name, raw string
+	}{
 		{"capturedFrom", q.CapturedFrom},
 		{"capturedTo", q.CapturedTo},
 	} {
@@ -65,6 +68,7 @@ func (q SearchQuery) Validate() error {
 	if hasFrom && hasTo && from.After(to) {
 		return fmt.Errorf("%w: capturedFrom must not exceed capturedTo", ErrInvalidSearch)
 	}
+
 	return nil
 }
 
@@ -72,6 +76,7 @@ func (s SessionRequest) Validate() error {
 	if !httpx.ValidPathSegment(s.ArchiveID) || !httpx.ValidHTTPURL(s.TargetURL) {
 		return fmt.Errorf("%w: expected archiveId and absolute HTTP(S) targetUrl", ErrInvalidSession)
 	}
+
 	return nil
 }
 
@@ -82,6 +87,7 @@ func (o WACZOptions) Validate() error {
 	if invalidRange || invalidIfRange {
 		return fmt.Errorf("%w: only one valid byte range is supported", ErrInvalidWACZRange)
 	}
+
 	return nil
 }
 
@@ -89,6 +95,7 @@ func validateArchiveID(id string) error {
 	if !httpx.ValidPathSegment(id) {
 		return ErrInvalidArchiveID
 	}
+
 	return nil
 }
 
@@ -96,6 +103,7 @@ func validateSessionID(id string) error {
 	if !httpx.ValidPathSegment(id) {
 		return ErrInvalidSessionID
 	}
+
 	return nil
 }
 
@@ -103,5 +111,6 @@ func validateSnapshotID(id string) error {
 	if !httpx.ValidPathSegment(id) {
 		return ErrInvalidSnapshotID
 	}
+
 	return nil
 }

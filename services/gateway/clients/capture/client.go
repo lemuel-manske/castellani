@@ -33,6 +33,7 @@ func NewClient(origin url.URL, timeout, streamTimeout time.Duration) *Client {
 	if streamTimeout <= 0 {
 		streamTimeout = defaultStreamTimeout
 	}
+
 	return &Client{origin: origin,
 		http:   &http.Client{Timeout: timeout, CheckRedirect: noRedirect, Transport: transport},
 		stream: &http.Client{Timeout: streamTimeout, CheckRedirect: noRedirect, Transport: transport},
@@ -75,6 +76,7 @@ func (c *Client) ListPages(
 	if json.Unmarshal(data, &v) != nil || v.Items == nil {
 		return Pages{}, ErrInvalidResponse
 	}
+
 	return v, nil
 }
 
@@ -101,6 +103,7 @@ func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) 
 	if json.Unmarshal(data, &v) != nil || v.ArchiveID != archiveID || v.SnapshotID != snapshotID || v.URL == "" || v.CapturedAt == "" {
 		return Snapshot{}, ErrInvalidResponse
 	}
+
 	return v, nil
 }
 
@@ -198,6 +201,7 @@ func validateSession(data []byte, id, archiveID string) (Session, error) {
 		v.Status == "" || v.ExpiresAt == "" || (id != "" && v.SessionID != id) || (archiveID != "" && v.ArchiveID != archiveID) {
 		return Session{}, ErrInvalidResponse
 	}
+
 	return v, nil
 }
 
@@ -262,6 +266,7 @@ func (c *Client) GetWACZ(
 		response.Body.Close()
 		return WACZ{}, ErrInvalidResponse
 	}
+
 	return WACZ{Body: response.Body, Partial: response.StatusCode == http.StatusPartialContent,
 		AcceptRanges: response.Header.Get("Accept-Ranges"), ContentRange: response.Header.Get("Content-Range"),
 		ETag: response.Header.Get("ETag"), LastModified: response.Header.Get("Last-Modified"),
@@ -300,6 +305,7 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
 		return nil, ErrInvalidResponse
 	}
+
 	return data, nil
 }
 
@@ -326,6 +332,7 @@ func failureError(status int, data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	return failure
 }
 
@@ -340,5 +347,6 @@ func parseFailure(status int, data []byte) (*Failure, error) {
 	if json.Unmarshal(data, &p) != nil || p.Status != status || p.Type == "" || p.Title == "" {
 		return nil, ErrInvalidResponse
 	}
+
 	return &Failure{Status: status, Type: p.Type, Title: p.Title, Detail: p.Detail}, nil
 }

@@ -28,10 +28,12 @@ type Pagination struct {
 	Limit  *int
 	Cursor string
 }
+
 type Query struct {
 	Text, CollectionID, ArchiveID, SnapshotID, CapturedFrom, CapturedTo string
 	Pagination                                                          Pagination
 }
+
 type Results struct {
 	Results    []json.RawMessage `json:"results"`
 	NextCursor *string           `json:"nextCursor,omitempty"`

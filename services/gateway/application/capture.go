@@ -20,6 +20,7 @@ func (a Application) ListPages(
 	if a.capture == nil {
 		return Pages{}, ErrDependencyUnavailable
 	}
+
 	return a.capture.ListPages(
 		ctx,
 		archiveID,
@@ -39,6 +40,7 @@ func (a Application) GetSnapshot(ctx context.Context, archiveID, snapshotID stri
 	if a.capture == nil {
 		return Snapshot{}, ErrDependencyUnavailable
 	}
+
 	return a.capture.GetSnapshot(
 		ctx,
 		archiveID,
@@ -62,6 +64,7 @@ func (a Application) GetWACZ(
 	if a.capture == nil {
 		return WACZ{}, ErrDependencyUnavailable
 	}
+
 	return a.capture.GetWACZ(
 		ctx,
 		archiveID,

@@ -12,5 +12,6 @@ func (a Application) Search(ctx context.Context, query SearchQuery) (SearchResul
 	if a.search == nil {
 		return SearchResults{}, ErrDependencyUnavailable
 	}
+
 	return a.search.Search(ctx, query)
 }

@@ -144,6 +144,7 @@ func durationSetting(
 	if duration <= 0 {
 		return 0, fmt.Errorf("%s must be positive", key)
 	}
+
 	return duration, nil
 }
 
