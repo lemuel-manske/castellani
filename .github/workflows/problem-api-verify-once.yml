@@ -1,4 +1,4 @@
-name: Verify Problem API refactor
+name: Verify Problem API refactor (final)
 on:
   push:
     branches: [feat/coordinator-service]
