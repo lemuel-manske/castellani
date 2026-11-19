@@ -134,11 +134,7 @@ func TestWACZ_PartialContentIsStreamedByCapture(t *testing.T) {
 		time.Second,
 		time.Second,
 	)
-	app := application.NewApplicationWithServices(
-		nil,
-		client,
-		nil,
-	)
+	app := assembly.NewApplication(nil, client, nil)
 
 	response, err := app.GetWACZ(
 		context.Background(),
