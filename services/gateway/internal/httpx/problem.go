@@ -17,12 +17,12 @@ const (
 
 type Problem = shared.Problem
 
-func WriteProblem(w http.ResponseWriter, r *http.Request, status int, kind, title, detail string) {
-	shared.WriteProblem(w, r, status, kind, title, detail)
+func NewProblem(r *http.Request, status int, kind, title, detail string) Problem {
+	return shared.NewProblem(r, status, kind, title, detail)
 }
 
-func Write(w http.ResponseWriter, p Problem) {
-	shared.Write(w, p)
+func WriteProblem(w http.ResponseWriter, problem Problem) {
+	shared.WriteProblem(w, problem)
 }
 
 func JSON(w http.ResponseWriter, status int, body any) {

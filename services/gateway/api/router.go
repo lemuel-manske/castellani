@@ -80,10 +80,10 @@ func NewRouterWithServices(
 	}
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		httpx.WriteProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusNotFound, "not-found", "Not Found", "The requested resource does not exist."))
 	})
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		httpx.WriteProblem(w, r, http.StatusMethodNotAllowed, "method-not-allowed", "Method Not Allowed", "The method is not supported for this resource.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusMethodNotAllowed, "method-not-allowed", "Method Not Allowed", "The method is not supported for this resource."))
 	})
 	return router
 }
@@ -93,7 +93,7 @@ func requestID(next http.Handler) http.Handler {
 		var random [16]byte
 
 		if _, err := rand.Read(random[:]); err != nil {
-			httpx.WriteProblem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Unable to create a request identifier.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusInternalServerError, "internal", "Internal Server Error", "Unable to create a request identifier."))
 			return
 		}
 		w.Header().Set(requestIDHeader, hex.EncodeToString(random[:]))
@@ -108,7 +108,7 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 
 				if value := recover(); value != nil {
 					logger.Error("HTTP handler panic", "path", r.URL.Path)
-					httpx.WriteProblem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
+					httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed."))
 				}
 			}()
 			next.ServeHTTP(w, r)

@@ -30,12 +30,12 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, httpx.ArchiveIDParameter)
 
 	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID."))
 		return
 	}
 
 	if err := httpx.ValidatePagination(r.URL.Query()); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-pagination", "Invalid Pagination", err.Error())
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-pagination", "Invalid Pagination", err.Error()))
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 		decodeErr := json.Unmarshal(result.Body, &document)
 
 		if decodeErr != nil || document.Items == nil {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid page metadata.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid page metadata."))
 			return
 		}
 	}
@@ -66,7 +66,7 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	validIDs := httpx.ValidateID(id) && httpx.ValidateID(snapshotID)
 
 	if !validIDs {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-snapshot-id", "Invalid Snapshot ID", "Invalid archive or snapshot ID.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-snapshot-id", "Invalid Snapshot ID", "Invalid archive or snapshot ID."))
 		return
 	}
 
@@ -90,7 +90,7 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			document.URL != "" && document.CapturedAt != ""
 
 		if decodeErr != nil || !validSnapshot {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid snapshot metadata.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid snapshot metadata."))
 			return
 		}
 	}

@@ -77,7 +77,7 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					logger.Error("coordinator handler panic", "path", r.URL.Path)
-					httpx.WriteProblem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
+					httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed."))
 				}
 			}()
 
@@ -96,7 +96,7 @@ func create(w http.ResponseWriter, r *http.Request, service Archives) {
 	key := r.Header.Get(idempotencyHeader)
 
 	if !httpx.ValidateIdempotencyKey(key) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace."))
 		return
 	}
 
@@ -106,13 +106,13 @@ func create(w http.ResponseWriter, r *http.Request, service Archives) {
 	if err != nil {
 		switch {
 		case errors.Is(err, httpx.ErrContentType):
-			httpx.WriteProblem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json."))
 		case errors.Is(err, httpx.ErrExtraJSON):
-			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object."))
 		case errors.Is(err, httpx.ErrInvalidJSON):
-			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object."))
 		default:
-			httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Invalid or oversized request.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Invalid or oversized request."))
 		}
 
 		return
@@ -143,13 +143,13 @@ func status(w http.ResponseWriter, r *http.Request, service Archives, id string)
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, application.ErrInvalid):
-		httpx.WriteProblem(w, r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", err.Error())
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusUnprocessableEntity, "invalid-archive", "Invalid Archive", err.Error()))
 	case errors.Is(err, application.ErrConflict):
-		httpx.WriteProblem(w, r, http.StatusConflict, "idempotency-conflict", "Conflict", "Idempotency-Key was used for a different archive request.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusConflict, "idempotency-conflict", "Conflict", "Idempotency-Key was used for a different archive request."))
 	case errors.Is(err, application.ErrNotFound):
-		httpx.WriteProblem(w, r, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist."))
 	default:
-		httpx.WriteProblem(w, r, http.StatusServiceUnavailable, "coordinator-unavailable", "Coordinator Unavailable", "The operation could not be confirmed. Retry with the same Idempotency-Key.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusServiceUnavailable, "coordinator-unavailable", "Coordinator Unavailable", "The operation could not be confirmed. Retry with the same Idempotency-Key."))
 	}
 }
 

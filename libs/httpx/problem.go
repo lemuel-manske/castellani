@@ -19,20 +19,19 @@ type Problem struct {
 	Instance string `json:"instance,omitempty"`
 }
 
-func WriteProblem(w http.ResponseWriter, r *http.Request, status int, kind, title, detail string) {
-	Write(w, Problem{
+func NewProblem(r *http.Request, status int, kind, title, detail string) Problem {
+	return Problem{
 		Type:     ProblemTypePrefix + kind,
 		Title:    title,
 		Status:   status,
 		Detail:   detail,
 		Instance: r.URL.Path,
-	})
+	}
 }
 
-func Write(w http.ResponseWriter, problem Problem) {
+func WriteProblem(w http.ResponseWriter, problem Problem) {
 	w.Header().Set(HeaderContentType, MediaTypeProblem)
 	w.Header().Set(HeaderCacheControl, CacheNoStore)
 	w.WriteHeader(problem.Status)
 	_ = json.NewEncoder(w).Encode(problem)
 }
-

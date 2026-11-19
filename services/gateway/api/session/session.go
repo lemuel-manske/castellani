@@ -45,7 +45,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
 	if !httpx.ValidateIdempotencyKey(key) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-idempotency-key", "Invalid Idempotency Key", "Idempotency-Key is required and must contain 8 to 200 characters.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-idempotency-key", "Invalid Idempotency Key", "Idempotency-Key is required and must contain 8 to 200 characters."))
 		return
 	}
 
@@ -53,12 +53,12 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	raw, err := readJSON(w, r, &input)
 
 	if err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error())
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error()))
 		return
 	}
 
 	if !httpx.ValidateID(input.ArchiveID) || !httpx.ValidateTargetURL(input.TargetURL) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", "Expected archiveId and absolute HTTP(S) targetUrl.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", "Expected archiveId and absolute HTTP(S) targetUrl."))
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		created.Status != "" && created.ExpiresAt != ""
 
 	if decodeErr != nil || !validSession {
-		httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid session metadata.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid session metadata."))
 		return
 	}
 
@@ -99,14 +99,14 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	raw, err := readJSON(w, r, &input)
 
 	if err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error())
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error()))
 		return
 	}
 
 	validStatus := input.Status == "COMPLETED" || input.Status == "CANCELLED"
 
 	if !validStatus {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session", "Invalid Session", "status must be COMPLETED or CANCELLED.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", "status must be COMPLETED or CANCELLED."))
 		return
 	}
 
@@ -117,7 +117,7 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 	id := chi.URLParam(r, idParameter)
 
 	if !httpx.ValidateID(id) {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID.")
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID."))
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 			session.Status != "" && session.ExpiresAt != ""
 
 		if decodeErr != nil || !validSession {
-			httpx.WriteProblem(w, r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid session metadata.")
+			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Capture returned invalid session metadata."))
 			return
 		}
 	}

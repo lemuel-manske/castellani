@@ -19,7 +19,7 @@ func NewHandler(client *upstream.Client) Handler {
 
 func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 	if err := httpx.ValidateSearch(r.URL.Query()); err != nil {
-		httpx.WriteProblem(w, r, http.StatusBadRequest, "invalid-search", "Invalid Search", err.Error())
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-search", "Invalid Search", err.Error()))
 		return
 	}
 

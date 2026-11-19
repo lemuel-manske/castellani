@@ -15,7 +15,8 @@ func TestWriteProblem_EmitsStandardProblemDocument(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/archives/missing", nil)
 	response := httptest.NewRecorder()
 
-	httpx.WriteProblem(response, request, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist.")
+	problem := httpx.NewProblem(request, http.StatusNotFound, "not-found", "Not Found", "Archive does not exist.")
+	httpx.WriteProblem(response, problem)
 
 	assert.Equal(t, http.StatusNotFound, response.Code)
 	assert.Equal(t, httpx.MediaTypeProblem, response.Header().Get(httpx.HeaderContentType))
