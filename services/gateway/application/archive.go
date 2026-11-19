@@ -58,7 +58,7 @@ func (a Application) CreateArchive(
 	key string,
 	submission archive.Submission,
 	raw []byte,
-) (archive.Accepted, error) {
+) (ArchiveAccepted, error) {
 	if err := submission.Validate(); err != nil {
 		return ArchiveAccepted{}, &ValidationError{Cause: err}
 	}
