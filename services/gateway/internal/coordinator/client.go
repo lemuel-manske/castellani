@@ -1,7 +1,6 @@
 package coordinator
 
 import (
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
@@ -65,7 +65,7 @@ func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) 
 	}
 
 	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
-	request.Header.Set(httpx.IdempotencyHeader, key)
+	request.Header.Set(sharedhttp.IdempotencyHeader, key)
 
 	status, rawResponse, err := c.execute(request)
 

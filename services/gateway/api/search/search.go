@@ -1,10 +1,10 @@
 package searchapi
 
 import (
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"net/http"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 

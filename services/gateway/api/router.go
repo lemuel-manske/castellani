@@ -2,13 +2,13 @@
 package api
 
 import (
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
 	searchapi "github.com/lemuel-manske/unnamed/services/gateway/api/search"
 	sessionapi "github.com/lemuel-manske/unnamed/services/gateway/api/session"

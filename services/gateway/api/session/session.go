@@ -1,12 +1,12 @@
 package sessionapi
 
 import (
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"encoding/json"
 	"net/http"
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
@@ -43,7 +43,7 @@ func NewHandler(client *upstream.Client) Handler {
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get(httpx.IdempotencyHeader)
+	key := r.Header.Get(sharedhttp.IdempotencyHeader)
 
 	if !sharedhttp.ValidateIdempotencyKey(key) {
 		responseProblem := sharedhttp.NewProblem(
@@ -115,7 +115,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	location := pathPrefix + url.PathEscape(created.SessionID)
 
-	w.Header().Set(httpx.LocationHeader, location)
+	w.Header().Set(sharedhttp.LocationHeader, location)
 	httpx.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
 }
 

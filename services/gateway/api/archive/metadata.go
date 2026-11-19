@@ -1,12 +1,12 @@
 package archiveapi
 
 import (
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"encoding/json"
 	"net/http"
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )

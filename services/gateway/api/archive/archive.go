@@ -1,12 +1,12 @@
 package archiveapi
 
 import (
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"errors"
 	"net/http"
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
@@ -22,7 +22,7 @@ func NewHandler(app application.Application) Handler {
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get(httpx.IdempotencyHeader)
+	key := r.Header.Get(sharedhttp.IdempotencyHeader)
 
 	if !sharedhttp.ValidateIdempotencyKey(key) {
 		responseProblem := sharedhttp.NewProblem(
@@ -91,7 +91,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	accepted.StatusURL = httpx.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
 
-	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
+	w.Header().Set(sharedhttp.LocationHeader, accepted.StatusURL)
 
 	sharedhttp.JSON(w, http.StatusAccepted, accepted)
 }
