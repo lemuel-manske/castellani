@@ -37,10 +37,10 @@ func (a *Application) SubmitArchive(
 	accepted, err := a.archives.Admit(ctx, admission)
 
 	if errors.Is(err, persistence.ErrIdempotencyConflict) {
-		return persistence.AcceptedArchive{}, ErrIdempotencyConflict
+		return AcceptedArchive{}, ErrIdempotencyConflict
 	}
 
-	return accepted, err
+	return AcceptedArchive{ArchiveID: accepted.ArchiveID}, err
 }
 
 func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive, error) {

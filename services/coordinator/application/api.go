@@ -15,6 +15,10 @@ var (
 	ErrInvalidArchiveID      = errors.New("invalid archive ID")
 )
 
+type AcceptedArchive struct {
+	ArchiveID string
+}
+
 type Application struct {
 	archives persistence.ArchiveRepository
 	workflow persistence.WorkflowRepository
