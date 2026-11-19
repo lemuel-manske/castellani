@@ -3,8 +3,9 @@ package archive
 import (
 	"errors"
 	"net/url"
-	"strings"
 )
+
+const AcceptedStatus = "ACCEPTED"
 
 type Submission struct {
 	SeedURL        string   `json:"seedUrl"`
@@ -50,15 +51,6 @@ func (s Submission) Validate() error {
 		seen[origin] = struct{}{}
 	}
 	return nil
-}
-
-const AcceptedStatus = "ACCEPTED"
-
-func ValidID(id string) bool {
-	reserved := id == "" || id == "." || id == ".."
-	containsSeparator := strings.ContainsAny(id, "/\\\\")
-
-	return !reserved && !containsSeparator
 }
 
 func validURL(raw string) bool {
