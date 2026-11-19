@@ -14,7 +14,7 @@ import (
 const (
 	maxJSONBytes       = 1 << 20
 	idleTimeout        = 90 * time.Second
-	responseHeaderTime = 10 * time.Second
+	defaultStreamTimeout = 30 * time.Minute
 )
 
 var ErrInvalidResponse = errors.New("invalid upstream response")
@@ -31,6 +31,10 @@ type Client struct {
 }
 
 func NewClient(origin url.URL, timeout time.Duration) *Client {
+	return NewClientWithStreamTimeout(origin, timeout, defaultStreamTimeout)
+}
+
+func NewClientWithStreamTimeout(origin url.URL, timeout, streamTimeout time.Duration) *Client {
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ResponseHeaderTimeout: timeout,
@@ -50,6 +54,7 @@ func NewClient(origin url.URL, timeout time.Duration) *Client {
 			Transport:     transport,
 		},
 		stream: &http.Client{
+			Timeout: streamTimeout,
 			CheckRedirect: noRedirect,
 			Transport:     transport,
 		},
