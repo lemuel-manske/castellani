@@ -2,11 +2,9 @@
 package application
 
 import (
-	"context"
 	"errors"
-	"time"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
+	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
 )
 
 var (
@@ -18,82 +16,13 @@ var (
 )
 
 type Application struct {
-	archives ArchiveRepository
-	workflow WorkflowRepository
+	archives persistence.ArchiveRepository
+	workflow persistence.WorkflowRepository
 }
 
-func NewApplication(archives ArchiveRepository, workflow WorkflowRepository) *Application {
+func NewApplication(archives persistence.ArchiveRepository, workflow persistence.WorkflowRepository) *Application {
 	return &Application{
 		archives: archives,
 		workflow: workflow,
-	}
-}
-
-type Admission struct {
-	Key         string
-	Fingerprint string
-	Submission  domain.Submission
-}
-
-type Message struct {
-	ID      string
-	Type    string
-	Payload []byte
-	Lease   string
-}
-
-type AcceptedArchive struct {
-	ArchiveID string
-}
-
-type Outbox interface {
-	Claim(context.Context, time.Duration) (Message, bool, error)
-
-	Confirm(context.Context, Message) error
-}
-
-type Publisher interface {
-	Publish(context.Context, Message) error
-}
-
-type Dispatcher struct {
-	outbox    Outbox
-	publisher Publisher
-}
-
-type ArchiveRepository interface {
-	Admit(context.Context, Admission) (AcceptedArchive, error)
-
-	Find(context.Context, string) (domain.Archive, error)
-}
-
-type WorkflowRepository interface {
-	Find(context.Context, string) (domain.Archive, error)
-
-	CommitEvent(
-		context.Context,
-		domain.Archive,
-		domain.Archive,
-		domain.Event,
-		[]domain.Effect,
-	) error
-
-	ListStalled(
-		context.Context,
-		time.Time,
-		int,
-	) ([]domain.Archive, error)
-
-	ScheduleRecovery(
-		context.Context,
-		domain.Archive,
-		domain.Effect,
-	) error
-}
-
-func NewDispatcher(outbox Outbox, publisher Publisher) *Dispatcher {
-	return &Dispatcher{
-		outbox:    outbox,
-		publisher: publisher,
 	}
 }

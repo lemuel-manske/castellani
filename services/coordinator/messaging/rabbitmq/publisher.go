@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/unnamed/services/coordinator/messaging"
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const publishTimeout = 15 * time.Second
 
-func (p *RabbitPublisher) Publish(ctx context.Context, message application.Message) error {
+func (p *RabbitPublisher) Publish(ctx context.Context, message messaging.Message) error {
 	publishing := amqp.Publishing{
 		DeliveryMode: amqp.Persistent,
 		ContentType:  "application/json",

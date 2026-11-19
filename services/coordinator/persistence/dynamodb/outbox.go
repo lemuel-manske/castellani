@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/unnamed/services/coordinator/messaging"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 func (r *DynamoArchiveRepository) Claim(
 	ctx context.Context,
 	lease time.Duration,
-) (application.Message, bool, error) {
+) (messaging.Message, bool, error) {
 	now := time.Now().UTC()
 	expired := now.Unix()
 
@@ -48,20 +48,20 @@ func (r *DynamoArchiveRepository) Claim(
 		})
 
 		if err != nil {
-			return application.Message{}, false, fmt.Errorf("scan outbox: %w", err)
+			return messaging.Message{}, false, fmt.Errorf("scan outbox: %w", err)
 		}
 
 		for _, item := range page.Items {
 			id := stringValue(item["messageId"])
 
 			if id == "" {
-				return application.Message{}, false, errors.New("outbox item missing messageId")
+				return messaging.Message{}, false, errors.New("outbox item missing messageId")
 			}
 
 			token, err := generateID("lease-")
 
 			if err != nil {
-				return application.Message{}, false, err
+				return messaging.Message{}, false, err
 			}
 
 			updated, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
@@ -106,10 +106,10 @@ func (r *DynamoArchiveRepository) Claim(
 					continue
 				}
 
-				return application.Message{}, false, fmt.Errorf("claim outbox entry: %w", err)
+				return messaging.Message{}, false, fmt.Errorf("claim outbox entry: %w", err)
 			}
 
-			return application.Message{
+			return messaging.Message{
 				ID:      id,
 				Type:    stringValue(updated.Attributes["type"]),
 				Payload: []byte(stringValue(updated.Attributes["envelope"])),
@@ -118,14 +118,14 @@ func (r *DynamoArchiveRepository) Claim(
 		}
 
 		if len(page.LastEvaluatedKey) == 0 {
-			return application.Message{}, false, nil
+			return messaging.Message{}, false, nil
 		}
 
 		cursor = page.LastEvaluatedKey
 	}
 }
 
-func (r *DynamoArchiveRepository) Confirm(ctx context.Context, message application.Message) error {
+func (r *DynamoArchiveRepository) Confirm(ctx context.Context, message messaging.Message) error {
 	_, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(r.tables.Outbox),
 		Key: map[string]types.AttributeValue{

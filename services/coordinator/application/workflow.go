@@ -5,14 +5,10 @@ import (
 	"errors"
 
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
+	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
 )
 
 const eventCommitAttempts = 8
-
-var (
-	ErrRevisionConflict = errors.New("archive changed concurrently")
-	ErrAlreadyProcessed = errors.New("event already processed")
-)
 
 func (a *Application) HandleEvent(ctx context.Context, event domain.Event) error {
 	if event.MessageID == "" || event.ArchiveID == "" {
@@ -41,14 +37,14 @@ func (a *Application) HandleEvent(ctx context.Context, event domain.Event) error
 		)
 
 		switch {
-		case err == nil, errors.Is(err, ErrAlreadyProcessed):
+		case err == nil, errors.Is(err, persistence.ErrAlreadyProcessed):
 			return nil
-		case errors.Is(err, ErrRevisionConflict):
+		case errors.Is(err, persistence.ErrRevisionConflict):
 			continue
 		default:
 			return err
 		}
 	}
 
-	return ErrRevisionConflict
+	return persistence.ErrRevisionConflict
 }

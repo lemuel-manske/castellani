@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
 )
 
@@ -219,10 +219,10 @@ func (r *DynamoArchiveRepository) CommitEvent(
 	}
 
 	if len(processed.Item) != 0 {
-		return application.ErrAlreadyProcessed
+		return persistence.ErrAlreadyProcessed
 	}
 
-	return application.ErrRevisionConflict
+	return persistence.ErrRevisionConflict
 }
 func (r *DynamoArchiveRepository) ListStalled(
 	ctx context.Context,
@@ -374,7 +374,7 @@ func (r *DynamoArchiveRepository) ScheduleRecovery(
 	var canceled *types.TransactionCanceledException
 
 	if errors.As(err, &canceled) {
-		return application.ErrRevisionConflict
+		return persistence.ErrRevisionConflict
 	}
 
 	return fmt.Errorf("schedule archive recovery: %w", err)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
+	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
 )
 
 func (a *Application) SubmitArchive(
@@ -33,7 +34,13 @@ func (a *Application) SubmitArchive(
 		Submission:  submission,
 	}
 
-	return a.archives.Admit(ctx, admission)
+	accepted, err := a.archives.Admit(ctx, admission)
+
+	if errors.Is(err, persistence.ErrIdempotencyConflict) {
+		return persistence.AcceptedArchive{}, ErrIdempotencyConflict
+	}
+
+	return accepted, err
 }
 
 func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive, error) {
@@ -41,5 +48,11 @@ func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive
 		return domain.Archive{}, ErrInvalidArchiveID
 	}
 
-	return a.archives.Find(ctx, id)
+	archive, err := a.archives.Find(ctx, id)
+
+	if errors.Is(err, persistence.ErrArchiveNotFound) {
+		return domain.Archive{}, ErrArchiveNotFound
+	}
+
+	return archive, err
 }

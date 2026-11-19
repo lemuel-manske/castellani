@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
 )
 
@@ -26,17 +26,17 @@ const (
 	messageVersion = 1
 )
 
-func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission application.Admission) (application.AcceptedArchive, error) {
+func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission persistence.Admission) (persistence.AcceptedArchive, error) {
 	archiveID, err := generateID("run-")
 
 	if err != nil {
-		return application.AcceptedArchive{}, err
+		return persistence.AcceptedArchive{}, err
 	}
 
 	messageID, err := generateID("msg-")
 
 	if err != nil {
-		return application.AcceptedArchive{}, err
+		return persistence.AcceptedArchive{}, err
 	}
 
 	now := time.Now().UTC()
@@ -61,7 +61,7 @@ func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission applicati
 	envelope, err := json.Marshal(command)
 
 	if err != nil {
-		return application.AcceptedArchive{}, fmt.Errorf("encode StartCrawl: %w", err)
+		return persistence.AcceptedArchive{}, fmt.Errorf("encode StartCrawl: %w", err)
 	}
 
 	transaction := &dynamodb.TransactWriteItemsInput{
@@ -178,15 +178,15 @@ func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission applicati
 		existing, found, err := r.findKey(ctx, admission.Key)
 
 		if err != nil {
-			return application.AcceptedArchive{}, err
+			return persistence.AcceptedArchive{}, err
 		}
 
 		if found {
 			if existing.fingerprint != admission.Fingerprint {
-				return application.AcceptedArchive{}, application.ErrIdempotencyConflict
+				return persistence.AcceptedArchive{}, persistence.ErrIdempotencyConflict
 			}
 
-			return application.AcceptedArchive{
+			return persistence.AcceptedArchive{
 				ArchiveID: existing.archiveID,
 			}, nil
 		}
@@ -194,7 +194,7 @@ func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission applicati
 		_, err = r.client.TransactWriteItems(ctx, transaction)
 
 		if err == nil {
-			return application.AcceptedArchive{
+			return persistence.AcceptedArchive{
 				ArchiveID: archiveID,
 			}, nil
 		}
@@ -208,15 +208,15 @@ func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission applicati
 
 			if lookupErr == nil && found {
 				if existing.fingerprint != admission.Fingerprint {
-					return application.AcceptedArchive{}, application.ErrIdempotencyConflict
+					return persistence.AcceptedArchive{}, persistence.ErrIdempotencyConflict
 				}
 
-				return application.AcceptedArchive{
+				return persistence.AcceptedArchive{
 					ArchiveID: existing.archiveID,
 				}, nil
 			}
 
-			return application.AcceptedArchive{}, fmt.Errorf("admit archive: %w", err)
+			return persistence.AcceptedArchive{}, fmt.Errorf("admit archive: %w", err)
 		}
 
 		delay := time.Duration(attempt+1) * admissionRetryDelay
@@ -226,12 +226,12 @@ func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission applicati
 		case <-ctx.Done():
 			timer.Stop()
 
-			return application.AcceptedArchive{}, ctx.Err()
+			return persistence.AcceptedArchive{}, ctx.Err()
 		case <-timer.C:
 		}
 	}
 
-	return application.AcceptedArchive{}, errors.New("archive admission contention exceeded retry budget")
+	return persistence.AcceptedArchive{}, errors.New("archive admission contention exceeded retry budget")
 }
 
 func (r *DynamoArchiveRepository) Find(ctx context.Context, id string) (domain.Archive, error) {
@@ -250,7 +250,7 @@ func (r *DynamoArchiveRepository) Find(ctx context.Context, id string) (domain.A
 	}
 
 	if len(response.Item) == 0 {
-		return domain.Archive{}, application.ErrArchiveNotFound
+		return domain.Archive{}, persistence.ErrArchiveNotFound
 	}
 
 	return archiveFromItem(id, response.Item), nil
