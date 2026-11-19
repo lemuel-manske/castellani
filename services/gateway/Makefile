@@ -1,5 +1,10 @@
 .PHONY: install run fmt test check
 
+ifneq (,$(wildcard .env))
+  include .env
+  export
+endif
+
 install:
 	go mod download
 
