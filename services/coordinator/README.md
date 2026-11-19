@@ -1,9 +1,28 @@
 # Archive Coordinator
 
-The Coordinator owns durable archive admission, public operation status, and the cross-service archive SAGA. It uses its own DynamoDB tables and communicates downstream through versioned messages; the Gateway forwards admission and status HTTP requests.
+The Archive Coordinator owns durable archive admission, archive lifecycle decisions, and cross-service workflow coordination for the Distributed Web Archive. The API Gateway forwards archive submissions and status requests to the Coordinator.
 
-The initial implementation provides transactional submission registration, idempotency-key replay, and durable StartCrawl outbox insertion. **The outbox dispatcher and incoming SAGA event processing are not yet implemented**, so registering an archive does not yet initiate crawling.
+The architecture and intended behavior are documented in the [ADRs](../../docs/adr/README.md), [backend specifications](../../docs/backend/README.md), and [public OpenAPI contract](../../contracts/openapi/api.yaml).
 
-Configuration: `COORDINATOR_ADDR` (default `:8081`), `COORDINATOR_TABLE_PREFIX`, and AWS SDK environment/profile configuration. Create the three Coordinator-owned DynamoDB tables before starting: `coordinator_archive_runs` (string `archiveId`), `coordinator_submission_keys` (string `idempotencyKey`), and `coordinator_outbox` (string `messageId`). Prefix names with `COORDINATOR_TABLE_PREFIX` where configured.
+## Development
 
-Run `make install`, `make run`, `make test`, or `make check`. Architecture and correctness constraints are documented in `docs/adr/`, `docs/backend/`, and `contracts/`.
+Requires Go 1.25.4. From `services/coordinator`:
+
+- `make install`: download dependencies.
+- `make run`: start the Coordinator.
+- `make fmt`: format Go code.
+- `make test`: run service-local tests.
+- `make check`: run static analysis and race-enabled tests.
+
+Development conventions and testing guidance are in [conventions.md](../../docs/conventions.md) and [testing.md](../../docs/testing.md).
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `COORDINATOR_ADDR` | `:8081` | Listen address |
+| `COORDINATOR_TABLE_PREFIX` | empty | Namespace prefix for Coordinator-owned DynamoDB tables |
+| `DYNAMODB_ENDPOINT` | AWS SDK default | Optional DynamoDB endpoint for local development |
+| `AWS_REGION` | AWS SDK default | DynamoDB region |
+
+The service requires its DynamoDB tables to be provisioned before startup. Broker dispatch and incoming SAGA event processing have not yet been implemented.
