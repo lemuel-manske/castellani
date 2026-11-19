@@ -16,9 +16,23 @@ import (
 )
 
 const (
-	maxRequestBytes = 64 << 10
-	healthLive      = "/health/live"
-	healthReady     = "/health/ready"
+	maxRequestBytes         = 64 << 10
+	minIdempotencyKeyLength = 8
+	maxIdempotencyKeyLength = 200
+
+	archivesPath  = "/archives"
+	archivePath   = "/archives/{archiveId}"
+	archiveIDPath = "archiveId"
+	healthLive    = "/health/live"
+	healthReady   = "/health/ready"
+
+	idempotencyHeader = "Idempotency-Key"
+	contentTypeHeader = "Content-Type"
+	mediaTypeJSON     = "application/json"
+	mediaTypeProblem  = "application/problem+json"
+	healthMediaType   = "text/plain; charset=utf-8"
+	healthResponse    = "ok\n"
+	problemTypePrefix = "urn:distributed-web-archive:problem:"
 )
 
 type Archives interface {
@@ -26,11 +40,14 @@ type Archives interface {
 	Get(*http.Request, string) (archive.Status, error)
 }
 
-type serviceAdapter struct{ app application.Service }
+type serviceAdapter struct {
+	app application.Service
+}
 
 func (s serviceAdapter) Create(r *http.Request, key string, submission archive.Submission) (archive.AcceptedResponse, error) {
 	return s.app.Create(r.Context(), key, submission)
 }
+
 func (s serviceAdapter) Get(r *http.Request, id string) (archive.Status, error) {
 	return s.app.Get(r.Context(), id)
 }
@@ -40,80 +57,118 @@ func NewRouter(app application.Service, ready func() bool, logger *slog.Logger) 
 }
 
 func Router(service Archives, ready func() bool, logger *slog.Logger) http.Handler {
-	r := chi.NewRouter()
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			defer func() {
-				if recover() != nil {
-					logger.Error("coordinator handler panic", "path", req.URL.Path)
-					problem(w, req, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
-				}
-			}()
-			next.ServeHTTP(w, req)
-		})
+	router := chi.NewRouter()
+	router.Use(recoverPanics(logger))
+
+	router.Get(healthLive, func(w http.ResponseWriter, _ *http.Request) {
+		health(w, http.StatusOK)
 	})
-	r.Get(healthLive, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = io.WriteString(w, "ok\n")
-	})
-	r.Get(healthReady, func(w http.ResponseWriter, _ *http.Request) {
+
+	router.Get(healthReady, func(w http.ResponseWriter, _ *http.Request) {
 		if !ready() {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = io.WriteString(w, "ok\n")
+
+		health(w, http.StatusOK)
 	})
-	r.Post("/archives", func(w http.ResponseWriter, req *http.Request) { create(w, req, service) })
-	r.Get("/archives/{archiveId}", func(w http.ResponseWriter, req *http.Request) {
-		status(w, req, service, chi.URLParam(req, "archiveId"))
+
+	router.Post(archivesPath, func(w http.ResponseWriter, r *http.Request) {
+		create(w, r, service)
 	})
-	return r
+	router.Get(archivePath, func(w http.ResponseWriter, r *http.Request) {
+		status(w, r, service, chi.URLParam(r, archiveIDPath))
+	})
+
+	return router
+}
+
+func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					logger.Error("coordinator handler panic", "path", r.URL.Path)
+					problem(w, r, http.StatusInternalServerError, "internal", "Internal Server Error", "Request handling failed.")
+				}
+			}()
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func health(w http.ResponseWriter, status int) {
+	w.Header().Set(contentTypeHeader, healthMediaType)
+	w.WriteHeader(status)
+	_, _ = io.WriteString(w, healthResponse)
+}
+
+func validIdempotencyKey(key string) bool {
+	validLength := len(key) >= minIdempotencyKeyLength && len(key) <= maxIdempotencyKeyLength
+	noOuterWhitespace := strings.TrimSpace(key) == key
+
+	return validLength && noOuterWhitespace
 }
 
 func create(w http.ResponseWriter, r *http.Request, service Archives) {
-	key := r.Header.Get("Idempotency-Key")
-	if len(key) < 8 || len(key) > 200 || strings.TrimSpace(key) != key {
+	key := r.Header.Get(idempotencyHeader)
+
+	if !validIdempotencyKey(key) {
 		problem(w, r, http.StatusBadRequest, "idempotency-key", "Invalid Idempotency Key", "Idempotency-Key must be 8 to 200 characters without surrounding whitespace.")
 		return
 	}
-	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
+
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get(contentTypeHeader))
+
+	if err != nil || mediaType != mediaTypeJSON {
 		problem(w, r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json.")
 		return
 	}
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+
 	if err != nil {
 		problem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Invalid or oversized request.")
 		return
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
+
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
+
 	var submission archive.Submission
+
 	if err := decoder.Decode(&submission); err != nil {
 		problem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object.")
 		return
 	}
+
 	var extra any
+
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		problem(w, r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object.")
 		return
 	}
+
 	accepted, err := service.Create(r, key, submission)
+
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
+
 	w.Header().Set("Location", accepted.StatusURL)
 	respond(w, http.StatusAccepted, accepted)
 }
 
 func status(w http.ResponseWriter, r *http.Request, service Archives, id string) {
 	record, err := service.Get(r, id)
+
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
+
 	respond(w, http.StatusOK, record)
 }
 
@@ -130,15 +185,32 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-func problem(w http.ResponseWriter, r *http.Request, code int, kind, title, detail string) {
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(map[string]any{"type": "urn:distributed-web-archive:problem:" + kind, "title": title, "status": code, "detail": detail, "instance": r.URL.Path})
+type problemDocument struct {
+	Type     string `json:"type"`
+	Title    string `json:"title"`
+	Status   int    `json:"status"`
+	Detail   string `json:"detail,omitempty"`
+	Instance string `json:"instance,omitempty"`
 }
-func respond(w http.ResponseWriter, code int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
+
+func problem(w http.ResponseWriter, r *http.Request, status int, kind, title, detail string) {
+	document := problemDocument{
+		Type:     problemTypePrefix + kind,
+		Title:    title,
+		Status:   status,
+		Detail:   detail,
+		Instance: r.URL.Path,
+	}
+
+	w.Header().Set(contentTypeHeader, mediaTypeProblem)
 	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(code)
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(document)
+}
+
+func respond(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set(contentTypeHeader, mediaTypeJSON)
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
 }
