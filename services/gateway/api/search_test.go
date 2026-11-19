@@ -15,11 +15,11 @@ const searchResults = `{"results":[{"archiveId":"run-1","snapshotId":"snap-1","u
 func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T) {
 	receivedQuery := make(chan string, 1)
 
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, func(w http.ResponseWriter, r *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithSearchService(func(w http.ResponseWriter, r *http.Request) {
 		receivedQuery <- r.URL.RawQuery
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		_, _ = io.WriteString(w, searchResults)
-	})
+	}))
 
 	result := gateway.Get("/search?q=historical&archiveId=run-1&limit=10")
 
@@ -30,7 +30,7 @@ func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T)
 
 func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testing.T) {
 	coordinator := &gatewaytest.RecordingCoordinator{}
-	gateway := gatewaytest.StartWithServices(t, coordinator.Accept, gatewaytest.Unused, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t, gatewaytest.WithCoordinatorService(coordinator.Accept))
 
 	result := gateway.Get("/search?limit=10")
 
@@ -39,7 +39,7 @@ func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testi
 }
 
 func TestGateway_SearchWithInvalidLimitReturnsValidationError(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, gatewaytest.Unused)
+	gateway := gatewaytest.Start(t)
 
 	result := gateway.Get("/search?q=archive&limit=101")
 
@@ -47,7 +47,7 @@ func TestGateway_SearchWithInvalidLimitReturnsValidationError(t *testing.T) {
 }
 
 func TestGateway_SearchOutageDoesNotDisableLiveness(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, gatewaytest.Unused, gatewaytest.Disconnect)
+	gateway := gatewaytest.Start(t, gatewaytest.WithSearchService(gatewaytest.Disconnect))
 
 	search := gateway.Get("/search?q=archive")
 	health := gateway.Get("/health/live")
