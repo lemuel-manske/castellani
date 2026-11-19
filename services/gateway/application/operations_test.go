@@ -175,3 +175,50 @@ func TestWACZ_MultipleRangesAreRejectedBeforeCallingService(t *testing.T) {
 
 	require.True(t, errors.Is(err, application.ErrInvalidWACZRange))
 }
+
+func TestSearch_ServiceFailureIsMappedToApplicationError(t *testing.T) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, `{"type":"urn:search:unavailable","title":"Unavailable","status":503}`)
+	}))
+	t.Cleanup(service.Close)
+
+	origin, err := url.Parse(service.URL)
+	require.NoError(t, err)
+
+	app := assembly.NewApplication(nil, nil, search.NewClient(*origin, time.Second))
+	_, err = app.Search(context.Background(), application.SearchQuery{Text: "archive"})
+
+	var failure *application.DependencyFailure
+	require.ErrorAs(t, err, &failure)
+
+	assert.Equal(t, http.StatusServiceUnavailable, failure.Status)
+	assert.Equal(t, "urn:search:unavailable", failure.Type)
+}
+
+func TestSession_CreateMapsCaptureResponseIntoApplicationSession(t *testing.T) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"sessionId":"sess-1","archiveId":"run-1","status":"CREATED","expiresAt":"2026-11-18T23:00:00Z","authGeneration":3}`)
+	}))
+	t.Cleanup(service.Close)
+
+	origin, err := url.Parse(service.URL)
+	require.NoError(t, err)
+
+	app := assembly.NewApplication(nil, capture.NewClient(*origin, time.Second, time.Second), nil)
+	session, err := app.CreateSession(
+		context.Background(),
+		"sample-key-123",
+		application.SessionRequest{ArchiveID: "run-1", TargetURL: "https://example.org/login"},
+		[]byte(`{"archiveId":"run-1","targetUrl":"https://example.org/login"}`),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, session.AuthGeneration)
+
+	assert.Equal(t, "sess-1", session.SessionID)
+	assert.Equal(t, "run-1", session.ArchiveID)
+	assert.Equal(t, 3, *session.AuthGeneration)
+}
