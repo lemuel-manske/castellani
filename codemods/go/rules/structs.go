@@ -34,6 +34,12 @@ func MultilineStructs(source []byte) ([]byte, error) {
 		start := open + 1
 		var listEdits []sourceEdit
 
+		// gofmt may collapse short structs to `struct{ ... }`. Restore
+		// the space before the opening brace when expanding the body.
+		if open > 0 && source[open-1] == 't' {
+			listEdits = append(listEdits, sourceEdit{start: open, end: open, text: " "})
+		}
+
 		for i, field := range fields.List {
 			end := set.Position(field.Pos()).Offset
 			separator := bytes.TrimSpace(source[start:end])
