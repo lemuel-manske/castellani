@@ -97,8 +97,8 @@ func (c *Client) JSON(ctx context.Context, method, path, query, key string, body
 	return Result{Status: response.StatusCode, Body: data}, nil
 }
 
-// Stream does not impose an overall response deadline. The client's context
-// governs cancellation; the caller must close the response body.
+// Stream uses a separate bounded transfer deadline and caller cancellation.
+// The caller must close the response body.
 func (c *Client) Stream(ctx context.Context, method, path, byteRange, ifRange string) (*http.Response, error) {
 	request, err := c.request(ctx, method, path, "", nil)
 
