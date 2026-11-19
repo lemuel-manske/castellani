@@ -12,12 +12,18 @@ import (
 
 var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
 
+type ArchiveAccepted struct {
+ ArchiveID string `json:"archiveId"`
+ Status string `json:"status"`
+ StatusURL string `json:"statusUrl"`
+}
+
 type ArchiveCoordinator interface {
 	CreateArchive(
 		context.Context,
 		string,
 		[]byte,
-	) (archive.Accepted, error)
+	) (ArchiveAccepted, error)
 	GetArchive(context.Context, string) (json.RawMessage, error)
 }
 
@@ -54,7 +60,7 @@ func (a Application) CreateArchive(
 	raw []byte,
 ) (archive.Accepted, error) {
 	if err := submission.Validate(); err != nil {
-		return archive.Accepted{}, &ValidationError{Cause: err}
+		return ArchiveAccepted{}, &ValidationError{Cause: err}
 	}
 
 	return a.Coordinator.CreateArchive(

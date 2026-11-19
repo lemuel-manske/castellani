@@ -14,7 +14,6 @@ import (
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
-	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 const (
@@ -25,6 +24,14 @@ const (
 )
 
 var ErrInvalidResponse = errors.New("invalid coordinator response")
+
+const acceptedStatus = "ACCEPTED"
+
+type Accepted struct {
+ ArchiveID string `json:"archiveId"`
+ Status string `json:"status"`
+ StatusURL string `json:"statusUrl"`
+}
 
 type Client struct {
 	baseURL url.URL
@@ -62,7 +69,7 @@ func (c *Client) CreateArchive(
 	ctx context.Context,
 	key string,
 	raw []byte,
-) (archive.Accepted, error) {
+) (Accepted, error) {
 	request, err := c.request(
 		ctx,
 		http.MethodPost,
@@ -71,7 +78,7 @@ func (c *Client) CreateArchive(
 	)
 
 	if err != nil {
-		return archive.Accepted{}, err
+		return Accepted{}, err
 	}
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
@@ -80,21 +87,21 @@ func (c *Client) CreateArchive(
 	status, rawResponse, err := c.execute(request)
 
 	if err != nil {
-		return archive.Accepted{}, err
+		return Accepted{}, err
 	}
 
 	if status != http.StatusAccepted {
-		return archive.Accepted{}, parseFailure(status, rawResponse)
+		return Accepted{}, parseFailure(status, rawResponse)
 	}
 
-	var accepted archive.Accepted
+	var accepted Accepted
 
 	decodeErr := json.Unmarshal(rawResponse, &accepted)
 
-	validAdmission := accepted.Status == archive.AcceptedStatus && httpx.ValidPathSegment(accepted.ArchiveID)
+	validAdmission := accepted.Status == AcceptedStatus && httpx.ValidPathSegment(accepted.ArchiveID)
 
 	if decodeErr != nil || !validAdmission {
-		return archive.Accepted{}, ErrInvalidResponse
+		return Accepted{}, ErrInvalidResponse
 	}
 
 	return accepted, nil

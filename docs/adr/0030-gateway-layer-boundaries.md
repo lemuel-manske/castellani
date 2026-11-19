@@ -17,7 +17,7 @@ Gateway uses one runtime flow for all public operations:
 Public HTTP API -> Application -> service-specific client -> net/http
 ```
 
-The API depends on the application for every operation, never on an outbound client. The application owns use cases, input semantics, and Gateway policy. Clients own their service's outbound HTTP protocol. Dependency interfaces belong with their consumers in `application`; concrete implementations implement them implicitly. Constructors use `NewClient` for clients and `NewHandler` for handlers.
+The API depends on the application for every operation, never on an outbound client. The application owns use cases, input semantics, and Gateway policy. Clients own their service's outbound HTTP protocol and service-local types. Dependency interfaces belong with their consumers in `application`. Clients do not import application interfaces, DTOs, or errors. A dedicated `assembly` package implements the application ports with adapters over the concrete clients; the composition root creates and wires these adapters. Constructors use `NewClient` for clients and `NewHandler` for handlers.
 
 ### Application operations
 
@@ -45,21 +45,22 @@ Implement three service-specific client packages: `clients/coordinator`, `client
 - Capture: page listing, snapshot metadata, WACZ retrieval, and session creation/lookup/update.
 - Search: search only. No streaming API or streaming-specific transport configuration.
 
-The clients own route construction, HTTP methods, request encoding, service headers, response decoding, upstream schema checks, timeouts, and transport errors. Use `net/http` directly; remove `internal/upstream` after callers have migrated. Do not create a replacement generic client layer. Shared helpers are justified only by proven meaningful reuse, never by a desire to eliminate small amounts of HTTP plumbing.
+The clients own route construction, HTTP methods, request encoding, service headers, response decoding, service-local DTOs and errors, upstream schema checks, timeouts, and transport errors. The assembly adapters translate their results and failures into application-owned representations; there is no common service-contract package. Use `net/http` directly; remove `internal/upstream` after callers have migrated. Do not create a replacement generic client layer. Shared helpers are justified only by proven meaningful reuse, never by a desire to eliminate small amounts of HTTP plumbing.
 
 ### Boundary-specific responsibilities
 
 - **API:** route parameters, HTTP body decoding, headers, public status and problem representation, streaming to `http.ResponseWriter`, and route/readiness middleware. It never imports concrete outbound clients or constructs outbound URLs.
+- **Assembly:** implements the application ports by calling concrete clients and explicitly mapping client input, result, and error types to application contracts; it owns the dependency construction. No generic common contracts layer is introduced.
 - **Application:** validates domain/use-case inputs, applies Gateway policies, selects the appropriate dependency operation, and exposes transport-independent results or errors. Simple operations may delegate directly; avoid empty wrapper layers and duplicated validation.
-- **Clients:** validate upstream responses against their own protocols, map upstream errors into application-consumable error values, and preserve validated information needed for public failure forwarding. They do not write public HTTP responses.
+- **Clients:** validate upstream responses against their own protocols, expose client-local result and error types, and preserve validated information needed for public failure forwarding. They do not write public HTTP responses or import application.
 - **WACZ:** only Capture retrieves the streaming body. An operation-specific result exposes a closeable stream and validated delivery metadata without leaking a raw `*http.Response` into API or application contracts. The API owns HEAD behavior and the public response copy. Streaming must remain bounded and must not buffer entire WACZ files.
 - **Errors:** transport failures and invalid upstream responses originate in clients; application validation and policy failures originate in the application; the API alone maps both to public HTTP statuses and problem documents. A validated upstream problem may be carried as data where faithful forwarding is required. The API does not inspect generic upstream result/status objects.
 
 ### Dependency organization
 
-Keep a single application composition path in `server.go`. The router takes the application (and independent HTTP infrastructure such as readiness and logging), never capture/search clients. Optional dependency wiring must not silently turn application-layer operations into direct API-to-client paths.
+Keep a single application composition path in `server.go`, via `assembly.NewApplication`. The router takes the application (and independent HTTP infrastructure such as readiness and logging), never capture/search clients. Optional dependency wiring must not silently turn application-layer operations into direct API-to-client paths.
 
-Shared route definitions and cross-boundary types remain in an appropriately accessible owning package; do not put service-specific client logic or HTTP response writers in `common`. Interfaces are declared at consumed boundaries, not duplicated in provider packages. Avoid re-export aliases and pass-through helpers.
+Shared route definitions and cross-boundary types remain in an appropriately accessible owning package; do not put service-specific client logic or HTTP response writers in `common`. Interfaces are declared at the application boundary and implemented by assembly adapters; provider clients have no application-layer imports. Avoid re-export aliases and pass-through helpers.
 
 ### Migration and verification
 
