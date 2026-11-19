@@ -87,7 +87,7 @@ func Start(t *testing.T, options ...Option) Gateway {
 	captureOrigin := startService(t, "Capture", services.capture)
 	searchOrigin := startService(t, "Search", services.search)
 
-	coordinatorClient := coordinator.NewHTTPClient(coordinatorOrigin, time.Second)
+	coordinatorClient := coordinator.NewClient(coordinatorOrigin, time.Second)
 	captureClient := upstream.NewClient(captureOrigin, time.Second)
 	searchClient := upstream.NewClient(searchOrigin, time.Second)
 	app := application.NewApplication(coordinatorClient)
