@@ -2,23 +2,14 @@ name: go @ codemods
 
 on:
   push:
-    paths:
-      - "codemods/go/**"
-      - "Makefile"
-      - ".github/workflows/codemods-go.yml"
   pull_request:
-    paths:
-      - "codemods/go/**"
-      - "Makefile"
-      - ".github/workflows/codemods-go.yml"
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+
+      - uses: ./.github/actions/go-verify
         with:
-          go-version-file: codemods/go/go.mod
-          cache: false
-      - run: make -C codemods/go check
+          module: codemods/go

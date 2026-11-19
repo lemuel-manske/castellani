@@ -2,21 +2,14 @@ name: go @ API gateway
 
 on:
   push:
-    paths:
-      - "services/gateway/**"
-      - ".github/workflows/gateway.yml"
-      - ".github/actions/go-verify/**"
   pull_request:
-    paths:
-      - "services/gateway/**"
-      - ".github/workflows/gateway.yml"
-      - ".github/actions/go-verify/**"
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: ./.github/actions/go-verify
         with:
           module: services/gateway
