@@ -58,7 +58,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input createRequest
-	raw, err := readJSON(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(w, r, &input)
 
 	if err != nil {
 		responseProblem := httpx.NewProblem(
@@ -125,7 +125,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	var input updateRequest
-	raw, err := readJSON(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(w, r, &input)
 
 	if err != nil {
 		responseProblem := httpx.NewProblem(
@@ -199,8 +199,4 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 	}
 
 	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
-}
-
-func readJSON(w http.ResponseWriter, r *http.Request, destination any) ([]byte, error) {
-	return httpx.DecodeJSONBytes(w, r, destination)
 }
