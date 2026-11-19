@@ -1,0 +1,25 @@
+name: Gateway
+
+on:
+  push:
+    paths:
+      - "services/gateway/**"
+      - ".github/workflows/gateway.yml"
+  pull_request:
+    paths:
+      - "services/gateway/**"
+      - ".github/workflows/gateway.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/gateway/go.mod
+          cache-dependency-path: services/gateway/go.sum
+      - run: make check
