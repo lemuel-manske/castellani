@@ -1,4 +1,3 @@
-// Package application provides the Gateway's application use cases.
 package application
 
 import (
@@ -10,46 +9,6 @@ import (
 )
 
 var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
-
-type ArchiveAccepted struct {
-	ArchiveID string `json:"archiveId"`
-	Status    string `json:"status"`
-	StatusURL string `json:"statusUrl"`
-}
-
-type ArchiveCoordinator interface {
-	CreateArchive(
-		context.Context,
-		string,
-		[]byte,
-	) (ArchiveAccepted, error)
-
-	GetArchive(context.Context, string) (json.RawMessage, error)
-}
-
-type Application struct {
-	coordinator ArchiveCoordinator
-	capture     Capture
-	search      SearchService
-}
-
-type ValidationError struct {
-	Cause error
-}
-
-func (e *ValidationError) Error() string { return e.Cause.Error() }
-
-func NewApplication(
-	coordinator ArchiveCoordinator,
-	capture Capture,
-	search SearchService,
-) Application {
-	return Application{
-		coordinator: coordinator,
-		capture:     capture,
-		search:      search,
-	}
-}
 
 func (a Application) CreateArchive(
 	ctx context.Context,

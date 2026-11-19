@@ -68,6 +68,12 @@ type SearchResults struct {
 	NextCursor *string           `json:"nextCursor,omitempty"`
 }
 
+type ArchiveAccepted struct {
+	ArchiveID string `json:"archiveId"`
+	Status    string `json:"status"`
+	StatusURL string `json:"statusUrl"`
+}
+
 type Capture interface {
 	ListPages(
 		context.Context,
@@ -103,6 +109,16 @@ type Capture interface {
 	) (Session, error)
 }
 
-type SearchService interface {
+type Search interface {
 	Search(context.Context, SearchQuery) (SearchResults, error)
+}
+
+type Coordinator interface {
+	CreateArchive(
+		context.Context,
+		string,
+		[]byte,
+	) (ArchiveAccepted, error)
+
+	GetArchive(context.Context, string) (json.RawMessage, error)
 }
