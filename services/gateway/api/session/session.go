@@ -6,8 +6,8 @@ import (
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
@@ -43,17 +43,17 @@ func NewHandler(client *upstream.Client) Handler {
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get(sharedhttp.IdempotencyHeader)
+	key := r.Header.Get(httpx.IdempotencyHeader)
 
-	if !sharedhttp.ValidateIdempotencyKey(key) {
-		responseProblem := sharedhttp.NewProblem(
+	if !httpx.ValidateIdempotencyKey(key) {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-idempotency-key",
 			"Invalid Idempotency Key",
 			"Idempotency-Key is required and must contain 8 to 200 characters.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -61,62 +61,62 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	raw, err := readJSON(w, r, &input)
 
 	if err != nil {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-session",
 			"Invalid Session",
 			err.Error(),
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	if !sharedhttp.ValidPathSegment(input.ArchiveID) || !sharedhttp.ValidHTTPURL(input.TargetURL) {
-		responseProblem := sharedhttp.NewProblem(
+	if !httpx.ValidPathSegment(input.ArchiveID) || !httpx.ValidHTTPURL(input.TargetURL) {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-session",
 			"Invalid Session",
 			"Expected archiveId and absolute HTTP(S) targetUrl.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
 	result, err := h.client.JSON(r.Context(), http.MethodPost, Path, "", key, raw)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
 	if result.Status != http.StatusCreated {
-		httpx.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
+		common.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
 		return
 	}
 
 	var created sessionResponse
 	decodeErr := json.Unmarshal(result.Body, &created)
-	validSession := sharedhttp.ValidPathSegment(created.SessionID) && created.ArchiveID == input.ArchiveID &&
+	validSession := httpx.ValidPathSegment(created.SessionID) && created.ArchiveID == input.ArchiveID &&
 		created.Status != "" && created.ExpiresAt != ""
 
 	if decodeErr != nil || !validSession {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadGateway,
 			"invalid-upstream",
 			"Invalid Upstream Response",
 			"Capture returned invalid session metadata.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
 	location := pathPrefix + url.PathEscape(created.SessionID)
 
-	w.Header().Set(sharedhttp.LocationHeader, location)
-	httpx.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
+	w.Header().Set(httpx.LocationHeader, location)
+	common.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
 }
 
 func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -128,28 +128,28 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	raw, err := readJSON(w, r, &input)
 
 	if err != nil {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-session",
 			"Invalid Session",
 			err.Error(),
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
 	validStatus := input.Status == "COMPLETED" || input.Status == "CANCELLED"
 
 	if !validStatus {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-session",
 			"Invalid Session",
 			"status must be COMPLETED or CANCELLED.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -159,15 +159,15 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method string, body []byte) {
 	id := chi.URLParam(r, idParameter)
 
-	if !sharedhttp.ValidPathSegment(id) {
-		responseProblem := sharedhttp.NewProblem(
+	if !httpx.ValidPathSegment(id) {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-session-id",
 			"Invalid Session ID",
 			"Invalid session ID.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -175,7 +175,7 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 	result, err := h.client.JSON(r.Context(), method, path, "", "", body)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
@@ -186,21 +186,21 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 			session.Status != "" && session.ExpiresAt != ""
 
 		if decodeErr != nil || !validSession {
-			responseProblem := sharedhttp.NewProblem(
+			responseProblem := httpx.NewProblem(
 				r,
 				http.StatusBadGateway,
 				"invalid-upstream",
 				"Invalid Upstream Response",
 				"Capture returned invalid session metadata.",
 			)
-			sharedhttp.WriteProblem(w, responseProblem)
+			httpx.WriteProblem(w, responseProblem)
 			return
 		}
 	}
 
-	httpx.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) ([]byte, error) {
-	return sharedhttp.DecodeJSONBytes(w, r, destination)
+	return httpx.DecodeJSONBytes(w, r, destination)
 }

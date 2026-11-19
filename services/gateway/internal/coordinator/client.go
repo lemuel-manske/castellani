@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 )
 
 const (
@@ -29,7 +29,7 @@ type HTTPClient struct {
 }
 
 type Failure struct {
-	Problem sharedhttp.Problem
+	Problem httpx.Problem
 }
 
 func (f *Failure) Error() string {
@@ -58,14 +58,14 @@ func NewHTTPClient(origin url.URL, timeout time.Duration) *HTTPClient {
 }
 
 func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) (archive.Accepted, error) {
-	request, err := c.request(ctx, http.MethodPost, httpx.ArchivesPath, bytes.NewReader(raw))
+	request, err := c.request(ctx, http.MethodPost, common.ArchivesPath, bytes.NewReader(raw))
 
 	if err != nil {
 		return archive.Accepted{}, err
 	}
 
-	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
-	request.Header.Set(sharedhttp.IdempotencyHeader, key)
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(httpx.IdempotencyHeader, key)
 
 	status, rawResponse, err := c.execute(request)
 
@@ -91,7 +91,7 @@ func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) 
 }
 
 func (c *HTTPClient) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
-	request, err := c.request(ctx, http.MethodGet, httpx.ArchivePathPrefix+id, nil)
+	request, err := c.request(ctx, http.MethodGet, common.ArchivePathPrefix+id, nil)
 
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func parseFailure(status int, data []byte) error {
 		return ErrInvalidResponse
 	}
 
-	var p sharedhttp.Problem
+	var p httpx.Problem
 
 	decodeErr := json.Unmarshal(data, &p)
 

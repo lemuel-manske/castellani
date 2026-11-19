@@ -6,8 +6,8 @@ import (
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
@@ -28,37 +28,37 @@ func NewMetadataHandler(client *upstream.Client) MetadataHandler {
 }
 
 func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, httpx.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
 
-	if !sharedhttp.ValidPathSegment(id) {
-		responseProblem := sharedhttp.NewProblem(
+	if !httpx.ValidPathSegment(id) {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-archive-id",
 			"Invalid Archive ID",
 			"Invalid archive ID.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	if err := httpx.ValidatePagination(r.URL.Query()); err != nil {
-		responseProblem := sharedhttp.NewProblem(
+	if err := common.ValidatePagination(r.URL.Query()); err != nil {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-pagination",
 			"Invalid Pagination",
 			err.Error(),
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	path := httpx.ArchivePathPrefix + url.PathEscape(id) + pagesSuffix
+	path := common.ArchivePathPrefix + url.PathEscape(id) + pagesSuffix
 	result, err := h.client.JSON(r.Context(), http.MethodGet, path, r.URL.RawQuery, "", nil)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
@@ -67,43 +67,43 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 		decodeErr := json.Unmarshal(result.Body, &document)
 
 		if decodeErr != nil || document.Items == nil {
-			responseProblem := sharedhttp.NewProblem(
+			responseProblem := httpx.NewProblem(
 				r,
 				http.StatusBadGateway,
 				"invalid-upstream",
 				"Invalid Upstream Response",
 				"Capture returned invalid page metadata.",
 			)
-			sharedhttp.WriteProblem(w, responseProblem)
+			httpx.WriteProblem(w, responseProblem)
 			return
 		}
 	}
 
-	httpx.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
 }
 
 func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, httpx.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
 	snapshotID := chi.URLParam(r, snapshotParam)
-	validIDs := sharedhttp.ValidPathSegment(id) && sharedhttp.ValidPathSegment(snapshotID)
+	validIDs := httpx.ValidPathSegment(id) && httpx.ValidPathSegment(snapshotID)
 
 	if !validIDs {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-snapshot-id",
 			"Invalid Snapshot ID",
 			"Invalid archive or snapshot ID.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	path := httpx.ArchivePathPrefix + url.PathEscape(id) + snapshotSegment + url.PathEscape(snapshotID)
+	path := common.ArchivePathPrefix + url.PathEscape(id) + snapshotSegment + url.PathEscape(snapshotID)
 	result, err := h.client.JSON(r.Context(), http.MethodGet, path, "", "", nil)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
@@ -119,17 +119,17 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			document.URL != "" && document.CapturedAt != ""
 
 		if decodeErr != nil || !validSnapshot {
-			responseProblem := sharedhttp.NewProblem(
+			responseProblem := httpx.NewProblem(
 				r,
 				http.StatusBadGateway,
 				"invalid-upstream",
 				"Invalid Upstream Response",
 				"Capture returned invalid snapshot metadata.",
 			)
-			sharedhttp.WriteProblem(w, responseProblem)
+			httpx.WriteProblem(w, responseProblem)
 			return
 		}
 	}
 
-	httpx.ForwardJSON(w, r, result, http.StatusOK, "Capture")
+	common.ForwardJSON(w, r, result, http.StatusOK, "Capture")
 }

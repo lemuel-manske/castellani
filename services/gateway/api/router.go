@@ -8,12 +8,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
 	searchapi "github.com/lemuel-manske/unnamed/services/gateway/api/search"
 	sessionapi "github.com/lemuel-manske/unnamed/services/gateway/api/session"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
@@ -57,8 +57,8 @@ func NewRouterWithServices(
 	})
 
 	archives := archiveapi.NewHandler(app)
-	router.Post(httpx.ArchivesPath, archives.Create)
-	router.Get(httpx.ArchivePath, archives.Status)
+	router.Post(common.ArchivesPath, archives.Create)
+	router.Get(common.ArchivePath, archives.Status)
 
 	if capture != nil {
 		metadata := archiveapi.NewMetadataHandler(capture)
@@ -81,24 +81,24 @@ func NewRouterWithServices(
 	}
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusNotFound,
 			"not-found",
 			"Not Found",
 			"The requested resource does not exist.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 	})
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusMethodNotAllowed,
 			"method-not-allowed",
 			"Method Not Allowed",
 			"The method is not supported for this resource.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 	})
 	return router
 }
@@ -108,14 +108,14 @@ func requestID(next http.Handler) http.Handler {
 		var random [16]byte
 
 		if _, err := rand.Read(random[:]); err != nil {
-			responseProblem := sharedhttp.NewProblem(
+			responseProblem := httpx.NewProblem(
 				r,
 				http.StatusInternalServerError,
 				"internal",
 				"Internal Server Error",
 				"Unable to create a request identifier.",
 			)
-			sharedhttp.WriteProblem(w, responseProblem)
+			httpx.WriteProblem(w, responseProblem)
 			return
 		}
 		w.Header().Set(requestIDHeader, hex.EncodeToString(random[:]))
@@ -130,14 +130,14 @@ func recoverPanics(logger *slog.Logger) func(http.Handler) http.Handler {
 
 				if value := recover(); value != nil {
 					logger.Error("HTTP handler panic", "path", r.URL.Path)
-					responseProblem := sharedhttp.NewProblem(
+					responseProblem := httpx.NewProblem(
 						r,
 						http.StatusInternalServerError,
 						"internal",
 						"Internal Server Error",
 						"Request handling failed.",
 					)
-					sharedhttp.WriteProblem(w, responseProblem)
+					httpx.WriteProblem(w, responseProblem)
 				}
 			}()
 			next.ServeHTTP(w, r)

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
@@ -37,17 +37,17 @@ func (h WACZHandler) Head(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, httpx.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
 
-	if !sharedhttp.ValidPathSegment(id) {
-		responseProblem := sharedhttp.NewProblem(
+	if !httpx.ValidPathSegment(id) {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-archive-id",
 			"Invalid Archive ID",
 			"Invalid archive ID.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -57,22 +57,22 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	invalidIfRange := len(ifRange) > maxRangeHeaderBytes || strings.ContainsAny(ifRange, "\r\n")
 
 	if invalidRange || invalidIfRange {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
 			"invalid-range",
 			"Invalid Range",
 			"Only one valid byte range is supported.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	path := httpx.ArchivePathPrefix + url.PathEscape(id) + waczSuffix
+	path := common.ArchivePathPrefix + url.PathEscape(id) + waczSuffix
 	response, err := h.client.Stream(r.Context(), r.Method, path, byteRange, ifRange)
 
 	if err != nil {
-		httpx.UpstreamError(w, r, err, "Capture")
+		common.UpstreamError(w, r, err, "Capture")
 		return
 	}
 
@@ -88,14 +88,14 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	isSuccess := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
 	if !isSuccess || response.Header.Get("Content-Type") != waczMediaType {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadGateway,
 			"invalid-upstream",
 			"Invalid Upstream Response",
 			"Capture returned unexpected WACZ metadata.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -121,34 +121,34 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, response *http.Response) {
-	data, err := io.ReadAll(io.LimitReader(response.Body, sharedhttp.MaxJSONRequestBytes+1))
+	data, err := io.ReadAll(io.LimitReader(response.Body, httpx.MaxJSONRequestBytes+1))
 
-	if err != nil || len(data) > sharedhttp.MaxJSONRequestBytes {
-		responseProblem := sharedhttp.NewProblem(
+	if err != nil || len(data) > httpx.MaxJSONRequestBytes {
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadGateway,
 			"invalid-upstream",
 			"Invalid Upstream Response",
 			"Capture returned invalid WACZ error metadata.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
-	var problem sharedhttp.Problem
+	var problem httpx.Problem
 	decodeErr := json.Unmarshal(data, &problem)
 	validProblem := decodeErr == nil && problem.Status == response.StatusCode &&
 		problem.Title != "" && problem.Type != ""
 
 	if !validProblem {
-		responseProblem := sharedhttp.NewProblem(
+		responseProblem := httpx.NewProblem(
 			r,
 			http.StatusBadGateway,
 			"invalid-upstream",
 			"Invalid Upstream Response",
 			"Capture returned invalid WACZ error metadata.",
 		)
-		sharedhttp.WriteProblem(w, responseProblem)
+		httpx.WriteProblem(w, responseProblem)
 		return
 	}
 
@@ -161,5 +161,5 @@ func (h WACZHandler) writeFailure(w http.ResponseWriter, r *http.Request, respon
 	}
 
 	problem.Instance = r.URL.Path
-	sharedhttp.WriteProblem(w, problem)
+	httpx.WriteProblem(w, problem)
 }
