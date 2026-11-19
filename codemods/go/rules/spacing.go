@@ -46,30 +46,25 @@ func separateStatements(source []byte, matches func(ast.Stmt, ast.Stmt) bool) ([
 				continue
 			}
 
-			start := set.Position(previous.End()).Offset
-			end := set.Position(current.Pos()).Offset
-			between := source[start:end]
-			if !whitespaceOnly(between) {
-				continue
-			}
-
-			indentStart := end
-			for indentStart > 0 && source[indentStart-1] != '\n' {
-				indentStart--
-			}
-			indent := source[indentStart:end]
-			if !whitespaceOnly(indent) {
-				continue
-			}
-
-			replacement := "\n\n" + string(indent)
-			if string(between) != replacement {
-				edits = append(edits, sourceEdit{start: start, end: end, text: replacement})
-			}
+			addBlankLine(source, set, previous.End(), current.Pos(), &edits)
 		}
 
 		return true
 	})
 
 	return applyEdits(source, edits)
+}
+
+func addBlankLine(source []byte, set *token.FileSet, previousEnd, nextStart token.Pos, edits *[]sourceEdit) {
+	start := set.Position(previousEnd).Offset
+	end := set.Position(nextStart).Offset
+	if start < 0 || end > len(source) || start > end || !whitespaceOnly(source[start:end]) {
+		return
+	}
+
+	indent := lineIndent(source, end)
+	replacement := "\n\n" + indent
+	if string(source[start:end]) != replacement {
+		*edits = append(*edits, sourceEdit{start: start, end: end, text: replacement})
+	}
 }
