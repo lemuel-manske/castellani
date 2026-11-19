@@ -11,10 +11,10 @@ import (
 )
 
 func TestGateway_PageListingReturnsCapturedOutcomes(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, _ *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		_, _ = io.WriteString(w, `{"items":[{"url":"https://example.org/","status":"CAPTURED","snapshotId":"snap-1"}]}`)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.Get("/archives/run-1/pages?limit=10")
 
@@ -23,10 +23,10 @@ func TestGateway_PageListingReturnsCapturedOutcomes(t *testing.T) {
 }
 
 func TestGateway_SnapshotResolutionReturnsCommittedMetadata(t *testing.T) {
-	gateway := gatewaytest.StartWithServices(t, gatewaytest.Unused, func(w http.ResponseWriter, _ *http.Request) {
+	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		_, _ = io.WriteString(w, `{"archiveId":"run-1","snapshotId":"snap-1","url":"https://example.org/","capturedAt":"2026-11-18T12:00:00Z"}`)
-	}, gatewaytest.Unused)
+	}))
 
 	result := gateway.Get("/archives/run-1/snapshots/snap-1")
 
