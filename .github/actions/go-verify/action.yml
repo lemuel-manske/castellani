@@ -1,0 +1,17 @@
+name: Verify Go module
+description: Verify an independent Go module using its standard Makefile
+inputs:
+  module:
+    description: Repository-relative path to the Go module
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ inputs.module }}/go.mod
+        cache-dependency-path: ${{ inputs.module }}/go.sum
+    - name: Verify
+      shell: bash
+      working-directory: ${{ inputs.module }}
+      run: make check
