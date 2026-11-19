@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/gatewaytest"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 
 func TestGateway_PageListingReturnsCapturedOutcomes(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 		_, _ = io.WriteString(w, `{"items":[{"url":"https://example.org/","status":"CAPTURED","snapshotId":"snap-1"}]}`)
 	}))
 
@@ -24,7 +25,7 @@ func TestGateway_PageListingReturnsCapturedOutcomes(t *testing.T) {
 
 func TestGateway_SnapshotResolutionReturnsCommittedMetadata(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 		_, _ = io.WriteString(w, `{"archiveId":"run-1","snapshotId":"snap-1","url":"https://example.org/","capturedAt":"2026-11-18T12:00:00Z"}`)
 	}))
 

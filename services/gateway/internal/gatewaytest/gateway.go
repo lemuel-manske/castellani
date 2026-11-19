@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
@@ -130,8 +131,8 @@ func (g Gateway) Submit(key, body string) Response {
 	request, err := http.NewRequest(http.MethodPost, g.server.URL+httpx.ArchivesPath, strings.NewReader(body))
 	require.NoError(g.t, err)
 
-	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-	request.Header.Set(httpx.IdempotencyHeader, key)
+	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
+	request.Header.Set(sharedhttp.IdempotencyHeader, key)
 
 	return g.send(request)
 }
@@ -142,8 +143,8 @@ func (g Gateway) CreateSession(key, body string) Response {
 	request, err := http.NewRequest(http.MethodPost, g.server.URL+"/sessions", strings.NewReader(body))
 	require.NoError(g.t, err)
 
-	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-	request.Header.Set(httpx.IdempotencyHeader, key)
+	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
+	request.Header.Set(sharedhttp.IdempotencyHeader, key)
 
 	return g.send(request)
 }
@@ -154,7 +155,7 @@ func (g Gateway) UpdateSession(id, body string) Response {
 	request, err := http.NewRequest(http.MethodPut, g.server.URL+"/sessions/"+id, strings.NewReader(body))
 	require.NoError(g.t, err)
 
-	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 
 	return g.send(request)
 }

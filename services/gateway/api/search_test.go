@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/gatewaytest"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T)
 
 	gateway := gatewaytest.Start(t, gatewaytest.WithSearchService(func(w http.ResponseWriter, r *http.Request) {
 		receivedQuery <- r.URL.RawQuery
-		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 		_, _ = io.WriteString(w, searchResults)
 	}))
 
@@ -35,7 +36,7 @@ func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testi
 	result := gateway.Get("/search?limit=10")
 
 	assert.Equal(t, http.StatusBadRequest, result.Status)
-	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
+	assert.Equal(t, sharedhttp.MediaTypeProblem, result.Header.Get(sharedhttp.HeaderContentType))
 }
 
 func TestGateway_SearchWithInvalidLimitReturnsValidationError(t *testing.T) {

@@ -5,22 +5,23 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
 )
 
 func AcceptArchive(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 	w.WriteHeader(http.StatusAccepted)
 	_, _ = io.WriteString(w, AcceptedArchive)
 }
 
 func ReturnArchiveStatus(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
 	_, _ = io.WriteString(w, RunningArchive)
 }
 
 func RejectConflictingKey(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeProblem)
+	w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeProblem)
 	w.WriteHeader(http.StatusConflict)
 	_, _ = io.WriteString(w, `{"type":"urn:coordinator:idempotency-conflict","title":"Conflict","status":409,"detail":"Key was used for different content."}`)
 }
