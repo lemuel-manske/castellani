@@ -8,8 +8,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
-const Path = "/search"
-
 type Handler struct {
 	client *upstream.Client
 }
@@ -31,7 +29,7 @@ func (h Handler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.client.JSON(r.Context(), http.MethodGet, Path, r.URL.RawQuery, "", nil)
+	result, err := h.client.JSON(r.Context(), http.MethodGet, common.SearchPath, r.URL.RawQuery, "", nil)
 
 	if err != nil {
 		common.UpstreamError(w, r, err, "Search")

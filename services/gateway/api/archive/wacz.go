@@ -14,8 +14,6 @@ import (
 )
 
 const (
-	WACZPath            = "/archives/{archiveId}/wacz"
-	waczSuffix          = "/wacz"
 	waczMediaType       = "application/wacz"
 	maxRangeHeaderBytes = 256
 )
@@ -68,7 +66,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := common.ArchivePathPrefix + url.PathEscape(id) + waczSuffix
+	path := common.ArchivePathPrefix + url.PathEscape(id) + common.WACZPathSuffix
 	response, err := h.client.Stream(r.Context(), r.Method, path, byteRange, ifRange)
 
 	if err != nil {

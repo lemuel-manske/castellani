@@ -13,7 +13,7 @@ import (
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
+	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 const (
@@ -81,7 +81,7 @@ func (c *HTTPClient) CreateArchive(ctx context.Context, key string, raw []byte) 
 
 	decodeErr := json.Unmarshal(rawResponse, &accepted)
 
-	validAdmission := accepted.Status == archive.AcceptedStatus && archive.ValidID(accepted.ArchiveID)
+	validAdmission := accepted.Status == archive.AcceptedStatus && httpx.ValidPathSegment(accepted.ArchiveID)
 
 	if decodeErr != nil || !validAdmission {
 		return archive.Accepted{}, ErrInvalidResponse

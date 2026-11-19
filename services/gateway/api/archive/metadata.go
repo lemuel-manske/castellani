@@ -11,14 +11,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
-const (
-	PagesPath       = "/archives/{archiveId}/pages"
-	SnapshotPath    = "/archives/{archiveId}/snapshots/{snapshotId}"
-	pagesSuffix     = "/pages"
-	snapshotSegment = "/snapshots/"
-	snapshotParam   = "snapshotId"
-)
-
 type MetadataHandler struct {
 	client *upstream.Client
 }
@@ -54,7 +46,7 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := common.ArchivePathPrefix + url.PathEscape(id) + pagesSuffix
+	path := common.ArchivePathPrefix + url.PathEscape(id) + common.PagesPathSuffix
 	result, err := h.client.JSON(r.Context(), http.MethodGet, path, r.URL.RawQuery, "", nil)
 
 	if err != nil {
@@ -86,7 +78,7 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 
 func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, common.ArchiveIDParameter)
-	snapshotID := chi.URLParam(r, snapshotParam)
+	snapshotID := chi.URLParam(r, common.SnapshotIDParameter)
 	validIDs := httpx.ValidPathSegment(id) && httpx.ValidPathSegment(snapshotID)
 
 	if !validIDs {
@@ -101,7 +93,7 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := common.ArchivePathPrefix + url.PathEscape(id) + snapshotSegment + url.PathEscape(snapshotID)
+	path := common.ArchivePathPrefix + url.PathEscape(id) + common.SnapshotPathSegment + url.PathEscape(snapshotID)
 	result, err := h.client.JSON(r.Context(), http.MethodGet, path, "", "", nil)
 
 	if err != nil {

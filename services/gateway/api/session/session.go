@@ -11,13 +11,6 @@ import (
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
-const (
-	Path         = "/sessions"
-	ResourcePath = "/sessions/{sessionId}"
-	pathPrefix   = "/sessions/"
-	idParameter  = "sessionId"
-)
-
 type Handler struct {
 	client *upstream.Client
 }
@@ -84,7 +77,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.client.JSON(r.Context(), http.MethodPost, Path, "", key, raw)
+	result, err := h.client.JSON(r.Context(), http.MethodPost, common.SessionsPath, "", key, raw)
 
 	if err != nil {
 		common.UpstreamError(w, r, err, "Capture")
@@ -113,7 +106,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	location := pathPrefix + url.PathEscape(created.SessionID)
+	location := common.SessionPathPrefix + url.PathEscape(created.SessionID)
 
 	w.Header().Set(httpx.LocationHeader, location)
 	common.ForwardJSON(w, r, result, http.StatusCreated, "Capture")
@@ -157,7 +150,7 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method string, body []byte) {
-	id := chi.URLParam(r, idParameter)
+	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
 		responseProblem := httpx.NewProblem(
@@ -171,7 +164,7 @@ func (h Handler) forwardSession(w http.ResponseWriter, r *http.Request, method s
 		return
 	}
 
-	path := pathPrefix + url.PathEscape(id)
+	path := common.SessionPathPrefix + url.PathEscape(id)
 	result, err := h.client.JSON(r.Context(), method, path, "", "", body)
 
 	if err != nil {

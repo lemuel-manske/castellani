@@ -1,11 +1,12 @@
 package application
 
 import (
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"context"
 	"encoding/json"
 	"errors"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
+	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 type ArchiveCoordinator interface {
@@ -41,7 +42,7 @@ func (a Application) CreateArchive(ctx context.Context, key string, submission a
 
 func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage, error) {
 
-	if !archive.ValidID(id) {
+	if !httpx.ValidPathSegment(id) {
 		return nil, ErrInvalidArchiveID
 	}
 	return a.Coordinator.GetArchive(ctx, id)

@@ -9,7 +9,7 @@ import (
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/archive"
+	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 )
 

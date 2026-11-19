@@ -18,11 +18,9 @@ import (
 )
 
 const (
-	healthLivePath  = "/health/live"
-	healthReadyPath = "/health/ready"
 	requestIDHeader = "X-Request-ID"
 	healthMediaType = "text/plain; charset=utf-8"
-	healthResponse  = "ok\n"
+	healthResponse  = "ok\\n"
 )
 
 func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
@@ -40,12 +38,12 @@ func NewRouterWithServices(
 	router.Use(requestID)
 	router.Use(recoverPanics(logger))
 
-	router.Get(healthLivePath, func(w http.ResponseWriter, _ *http.Request) {
+	router.Get(common.HealthLivePath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", healthMediaType)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(healthResponse))
 	})
-	router.Get(healthReadyPath, func(w http.ResponseWriter, _ *http.Request) {
+	router.Get(common.HealthReadyPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", healthMediaType)
 
 		if !ready() {
@@ -65,19 +63,19 @@ func NewRouterWithServices(
 		wacz := archiveapi.NewWACZHandler(capture)
 		sessions := sessionapi.NewHandler(capture)
 
-		router.Get(archiveapi.PagesPath, metadata.Pages)
-		router.Get(archiveapi.SnapshotPath, metadata.Snapshot)
-		router.Get(archiveapi.WACZPath, wacz.Get)
-		router.Head(archiveapi.WACZPath, wacz.Head)
+		router.Get(common.PagesPath, metadata.Pages)
+		router.Get(common.SnapshotPath, metadata.Snapshot)
+		router.Get(common.WACZPath, wacz.Get)
+		router.Head(common.WACZPath, wacz.Head)
 
-		router.Post(sessionapi.Path, sessions.Create)
-		router.Get(sessionapi.ResourcePath, sessions.Get)
-		router.Put(sessionapi.ResourcePath, sessions.Update)
+		router.Post(common.SessionsPath, sessions.Create)
+		router.Get(common.SessionPath, sessions.Get)
+		router.Put(common.SessionPath, sessions.Update)
 	}
 
 	if search != nil {
 		searchHandler := searchapi.NewHandler(search)
-		router.Get(searchapi.Path, searchHandler.Search)
+		router.Get(common.SearchPath, searchHandler.Search)
 	}
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
