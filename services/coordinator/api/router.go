@@ -20,7 +20,7 @@ const (
 
 	idempotencyHeader = "Idempotency-Key"
 	healthMediaType   = "text/plain; charset=utf-8"
-	healthResponse    = "ok\\n"
+	healthResponse    = "ok\n"
 )
 
 type Archives interface {

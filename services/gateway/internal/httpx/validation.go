@@ -19,6 +19,12 @@ const (
 	MaxQueryLength      = 500
 )
 
+var (
+	ErrContentType = shared.ErrContentType
+	ErrInvalidJSON = shared.ErrInvalidJSON
+	ErrExtraJSON   = shared.ErrExtraJSON
+)
+
 func DecodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
 	return shared.DecodeJSON(w, r, destination)
 }
