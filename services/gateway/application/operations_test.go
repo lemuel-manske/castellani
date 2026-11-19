@@ -50,7 +50,7 @@ func TestSearch_ValidQueryCallsSearchService(t *testing.T) {
 }
 
 func TestSearch_InvalidQueryIsRejectedBeforeCallingService(t *testing.T) {
-	app := application.NewApplicationWithServices(
+	app := application.NewApplication(
 		nil,
 		nil,
 		nil,
@@ -100,7 +100,7 @@ func TestSnapshot_MismatchedServiceResponseIsRejected(t *testing.T) {
 }
 
 func TestSession_InvalidTransitionIsRejectedBeforeCallingService(t *testing.T) {
-	app := application.NewApplicationWithServices(
+	app := application.NewApplication(
 		nil,
 		nil,
 		nil,
@@ -173,7 +173,7 @@ func TestWACZ_PartialContentIsStreamedByCapture(t *testing.T) {
 }
 
 func TestWACZ_MultipleRangesAreRejectedBeforeCallingService(t *testing.T) {
-	app := application.NewApplicationWithServices(
+	app := application.NewApplication(
 		nil,
 		nil,
 		nil,

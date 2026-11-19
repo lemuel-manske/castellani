@@ -31,7 +31,7 @@ func NewApplication(
 		searchPort = searchAdapter{client: searchClient}
 	}
 
-	return application.NewApplicationWithServices(
+	return application.NewApplication(
 		coordinatorPort,
 		capturePort,
 		searchPort,

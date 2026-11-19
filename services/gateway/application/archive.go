@@ -29,7 +29,7 @@ type ArchiveCoordinator interface {
 }
 
 type Application struct {
-	Coordinator ArchiveCoordinator
+	coordinator ArchiveCoordinator
 	capture     Capture
 	search      SearchService
 }
@@ -40,20 +40,12 @@ type ValidationError struct {
 
 func (e *ValidationError) Error() string { return e.Cause.Error() }
 
-func NewApplication(coordinator ArchiveCoordinator) Application {
-	return NewApplicationWithServices(
-		coordinator,
-		nil,
-		nil,
-	)
-}
-
-func NewApplicationWithServices(
+func NewApplication(
 	coordinator ArchiveCoordinator,
 	capture Capture,
 	search SearchService,
 ) Application {
-	return Application{Coordinator: coordinator, capture: capture, search: search}
+	return Application{coordinator: coordinator, capture: capture, search: search}
 }
 
 func (a Application) CreateArchive(
@@ -66,7 +58,7 @@ func (a Application) CreateArchive(
 		return ArchiveAccepted{}, &ValidationError{Cause: err}
 	}
 
-	return a.Coordinator.CreateArchive(
+	return a.coordinator.CreateArchive(
 		ctx,
 		key,
 		raw,
@@ -78,5 +70,5 @@ func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage
 		return nil, ErrInvalidArchiveID
 	}
 
-	return a.Coordinator.GetArchive(ctx, id)
+	return a.coordinator.GetArchive(ctx, id)
 }

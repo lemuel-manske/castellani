@@ -2,11 +2,11 @@ package archiveapi
 
 import (
  "net/http"
- "strconv"
 
  "github.com/go-chi/chi/v5"
  "github.com/lemuel-manske/castellani/libs/httpx"
  "github.com/lemuel-manske/unnamed/services/gateway/application"
+ "github.com/lemuel-manske/unnamed/services/gateway/api/params"
  "github.com/lemuel-manske/unnamed/services/gateway/api/response"
  "github.com/lemuel-manske/unnamed/services/gateway/common"
 )
@@ -27,19 +27,10 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
   return
  }
 
- if err := common.ValidatePagination(r.URL.Query()); err != nil {
+ pagination, err := params.Pagination(r.URL.Query())
+ if err != nil {
   httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-pagination", "Invalid Pagination", err.Error()))
   return
- }
-
- pagination := application.Pagination{Cursor: r.URL.Query().Get("cursor")}
- if raw := r.URL.Query().Get("limit"); raw != "" {
-  limit, err := strconv.Atoi(raw)
-  if err != nil {
-   httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-pagination", "Invalid Pagination", "limit must be an integer"))
-   return
-  }
-  pagination.Limit = &limit
  }
 
  result, err := h.app.ListPages(r.Context(), id, pagination)
