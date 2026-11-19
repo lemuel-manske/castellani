@@ -35,7 +35,9 @@ func (c *Client) ListPages(ctx context.Context, archiveID string, page applicati
  if page.Limit != nil { query.Set("limit", strconv.Itoa(*page.Limit)) }
  if page.Cursor != "" { query.Set("cursor", page.Cursor) }
  path := common.ArchivePathPrefix + url.PathEscape(archiveID) + common.PagesPathSuffix
- data, err := c.json(ctx, http.MethodGet, path, query.Encode(), "", nil, http.StatusOK)
+ request, err := c.request(ctx, http.MethodGet, path, query.Encode(), nil)
+ if err != nil { return nil, err }
+ data, err := c.execute(request, http.StatusOK)
  if err != nil { return nil, err }
  var v struct { Items []json.RawMessage `json:"items"` }
  if json.Unmarshal(data, &v) != nil || v.Items == nil { return nil, application.ErrInvalidUpstream }
@@ -43,7 +45,9 @@ func (c *Client) ListPages(ctx context.Context, archiveID string, page applicati
 }
 func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (json.RawMessage, error) {
  path := common.ArchivePathPrefix + url.PathEscape(archiveID) + common.SnapshotPathSegment + url.PathEscape(snapshotID)
- data, err := c.json(ctx, http.MethodGet, path, "", "", nil, http.StatusOK)
+ request, err := c.request(ctx, http.MethodGet, path, "", nil)
+ if err != nil { return nil, err }
+ data, err := c.execute(request, http.StatusOK)
  if err != nil { return nil, err }
  var v struct { ArchiveID string `json:"archiveId"`; SnapshotID string `json:"snapshotId"`; URL string `json:"url"`; CapturedAt string `json:"capturedAt"` }
  if json.Unmarshal(data, &v) != nil || v.ArchiveID != archiveID || v.SnapshotID != snapshotID || v.URL == "" || v.CapturedAt == "" {
@@ -52,7 +56,11 @@ func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) 
  return data, nil
 }
 func (c *Client) CreateSession(ctx context.Context, key string, session application.SessionRequest, raw []byte) (json.RawMessage, error) {
- data, err := c.json(ctx, http.MethodPost, common.SessionsPath, "", key, raw, http.StatusCreated)
+ request, err := c.request(ctx, http.MethodPost, common.SessionsPath, "", raw)
+ if err != nil { return nil, err }
+ request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+ request.Header.Set(httpx.IdempotencyHeader, key)
+ data, err := c.execute(request, http.StatusCreated)
  if err != nil { return nil, err }
  if err := validateSession(data, "", session.ArchiveID); err != nil { return nil, err }
  return data, nil
@@ -60,11 +68,14 @@ func (c *Client) CreateSession(ctx context.Context, key string, session applicat
 func (c *Client) GetSession(ctx context.Context, id string) (json.RawMessage, error) {
  return c.session(ctx, http.MethodGet, id, nil)
 }
-func (c *Client) UpdateSession(ctx context.Context, id, status string, raw []byte) (json.RawMessage, error) {
+func (c *Client) UpdateSession(ctx context.Context, id string, raw []byte) (json.RawMessage, error) {
  return c.session(ctx, http.MethodPut, id, raw)
 }
 func (c *Client) session(ctx context.Context, method, id string, raw []byte) (json.RawMessage, error) {
- data, err := c.json(ctx, method, common.SessionPathPrefix+url.PathEscape(id), "", "", raw, http.StatusOK)
+ request, err := c.request(ctx, method, common.SessionPathPrefix+url.PathEscape(id), "", raw)
+ if err != nil { return nil, err }
+ if raw != nil { request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON) }
+ data, err := c.execute(request, http.StatusOK)
  if err != nil { return nil, err }
  if err := validateSession(data, id, ""); err != nil { return nil, err }
  return data, nil
@@ -106,11 +117,7 @@ func (c *Client) GetWACZ(ctx context.Context, id string, options application.WAC
   ETag: response.Header.Get("ETag"), LastModified: response.Header.Get("Last-Modified"),
   ContentLength: response.Header.Get("Content-Length")}, nil
 }
-func (c *Client) json(ctx context.Context, method, path, query, key string, body []byte, success int) (json.RawMessage, error) {
- request, err := c.request(ctx, method, path, query, body)
- if err != nil { return nil, err }
- if body != nil { request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON) }
- if key != "" { request.Header.Set(httpx.IdempotencyHeader, key) }
+func (c *Client) execute(request *http.Request, success int) (json.RawMessage, error) {
  response, err := c.http.Do(request)
  if err != nil { return nil, fmt.Errorf("%w: capture request: %v", application.ErrDependencyUnavailable, err) }
  defer response.Body.Close()
