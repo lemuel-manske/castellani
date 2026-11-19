@@ -16,7 +16,7 @@ const (
 	outboxClaimLimit = 50
 )
 
-func (r *DynamoArchiveRepository) Claim(
+func (r *DynamoRepository) Claim(
 	ctx context.Context,
 	lease time.Duration,
 ) (messaging.Message, bool, error) {
@@ -125,7 +125,7 @@ func (r *DynamoArchiveRepository) Claim(
 	}
 }
 
-func (r *DynamoArchiveRepository) Confirm(ctx context.Context, message messaging.Message) error {
+func (r *DynamoRepository) Confirm(ctx context.Context, message messaging.Message) error {
 	_, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(r.tables.Outbox),
 		Key: map[string]types.AttributeValue{

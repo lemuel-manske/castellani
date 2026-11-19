@@ -17,7 +17,7 @@ import (
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
 )
 
-func (r *DynamoArchiveRepository) CommitEvent(
+func (r *DynamoRepository) CommitEvent(
 	ctx context.Context,
 	before domain.Archive,
 	after domain.Archive,
@@ -224,7 +224,7 @@ func (r *DynamoArchiveRepository) CommitEvent(
 
 	return persistence.ErrRevisionConflict
 }
-func (r *DynamoArchiveRepository) ListStalled(
+func (r *DynamoRepository) ListStalled(
 	ctx context.Context,
 	before time.Time,
 	limit int,
@@ -292,7 +292,7 @@ func (r *DynamoArchiveRepository) ListStalled(
 	return archives, nil
 }
 
-func (r *DynamoArchiveRepository) ScheduleRecovery(
+func (r *DynamoRepository) ScheduleRecovery(
 	ctx context.Context,
 	archive domain.Archive,
 	effect domain.Effect,

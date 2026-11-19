@@ -22,7 +22,7 @@ type Tables struct {
 	Inbox       string
 }
 
-type DynamoArchiveRepository struct {
+type DynamoRepository struct {
 	client *dynamodb.Client
 	tables Tables
 }
@@ -51,8 +51,8 @@ type StartCrawlPayload struct {
 	AuthGeneration *int     `json:"authGeneration,omitempty"`
 }
 
-func NewDynamoArchiveRepository(client *dynamodb.Client, tables Tables) *DynamoArchiveRepository {
-	return &DynamoArchiveRepository{
+func NewDynamoRepository(client *dynamodb.Client, tables Tables) *DynamoRepository {
+	return &DynamoRepository{
 		client: client,
 		tables: tables,
 	}

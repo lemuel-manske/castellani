@@ -26,7 +26,7 @@ const (
 	messageVersion = 1
 )
 
-func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission persistence.Admission) (persistence.AcceptedArchive, error) {
+func (r *DynamoRepository) Admit(ctx context.Context, admission persistence.Admission) (persistence.AcceptedArchive, error) {
 	archiveID, err := generateID("run-")
 
 	if err != nil {
@@ -234,7 +234,7 @@ func (r *DynamoArchiveRepository) Admit(ctx context.Context, admission persisten
 	return persistence.AcceptedArchive{}, errors.New("archive admission contention exceeded retry budget")
 }
 
-func (r *DynamoArchiveRepository) Find(ctx context.Context, id string) (domain.Archive, error) {
+func (r *DynamoRepository) Find(ctx context.Context, id string) (domain.Archive, error) {
 	response, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:      aws.String(r.tables.Archives),
 		ConsistentRead: aws.Bool(true),
@@ -256,7 +256,7 @@ func (r *DynamoArchiveRepository) Find(ctx context.Context, id string) (domain.A
 	return archiveFromItem(id, response.Item), nil
 }
 
-func (r *DynamoArchiveRepository) findKey(ctx context.Context, key string) (AdmissionKey, bool, error) {
+func (r *DynamoRepository) findKey(ctx context.Context, key string) (AdmissionKey, bool, error) {
 	response, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:      aws.String(r.tables.Submissions),
 		ConsistentRead: aws.Bool(true),

@@ -14,7 +14,7 @@ type Components struct {
 }
 
 func NewComponents(
-	repository *persistence.DynamoArchiveRepository,
+	repository *persistence.DynamoRepository,
 	rabbitURL string,
 	rabbitExchange string,
 ) Components {

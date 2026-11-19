@@ -79,7 +79,7 @@ func run(logger *slog.Logger) error {
 		}
 	})
 
-	repository := persistence.NewDynamoArchiveRepository(client, persistence.Tables{
+	repository := persistence.NewDynamoRepository(client, persistence.Tables{
 		Archives:    config.archivesTable,
 		Submissions: config.submissionsTable,
 		Outbox:      config.outboxTable,
