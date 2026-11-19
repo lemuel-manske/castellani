@@ -19,7 +19,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("gofmtx", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	write := flags.Bool("w", false, "write changes to files")
-	ruleNames := flags.String("rules", "declarations,types,spacing,returns,signatures,calls,structs,interfaces", "comma-separated rules")
+	ruleNames := flags.String("rules", "declarations,types,spacing,returns,signatures,calls,structs,interfaces,grouping", "comma-separated rules")
 
 	if err := flags.Parse(args); err != nil {
 		return 2
@@ -57,6 +57,7 @@ func selectRules(names string) ([]rules.Rule, error) {
 		"interfaces":   rules.InterfaceMethodSpacing,
 		"signatures":   rules.MultilineSignatures,
 		"calls":        rules.MultilineCalls,
+		"grouping":     rules.StatementGrouping,
 	}
 
 	var selected []rules.Rule
