@@ -15,13 +15,13 @@ func IfSpacing(source []byte) ([]byte, error) {
 	})
 }
 
-// ReturnSpacing separates a return from a preceding if statement. Returns
-// inside the if body and returns following comments are left unchanged.
+// ReturnSpacing separates a return from any preceding statement in the same
+// block or switch/select clause. Leading comments remain attached to returns,
+// and the first statement in a block or clause is left unchanged.
 func ReturnSpacing(source []byte) ([]byte, error) {
 	return separateStatements(source, func(previous, current ast.Stmt) bool {
-		_, isIf := previous.(*ast.IfStmt)
-		_, isReturn := current.(*ast.ReturnStmt)
-		return isIf && isReturn
+		_, ok := current.(*ast.ReturnStmt)
+		return ok
 	})
 }
 
@@ -35,13 +35,21 @@ func separateStatements(source []byte, matches func(ast.Stmt, ast.Stmt) bool) ([
 	var edits []sourceEdit
 
 	ast.Inspect(file, func(node ast.Node) bool {
-		block, ok := node.(*ast.BlockStmt)
-		if !ok {
+		var statements []ast.Stmt
+
+		switch block := node.(type) {
+		case *ast.BlockStmt:
+			statements = block.List
+		case *ast.CaseClause:
+			statements = block.Body
+		case *ast.CommClause:
+			statements = block.Body
+		default:
 			return true
 		}
 
-		for i := 1; i < len(block.List); i++ {
-			previous, current := block.List[i-1], block.List[i]
+		for i := 1; i < len(statements); i++ {
+			previous, current := statements[i-1], statements[i]
 			if !matches(previous, current) {
 				continue
 			}
