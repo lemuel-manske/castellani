@@ -95,3 +95,70 @@ func Run(
 
 	assertFormat(t, source, expected, DeclarationsOrder, MultilineSignatures, MultilineCalls, IfSpacing)
 }
+
+
+func TestFormat_ReturnAfterIf_HasBlankLine(t *testing.T) {
+	source := `package example
+
+func Get() error {
+	if true {
+		return nil
+	}
+	return nil
+}
+`
+
+	expected := `package example
+
+func Get() error {
+	if true {
+		return nil
+	}
+
+	return nil
+}
+`
+
+	assertFormat(t, source, expected, ReturnSpacing)
+}
+
+func TestFormat_ReturnAfterIf_PreservesExistingSpacing(t *testing.T) {
+	source := `package example
+
+func Get() error {
+	if true {
+		return nil
+	}
+
+	return nil
+}
+`
+
+	assertFormat(t, source, source, ReturnSpacing)
+}
+
+func TestFormat_ReturnAfterIf_WithComment_LeavesCommentAttached(t *testing.T) {
+	source := `package example
+
+func Get() error {
+	if true {
+		return nil
+	}
+	// This is a fallback.
+	return nil
+}
+`
+
+	assertFormat(t, source, source, ReturnSpacing)
+}
+
+func TestFormat_ReturnAtStartOfBlock_DoesNotAddBlankLine(t *testing.T) {
+	source := `package example
+
+func Get() error {
+	return nil
+}
+`
+
+	assertFormat(t, source, source, ReturnSpacing)
+}
