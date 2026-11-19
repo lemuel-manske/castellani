@@ -22,6 +22,38 @@ func (p Pagination) Validate() error {
 	return nil
 }
 
+func (s Submission) Validate() error {
+	if !httpx.ValidHTTPURL(s.SeedURL) {
+		return fmt.Errorf("%w: seedUrl must be an absolute HTTP(S) URL without credentials or fragment", ErrInvalidSubmission)
+	}
+
+	if s.MaxDepth == nil || *s.MaxDepth < 0 {
+		return fmt.Errorf("%w: maxDepth must be a nonnegative integer", ErrInvalidSubmission)
+	}
+
+	if s.MaxPages == nil || *s.MaxPages < 1 {
+		return fmt.Errorf("%w: maxPages must be a positive integer", ErrInvalidSubmission)
+	}
+
+	if s.AuthGeneration != nil && *s.AuthGeneration < 1 {
+		return fmt.Errorf("%w: authGeneration must be a positive integer", ErrInvalidSubmission)
+	}
+
+	seen := make(map[string]struct{}, len(s.AllowedOrigins))
+	for _, origin := range s.AllowedOrigins {
+		if !httpx.ValidHTTPURL(origin) {
+			return fmt.Errorf("%w: allowedOrigins entries must be absolute HTTP(S) URLs without credentials or fragment", ErrInvalidSubmission)
+		}
+
+		if _, exists := seen[origin]; exists {
+			return fmt.Errorf("%w: allowedOrigins entries must be unique", ErrInvalidSubmission)
+		}
+		seen[origin] = struct{}{}
+	}
+
+	return nil
+}
+
 func (q SearchQuery) Validate() error {
 	if len(q.Text) == 0 || len(q.Text) > maxQueryLength || strings.TrimSpace(q.Text) == "" {
 		return fmt.Errorf("%w: q must contain between 1 and 500 characters", ErrInvalidSearch)
