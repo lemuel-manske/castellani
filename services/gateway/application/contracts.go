@@ -27,7 +27,7 @@ type Capture interface {
  GetWACZ(context.Context, string, WACZOptions) (WACZ, error)
  CreateSession(context.Context, string, SessionRequest, []byte) (json.RawMessage, error)
  GetSession(context.Context, string) (json.RawMessage, error)
- UpdateSession(context.Context, string, string, []byte) (json.RawMessage, error)
+ UpdateSession(context.Context, string, []byte) (json.RawMessage, error)
 }
 type SearchService interface {
  Search(context.Context, SearchQuery) (json.RawMessage, error)
