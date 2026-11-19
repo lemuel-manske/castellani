@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/lemuel-manske/castellani/libs/httpx"
 )
 
 const (
@@ -69,11 +71,11 @@ func (c *Client) JSON(ctx context.Context, method, path, query, key string, body
 	}
 
 	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	}
 
 	if key != "" {
-		request.Header.Set("Idempotency-Key", key)
+		request.Header.Set(httpx.IdempotencyHeader, key)
 	}
 
 	response, err := c.http.Do(request)
