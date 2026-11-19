@@ -2,7 +2,11 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
@@ -30,6 +34,38 @@ type Submission struct {
 	MaxPages       *int
 	AllowedOrigins []string
 	AuthGeneration *int
+}
+
+func (s Submission) Fingerprint() (string, error) {
+	origins := append([]string(nil), s.AllowedOrigins...)
+
+	sort.Strings(origins)
+
+	payload := struct {
+		SeedURL        string   `json:"seedUrl"`
+		CollectionID   string   `json:"collectionId,omitempty"`
+		MaxDepth       int      `json:"maxDepth"`
+		MaxPages       int      `json:"maxPages"`
+		AllowedOrigins []string `json:"allowedOrigins,omitempty"`
+		AuthGeneration *int     `json:"authGeneration,omitempty"`
+	}{
+		SeedURL:        s.SeedURL,
+		CollectionID:   s.CollectionID,
+		MaxDepth:       *s.MaxDepth,
+		MaxPages:       *s.MaxPages,
+		AllowedOrigins: origins,
+		AuthGeneration: s.AuthGeneration,
+	}
+
+	data, err := json.Marshal(payload)
+
+	if err != nil {
+		return "", err
+	}
+
+	digest := sha256.Sum256(data)
+
+	return hex.EncodeToString(digest[:]), nil
 }
 
 type CaptureProgress struct {

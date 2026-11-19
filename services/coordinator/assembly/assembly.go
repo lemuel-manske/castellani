@@ -23,7 +23,7 @@ func NewComponents(
 	return Components{
 		Application: application.NewApplication(repository, repository),
 		Dispatcher:  application.NewDispatcher(repository, publisher),
-		Consumer:    rabbitmq.NewRabbitConsumer(
+		Consumer: rabbitmq.NewRabbitConsumer(
 			rabbitURL,
 			rabbitExchange,
 			publisher,

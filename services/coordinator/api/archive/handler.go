@@ -49,9 +49,9 @@ type archiveResponse struct {
 	} `json:"search"`
 }
 
-func NewHandler(service *application.Application) Handler {
+func NewHandler(app *application.Application) Handler {
 	return Handler{
-		app: service,
+		app: app,
 	}
 }
 
@@ -66,6 +66,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			"Invalid Idempotency Key",
 			"Idempotency-Key must be 8 to 200 characters without surrounding whitespace.",
 		)
+
 		httpx.WriteProblem(w, problem)
 
 		return
@@ -95,6 +96,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			title,
 			detail,
 		)
+
 		httpx.WriteProblem(w, problem)
 
 		return
@@ -133,6 +135,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:    domain.StatusAccepted,
 		StatusURL: statusURL,
 	}
+
 	httpx.JSON(
 		w,
 		http.StatusAccepted,

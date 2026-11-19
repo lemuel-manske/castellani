@@ -37,7 +37,7 @@ func NewCoordinatorServer(
 	}
 
 	server.http = &http.Server{
-		Handler:           api.NewRouter(
+		Handler: api.NewRouter(
 			server.ready.Load,
 			app,
 			logger,

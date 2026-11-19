@@ -2,11 +2,7 @@ package application
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"sort"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
@@ -25,7 +21,7 @@ func (a *Application) SubmitArchive(
 		return AcceptedArchive{}, errors.Join(ErrInvalidSubmission, err)
 	}
 
-	fingerprint, err := fingerprintSubmission(submission)
+	fingerprint, err := submission.Fingerprint()
 
 	if err != nil {
 		return AcceptedArchive{}, err
@@ -46,35 +42,4 @@ func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive
 	}
 
 	return a.archives.Find(ctx, id)
-}
-
-func fingerprintSubmission(submission domain.Submission) (string, error) {
-	origins := append([]string(nil), submission.AllowedOrigins...)
-	sort.Strings(origins)
-
-	payload := struct {
-		SeedURL        string   `json:"seedUrl"`
-		CollectionID   string   `json:"collectionId,omitempty"`
-		MaxDepth       int      `json:"maxDepth"`
-		MaxPages       int      `json:"maxPages"`
-		AllowedOrigins []string `json:"allowedOrigins,omitempty"`
-		AuthGeneration *int     `json:"authGeneration,omitempty"`
-	}{
-		SeedURL:        submission.SeedURL,
-		CollectionID:   submission.CollectionID,
-		MaxDepth:       *submission.MaxDepth,
-		MaxPages:       *submission.MaxPages,
-		AllowedOrigins: origins,
-		AuthGeneration: submission.AuthGeneration,
-	}
-
-	data, err := json.Marshal(payload)
-
-	if err != nil {
-		return "", err
-	}
-
-	digest := sha256.Sum256(data)
-
-	return hex.EncodeToString(digest[:]), nil
 }
