@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 )
 
 func (a Application) Search(ctx context.Context, query SearchQuery) (SearchResults, error) {

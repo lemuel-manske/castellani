@@ -13,9 +13,11 @@ import (
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/unnamed/services/gateway/assembly"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 	"github.com/lemuel-manske/unnamed/services/gateway/common"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 	"github.com/stretchr/testify/require"
 )
@@ -100,15 +102,17 @@ func Start(t *testing.T, options ...Option) Gateway {
 	)
 
 	coordinatorClient := coordinator.NewClient(coordinatorOrigin, time.Second)
-	captureClient := upstream.NewClient(captureOrigin, time.Second)
-	searchClient := upstream.NewClient(searchOrigin, time.Second)
-	app := application.NewApplication(coordinatorClient)
+	captureClient := capture.NewClient(captureOrigin, time.Second, time.Second)
+	searchClient := search.NewClient(searchOrigin, time.Second)
+	app := assembly.NewApplication(coordinatorClient, captureClient, searchClient)
+	legacyCapture := upstream.NewClient(captureOrigin, time.Second)
+	legacySearch := upstream.NewClient(searchOrigin, time.Second)
 
 	router := api.NewRouterWithServices(
 		func() bool { return services.ready },
 		app,
-		captureClient,
-		searchClient,
+		legacyCapture,
+		legacySearch,
 		slog.Default(),
 	)
 

@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"

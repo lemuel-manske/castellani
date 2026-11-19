@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/unnamed/services/gateway/assembly"
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
 	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 	"github.com/stretchr/testify/assert"
@@ -29,22 +30,14 @@ func TestSearch_ValidQueryCallsSearchService(t *testing.T) {
 	origin, err := url.Parse(service.URL)
 	require.NoError(t, err)
 
-	app := application.NewApplicationWithServices(
-		nil,
-		nil,
-		search.NewClient(*origin, time.Second),
-	)
+	app := assembly.NewApplication(nil, nil, search.NewClient(*origin, time.Second))
 	limit := 10
 	result, err := app.Search(context.Background(), application.SearchQuery{
 		Text: "archive", ArchiveID: "run-1", Pagination: application.Pagination{Limit: &limit},
 	})
 	require.NoError(t, err)
 
-	assert.JSONEq(
-		t,
-		`{"results":[]}`,
-		string(result),
-	)
+	assert.Empty(t, result.Results)
 	assert.Equal(
 		t,
 		"archive",
@@ -83,11 +76,7 @@ func TestSnapshot_MismatchedServiceResponseIsRejected(t *testing.T) {
 		time.Second,
 		time.Second,
 	)
-	app := application.NewApplicationWithServices(
-		nil,
-		client,
-		nil,
-	)
+	app := assembly.NewApplication(nil, client, nil)
 
 	_, err = app.GetSnapshot(
 		context.Background(),

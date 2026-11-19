@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/assembly"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 )
 
@@ -32,13 +34,12 @@ type GatewayServer struct {
 func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
 
-	app := application.NewApplication(coordinatorClient)
 
-	var captureClient *upstream.Client
-	var searchClient *upstream.Client
+	var captureClient *capture.Client
+	var searchClient *search.Client
 
 	if cfg.captureURL != nil {
-		captureClient = upstream.NewClientWithStreamTimeout(
+		captureClient = capture.NewClient(
 			*cfg.captureURL,
 			cfg.upstreamTimeout,
 			cfg.streamTimeout,
@@ -46,16 +47,24 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	}
 
 	if cfg.searchURL != nil {
-		searchClient = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
+		searchClient = search.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
 	}
+
+	app := assembly.NewApplication(coordinatorClient, captureClient, searchClient)
+
+	// Legacy API clients remain until the HTTP handlers migrate to the application.
+	var legacyCapture *upstream.Client
+	var legacySearch *upstream.Client
+	if cfg.captureURL != nil { legacyCapture = upstream.NewClientWithStreamTimeout(*cfg.captureURL, cfg.upstreamTimeout, cfg.streamTimeout) }
+	if cfg.searchURL != nil { legacySearch = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout) }
 
 	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
 	gateway.http = &http.Server{
 		Handler: api.NewRouterWithServices(
 			gateway.ready.Load,
 			app,
-			captureClient,
-			searchClient,
+			legacyCapture,
+			legacySearch,
 			logger,
 		),
 		ReadHeaderTimeout: serverReadHeaderTimeout,

@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 )
 
 func (a Application) ListPages(
@@ -19,7 +18,7 @@ func (a Application) ListPages(
 	}
 
 	if a.capture == nil {
-		return nil, ErrDependencyUnavailable
+		return Pages{}, ErrDependencyUnavailable
 	}
 	return a.capture.ListPages(
 		ctx,
@@ -38,7 +37,7 @@ func (a Application) GetSnapshot(ctx context.Context, archiveID, snapshotID stri
 	}
 
 	if a.capture == nil {
-		return nil, ErrDependencyUnavailable
+		return Snapshot{}, ErrDependencyUnavailable
 	}
 	return a.capture.GetSnapshot(
 		ctx,
