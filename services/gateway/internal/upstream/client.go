@@ -27,22 +27,31 @@ type Result struct {
 type Client struct {
 	baseURL url.URL
 	http    *http.Client
+	stream  *http.Client
 }
 
 func NewClient(origin url.URL, timeout time.Duration) *Client {
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ResponseHeaderTimeout: timeout,
+		IdleConnTimeout:       idleTimeout,
+		MaxIdleConnsPerHost:   16,
+	}
+
+	noRedirect := func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
 	return &Client{
 		baseURL: origin,
 		http: &http.Client{
-			Timeout: timeout,
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-			Transport: &http.Transport{
-				Proxy:                 http.ProxyFromEnvironment,
-				ResponseHeaderTimeout: timeout,
-				IdleConnTimeout:       idleTimeout,
-				MaxIdleConnsPerHost:   16,
-			},
+			Timeout:       timeout,
+			CheckRedirect: noRedirect,
+			Transport:     transport,
+		},
+		stream: &http.Client{
+			CheckRedirect: noRedirect,
+			Transport:     transport,
 		},
 	}
 }
@@ -100,7 +109,7 @@ func (c *Client) Stream(ctx context.Context, method, path, byteRange, ifRange st
 		request.Header.Set("If-Range", ifRange)
 	}
 
-	response, err := c.http.Do(request)
+	response, err := c.stream.Do(request)
 
 	if err != nil {
 		return nil, fmt.Errorf("stream from upstream: %w", err)
