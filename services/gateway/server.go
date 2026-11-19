@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
+	"github.com/lemuel-manske/unnamed/services/gateway/assembly"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
 )
 
 const (
@@ -32,13 +33,11 @@ type GatewayServer struct {
 func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
 
-	app := application.NewApplication(coordinatorClient)
-
-	var captureClient *upstream.Client
-	var searchClient *upstream.Client
+	var captureClient *capture.Client
+	var searchClient *search.Client
 
 	if cfg.captureURL != nil {
-		captureClient = upstream.NewClientWithStreamTimeout(
+		captureClient = capture.NewClient(
 			*cfg.captureURL,
 			cfg.upstreamTimeout,
 			cfg.streamTimeout,
@@ -46,16 +45,23 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	}
 
 	if cfg.searchURL != nil {
-		searchClient = upstream.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
+		searchClient = search.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
 	}
 
-	gateway := &GatewayServer{shutdownTimeout: cfg.shutdownTimeout}
+	app := assembly.NewApplication(
+		coordinatorClient,
+		captureClient,
+		searchClient,
+	)
+
+	gateway := &GatewayServer{
+		shutdownTimeout: cfg.shutdownTimeout,
+	}
+
 	gateway.http = &http.Server{
-		Handler:           api.NewRouterWithServices(
+		Handler: api.NewRouter(
 			gateway.ready.Load,
 			app,
-			captureClient,
-			searchClient,
 			logger,
 		),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
@@ -63,6 +69,7 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		IdleTimeout:       serverIdleTimeout,
 		MaxHeaderBytes:    serverMaxHeaderBytes,
 	}
+
 	return gateway
 }
 

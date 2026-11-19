@@ -37,6 +37,7 @@ func NewProblem(
 func WriteProblem(w http.ResponseWriter, problem Problem) {
 	w.Header().Set(HeaderContentType, MediaTypeProblem)
 	w.Header().Set(HeaderCacheControl, CacheNoStore)
+
 	w.WriteHeader(problem.Status)
 	_ = json.NewEncoder(w).Encode(problem)
 }

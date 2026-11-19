@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -51,7 +50,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 
 	var err error
 
-	cfg.shutdownTimeout, err = durationSetting(
+	cfg.shutdownTimeout, err = getDurationSetting(
 		getenv,
 		shutdownEnvironment,
 		cfg.shutdownTimeout,
@@ -61,7 +60,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	cfg.upstreamTimeout, err = durationSetting(
+	cfg.upstreamTimeout, err = getDurationSetting(
 		getenv,
 		upstreamEnvironment,
 		cfg.upstreamTimeout,
@@ -71,7 +70,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	cfg.streamTimeout, err = durationSetting(
+	cfg.streamTimeout, err = getDurationSetting(
 		getenv,
 		streamTimeoutEnvironment,
 		cfg.streamTimeout,
@@ -81,47 +80,61 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	rawURL := getenv(coordinatorEnvironment)
+	captureRawURL := getenv(captureEnvironment)
+	searchRawURL := getenv(searchEnvironment)
 
-	if rawURL == "" {
-		return Config{}, fmt.Errorf("COORDINATOR_URL is required")
-	}
-	parsed, err := url.Parse(rawURL)
-
-	if err != nil {
-		return Config{}, fmt.Errorf("invalid COORDINATOR_URL: %w", err)
-	}
-
-	if !validCoordinatorOrigin(parsed) {
-		return Config{}, fmt.Errorf("COORDINATOR_URL must be an absolute HTTP(S) origin without credentials, path, query or fragment")
-	}
-	cfg.coordinatorURL = parsed
-
-	cfg.captureURL, err = serviceOrigin(getenv, captureEnvironment)
+	parsedCoordinatorURL, err := getServiceURL(getenv, coordinatorEnvironment)
 
 	if err != nil {
 		return Config{}, err
 	}
 
-	cfg.searchURL, err = serviceOrigin(getenv, searchEnvironment)
+	cfg.coordinatorURL = parsedCoordinatorURL
 
-	if err != nil {
-		return Config{}, err
+	if captureRawURL != "" {
+		parsedCaptureURL, err := getServiceURL(getenv, captureEnvironment)
+
+		if err != nil {
+			return Config{}, err
+		}
+
+		cfg.captureURL = parsedCaptureURL
+	}
+
+	if searchRawURL != "" {
+		parsedSearchURL, err := getServiceURL(getenv, searchEnvironment)
+
+		if err != nil {
+			return Config{}, err
+		}
+
+		cfg.searchURL = parsedSearchURL
 	}
 
 	return cfg, nil
 }
 
-func validCoordinatorOrigin(parsed *url.URL) bool {
-	httpScheme := parsed.Scheme == "http" || parsed.Scheme == "https"
-	validAuthority := parsed.Host != "" && parsed.User == nil
-	cleanPath := parsed.Path == "" || parsed.Path == "/"
-	noAdditionalParts := parsed.RawQuery == "" && parsed.Fragment == ""
+func getServiceURL(getenv func(string) string, key string) (*url.URL, error) {
+	rawURL := getenv(key)
 
-	return httpScheme && validAuthority && cleanPath && noAdditionalParts && !strings.HasSuffix(parsed.Host, "@")
+	if rawURL == "" {
+		return nil, nil
+	}
+
+	parsedURL, err := url.Parse(rawURL)
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"invalid %s: %w",
+			key,
+			err,
+		)
+	}
+
+	return parsedURL, nil
 }
 
-func durationSetting(
+func getDurationSetting(
 	getenv func(string) string,
 	key string,
 	fallback time.Duration,
@@ -144,29 +157,6 @@ func durationSetting(
 	if duration <= 0 {
 		return 0, fmt.Errorf("%s must be positive", key)
 	}
+
 	return duration, nil
-}
-
-func serviceOrigin(getenv func(string) string, key string) (*url.URL, error) {
-	raw := getenv(key)
-
-	if raw == "" {
-		return nil, fmt.Errorf("%s is required", key)
-	}
-
-	origin, err := url.Parse(raw)
-
-	if err != nil {
-		return nil, fmt.Errorf(
-			"invalid %s: %w",
-			key,
-			err,
-		)
-	}
-
-	if !validCoordinatorOrigin(origin) {
-		return nil, fmt.Errorf("%s must be an absolute HTTP(S) origin without credentials, path, query or fragment", key)
-	}
-
-	return origin, nil
 }

@@ -1,40 +1,55 @@
-// Package application provides the application layer for the Gateway service.
+// Package application provides the Gateway's application use cases.
 package application
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/lemuel-manske/castellani/libs/httpx"
 
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
+
+type ArchiveAccepted struct {
+	ArchiveID string `json:"archiveId"`
+	Status    string `json:"status"`
+	StatusURL string `json:"statusUrl"`
+}
 
 type ArchiveCoordinator interface {
 	CreateArchive(
 		context.Context,
 		string,
 		[]byte,
-	) (archive.Accepted, error)
+	) (ArchiveAccepted, error)
+
 	GetArchive(context.Context, string) (json.RawMessage, error)
 }
 
 type Application struct {
-	Coordinator ArchiveCoordinator
+	coordinator ArchiveCoordinator
+	capture     Capture
+	search      SearchService
 }
 
 type ValidationError struct {
 	Cause error
 }
 
-func (e *ValidationError) Error() string {
-	return e.Cause.Error()
-}
+func (e *ValidationError) Error() string { return e.Cause.Error() }
 
-func NewApplication(coordinator ArchiveCoordinator) Application {
-	return Application{Coordinator: coordinator}
+func NewApplication(
+	coordinator ArchiveCoordinator,
+	capture Capture,
+	search SearchService,
+) Application {
+	return Application{
+		coordinator: coordinator,
+		capture:     capture,
+		search:      search,
+	}
 }
 
 func (a Application) CreateArchive(
@@ -42,12 +57,14 @@ func (a Application) CreateArchive(
 	key string,
 	submission archive.Submission,
 	raw []byte,
-) (archive.Accepted, error) {
+) (ArchiveAccepted, error) {
 	if err := submission.Validate(); err != nil {
-		return archive.Accepted{}, &ValidationError{Cause: err}
+		return ArchiveAccepted{}, &ValidationError{
+			Cause: err,
+		}
 	}
 
-	return a.Coordinator.CreateArchive(
+	return a.coordinator.CreateArchive(
 		ctx,
 		key,
 		raw,
@@ -59,5 +76,5 @@ func (a Application) GetArchive(ctx context.Context, id string) (json.RawMessage
 		return nil, ErrInvalidArchiveID
 	}
 
-	return a.Coordinator.GetArchive(ctx, id)
+	return a.coordinator.GetArchive(ctx, id)
 }

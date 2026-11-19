@@ -96,7 +96,6 @@ func Run(
 	assertFormat(t, source, expected, DeclarationsOrder, MultilineSignatures, MultilineCalls, IfSpacing)
 }
 
-
 func TestFormat_ReturnAfterIf_HasBlankLine(t *testing.T) {
 	source := `package example
 
