@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/api"
 	"github.com/lemuel-manske/unnamed/services/gateway/application"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/coordinator"
-	"github.com/lemuel-manske/unnamed/services/gateway/internal/httpx"
+	"github.com/lemuel-manske/unnamed/services/gateway/common"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/upstream"
 	"github.com/stretchr/testify/require"
 )
@@ -128,11 +128,11 @@ func startService(t *testing.T, name string, handler http.HandlerFunc) url.URL {
 func (g Gateway) Submit(key, body string) Response {
 	g.t.Helper()
 
-	request, err := http.NewRequest(http.MethodPost, g.server.URL+httpx.ArchivesPath, strings.NewReader(body))
+	request, err := http.NewRequest(http.MethodPost, g.server.URL+common.ArchivesPath, strings.NewReader(body))
 	require.NoError(g.t, err)
 
-	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
-	request.Header.Set(sharedhttp.IdempotencyHeader, key)
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(httpx.IdempotencyHeader, key)
 
 	return g.send(request)
 }
@@ -143,8 +143,8 @@ func (g Gateway) CreateSession(key, body string) Response {
 	request, err := http.NewRequest(http.MethodPost, g.server.URL+"/sessions", strings.NewReader(body))
 	require.NoError(g.t, err)
 
-	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
-	request.Header.Set(sharedhttp.IdempotencyHeader, key)
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+	request.Header.Set(httpx.IdempotencyHeader, key)
 
 	return g.send(request)
 }
@@ -155,7 +155,7 @@ func (g Gateway) UpdateSession(id, body string) Response {
 	request, err := http.NewRequest(http.MethodPut, g.server.URL+"/sessions/"+id, strings.NewReader(body))
 	require.NoError(g.t, err)
 
-	request.Header.Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 
 	return g.send(request)
 }

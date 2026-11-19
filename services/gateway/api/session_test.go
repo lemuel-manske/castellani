@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/gatewaytest"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,9 +18,9 @@ const (
 func TestGateway_CreateSessionRetainsIdempotencyKeyAndPublicLocation(t *testing.T) {
 	keys := make(chan string, 1)
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, r *http.Request) {
-		keys <- r.Header.Get(sharedhttp.IdempotencyHeader)
-		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
-		w.Header().Set(sharedhttp.LocationHeader, "http://capture.internal/private/sess-1")
+		keys <- r.Header.Get(httpx.IdempotencyHeader)
+		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+		w.Header().Set(httpx.LocationHeader, "http://capture.internal/private/sess-1")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, sessionCreated)
 	}))
@@ -29,7 +29,7 @@ func TestGateway_CreateSessionRetainsIdempotencyKeyAndPublicLocation(t *testing.
 
 	assert.Equal(t, http.StatusCreated, result.Status)
 	assert.JSONEq(t, sessionCreated, result.Body)
-	assert.Equal(t, "/sessions/sess-1", result.Header.Get(sharedhttp.LocationHeader))
+	assert.Equal(t, "/sessions/sess-1", result.Header.Get(httpx.LocationHeader))
 	assert.Equal(t, gatewaytest.IdempotencyKey, <-keys)
 }
 
@@ -54,7 +54,7 @@ func TestGateway_SessionFinalizationForwardsDesiredState(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		received <- string(body)
-		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeJSON)
+		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		_, _ = io.WriteString(w, `{"sessionId":"sess-1","archiveId":"run-1","status":"COMPLETED","expiresAt":"2026-11-18T23:00:00Z","authGeneration":1}`)
 	}))
 

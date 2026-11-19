@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	sharedhttp "github.com/lemuel-manske/castellani/libs/httpx"
+	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/unnamed/services/gateway/internal/gatewaytest"
 	"github.com/stretchr/testify/assert"
 )
@@ -63,7 +63,7 @@ func TestGateway_WACZHeadReturnsMetadataWithoutReadingBytes(t *testing.T) {
 
 func TestGateway_UnpublishedWACZIsNotExposed(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeProblem)
+		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeProblem)
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `{"type":"urn:capture:unpublished","title":"Not Found","status":404}`)
 	}))
@@ -71,13 +71,13 @@ func TestGateway_UnpublishedWACZIsNotExposed(t *testing.T) {
 	result := gateway.WACZ("run-1", "", "")
 
 	assert.Equal(t, http.StatusNotFound, result.Status)
-	assert.Equal(t, sharedhttp.MediaTypeProblem, result.Header.Get(sharedhttp.HeaderContentType))
+	assert.Equal(t, httpx.MediaTypeProblem, result.Header.Get(httpx.HeaderContentType))
 	assert.NotContains(t, strings.ToLower(result.Body), "s3://")
 }
 
 func TestGateway_WACZUnsatisfiableRangePreservesContentRange(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set(sharedhttp.HeaderContentType, sharedhttp.MediaTypeProblem)
+		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeProblem)
 		w.Header().Set("Content-Range", "bytes */8")
 		w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
 		_, _ = io.WriteString(w, `{"type":"urn:capture:range","title":"Range Not Satisfiable","status":416}`)
