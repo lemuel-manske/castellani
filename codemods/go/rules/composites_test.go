@@ -97,7 +97,7 @@ func Run() {
 	expected := `package example
 
 func Run() {
-	config := Config{Host: "localhost", /* important */ Port: 8080}
+	config := Config{Host: "localhost" /* important */, Port: 8080}
 	_ = config
 }
 `
