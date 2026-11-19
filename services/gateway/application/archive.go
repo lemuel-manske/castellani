@@ -1,4 +1,3 @@
-// Package application provides the Gateway's application use cases.
 package application
 
 import (
@@ -7,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/common/archive"
 )
 
 var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment")
@@ -15,7 +13,7 @@ var ErrInvalidArchiveID = errors.New("archive ID must be a nonempty path segment
 func (a Application) CreateArchive(
 	ctx context.Context,
 	key string,
-	submission archive.Submission,
+	submission Submission,
 	raw []byte,
 ) (ArchiveAccepted, error) {
 	if err := submission.Validate(); err != nil {
