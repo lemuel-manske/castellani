@@ -47,7 +47,7 @@ func Start(t *testing.T, coordinatorHandler http.HandlerFunc) Gateway {
 	origin, err := url.Parse(upstream.URL)
 	require.NoError(t, err)
 
-	client := coordinator.NewClient(*origin, time.Second)
+	client := coordinator.NewHTTPClient(*origin, time.Second)
 	app := application.NewApplication(client)
 	router := api.NewRouter(func() bool { return true }, app, slog.Default())
 
@@ -79,7 +79,7 @@ func StartWithServices(
 	searchOrigin, err := url.Parse(searchServer.URL)
 	require.NoError(t, err)
 
-	app := application.NewApplication(coordinator.NewClient(*coordinatorOrigin, time.Second))
+	app := application.NewApplication(coordinator.NewHTTPClient(*coordinatorOrigin, time.Second))
 	captureClient := upstream.NewClient(*captureOrigin, time.Second)
 	searchClient := upstream.NewClient(*searchOrigin, time.Second)
 	router := api.NewRouterWithServices(func() bool { return true }, app, captureClient, searchClient, slog.Default())
