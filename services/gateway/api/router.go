@@ -21,7 +21,11 @@ const (
 	healthResponse  = "ok\n"
 )
 
-func NewRouter(ready func() bool, app application.Application, logger *slog.Logger) http.Handler {
+func NewRouter(
+	ready func() bool,
+	app application.Application,
+	logger *slog.Logger,
+) http.Handler {
 	router := chi.NewRouter()
 
 	router.Use(requestID)

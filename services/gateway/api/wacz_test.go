@@ -16,6 +16,7 @@ func TestGateway_PublishedWACZStreamsBytesWithoutRewriting(t *testing.T) {
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Accept-Ranges", "bytes")
 		w.Header().Set("ETag", `"digest-1"`)
+
 		_, _ = io.WriteString(w, "WACZ-PAYLOAD")
 	}))
 
@@ -54,6 +55,7 @@ func TestGateway_WACZRangeRequestPreservesPartialContentSemantics(t *testing.T) 
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Accept-Ranges", "bytes")
 		w.Header().Set("Content-Range", "bytes 0-3/8")
+
 		w.WriteHeader(http.StatusPartialContent)
 		_, _ = io.WriteString(w, "WACZ")
 	}))
@@ -91,6 +93,7 @@ func TestGateway_WACZHeadReturnsMetadataWithoutReadingBytes(t *testing.T) {
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Content-Length", "900")
 		w.Header().Set("ETag", `"digest-1"`)
+
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -143,6 +146,7 @@ func TestGateway_WACZUnsatisfiableRangePreservesContentRange(t *testing.T) {
 	gateway := gatewaytest.Start(t, gatewaytest.WithCaptureService(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeProblem)
 		w.Header().Set("Content-Range", "bytes */8")
+
 		w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
 		_, _ = io.WriteString(w, `{"type":"urn:capture:range","title":"Range Not Satisfiable","status":416}`)
 	}))

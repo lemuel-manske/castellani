@@ -14,6 +14,7 @@ func JSON(
 ) {
 	w.Header().Set(HeaderContentType, MediaTypeJSON)
 	w.Header().Set(HeaderCacheControl, CacheNoStore)
+
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
 }

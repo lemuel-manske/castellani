@@ -129,6 +129,7 @@ func TestWACZ_PartialContentIsStreamedByCapture(t *testing.T) {
 		)
 		w.Header().Set("Content-Type", "application/wacz")
 		w.Header().Set("Content-Range", "bytes 0-3/8")
+
 		w.WriteHeader(http.StatusPartialContent)
 		_, _ = io.WriteString(w, "WACZ")
 	}))

@@ -186,8 +186,6 @@ func writeFailure(
 		)
 		httpx.WriteProblem(w, responseProblem)
 
-
-
 	default:
 		responseProblem := httpx.NewProblem(
 			r,

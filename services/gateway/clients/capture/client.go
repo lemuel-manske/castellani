@@ -126,6 +126,7 @@ func (c *Client) CreateSession(
 	}
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	request.Header.Set(httpx.IdempotencyHeader, key)
+
 	data, err := c.execute(request, http.StatusCreated)
 
 	if err != nil {
@@ -299,13 +300,13 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	}
 
 	if response.StatusCode != success {
-        // Range failures are part of the WACZ protocol, not JSON endpoints.
-        if response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
-            return nil, ErrInvalidResponse
-        }
+		// Range failures are part of the WACZ protocol, not JSON endpoints.
+		if response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+			return nil, ErrInvalidResponse
+		}
 
-        return nil, failureError(response.StatusCode, data)
-    }
+		return nil, failureError(response.StatusCode, data)
+	}
 
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
 		return nil, ErrInvalidResponse
@@ -320,6 +321,7 @@ func (c *Client) request(
 	body []byte,
 ) (*http.Request, error) {
 	target := c.origin
+
 	target.Path = path
 	target.RawPath = ""
 	target.RawQuery = query

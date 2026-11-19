@@ -2,8 +2,8 @@ package api_test
 
 import (
 	"io"
-	"net/url"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
@@ -34,7 +34,11 @@ func TestGateway_SearchReturnsHistoricalSnapshotsFromSearchService(t *testing.T)
 		searchResults,
 		result.Body,
 	)
-	assert.Equal(t, url.Values{"q": {"historical"}, "archiveId": {"run-1"}, "limit": {"10"}}, <-receivedQuery)
+	assert.Equal(
+		t,
+		url.Values{"q": {"historical"}, "archiveId": {"run-1"}, "limit": {"10"}},
+		<-receivedQuery,
+	)
 }
 
 func TestGateway_SearchWithoutQueryIsRejectedBeforeCallingSearchService(t *testing.T) {

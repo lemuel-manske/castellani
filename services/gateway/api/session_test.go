@@ -21,6 +21,7 @@ func TestGateway_CreateSessionRetainsIdempotencyKeyAndPublicLocation(t *testing.
 		keys <- r.Header.Get(httpx.IdempotencyHeader)
 		w.Header().Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 		w.Header().Set(httpx.LocationHeader, "http://capture.internal/private/sess-1")
+
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, sessionCreated)
 	}))

@@ -62,6 +62,7 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 		values.Set("cursor", query.Pagination.Cursor)
 	}
 	target := c.origin
+
 	target.Path = common.SearchPath
 	target.RawPath = ""
 	target.RawQuery = values.Encode()

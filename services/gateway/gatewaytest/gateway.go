@@ -113,7 +113,11 @@ func Start(t *testing.T, options ...Option) Gateway {
 		searchClient,
 	)
 
-	router := api.NewRouter(func() bool { return services.ready }, app, slog.Default())
+	router := api.NewRouter(
+		func() bool { return services.ready },
+		app,
+		slog.Default(),
+	)
 
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
