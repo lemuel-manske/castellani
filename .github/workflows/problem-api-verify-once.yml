@@ -1,0 +1,33 @@
+name: Verify Problem API refactor
+on:
+  push:
+    branches: [feat/coordinator-service]
+    paths: [.github/workflows/problem-api-verify-once.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Check independent Go modules
+        shell: bash
+        run: |
+          overall=0
+          : > PROBLEM-VERIFY-TEMP.txt
+          for module in libs/httpx services/gateway services/coordinator; do
+            echo "=== $module ===" >> PROBLEM-VERIFY-TEMP.txt
+            (
+              cd "$module"
+              GOWORK=off go mod tidy &&
+              GOWORK=off go vet ./... &&
+              GOWORK=off go test -race ./...
+            ) >> PROBLEM-VERIFY-TEMP.txt 2>&1 || overall=1
+          done
+          echo "overall_result=$overall" >> PROBLEM-VERIFY-TEMP.txt
+          git add libs/httpx services/gateway services/coordinator PROBLEM-VERIFY-TEMP.txt
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore(httpx): record Problem API verification'
+          git push origin HEAD:feat/coordinator-service
