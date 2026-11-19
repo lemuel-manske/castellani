@@ -19,9 +19,13 @@ func TestAdmission_AtomicallyRecordsRunAndStartCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "run-1", accepted.ArchiveID)
+
 	assert.Len(t, database.keys, 1)
+
 	assert.Len(t, database.runs, 1)
+
 	assert.Len(t, database.outbox, 1)
+
 	assert.Equal(t, outboxPending, stringAttr(database.outbox["run-1:start:1"], "state"))
 }
 
@@ -58,7 +62,9 @@ func TestAdmission_ConcurrentRetriesProduceOneRun(t *testing.T) {
 	}
 
 	assert.Len(t, database.keys, 1)
+
 	assert.Len(t, database.runs, 1)
+
 	assert.Len(t, database.outbox, 1)
 }
 
@@ -73,7 +79,9 @@ func TestAdmission_ChangingRequestUnderExistingKeyIsRejected(t *testing.T) {
 
 	require.ErrorIs(t, err, application.ErrConflict)
 
+
 	assert.Len(t, database.runs, 1)
+
 	assert.Len(t, database.outbox, 1)
 }
 
@@ -88,7 +96,10 @@ func TestArchive_AdmittedRunHasReadableInitialStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "run-1", status.ArchiveID)
+
 	assert.Equal(t, archive.Accepted, status.Status)
+
 	assert.Equal(t, "NOT_READY", status.Replay.Status)
+
 	assert.Equal(t, "PENDING", status.Search.Status)
 }
