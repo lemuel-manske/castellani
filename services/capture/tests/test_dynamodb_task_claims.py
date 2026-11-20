@@ -43,7 +43,18 @@ async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation() -> 
 
 
 async def test_claim_does_not_replace_an_active_attempt() -> None:
-    client = new_frontier_client()
+    client = FakeDynamoDBFrontierClient()
+    client.runs["archive-1"] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": "OPEN"},
+    }
+    client.frontier[("archive-1", "url-1")] = {
+        "archiveId": {"S": "archive-1"},
+        "urlKey": {"S": "url-1"},
+        "url": {"S": "https://example.org/"},
+        "depth": {"N": "2"},
+        "state": {"S": "PENDING"},
+    }
     attempt_ids = iter(("attempt-1", "attempt-2"))
     claims = DynamoDBTaskClaims(
         client=client,
@@ -63,7 +74,18 @@ async def test_claim_does_not_replace_an_active_attempt() -> None:
 
 async def test_expired_claim_is_reclaimed_with_a_higher_fence() -> None:
     clock = FakeClock()
-    client = new_frontier_client()
+    client = FakeDynamoDBFrontierClient()
+    client.runs["archive-1"] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": "OPEN"},
+    }
+    client.frontier[("archive-1", "url-1")] = {
+        "archiveId": {"S": "archive-1"},
+        "urlKey": {"S": "url-1"},
+        "url": {"S": "https://example.org/"},
+        "depth": {"N": "2"},
+        "state": {"S": "PENDING"},
+    }
     attempt_ids = iter(("attempt-1", "attempt-2"))
     claims = DynamoDBTaskClaims(
         client=client,
@@ -89,7 +111,18 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence() -> None:
 
 
 async def test_claim_requires_an_open_archive_run() -> None:
-    client = new_frontier_client()
+    client = FakeDynamoDBFrontierClient()
+    client.runs["archive-1"] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": "OPEN"},
+    }
+    client.frontier[("archive-1", "url-1")] = {
+        "archiveId": {"S": "archive-1"},
+        "urlKey": {"S": "url-1"},
+        "url": {"S": "https://example.org/"},
+        "depth": {"N": "2"},
+        "state": {"S": "PENDING"},
+    }
     client.runs["archive-1"]["admission"] = {"S": "CLOSED"}
     claims = DynamoDBTaskClaims(
         client=client,
@@ -107,7 +140,18 @@ async def test_claim_requires_an_open_archive_run() -> None:
 
 async def test_renewal_extends_the_lease_without_changing_attempt_or_fence() -> None:
     clock = FakeClock()
-    client = new_frontier_client()
+    client = FakeDynamoDBFrontierClient()
+    client.runs["archive-1"] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": "OPEN"},
+    }
+    client.frontier[("archive-1", "url-1")] = {
+        "archiveId": {"S": "archive-1"},
+        "urlKey": {"S": "url-1"},
+        "url": {"S": "https://example.org/"},
+        "depth": {"N": "2"},
+        "state": {"S": "PENDING"},
+    }
     claims = DynamoDBTaskClaims(
         client=client,
         frontier_table_name="capture_frontier",
@@ -130,7 +174,18 @@ async def test_renewal_extends_the_lease_without_changing_attempt_or_fence() -> 
 
 
 async def test_renewal_is_rejected_after_the_archive_run_closes() -> None:
-    client = new_frontier_client()
+    client = FakeDynamoDBFrontierClient()
+    client.runs["archive-1"] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": "OPEN"},
+    }
+    client.frontier[("archive-1", "url-1")] = {
+        "archiveId": {"S": "archive-1"},
+        "urlKey": {"S": "url-1"},
+        "url": {"S": "https://example.org/"},
+        "depth": {"N": "2"},
+        "state": {"S": "PENDING"},
+    }
     claims = DynamoDBTaskClaims(
         client=client,
         frontier_table_name="capture_frontier",
@@ -149,7 +204,18 @@ async def test_renewal_is_rejected_after_the_archive_run_closes() -> None:
 
 
 async def test_concurrent_claims_have_exactly_one_winner_for_a_page() -> None:
-    client = new_frontier_client()
+    client = FakeDynamoDBFrontierClient()
+    client.runs["archive-1"] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": "OPEN"},
+    }
+    client.frontier[("archive-1", "url-1")] = {
+        "archiveId": {"S": "archive-1"},
+        "urlKey": {"S": "url-1"},
+        "url": {"S": "https://example.org/"},
+        "depth": {"N": "2"},
+        "state": {"S": "PENDING"},
+    }
     attempt_ids = iter(f"attempt-{number}" for number in range(20))
     claims = DynamoDBTaskClaims(
         client=client,
