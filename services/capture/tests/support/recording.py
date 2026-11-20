@@ -201,6 +201,7 @@ class ReplayResult:
     page_state: str
     download_content: str
     image_width: int
+    body_font_family: str
 
 
 async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> ReplayResult:
@@ -231,6 +232,9 @@ async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> Rep
                     page_state=await page.locator("#state").inner_text(),
                     download_content=await page.locator("#download").inner_text(),
                     image_width=await page.locator("img").evaluate("(image) => image.naturalWidth"),
+                    body_font_family=await page.locator("body").evaluate(
+                        "(body) => getComputedStyle(body).fontFamily"
+                    ),
                 )
             finally:
                 await browser.close()
