@@ -13,9 +13,6 @@ HOST = "127.0.0.1"
 
 COLLECTION_NAME = "capture"
 
-CA_DOWNLOAD_HOST = "wsgiprox"
-CA_DOWNLOAD_PATH = "/download/pem"
-
 PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 10
 STARTUP_TIMEOUT_SECONDS = 15
 
@@ -57,29 +54,48 @@ def available_port() -> int:
 async def wait_for_http_response(
     process: asyncio.subprocess.Process,
     url: str,
-    is_ready: Callable[[httpx.Response], bool] | None = None,
-    headers: dict[str, str] | None = None,
+    is_ready: Callable[[httpx.Response], bool],
 ) -> httpx.Response:
-    deadline = asyncio.get_running_loop().time() + STARTUP_TIMEOUT_SECONDS
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + STARTUP_TIMEOUT_SECONDS
+    last_response: httpx.Response | None = None
+    last_error: httpx.TransportError | None = None
 
     async with httpx.AsyncClient(trust_env=False, timeout=1) as client:
-        while asyncio.get_running_loop().time() < deadline:
+        while loop.time() < deadline:
             if process.returncode is not None:
-                raise RuntimeError("pywb process exited before becoming ready")
+                raise RuntimeError(
+                    f"pywb process exited before becoming ready (exit code {process.returncode})"
+                )
 
             try:
-                response = await client.get(url, headers=headers)
-            except httpx.TransportError:
-                await asyncio.sleep(0.1)
+                response = await client.get(url)
+            except httpx.TransportError as error:
+                last_error = error
+            else:
+                last_response = response
 
-                continue
+                if is_ready(response):
+                    return response
 
-            if is_ready is None or is_ready(response):
-                return response
+            remaining = deadline - loop.time()
 
-            await asyncio.sleep(0.1)
+            if remaining > 0:
+                await asyncio.sleep(min(0.1, remaining))
 
-    raise TimeoutError("pywb process did not become ready in time")
+    if last_response is not None:
+        raise TimeoutError(
+            f"pywb did not become ready at {url}; "
+            f"last response was HTTP {last_response.status_code}"
+        )
+
+    if last_error is not None:
+        raise TimeoutError(
+            f"pywb did not become ready at {url}; "
+            f"last connection error was {last_error}"
+        ) from last_error
+
+    raise TimeoutError(f"pywb did not become ready at {url}")
 
 
 async def stop_process(process: asyncio.subprocess.Process) -> None:
@@ -135,8 +151,6 @@ class PyWBRecorder:
             "-p",
             str(self.port),
             cwd=self.output_dir,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
         )
 
         try:
@@ -169,8 +183,6 @@ class PyWBRecorder:
             "init",
             COLLECTION_NAME,
             cwd=self.output_dir,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
         )
 
         result = await process.wait()
@@ -184,16 +196,23 @@ class PyWBRecorder:
         if process is None:
             raise RuntimeError("pywb recorder process has not started")
 
-        response = await wait_for_http_response(
+        await wait_for_http_response(
             process,
-            f"{self.proxy_url}{CA_DOWNLOAD_PATH}",
-            lambda response: (
-                response.status_code == 200 and b"BEGIN CERTIFICATE" in response.content
-            ),
-            headers={"Host": CA_DOWNLOAD_HOST},
+            self.proxy_url,
+            lambda response: response.status_code < 500,
         )
 
-        self.ca_certificate_path.write_bytes(response.content)
+        try:
+            certificate = self.ca_certificate_path.read_bytes()
+        except OSError as error:
+            raise RuntimeError(
+                f"pywb started without creating its proxy CA at {self.ca_certificate_path}"
+            ) from error
+
+        if b"BEGIN CERTIFICATE" not in certificate:
+            raise RuntimeError(
+                f"pywb created an invalid proxy CA at {self.ca_certificate_path}"
+            )
 
 
 class PyWBReplayServer:
@@ -223,8 +242,6 @@ class PyWBReplayServer:
             "-p",
             str(self.port),
             cwd=self.replay_dir,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
         )
 
         try:
@@ -233,7 +250,11 @@ class PyWBReplayServer:
             if not process:
                 raise RuntimeError("pywb replay process has not started")
 
-            await wait_for_http_response(process, f"http://{HOST}:{self.port}/")
+            await wait_for_http_response(
+                process,
+                f"http://{HOST}:{self.port}/",
+                lambda response: response.status_code < 500,
+            )
         except BaseException:
             await self.stop()
 
@@ -260,8 +281,6 @@ class PyWBReplayServer:
             "reindex",
             COLLECTION_NAME,
             cwd=self.capture_dir,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
         )
 
         result = await process.wait()
