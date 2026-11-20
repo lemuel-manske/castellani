@@ -1,0 +1,37 @@
+name: python @ Capture
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: services/capture/.python-version
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/capture/uv.lock
+
+      - run: sudo apt-get update && sudo apt-get install --yes libnss3-tools
+
+      - run: make install
+        working-directory: services/capture
+
+      - run: uv run playwright install --with-deps chromium
+        working-directory: services/capture
+
+      - run: make check
+        working-directory: services/capture
+
+      - run: make test
+        working-directory: services/capture
