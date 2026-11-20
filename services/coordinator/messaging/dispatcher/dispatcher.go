@@ -5,21 +5,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/lemuel-manske/unnamed/services/coordinator/messaging"
 )
-
-type Dispatcher struct {
-	outbox    messaging.Outbox
-	publisher messaging.Publisher
-}
-
-func NewDispatcher(outbox messaging.Outbox, publisher messaging.Publisher) *Dispatcher {
-	return &Dispatcher{
-		outbox:    outbox,
-		publisher: publisher,
-	}
-}
 
 func (d *Dispatcher) Dispatch(ctx context.Context) (bool, error) {
 	message, found, err := d.outbox.Claim(ctx, 30*time.Second)
