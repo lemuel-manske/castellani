@@ -194,19 +194,21 @@ async def capture_page(
 
                 main_request_finished = asyncio.Event()
 
-                main_response: Response | None = None
+                main_response_future: asyncio.Future[Response] = loop.create_future()
 
                 def record_download(download: Download) -> None:
                     if not download_future.done():
                         download_future.set_result(download)
 
                 def record_main_response(response: Response) -> None:
-                    nonlocal main_response
-
                     request = response.request
 
-                    if request.is_navigation_request() and request.frame == page.main_frame:
-                        main_response = response
+                    if (
+                        request.is_navigation_request()
+                        and request.frame == page.main_frame
+                        and not main_response_future.done()
+                    ):
+                        main_response_future.set_result(response)
 
                 def record_main_request_finished(request: Request) -> None:
                     if request.is_navigation_request() and request.frame == page.main_frame:
@@ -240,8 +242,11 @@ async def capture_page(
                             final_url = download.url
 
                             response = main_response
-                        elif main_response is not None and is_pdf_content_type(
-                            main_response.headers.get("content-type")
+                        elif (
+                            main_response_future.done()
+                            and is_pdf_content_type(
+                                main_response_future.result().headers.get("content-type")
+                            )
                         ):
                             try:
                                 await asyncio.wait_for(
@@ -251,12 +256,16 @@ async def capture_page(
                             except TimeoutError:
                                 raise navigation_error from None
 
-                            response = main_response
-                            final_url = main_response.url
+                            response = main_response_future.result()
+                            final_url = response.url
                         else:
                             raise
                     else:
-                        response = response or main_response
+                        response = response or (
+                            main_response_future.result()
+                            if main_response_future.done()
+                            else None
+                        )
                         final_url = page.url
 
                     if (
