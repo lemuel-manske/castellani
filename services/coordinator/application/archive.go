@@ -40,7 +40,9 @@ func (a *Application) SubmitArchive(
 		return AcceptedArchive{}, ErrIdempotencyConflict
 	}
 
-	return AcceptedArchive{ArchiveID: accepted.ArchiveID}, err
+	return AcceptedArchive{
+		ArchiveID: accepted.ArchiveID,
+	}, err
 }
 
 func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive, error) {

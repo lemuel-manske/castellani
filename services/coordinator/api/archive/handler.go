@@ -35,7 +35,7 @@ type ArchiveResponse struct {
 	ArchiveID string `json:"archiveId"`
 	Status    string `json:"status"`
 
-	Capture   struct {
+	Capture struct {
 		Captured int `json:"captured"`
 		Failed   int `json:"failed"`
 		Pending  int `json:"pending"`
