@@ -6,11 +6,12 @@ from pathlib import Path
 from application.contracts import (
     ArtifactStore,
     BrowserCapacity,
-    BrowserReservation,
-    CaptureOutcome,
+    CaptureArtifact,
     PageExecutor,
     TaskRepository,
 )
+from domain.browser_reservation import BrowserReservation
+from domain.capture import CaptureOutcome
 from domain.task import TaskClaim
 from utils.fn import awaitable, noop
 
@@ -145,11 +146,14 @@ class Worker:
         directory = await self.artifacts.create_attempt_directory(claim_state[0])
         directory_state[0] = directory
 
-        artifact = await self.executor.execute(claim_state[0].task.url, directory)
+        artifact: CaptureArtifact = await self.executor.execute(
+            claim_state[0].task.url,
+            directory,
+        )
 
         await self.repository.admit_discovered(
             claim_state[0],
-            artifact.discovered_urls,
+            artifact.capture.discovered_urls,
         )
 
         claim = claim_state[0]
@@ -158,10 +162,10 @@ class Worker:
             url_key=claim.task.url_key,
             attempt_id=claim.attempt_id,
             fence=claim.fence,
-            artifact=artifact,
+            capture=artifact.capture,
         )
 
-        await self.repository.complete(outcome)
+        await self.repository.complete(outcome, artifact.warc_files)
         terminal_state[0] = True
 
     async def _maintain_leases(
@@ -192,10 +196,13 @@ class Worker:
 
             claim = claim_state[0]
             reservation = reservation_state[0]
-            remaining = min(
-                [claim.lease_until]
-                + ([reservation.lease_until] if reservation is not None else [])
-            ) - time.time()
+            remaining = (
+                min(
+                    [claim.lease_until]
+                    + ([reservation.lease_until] if reservation is not None else [])
+                )
+                - time.time()
+            )
 
             if remaining <= 0:
                 raise LeaseLostError("an execution lease expired before renewal began")
@@ -206,7 +213,7 @@ class Worker:
                         self.repository.renew(claim),
                         timeout=remaining * 0.8,
                     )
-                    self._verify_claim_renewal(claim, renewed_claim)
+                    claim.verify_renewal(renewed_claim, time.time())
                     claim_state[0] = renewed_claim
                     continue
 
@@ -221,11 +228,11 @@ class Worker:
                 renewed_claim, renewed_reservation = renewals
 
                 if not isinstance(renewed_claim, BaseException):
-                    self._verify_claim_renewal(claim, renewed_claim)
+                    claim.verify_renewal(renewed_claim, time.time())
                     claim_state[0] = renewed_claim
 
                 if not isinstance(renewed_reservation, BaseException):
-                    self._verify_reservation_renewal(reservation, renewed_reservation)
+                    reservation.verify_renewal(renewed_reservation, time.time())
                     reservation_state[0] = renewed_reservation
 
                 if isinstance(renewed_claim, BaseException):
@@ -236,30 +243,6 @@ class Worker:
 
             except Exception as error:
                 raise LeaseLostError("failed to renew execution ownership") from error
-
-    @staticmethod
-    def _verify_claim_renewal(previous: TaskClaim, renewed: TaskClaim) -> None:
-        if (
-            renewed.attempt_id != previous.attempt_id
-            or renewed.fence != previous.fence
-            or renewed.task != previous.task
-            or renewed.lease_until <= max(previous.lease_until, time.time())
-        ):
-            raise LeaseLostError("task lease renewal returned an invalid claim")
-
-    @staticmethod
-    def _verify_reservation_renewal(
-        previous: BrowserReservation,
-        renewed: BrowserReservation,
-    ) -> None:
-        if (
-            renewed.attempt_id != previous.attempt_id
-            or renewed.reservation_id != previous.reservation_id
-            or renewed.slot_id != previous.slot_id
-            or renewed.fence != previous.fence
-            or renewed.lease_until <= max(previous.lease_until, time.time())
-        ):
-            raise LeaseLostError("browser reservation renewal returned an invalid reservation")
 
     async def _discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         try:
