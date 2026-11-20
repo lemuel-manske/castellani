@@ -1,4 +1,4 @@
-name: go @ Archive Coordinator
+name: go @ Coordinator
 
 on:
   push:
