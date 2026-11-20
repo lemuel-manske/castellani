@@ -13,7 +13,8 @@ HOST = "127.0.0.1"
 
 COLLECTION_NAME = "capture"
 
-CA_DOWNLOAD_PATH = "/wsgiprox/download/pem"
+CA_DOWNLOAD_HOST = "wsgiprox"
+CA_DOWNLOAD_PATH = "/download/pem"
 
 PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 10
 STARTUP_TIMEOUT_SECONDS = 15
@@ -57,6 +58,7 @@ async def wait_for_http_response(
     process: asyncio.subprocess.Process,
     url: str,
     is_ready: Callable[[httpx.Response], bool] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     deadline = asyncio.get_running_loop().time() + STARTUP_TIMEOUT_SECONDS
 
@@ -66,7 +68,7 @@ async def wait_for_http_response(
                 raise RuntimeError("pywb process exited before becoming ready")
 
             try:
-                response = await client.get(url)
+                response = await client.get(url, headers=headers)
             except httpx.TransportError:
                 await asyncio.sleep(0.1)
 
@@ -188,6 +190,7 @@ class PyWBRecorder:
             lambda response: (
                 response.status_code == 200 and b"BEGIN CERTIFICATE" in response.content
             ),
+            headers={"Host": CA_DOWNLOAD_HOST},
         )
 
         self.ca_certificate_path.write_bytes(response.content)
