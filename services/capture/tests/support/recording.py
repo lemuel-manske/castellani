@@ -94,6 +94,20 @@ def start_local_site() -> LocalSite:
 
                 return
 
+            if path == "/redirect-to-pdf":
+                self.send_response(302)
+                self.send_header("Location", "/assets/document.pdf")
+                self.end_headers()
+
+                return
+
+            if path == "/redirect-to-download":
+                self.send_response(302)
+                self.send_header("Location", "/assets/download.bin")
+                self.end_headers()
+
+                return
+
             if path == "/page":
                 self._write(PAGE.encode(), "text/html; charset=utf-8")
 
