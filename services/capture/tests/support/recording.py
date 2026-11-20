@@ -1,0 +1,260 @@
+import asyncio
+import gzip
+import json
+import signal
+import socket
+import subprocess
+import threading
+from collections.abc import Sequence
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import httpx
+from playwright.async_api import async_playwright
+
+HOST = "127.0.0.1"
+COLLECTION_NAME = "capture"
+REPLAY_STARTUP_TIMEOUT_SECONDS = 15
+
+PAGE = """<!doctype html>
+<html>
+  <head>
+    <title>Recorder acceptance page</title>
+    <link rel="stylesheet" href="/assets/site.css">
+    <script defer src="/assets/app.js"></script>
+  </head>
+  <body>
+    <h1>Recorder acceptance page</h1>
+    <p id="state">waiting</p>
+    <p id="download">waiting</p>
+    <img src="/assets/pixel.svg" alt="pixel">
+    <a href="/next">Next</a>
+  </body>
+</html>
+"""
+
+STYLESHEET = "body { font-family: sans-serif; }"
+SCRIPT = """
+document.querySelector("#state").textContent = "rendered";
+
+fetch("/assets/download.bin")
+  .then((response) => response.text())
+  .then((body) => {
+    document.querySelector("#download").textContent = body;
+  });
+"""
+IMAGE = """<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">
+  <rect width="1" height="1" fill="#000"/>
+</svg>"""
+DOWNLOAD = "archive-download-payload"
+
+
+@dataclass
+class LocalSite:
+    server: ThreadingHTTPServer
+    thread: threading.Thread
+    base_url: str
+    stopped: bool = False
+
+    def stop(self) -> None:
+        if self.stopped:
+            return
+
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+        self.stopped = True
+
+
+def start_local_site() -> LocalSite:
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            path = self.path.split("?", maxsplit=1)[0]
+
+            if path == "/start":
+                self.send_response(302)
+                self.send_header("Location", "/page")
+                self.end_headers()
+
+                return
+
+            if path == "/page":
+                self._write(PAGE.encode(), "text/html; charset=utf-8")
+
+                return
+
+            if path == "/assets/site.css":
+                self._write(STYLESHEET.encode(), "text/css")
+
+                return
+
+            if path == "/assets/app.js":
+                self._write(SCRIPT.encode(), "text/javascript")
+
+                return
+
+            if path == "/assets/pixel.svg":
+                self._write(IMAGE.encode(), "image/svg+xml")
+
+                return
+
+            if path == "/assets/download.bin":
+                self._write(
+                    DOWNLOAD.encode(),
+                    "application/octet-stream",
+                    "attachment; filename=download.bin",
+                )
+
+                return
+
+            self.send_error(404)
+
+        def _write(
+            self,
+            body: bytes,
+            content_type: str,
+            content_disposition: str | None = None,
+        ) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+
+            if content_disposition:
+                self.send_header("Content-Disposition", content_disposition)
+
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer((HOST, 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    return LocalSite(
+        server=server,
+        thread=thread,
+        base_url=f"http://{HOST}:{server.server_port}",
+    )
+
+
+def read_warc_files(warc_files: Sequence[Path]) -> bytes:
+    content = b""
+
+    for warc_file in warc_files:
+        with gzip.open(warc_file, "rb") as archive:
+            content += archive.read()
+
+    return content
+
+
+@dataclass
+class ReplayResult:
+    status_code: int
+    page_state: str
+    download_content: str
+    image_width: int
+
+
+def available_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind((HOST, 0))
+
+        return int(listener.getsockname()[1])
+
+
+async def wait_for_server(process: asyncio.subprocess.Process, port: int) -> None:
+    deadline = asyncio.get_running_loop().time() + REPLAY_STARTUP_TIMEOUT_SECONDS
+
+    async with httpx.AsyncClient(trust_env=False, timeout=1) as client:
+        while asyncio.get_running_loop().time() < deadline:
+            if process.returncode is not None:
+                raise RuntimeError("pywb replay server exited before becoming ready")
+
+            try:
+                await client.get(f"http://{HOST}:{port}/")
+
+                return
+            except httpx.TransportError:
+                await asyncio.sleep(0.1)
+
+    raise TimeoutError("pywb replay server did not become ready in time")
+
+
+async def stop_server(process: asyncio.subprocess.Process) -> None:
+    if process.returncode is not None:
+        return
+
+    process.send_signal(signal.SIGINT)
+
+    try:
+        await asyncio.wait_for(process.wait(), timeout=10)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+
+
+async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> ReplayResult:
+    await asyncio.to_thread(
+        subprocess.run,
+        ["wb-manager", "reindex", COLLECTION_NAME],
+        cwd=capture_dir,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
+    replay_dir.mkdir(parents=True, exist_ok=True)
+    replay_config = f"""
+collections_root: {json.dumps(str(capture_dir / "collections"))}
+archive_paths:
+  - archive
+index_paths:
+  - indexes
+framed_replay: false
+"""
+    (replay_dir / "config.yaml").write_text(replay_config, encoding="utf-8")
+
+    replay_port = available_port()
+    process = await asyncio.create_subprocess_exec(
+        "wayback",
+        "-p",
+        str(replay_port),
+        cwd=replay_dir,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+
+    try:
+        await wait_for_server(process, replay_port)
+        replay_url = f"http://{HOST}:{replay_port}/{COLLECTION_NAME}/{page_url}"
+
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(headless=True)
+
+            try:
+                page = await browser.new_page()
+                response = await page.goto(replay_url, wait_until="domcontentloaded")
+
+                if response is None:
+                    raise RuntimeError("Replay navigation did not return a response")
+
+                await page.wait_for_function(
+                    "document.querySelector('#download')?.textContent === "
+                    "'archive-download-payload'"
+                )
+
+                return ReplayResult(
+                    status_code=response.status,
+                    page_state=await page.locator("#state").inner_text(),
+                    download_content=await page.locator("#download").inner_text(),
+                    image_width=await page.locator("img").evaluate(
+                        "(image) => image.naturalWidth"
+                    ),
+                )
+            finally:
+                await browser.close()
+    finally:
+        await stop_server(process)
