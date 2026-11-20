@@ -8,6 +8,7 @@ init:
 fmt:
 	$(TERRAFORM) -chdir=terraform fmt -recursive
 
+
 validate: init
 	$(TERRAFORM) -chdir=terraform validate
 

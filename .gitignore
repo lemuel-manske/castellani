@@ -1,6 +1,5 @@
 .env
 
-# Terraform
 **/.terraform/*
 **/terraform.tfstate
 **/terraform.tfstate.*
@@ -13,6 +12,5 @@
 **/.terraformrc
 **/terraform.rc
 
-# Local Terraform variable overrides
 infra/terraform/terraform.tfvars
 infra/terraform/*.auto.tfvars
