@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
-from playwright.async_api import Route, TimeoutError as PlaywrightTimeoutError, async_playwright
+from playwright.async_api import async_playwright, Route, TimeoutError as PlaywrightTimeoutError
 from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
