@@ -76,7 +76,6 @@ class Worker:
                 str(getattr(error, "reason_code", "capture_failed")),
                 str(error),
             )
-            terminal = True
             await self.on_error(error)
         finally:
             if directory is not None and not terminal:
