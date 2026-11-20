@@ -8,9 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
-from playwright.async_api import Route
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import async_playwright
+from playwright.async_api import Route, TimeoutError as PlaywrightTimeoutError, async_playwright
 from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
@@ -323,7 +321,10 @@ def is_valid_url(url: str) -> bool:
         ):
             return False
 
-        parsed_url.port
+        port = parsed_url.port
+
+        if port is not None and not 0 <= port <= 65_535:
+            return False
     except ValueError:
         return False
 
