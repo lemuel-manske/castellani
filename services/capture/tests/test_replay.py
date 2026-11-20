@@ -7,6 +7,7 @@ from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
 
 from capture.browser import capture_local_page
 from capture.recording import PyWBReplayServer
+from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
 
@@ -47,6 +48,18 @@ async def test_replay_serves_downloaded_resource(
     assert replay.download_content == DOWNLOAD
 
 
+async def test_replay_applies_recorded_stylesheet(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
+    local_site.stop()
+
+    replay = await replay_page(tmp_path, tmp_path / "replay", capture.final_url)
+
+    assert "sans-serif" in replay.body_font_family
+
+
 async def test_replay_loads_page_image(
     local_site: LocalSite,
     tmp_path: Path,
@@ -68,6 +81,14 @@ async def test_concurrent_captures_replay_only_their_own_pages(
         capture_local_page(f"{local_site.base_url}/capture/second", tmp_path / "second"),
     )
     local_site.stop()
+
+    first_warc = read_gzip_files(first_capture.warc_files)
+    second_warc = read_gzip_files(second_capture.warc_files)
+
+    assert b"First capture" in first_warc
+    assert b"Second capture" not in first_warc
+    assert b"Second capture" in second_warc
+    assert b"First capture" not in second_warc
 
     first_replay = await replay_page(
         tmp_path / "first",
