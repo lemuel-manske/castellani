@@ -1,3 +1,4 @@
+import asyncio
 import gzip
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from capture.browser import (
     capture_local_page,
     capture_page,
 )
+from capture.recording import PyWBRecorder
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
@@ -46,6 +48,46 @@ async def test_capture_fails_when_navigation_response_is_interrupted(
         )
 
     assert error.value.reason_code == CaptureFailureCode.NAVIGATION_FAILED
+
+
+async def test_cancellation_stops_capture_recorder(
+    local_site: LocalSite,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder_started = asyncio.Event()
+    stopped_process_codes: list[int | None] = []
+
+    original_start = PyWBRecorder.start
+    original_stop = PyWBRecorder.stop
+
+    async def start_recorder(recorder: PyWBRecorder) -> PyWBRecorder:
+        result = await original_start(recorder)
+        recorder_started.set()
+
+        return result
+
+    async def stop_recorder(recorder: PyWBRecorder) -> None:
+        await original_stop(recorder)
+
+        if recorder.process is not None:
+            stopped_process_codes.append(recorder.process.returncode)
+
+    monkeypatch.setattr(PyWBRecorder, "start", start_recorder)
+    monkeypatch.setattr(PyWBRecorder, "stop", stop_recorder)
+
+    capture = asyncio.create_task(
+        capture_local_page(f"{local_site.base_url}/page", tmp_path)
+    )
+
+    await recorder_started.wait()
+    capture.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await capture
+
+    assert stopped_process_codes
+    assert all(code is not None for code in stopped_process_codes)
 
 
 async def test_capture_warc_segments_are_valid_gzip_records(
