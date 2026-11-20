@@ -29,6 +29,12 @@ class CaptureOutcome:
     artifact: CaptureArtifact
 
 
+@dataclass(frozen=True)
+class PageTaskDelivery:
+    archive_id: str
+    url_key: str
+
+
 class TaskRepository(Protocol):
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None: ...
 
