@@ -87,8 +87,7 @@ async def wait_for_http_response(
 
     if last_error is not None:
         raise TimeoutError(
-            f"pywb did not become ready at {url}; "
-            f"last connection error was {last_error}"
+            f"pywb did not become ready at {url}; last connection error was {last_error}"
         ) from last_error
 
     raise TimeoutError(f"pywb did not become ready at {url}")
@@ -206,9 +205,7 @@ class PyWBRecorder:
             ) from error
 
         if b"BEGIN CERTIFICATE" not in certificate:
-            raise RuntimeError(
-                f"pywb created an invalid proxy CA at {self.ca_certificate_path}"
-            )
+            raise RuntimeError(f"pywb created an invalid proxy CA at {self.ca_certificate_path}")
 
 
 class PyWBReplayServer:

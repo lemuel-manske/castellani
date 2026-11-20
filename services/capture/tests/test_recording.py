@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import pytest
-from warcio.archiveiterator import ArchiveIterator
 from support.recording import DOWNLOAD, LocalSite
+from warcio.archiveiterator import ArchiveIterator
 
 from capture.browser import capture_page
 from utils.io import read_gzip_files
