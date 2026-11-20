@@ -1,12 +1,16 @@
 from dataclasses import dataclass
 
 
+class InvalidTaskClaimRenewal(ValueError):
+    """Raised when a task claim renewal violates ownership or lease invariants."""
+
+
 @dataclass(frozen=True)
 class PageTask:
     """A page admitted to an archive's crawl frontier for capture."""
 
     archive_id: str
-    url_key: str  # the "canonical" URL key for the page... It's id, perhaps
+    url_key: str
     url: str
     depth: int
 
@@ -29,9 +33,7 @@ class TaskClaim:
     """A worker's fenced, time-limited ownership of a page task attempt."""
 
     task: PageTask
-
     attempt_id: str
-
     fence: int
     lease_until: float
 
@@ -41,3 +43,12 @@ class TaskClaim:
 
         if self.fence < 1:
             raise ValueError("fence must be positive")
+
+    def verify_renewal(self, renewed: TaskClaim, now: float) -> None:
+        if (
+            renewed.attempt_id != self.attempt_id
+            or renewed.fence != self.fence
+            or renewed.task != self.task
+            or renewed.lease_until <= max(self.lease_until, now)
+        ):
+            raise InvalidTaskClaimRenewal("task lease renewal returned an invalid claim")
