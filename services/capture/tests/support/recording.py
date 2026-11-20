@@ -1,4 +1,5 @@
 import threading
+import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -91,6 +92,19 @@ def start_local_site() -> LocalSite:
 
             if path == "/missing":
                 self.send_error(404)
+
+                return
+
+            if path == "/slow":
+                body = b"<!doctype html><html><body><h1>Slow response</h1></body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body[:20])
+                self.wfile.flush()
+                time.sleep(0.5)
+                self.wfile.write(body[20:])
 
                 return
 
