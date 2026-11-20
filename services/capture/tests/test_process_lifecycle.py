@@ -6,12 +6,24 @@ import pytest
 from capture.recording import stop_process, wait_for_process
 
 
-async def start_long_running_process(*arguments: str) -> asyncio.subprocess.Process:
-    return await asyncio.create_subprocess_exec(
+async def start_long_running_process(
+    *arguments: str,
+    wait_for_ready: bool = False,
+) -> asyncio.subprocess.Process:
+    process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-c",
         *arguments,
+        stdout=asyncio.subprocess.PIPE if wait_for_ready else asyncio.subprocess.DEVNULL,
     )
+
+    if wait_for_ready:
+        if process.stdout is None:
+            raise RuntimeError("process stdout was not captured")
+
+        await process.stdout.readline()
+
+    return process
 
 
 @pytest.mark.asyncio
@@ -29,7 +41,9 @@ async def test_stop_process_kills_child_that_ignores_interrupt(
 ) -> None:
     monkeypatch.setattr("capture.recording.PROCESS_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
     process = await start_long_running_process(
-        "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); time.sleep(60)"
+        "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); "
+        "print('ready', flush=True); time.sleep(60)",
+        wait_for_ready=True,
     )
 
     await stop_process(process)
@@ -43,7 +57,9 @@ async def test_cancellation_waits_for_process_shutdown(
 ) -> None:
     monkeypatch.setattr("capture.recording.PROCESS_SHUTDOWN_TIMEOUT_SECONDS", 0.05)
     process = await start_long_running_process(
-        "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); time.sleep(60)"
+        "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); "
+        "print('ready', flush=True); time.sleep(60)",
+        wait_for_ready=True,
     )
     shutdown = asyncio.create_task(stop_process(process))
 

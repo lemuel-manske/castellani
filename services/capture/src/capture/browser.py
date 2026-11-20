@@ -12,7 +12,6 @@ from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
 from utils.http import is_safe_request_url, is_valid_url
-from utils.tasks import complete_before_cancellation
 
 NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
 NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
@@ -230,9 +229,9 @@ async def capture_page(
 
                 captured_at = datetime.now(UTC)
             finally:
-                await complete_before_cancellation(context.close())
+                await context.close()
     finally:
-        await complete_before_cancellation(recorder.stop())
+        await recorder.stop()
 
     warc_files = recorder.warc_files
 
