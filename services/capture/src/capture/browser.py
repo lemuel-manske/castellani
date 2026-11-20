@@ -3,6 +3,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -62,12 +63,50 @@ class PageCapture:
     warc_files: tuple[Path, ...]
 
 
-class CaptureLimitExceeded(RuntimeError):
+class CaptureFailureCode(StrEnum):
+    INVALID_URL = "invalid_url"
+    UNSAFE_REQUEST = "unsafe_request"
+    REQUEST_LIMIT_EXCEEDED = "request_limit_exceeded"
+    DOCUMENT_LIMIT_EXCEEDED = "document_limit_exceeded"
+    DISCOVERED_LINK_LIMIT_EXCEEDED = "discovered_link_limit_exceeded"
+    NAVIGATION_FAILED = "navigation_failed"
+    DOWNLOAD_FAILED = "download_failed"
+    RECORDING_FAILED = "recording_failed"
+
+
+class CaptureFailure(RuntimeError):
+    def __init__(self, reason_code: CaptureFailureCode, message: str) -> None:
+        super().__init__(message)
+
+        self.reason_code = reason_code
+
+
+class CaptureLimitExceeded(CaptureFailure):
     pass
 
 
-class UnsafeCaptureRequest(RuntimeError):
-    pass
+class UnsafeCaptureRequest(CaptureFailure):
+    def __init__(self, message: str) -> None:
+        super().__init__(CaptureFailureCode.UNSAFE_REQUEST, message)
+
+
+class InvalidCaptureURL(ValueError):
+    reason_code = CaptureFailureCode.INVALID_URL
+
+
+class CaptureNavigationFailed(CaptureFailure):
+    def __init__(self, message: str) -> None:
+        super().__init__(CaptureFailureCode.NAVIGATION_FAILED, message)
+
+
+class CaptureDownloadFailed(CaptureFailure):
+    def __init__(self, message: str) -> None:
+        super().__init__(CaptureFailureCode.DOWNLOAD_FAILED, message)
+
+
+class CaptureRecordingFailed(CaptureFailure):
+    def __init__(self, message: str) -> None:
+        super().__init__(CaptureFailureCode.RECORDING_FAILED, message)
 
 
 class RequestGuard:
@@ -107,7 +146,8 @@ class RequestGuard:
     def raise_if_rejected(self) -> None:
         if self.request_limit_exceeded:
             raise CaptureLimitExceeded(
-                f"capture exceeded the request limit of {self.limits.max_requests}"
+                CaptureFailureCode.REQUEST_LIMIT_EXCEEDED,
+                f"capture exceeded the request limit of {self.limits.max_requests}",
             )
 
         if self.blocked_navigation_url is not None:
@@ -142,7 +182,10 @@ def extract_links(
             continue
 
         if len(discovered) >= max_links:
-            raise CaptureLimitExceeded(f"page exceeded the discovered-link limit of {max_links}")
+            raise CaptureLimitExceeded(
+                CaptureFailureCode.DISCOVERED_LINK_LIMIT_EXCEEDED,
+                f"page exceeded the discovered-link limit of {max_links}",
+            )
 
         discovered.setdefault(absolute_url, None)
 
@@ -161,7 +204,9 @@ async def capture_page(
     url: str, output_dir: Path, limits: CaptureLimits = DEFAULT_LIMITS
 ) -> PageCapture:
     if not is_valid_url(url):
-        raise ValueError("capture URL must be an absolute HTTP or HTTPS URL without credentials")
+        raise InvalidCaptureURL(
+            "capture URL must be an absolute HTTP or HTTPS URL without credentials"
+        )
 
     recorder = PyWBRecorder(output_dir)
 
@@ -258,12 +303,16 @@ async def capture_page(
                                     timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
                                 )
                             except TimeoutError:
-                                raise navigation_error from None
+                                raise CaptureNavigationFailed(
+                                    "browser did not finish the PDF navigation response"
+                                ) from navigation_error
 
                             response = main_response_future.result()
                             final_url = response.url
                         else:
-                            raise
+                            raise CaptureNavigationFailed(
+                                "browser navigation did not produce a document or downloadable resource"
+                            ) from navigation_error
                     else:
                         response = response or (
                             main_response_future.result()
@@ -283,7 +332,7 @@ async def capture_page(
                                 timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
                             )
                         except TimeoutError as error:
-                            raise RuntimeError(
+                            raise CaptureDownloadFailed(
                                 "browser did not complete the attachment download"
                             ) from error
 
@@ -320,7 +369,8 @@ async def capture_page(
 
                         if document_bytes > limits.max_document_bytes:
                             raise CaptureLimitExceeded(
-                                f"page document exceeded the {limits.max_document_bytes}-byte limit"
+                                CaptureFailureCode.DOCUMENT_LIMIT_EXCEEDED,
+                                f"page document exceeded the {limits.max_document_bytes}-byte limit",
                             )
 
                         html = await page.content()
@@ -352,7 +402,7 @@ async def capture_page(
     warc_files = recorder.warc_files
 
     if not warc_files:
-        raise RuntimeError("pywb recorder produced no WARC artifacts")
+        raise CaptureRecordingFailed("pywb recorder produced no WARC artifacts")
 
     return PageCapture(
         requested_url=url,
