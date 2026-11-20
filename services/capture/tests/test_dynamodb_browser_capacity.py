@@ -1,12 +1,12 @@
 import asyncio
 
 import pytest
+from support.dynamodb import FakeClock, FakeDynamoDBClient
 
 from adapters.persistence.dynamodb.browser_capacity import (
     BrowserReservationLostError,
     DynamoDBBrowserCapacity,
 )
-from support.dynamodb import FakeClock, FakeDynamoDBClient
 
 
 async def test_capacity_admits_exactly_the_configured_number_of_contenders() -> None:

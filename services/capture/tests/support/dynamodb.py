@@ -36,9 +36,8 @@ class FakeDynamoDBClient:
                 owner_name = names["#owner"]
                 lease_name = names["#lease"]
                 owner = item.get(owner_name)
-                expired = (
-                    owner is not None
-                    and float(item[lease_name]["N"]) <= float(values[":now"]["N"])
+                expired = owner is not None and float(item[lease_name]["N"]) <= float(
+                    values[":now"]["N"]
                 )
 
                 if owner is not None and not expired:

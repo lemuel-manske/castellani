@@ -19,7 +19,10 @@ def parse_delivery(body: bytes) -> tuple[str, str] | None:
 
     envelope = cast(dict[str, object], decoded)
 
-    if envelope.get("type") != EXPECTED_MESSAGE_TYPE or envelope.get("version") != EXPECTED_MESSAGE_VERSION:
+    if (
+        envelope.get("type") != EXPECTED_MESSAGE_TYPE
+        or envelope.get("version") != EXPECTED_MESSAGE_VERSION
+    ):
         return None
 
     payload = envelope.get("payload")

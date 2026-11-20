@@ -1,7 +1,7 @@
 import pytest
+from support.rabbitmq import IncomingMessage, capture_page_envelope
 
 from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
-from support.rabbitmq import IncomingMessage, capture_page_envelope
 
 
 async def test_consumer_processes_a_valid_capture_page_delivery() -> None:

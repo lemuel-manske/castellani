@@ -129,9 +129,7 @@ class DynamoDBBrowserCapacity:
                         "SET #owner = :attempt, #reservation = :reservation, "
                         "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one"
                     ),
-                    ConditionExpression=(
-                        "attribute_not_exists(#owner) OR #lease <= :now"
-                    ),
+                    ConditionExpression=("attribute_not_exists(#owner) OR #lease <= :now"),
                     ExpressionAttributeNames={
                         "#owner": "ownerAttemptId",
                         "#reservation": "reservationId",
@@ -206,9 +204,7 @@ class DynamoDBBrowserCapacity:
         renewed = reservation_from_item(reservation.slot_id, response["Attributes"])
 
         if renewed.lease_until <= max(reservation.lease_until, now):
-            raise BrowserReservationLostError(
-                "browser capacity renewal did not extend the lease"
-            )
+            raise BrowserReservationLostError("browser capacity renewal did not extend the lease")
 
         return renewed
 

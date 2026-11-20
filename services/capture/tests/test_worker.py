@@ -1,20 +1,21 @@
 import time
 from pathlib import Path
 
-from application.worker import LeaseLostError, Worker
-from domain.task import PageTask, TaskClaim
 from support.worker import (
     BlockingPageExecutor,
     ExpiringCapacity,
     ExpiringRepository,
+    FailingPageExecutor,
     FakeArtifactStore,
     FakeCapacity,
     FakeRepository,
-    FailingPageExecutor,
     ShortLeaseCapacity,
     ShortLeaseRepository,
     SlowPageExecutor,
 )
+
+from application.worker import LeaseLostError, Worker
+from domain.task import PageTask, TaskClaim
 
 
 async def test_worker_discards_attempt_artifacts_after_capture_failure(tmp_path: Path) -> None:

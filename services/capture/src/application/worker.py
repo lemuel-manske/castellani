@@ -192,10 +192,13 @@ class Worker:
 
             claim = claim_state[0]
             reservation = reservation_state[0]
-            remaining = min(
-                [claim.lease_until]
-                + ([reservation.lease_until] if reservation is not None else [])
-            ) - time.time()
+            remaining = (
+                min(
+                    [claim.lease_until]
+                    + ([reservation.lease_until] if reservation is not None else [])
+                )
+                - time.time()
+            )
 
             if remaining <= 0:
                 raise LeaseLostError("an execution lease expired before renewal began")
