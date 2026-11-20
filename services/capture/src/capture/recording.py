@@ -186,8 +186,7 @@ class PyWBRecorder:
             process,
             f"{self.proxy_url}{CA_DOWNLOAD_PATH}",
             lambda response: (
-                response.status_code == 200
-                and b"BEGIN CERTIFICATE" in response.content
+                response.status_code == 200 and b"BEGIN CERTIFICATE" in response.content
             ),
         )
 
@@ -248,8 +247,7 @@ class PyWBReplayServer:
         await stop_process(process)
 
     def _write_config(self) -> None:
-        replay_config = template(REPLAY_CONFIG_TEMPLATE) \
-            .r("ROOT", str(self.collections_dir))
+        replay_config = template(REPLAY_CONFIG_TEMPLATE).r("ROOT", str(self.collections_dir))
 
         self.config_path.write_text(str(replay_config), encoding="utf-8")
 

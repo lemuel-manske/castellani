@@ -2,7 +2,7 @@ import asyncio
 import os
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
@@ -108,7 +108,7 @@ async def capture_page(url: str, output_dir: Path) -> PageCapture:
 
                 final_url = page.url
                 discovered_urls = extract_links(html, final_url)
-                captured_at = datetime.now(timezone.utc)
+                captured_at = datetime.now(UTC)
             finally:
                 await context.close()
     finally:
@@ -171,8 +171,6 @@ def is_valid_url(url: str) -> bool:
 
         if parsed_url.scheme not in HTTP_SCHEMES or not parsed_url.hostname:
             return False
-
-        parsed_url.port
     except ValueError:
         return False
 

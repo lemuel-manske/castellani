@@ -1,7 +1,6 @@
 import gzip
-
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 
 def read_gzip_files(files: Sequence[Path]) -> bytes:

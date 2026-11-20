@@ -1,5 +1,4 @@
 import threading
-
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -180,9 +179,7 @@ async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> Rep
                     page_title=await page.title(),
                     page_state=await page.locator("#state").inner_text(),
                     download_content=await page.locator("#download").inner_text(),
-                    image_width=await page.locator("img").evaluate(
-                        "(image) => image.naturalWidth"
-                    ),
+                    image_width=await page.locator("img").evaluate("(image) => image.naturalWidth"),
                 )
             finally:
                 await browser.close()

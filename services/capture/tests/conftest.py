@@ -1,7 +1,6 @@
 from collections.abc import Iterator
 
 import pytest
-
 from support.recording import LocalSite, start_local_site
 
 

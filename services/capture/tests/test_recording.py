@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import pytest
+from support.recording import DOWNLOAD, LocalSite
 
 from capture.browser import capture_page
-from support.recording import DOWNLOAD, LocalSite
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
