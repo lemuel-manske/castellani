@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 
+from utils.tasks import complete_before_cancellation
 from utils.template import template
 
 HOST = "127.0.0.1"
@@ -93,11 +94,27 @@ async def wait_for_http_response(
     raise TimeoutError(f"pywb did not become ready at {url}")
 
 
+async def wait_for_process(process: asyncio.subprocess.Process) -> int:
+    try:
+        return await process.wait()
+    except asyncio.CancelledError:
+        await stop_process(process)
+        raise
+
+
 async def stop_process(process: asyncio.subprocess.Process) -> None:
     if process.returncode is not None:
         return
 
-    process.send_signal(signal.SIGINT)
+    await complete_before_cancellation(_stop_process(process))
+
+
+async def _stop_process(process: asyncio.subprocess.Process) -> None:
+    try:
+        process.send_signal(signal.SIGINT)
+    except ProcessLookupError:
+        await process.wait()
+        return
 
     try:
         await asyncio.wait_for(
@@ -105,7 +122,9 @@ async def stop_process(process: asyncio.subprocess.Process) -> None:
             timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS,
         )
     except TimeoutError:
-        process.kill()
+        if process.returncode is None:
+            process.kill()
+
         await process.wait()
 
 
@@ -180,7 +199,7 @@ class PyWBRecorder:
             cwd=self.output_dir,
         )
 
-        result = await process.wait()
+        result = await wait_for_process(process)
 
         if result != 0:
             raise RuntimeError("pywb could not initialize the recording collection")
@@ -276,7 +295,7 @@ class PyWBReplayServer:
             cwd=self.capture_dir,
         )
 
-        result = await process.wait()
+        result = await wait_for_process(process)
 
         if result != 0:
             raise RuntimeError("pywb could not reindex the recording collection")
