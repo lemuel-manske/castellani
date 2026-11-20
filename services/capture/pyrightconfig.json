@@ -1,5 +1,6 @@
 {
   "include": ["src", "tests"],
+
   "exclude": [
     ".venv",
     ".pytest_cache",
@@ -7,9 +8,12 @@
     "build",
     "dist"
   ],
+
   "pythonVersion": "3.13",
   "pythonPlatform": "All",
-  "typeCheckingMode": "strict",
+
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+
+  "typeCheckingMode": "strict"
 }
