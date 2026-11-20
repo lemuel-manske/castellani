@@ -10,6 +10,7 @@ from application.contracts import (
     TaskRepository,
 )
 from domain.task import TaskClaim
+from utils.fn import awaitable, noop
 
 
 class Worker:
@@ -28,7 +29,7 @@ class Worker:
         self.executor = executor
         self.artifacts = artifacts
 
-        self.on_error = on_error or self._ignore_error
+        self.on_error = on_error or awaitable(noop)
 
     async def execute(self, archive_id: str, url_key: str) -> bool:
         claim = await self.repository.claim(archive_id, url_key)
@@ -43,6 +44,7 @@ class Worker:
     async def _execute_claim(self, claim: TaskClaim) -> None:
         reservation_id: str | None = None
         directory: Path | None = None
+
         terminal = False
 
         try:
@@ -50,7 +52,9 @@ class Worker:
 
             if reservation_id is None:
                 await self.repository.release(claim)
+
                 terminal = True
+
                 return
 
             directory = await self.artifacts.create_attempt_directory(claim)
@@ -67,16 +71,21 @@ class Worker:
             )
 
             await self.repository.complete(outcome)
+
             terminal = True
+
         except asyncio.CancelledError:
             raise
+
         except Exception as error:
             await self.repository.fail(
                 claim,
                 str(getattr(error, "reason_code", "capture_failed")),
                 str(error),
             )
+
             await self.on_error(error)
+
         finally:
             if directory is not None and not terminal:
                 await self._discard_attempt(claim, directory)
@@ -89,7 +98,3 @@ class Worker:
             await self.artifacts.discard_attempt(claim, directory)
         except Exception as error:
             await self.on_error(error)
-
-    @staticmethod
-    async def _ignore_error(error: Exception) -> None:
-        return None
