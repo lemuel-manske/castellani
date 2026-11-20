@@ -6,7 +6,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin
 
-from playwright.async_api import Download, Error as PlaywrightError, Request, Response, Route, async_playwright
+from playwright.async_api import (
+    Download,
+    Error as PlaywrightError,
+    Request,
+    Response,
+    Route,
+    async_playwright,
+)
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from selectolax.parser import HTMLParser
 
@@ -113,6 +120,15 @@ def is_html_content_type(content_type: str | None) -> bool:
     media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
 
     return media_type in {"text/html", "application/xhtml+xml"}
+
+
+def is_pdf_content_type(content_type: str | None) -> bool:
+    if content_type is None:
+        return False
+
+    media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
+
+    return media_type == "application/pdf"
 
 
 def extract_links(
@@ -239,11 +255,7 @@ async def capture_page(
                             final_url = download.url
                         elif (
                             main_response is not None
-                            and main_response.headers.get("content-type", "")
-                            .split(";", maxsplit=1)[0]
-                            .strip()
-                            .lower()
-                            == "application/pdf"
+                            and is_pdf_content_type(main_response.headers.get("content-type"))
                         ):
                             try:
                                 await asyncio.wait_for(
