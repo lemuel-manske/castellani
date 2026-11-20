@@ -5,6 +5,7 @@ from application.worker import LeaseLostError, Worker
 from domain.task import PageTask, TaskClaim
 from support.worker import (
     BlockingPageExecutor,
+    ExpiringCapacity,
     ExpiringRepository,
     FakeArtifactStore,
     FakeCapacity,
