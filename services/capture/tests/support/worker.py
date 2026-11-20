@@ -1,9 +1,12 @@
 import asyncio
 import time
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
-from application.contracts import BrowserReservation, CaptureArtifact, CaptureOutcome
+from application.contracts import CaptureArtifact
+from domain.browser_reservation import BrowserReservation
+from domain.capture import CaptureOutcome, PageCapture
 from domain.task import TaskClaim
 
 
@@ -11,7 +14,7 @@ class FakeRepository:
     def __init__(self, claim: TaskClaim) -> None:
         self.claim_result = claim
         self.failed: tuple[TaskClaim, str, str] | None = None
-        self.completed: CaptureOutcome | None = None
+        self.completed: tuple[CaptureOutcome, tuple[Path, ...]] | None = None
         self.renewals = 0
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
@@ -21,8 +24,12 @@ class FakeRepository:
         self.renewals += 1
         return replace(claim, lease_until=time.time() + 60)
 
-    async def complete(self, outcome: CaptureOutcome) -> None:
-        self.completed = outcome
+    async def complete(
+        self,
+        outcome: CaptureOutcome,
+        warc_files: tuple[Path, ...],
+    ) -> None:
+        self.completed = (outcome, warc_files)
 
     async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
         self.failed = (claim, reason_code, message)
@@ -76,14 +83,16 @@ class SlowPageExecutor:
     async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
         await asyncio.sleep(0.4)
         return CaptureArtifact(
-            requested_url=url,
-            final_url=url,
-            redirect_chain=(),
-            status_code=200,
-            content_type="text/html",
-            title="Example",
-            captured_at="2026-11-20T12:00:00Z",
-            discovered_urls=(),
+            capture=PageCapture(
+                requested_url=url,
+                final_url=url,
+                redirect_chain=(),
+                status_code=200,
+                content_type="text/html",
+                title="Example",
+                captured_at=datetime(2026, 11, 20, 12, 0, tzinfo=UTC),
+                discovered_urls=(),
+            ),
             blocked_urls=(),
             warc_files=(),
         )
