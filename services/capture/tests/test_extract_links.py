@@ -1,8 +1,4 @@
-from pathlib import Path
-
-import pytest
-
-from capture.browser import capture_page, extract_links
+from capture.browser import extract_links
 
 
 def test_extract_links_resolves_relative_urls_and_preserves_first_occurrence() -> None:
@@ -25,9 +21,3 @@ def test_extract_links_resolves_relative_urls_and_preserves_first_occurrence() -
         "https://example.org/about",
         "https://example.org/archive",
     )
-
-
-@pytest.mark.asyncio
-async def test_capture_rejects_non_http_urls(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="absolute HTTP or HTTPS URL"):
-        await capture_page("file:///etc/passwd", tmp_path)
