@@ -1,8 +1,8 @@
 from capture.browser import (
+    CaptureDownloadFailed,
     CaptureFailure,
     CaptureFailureCode,
     CaptureLimitExceeded,
-    CaptureDownloadFailed,
     CaptureNavigationFailed,
     CaptureRecordingFailed,
     InvalidCaptureURL,
@@ -14,6 +14,7 @@ from capture.browser import (
 )
 
 __all__ = [
+    "CaptureDownloadFailed",
     "CaptureFailure",
     "CaptureFailureCode",
     "CaptureLimitExceeded",
