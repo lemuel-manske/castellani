@@ -16,7 +16,7 @@ type Handler struct {
 	app *application.Application
 }
 
-type submissionRequest struct {
+type SubmissionRequest struct {
 	SeedURL        string   `json:"seedUrl"`
 	CollectionID   string   `json:"collectionId,omitempty"`
 	MaxDepth       *int     `json:"maxDepth"`
@@ -25,23 +25,26 @@ type submissionRequest struct {
 	AuthGeneration *int     `json:"authGeneration,omitempty"`
 }
 
-type acceptedResponse struct {
+type AcceptedResponse struct {
 	ArchiveID string `json:"archiveId"`
 	Status    string `json:"status"`
 	StatusURL string `json:"statusUrl"`
 }
 
-type archiveResponse struct {
+type ArchiveResponse struct {
 	ArchiveID string `json:"archiveId"`
 	Status    string `json:"status"`
+
 	Capture   struct {
 		Captured int `json:"captured"`
 		Failed   int `json:"failed"`
 		Pending  int `json:"pending"`
 	} `json:"capture"`
+
 	Replay struct {
 		Status string `json:"status"`
 	} `json:"replay"`
+
 	Search struct {
 		Status   string `json:"status"`
 		Indexed  int    `json:"indexed"`
@@ -72,7 +75,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input submissionRequest
+	var input SubmissionRequest
 
 	if _, err := httpx.DecodeJSONBytes(
 		w,
@@ -130,7 +133,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	statusURL := common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
 	w.Header().Set(httpx.LocationHeader, statusURL)
 
-	response := acceptedResponse{
+	response := AcceptedResponse{
 		ArchiveID: accepted.ArchiveID,
 		Status:    domain.StatusAccepted,
 		StatusURL: statusURL,
@@ -158,7 +161,7 @@ func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := archiveResponse{
+	response := ArchiveResponse{
 		ArchiveID: archive.ID,
 		Status:    archive.Status,
 	}
