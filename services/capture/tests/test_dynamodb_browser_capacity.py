@@ -11,6 +11,7 @@ from adapters.persistence.dynamodb.browser_capacity import (
 
 async def test_capacity_admits_exactly_the_configured_number_of_contenders() -> None:
     client = FakeDynamoDBClient()
+
     capacity = DynamoDBBrowserCapacity(
         client=client,
         table_name="capture_browser_slots",
@@ -31,8 +32,10 @@ async def test_capacity_admits_exactly_the_configured_number_of_contenders() -> 
 
 async def test_reservation_renewal_extends_the_lease_without_changing_its_fence() -> None:
     clock = FakeClock()
+    client = FakeDynamoDBClient()
+
     capacity = DynamoDBBrowserCapacity(
-        client=FakeDynamoDBClient(),
+        client=client,
         table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
@@ -54,8 +57,10 @@ async def test_reservation_renewal_extends_the_lease_without_changing_its_fence(
 
 async def test_expired_reservation_is_reclaimed_with_a_new_fence() -> None:
     clock = FakeClock()
+    client = FakeDynamoDBClient()
+
     capacity = DynamoDBBrowserCapacity(
-        client=FakeDynamoDBClient(),
+        client=client,
         table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
@@ -66,11 +71,12 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence() -> None:
     assert previous is not None
 
     clock.advance(31)
-    current = await capacity.reserve("attempt-2")
 
+    current = await capacity.reserve("attempt-2")
     assert current is not None
-    assert current.slot_id == previous.slot_id
+
     assert current.attempt_id == "attempt-2"
+    assert current.slot_id == previous.slot_id
     assert current.fence == previous.fence + 1
 
     with pytest.raises(BrowserReservationLostError):
@@ -82,8 +88,10 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence() -> None:
 
 async def test_release_is_idempotent_and_stale_release_cannot_free_a_new_owner() -> None:
     clock = FakeClock()
+    client = FakeDynamoDBClient()
+
     capacity = DynamoDBBrowserCapacity(
-        client=FakeDynamoDBClient(),
+        client=client,
         table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
@@ -98,6 +106,7 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_a_new_owner()
 
     current = await capacity.reserve("attempt-2")
     assert current is not None
+
     assert current.fence == previous.fence + 1
 
     await capacity.release(previous)
@@ -115,8 +124,10 @@ def test_capacity_rejects_invalid_configuration() -> None:
 
 
 async def test_repeated_reservation_returns_the_existing_slot_after_an_earlier_slot_frees() -> None:
+    client = FakeDynamoDBClient()
+
     capacity = DynamoDBBrowserCapacity(
-        client=FakeDynamoDBClient(),
+        client=client,
         table_name="capture_browser_slots",
         slot_count=2,
         lease_duration=30,
@@ -124,8 +135,10 @@ async def test_repeated_reservation_returns_the_existing_slot_after_an_earlier_s
 
     first = await capacity.reserve("attempt-1")
     second = await capacity.reserve("attempt-2")
+
     assert first is not None
     assert second is not None
+
     assert first.slot_id == "0"
     assert second.slot_id == "1"
 

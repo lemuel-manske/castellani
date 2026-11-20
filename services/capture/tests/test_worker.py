@@ -1,7 +1,7 @@
-import pytest
 import time
 from pathlib import Path
 
+import pytest
 from support.worker import (
     BlockingPageExecutor,
     ExpiringCapacity,
@@ -92,7 +92,7 @@ async def test_worker_stops_capture_when_task_lease_renewal_fails(tmp_path: Path
         attempt_id="attempt-1",
         fence=1,
         lease_until=time.time() + 0.3,
-    )$
+    )
 
     repository = ExpiringRepository(claim)
     artifacts = FakeArtifactStore(tmp_path)
