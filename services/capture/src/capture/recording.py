@@ -34,10 +34,8 @@ recorder:
 
 REPLAY_CONFIG_TEMPLATE = """
 collections_root: {{ROOT}}
-archive_paths:
-  - archive
-index_paths:
-  - indexes
+archive_paths: archive
+index_paths: indexes
 framed_replay: false
 """
 
