@@ -2,9 +2,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from support.recording import DOWNLOAD, LocalSite, replay_page
-
-from capture.browser import capture_page
+from support.recording import DOWNLOAD, LocalSite, capture_local_page, replay_page
 
 pytestmark = pytest.mark.integration
 
@@ -13,7 +11,7 @@ async def test_replay_returns_successful_response(
     local_site: LocalSite,
     tmp_path: Path,
 ) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     replay = await replay_page(tmp_path, tmp_path / "replay", capture.final_url)

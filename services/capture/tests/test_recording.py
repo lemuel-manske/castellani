@@ -1,16 +1,14 @@
 from pathlib import Path
 
 import pytest
-from support.recording import DOWNLOAD, LocalSite
-
-from capture.browser import capture_page
+from support.recording import DOWNLOAD, LocalSite, capture_local_page
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
 
 
 async def test_capture_follows_redirect(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     assert capture.final_url.endswith("/page")
