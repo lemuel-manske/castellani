@@ -129,3 +129,8 @@ class BlockingPageExecutor:
         except asyncio.CancelledError:
             self.cancelled.set()
             raise
+
+
+class ExpiringCapacity(FakeCapacity):
+    async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
+        raise RuntimeError("capacity store unavailable")

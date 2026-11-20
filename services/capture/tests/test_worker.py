@@ -108,3 +108,39 @@ async def test_worker_stops_capture_when_task_lease_renewal_fails(tmp_path: Path
     assert repository.failed is None
     assert repository.completed is None
     assert artifacts.discarded == [(claim, tmp_path)]
+
+
+async def test_worker_stops_capture_when_capacity_lease_renewal_fails(tmp_path: Path) -> None:
+    claim = TaskClaim(
+        task=PageTask(
+            archive_id="archive-1",
+            url_key="url-1",
+            url="https://example.org/",
+            depth=0,
+        ),
+        attempt_id="attempt-1",
+        fence=1,
+        lease_until=time.time() + 0.06,
+    )
+    repository = FakeRepository(claim)
+    artifacts = FakeArtifactStore(tmp_path)
+    executor = BlockingPageExecutor()
+    worker = Worker(
+        repository=repository,
+        capacity=ExpiringCapacity(),
+        executor=executor,
+        artifacts=artifacts,
+    )
+
+    try:
+        await worker.execute("archive-1", "url-1")
+    except LeaseLostError:
+        pass
+    else:
+        raise AssertionError("Expected capacity lease loss to abort the capture")
+
+    assert executor.started.is_set()
+    assert executor.cancelled.is_set()
+    assert repository.failed is None
+    assert repository.completed is None
+    assert artifacts.discarded == [(claim, tmp_path)]

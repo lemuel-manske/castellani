@@ -187,7 +187,8 @@ class Worker:
                 await asyncio.wait_for(stop.wait(), timeout=remaining / 3)
                 return
             except TimeoutError:
-                pass
+                if stop.is_set():
+                    return
 
             claim = claim_state[0]
             reservation = reservation_state[0]
