@@ -20,6 +20,7 @@ from selectolax.parser import HTMLParser
 from capture.recording import PyWBRecorder
 from utils.http import is_safe_request_url, is_valid_url
 from utils.tasks import complete_before_cancellation
+from utils.web import is_html_content_type, is_pdf_content_type
 
 NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
 NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
@@ -111,24 +112,6 @@ class RequestGuard:
             raise UnsafeCaptureRequest(
                 f"navigation to a disallowed URL was blocked: {self.blocked_navigation_url}"
             )
-
-
-def is_html_content_type(content_type: str | None) -> bool:
-    if content_type is None:
-        return True
-
-    media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
-
-    return media_type in {"text/html", "application/xhtml+xml"}
-
-
-def is_pdf_content_type(content_type: str | None) -> bool:
-    if content_type is None:
-        return False
-
-    media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
-
-    return media_type == "application/pdf"
 
 
 def extract_links(
