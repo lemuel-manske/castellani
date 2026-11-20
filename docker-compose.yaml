@@ -58,15 +58,22 @@ services:
       TF_VAR_ministack_endpoint: http://ministack:4566
       TF_VAR_aws_region: ${AWS_REGION:-us-east-1}
 
+      # State and provider cache live in a volume, never in the bind mount, so
+      # the host checkout stays clean and the state is removed together with
+      # MiniStack's data by `docker compose down -v`.
+      TF_DATA_DIR: /state/.terraform
+      TF_CLI_ARGS_init: "-input=false -lockfile=readonly -backend-config=path=/state/terraform.tfstate"
+
     volumes:
-      - ./infra/terraform:/workspace
+      - ./infra/terraform:/workspace:ro
+      - terraform-state:/state
 
     depends_on:
       ministack:
         condition: service_healthy
 
     entrypoint: ["/bin/sh", "-c"]
-    command: ["terraform init -input=false -lockfile=readonly && terraform apply -auto-approve -input=false"]
+    command: ["terraform init && terraform apply -auto-approve -input=false"]
     restart: "no"
 
   coordinator:
@@ -151,6 +158,7 @@ services:
 volumes:
   ministack-state:
   ministack-s3:
+  terraform-state:
   rabbitmq-data:
 
 networks:

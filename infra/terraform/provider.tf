@@ -1,3 +1,6 @@
+# LOCAL-ONLY. This provider targets the MiniStack emulator with dummy
+# credentials; `ministack_endpoint` is validated to reject anything else.
+# Do not point it at real AWS: see README.md in this directory.
 provider "aws" {
   region = var.aws_region
 
