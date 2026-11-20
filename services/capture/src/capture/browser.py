@@ -213,7 +213,7 @@ async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult
 
 async def capture_page(
     url: str, output_dir: Path, limits: CaptureLimits = DEFAULT_LIMITS
-) -> PageCapture:
+) -> BrowserCaptureResult:
     if not is_valid_url(url):
         raise InvalidCaptureURL(
             "capture URL must be an absolute HTTP or HTTPS URL without credentials"
