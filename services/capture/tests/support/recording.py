@@ -1,21 +1,15 @@
-import asyncio
 import gzip
-import json
-import signal
-import socket
-import subprocess
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import httpx
 from playwright.async_api import async_playwright
 
+from capture.recording import PyWBReplayServer
+
 HOST = "127.0.0.1"
-COLLECTION_NAME = "capture"
-REPLAY_STARTUP_TIMEOUT_SECONDS = 15
 
 PAGE = """<!doctype html>
 <html>
@@ -158,85 +152,19 @@ class ReplayResult:
     image_width: int
 
 
-def available_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind((HOST, 0))
-
-        return int(listener.getsockname()[1])
-
-
-async def wait_for_server(process: asyncio.subprocess.Process, port: int) -> None:
-    deadline = asyncio.get_running_loop().time() + REPLAY_STARTUP_TIMEOUT_SECONDS
-
-    async with httpx.AsyncClient(trust_env=False, timeout=1) as client:
-        while asyncio.get_running_loop().time() < deadline:
-            if process.returncode is not None:
-                raise RuntimeError("pywb replay server exited before becoming ready")
-
-            try:
-                await client.get(f"http://{HOST}:{port}/")
-
-                return
-            except httpx.TransportError:
-                await asyncio.sleep(0.1)
-
-    raise TimeoutError("pywb replay server did not become ready in time")
-
-
-async def stop_server(process: asyncio.subprocess.Process) -> None:
-    if process.returncode is not None:
-        return
-
-    process.send_signal(signal.SIGINT)
-
-    try:
-        await asyncio.wait_for(process.wait(), timeout=10)
-    except TimeoutError:
-        process.kill()
-        await process.wait()
-
-
 async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> ReplayResult:
-    await asyncio.to_thread(
-        subprocess.run,
-        ["wb-manager", "reindex", COLLECTION_NAME],
-        cwd=capture_dir,
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
-
-    replay_dir.mkdir(parents=True, exist_ok=True)
-    replay_config = f"""
-collections_root: {json.dumps(str(capture_dir / "collections"))}
-archive_paths:
-  - archive
-index_paths:
-  - indexes
-framed_replay: false
-"""
-    (replay_dir / "config.yaml").write_text(replay_config, encoding="utf-8")
-
-    replay_port = available_port()
-    process = await asyncio.create_subprocess_exec(
-        "wayback",
-        "-p",
-        str(replay_port),
-        cwd=replay_dir,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
+    replay_server = await PyWBReplayServer(capture_dir, replay_dir).start()
 
     try:
-        await wait_for_server(process, replay_port)
-        replay_url = f"http://{HOST}:{replay_port}/{COLLECTION_NAME}/{page_url}"
-
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(headless=True)
 
             try:
                 page = await browser.new_page()
-                response = await page.goto(replay_url, wait_until="domcontentloaded")
+                response = await page.goto(
+                    replay_server.replay_url(page_url),
+                    wait_until="domcontentloaded",
+                )
 
                 if response is None:
                     raise RuntimeError("Replay navigation did not return a response")
@@ -257,4 +185,4 @@ framed_replay: false
             finally:
                 await browser.close()
     finally:
-        await stop_server(process)
+        await replay_server.stop()
