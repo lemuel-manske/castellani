@@ -1,0 +1,38 @@
+[project]
+name = "castellani-capture"
+version = "0.1.0"
+description = "Python Capture service for Castellani web archives."
+requires-python = "==3.13.5"
+dependencies = [
+    "aio-pika==9.5.5",
+    "boto3==1.37.18",
+    "fastapi==0.115.12",
+    "httpx==0.28.1",
+    "playwright==1.51.0",
+    "selectolax==0.3.28",
+    "uvicorn[standard]==0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.398",
+    "pytest==8.3.5",
+    "pytest-asyncio==0.25.3",
+    "ruff==0.11.2",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
