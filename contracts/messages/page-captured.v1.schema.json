@@ -63,7 +63,7 @@
           "type": "string",
           "format": "uri"
         },
-"redirectChain": {
+        "redirectChain": {
           "type": "array",
           "items": {
             "type": "string",
