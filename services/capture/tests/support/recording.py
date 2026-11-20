@@ -5,6 +5,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+from capture.browser import CaptureLimits, PageCapture, capture_page
 from capture.recording import PyWBReplayServer
 
 HOST = "127.0.0.1"
@@ -45,6 +46,14 @@ IMAGE = """<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">
   <rect width="1" height="1" fill="#000"/>
 </svg>"""
 DOWNLOAD = "archive-download-payload"
+
+
+async def capture_local_page(url: str, output_dir: Path) -> PageCapture:
+    return await capture_page(
+        url,
+        output_dir,
+        limits=CaptureLimits(allow_private_networks=True),
+    )
 
 
 @dataclass
