@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from capture.browser import capture_page
-from support.recording import DOWNLOAD, LocalSite, read_warc_files
+from support.recording import DOWNLOAD, LocalSite
+from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
 
@@ -47,7 +48,7 @@ async def test_capture_records_request_record(local_site: LocalSite, tmp_path: P
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"WARC-Type: request" in warc_content
 
@@ -56,7 +57,7 @@ async def test_capture_records_response_record(local_site: LocalSite, tmp_path: 
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"WARC-Type: response" in warc_content
 
@@ -65,7 +66,7 @@ async def test_capture_records_redirect_response(local_site: LocalSite, tmp_path
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"HTTP/1.1 302" in warc_content
 
@@ -74,7 +75,7 @@ async def test_capture_records_html_document(local_site: LocalSite, tmp_path: Pa
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"Recorder acceptance page" in warc_content
 
@@ -83,7 +84,7 @@ async def test_capture_records_stylesheet(local_site: LocalSite, tmp_path: Path)
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"site.css" in warc_content
 
@@ -92,7 +93,7 @@ async def test_capture_records_script(local_site: LocalSite, tmp_path: Path) -> 
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"app.js" in warc_content
 
@@ -101,7 +102,7 @@ async def test_capture_records_image(local_site: LocalSite, tmp_path: Path) -> N
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert b"pixel.svg" in warc_content
 
@@ -110,6 +111,6 @@ async def test_capture_records_download(local_site: LocalSite, tmp_path: Path) -
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_warc_files(capture.warc_files)
+    warc_content = read_gzip_files(capture.warc_files)
 
     assert DOWNLOAD.encode() in warc_content

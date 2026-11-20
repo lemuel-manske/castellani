@@ -1,6 +1,5 @@
-import gzip
 import threading
-from collections.abc import Sequence
+
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -132,16 +131,6 @@ def start_local_site() -> LocalSite:
         thread=thread,
         base_url=f"http://{HOST}:{server.server_port}",
     )
-
-
-def read_warc_files(warc_files: Sequence[Path]) -> bytes:
-    content = b""
-
-    for warc_file in warc_files:
-        with gzip.open(warc_file, "rb") as archive:
-            content += archive.read()
-
-    return content
 
 
 @dataclass
