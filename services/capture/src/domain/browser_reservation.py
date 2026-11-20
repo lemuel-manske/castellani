@@ -28,6 +28,9 @@ class BrowserReservation:
         if self.fence < 1:
             raise ValueError("fence must be positive")
 
+        if self.lease_until <= 0:
+            raise ValueError("lease_until must be positive")
+
     def verify_renewal(self, renewed: BrowserReservation, now: float) -> None:
         if (
             renewed.attempt_id != self.attempt_id
