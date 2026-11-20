@@ -1,7 +1,6 @@
 import asyncio
 import time
 from collections.abc import Callable
-from time import sleep
 from typing import Any
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
@@ -115,7 +114,7 @@ class DynamoDBTaskClaims:
         ]
 
         try:
-            self._transact(transaction, attempt_id)
+            self._transact(transaction, str(uuid5(NAMESPACE_URL, attempt_id)))
         except _ConditionalWriteRejected:
             return None
 
@@ -217,7 +216,7 @@ class DynamoDBTaskClaims:
                 if "TransactionConflict" not in codes or attempt == 4:
                     raise
 
-                sleep(0.01 * (2**attempt))
+                time.sleep(0.01 * (2**attempt))
 
     def _read_frontier(self, archive_id: str, url_key: str) -> dict[str, Any] | None:
         response = self.client.get_item(
