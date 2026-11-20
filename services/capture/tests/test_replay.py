@@ -86,7 +86,6 @@ async def test_concurrent_captures_replay_only_their_own_pages(
     )
 
 
-
 async def test_replay_serves_direct_download(
     local_site: LocalSite,
     tmp_path: Path,
@@ -94,7 +93,9 @@ async def test_replay_serves_direct_download(
     capture = await capture_local_page(f"{local_site.base_url}/assets/download.bin", tmp_path)
     local_site.stop()
 
-    replay_server = await PyWBReplayServer(tmp_path, tmp_path / "replay").start()
+    replayer = PyWBReplayServer(tmp_path, tmp_path / "replay")
+
+    replay_server = await replayer.start()
 
     try:
         async with httpx.AsyncClient(trust_env=False) as client:
@@ -113,7 +114,9 @@ async def test_replay_serves_direct_pdf(
     capture = await capture_local_page(f"{local_site.base_url}/assets/document.pdf", tmp_path)
     local_site.stop()
 
-    replay_server = await PyWBReplayServer(tmp_path, tmp_path / "replay").start()
+    replayer = PyWBReplayServer(tmp_path, tmp_path / "replay")
+
+    replay_server = await replayer.start()
 
     try:
         async with httpx.AsyncClient(trust_env=False) as client:

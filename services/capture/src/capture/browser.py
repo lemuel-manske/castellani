@@ -8,11 +8,13 @@ from urllib.parse import urljoin
 
 from playwright.async_api import (
     Download,
-    Error as PlaywrightError,
     Request,
     Response,
     Route,
     async_playwright,
+)
+from playwright.async_api import (
+    Error as PlaywrightError,
 )
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from selectolax.parser import HTMLParser
@@ -189,7 +191,9 @@ async def capture_page(
 
                 loop = asyncio.get_running_loop()
                 download_future: asyncio.Future[Download] = loop.create_future()
+
                 main_request_finished = asyncio.Event()
+
                 main_response: Response | None = None
 
                 def record_download(download: Download) -> None:
@@ -233,11 +237,11 @@ async def capture_page(
 
                         if download_future.done():
                             download = download_future.result()
-                            response = main_response
                             final_url = download.url
-                        elif (
-                            main_response is not None
-                            and is_pdf_content_type(main_response.headers.get("content-type"))
+
+                            response = main_response
+                        elif main_response is not None and is_pdf_content_type(
+                            main_response.headers.get("content-type")
                         ):
                             try:
                                 await asyncio.wait_for(
@@ -266,12 +270,15 @@ async def capture_page(
                                 timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
                             )
                         except TimeoutError as error:
-                            raise RuntimeError("browser did not complete the attachment download") from error
+                            raise RuntimeError(
+                                "browser did not complete the attachment download"
+                            ) from error
 
                     if download_future.done():
                         download = download_future.result()
-                        await download.path()
                         final_url = download.url
+
+                        await download.path()
 
                     request_guard.raise_if_rejected()
 
@@ -313,6 +320,7 @@ async def capture_page(
                         )
                     else:
                         title = ""
+
                         discovered_urls = ()
 
                     captured_at = datetime.now(UTC)
@@ -320,6 +328,7 @@ async def capture_page(
                     page.remove_listener("download", record_download)
                     page.remove_listener("response", record_main_response)
                     page.remove_listener("requestfinished", record_main_request_finished)
+
                     if not download_future.done():
                         download_future.cancel()
             finally:

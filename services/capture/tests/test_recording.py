@@ -107,7 +107,6 @@ async def test_capture_records_download(local_site: LocalSite, tmp_path: Path) -
     assert DOWNLOAD.encode() in warc_content
 
 
-
 async def test_capture_records_direct_download(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/assets/download.bin", tmp_path)
     local_site.stop()
