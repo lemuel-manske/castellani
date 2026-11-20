@@ -1,4 +1,4 @@
-.PHONY: install run fmt test test-integration check
+.PHONY: install run fmt test test-unit test-integration check
 
 install:
 	uv sync --all-groups
@@ -7,11 +7,13 @@ fmt:
 	uv run ruff format .
 	uv run ruff check --fix .
 
-test:
+test-unit:
 	uv run pytest -m "not integration"
 
 test-integration:
 	uv run pytest -m integration
+
+test: test-unit test-integration
 
 check:
 	uv run ruff check .
