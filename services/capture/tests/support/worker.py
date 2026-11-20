@@ -73,7 +73,7 @@ class FakeArtifactStore:
 
 class SlowPageExecutor:
     async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
-        await asyncio.sleep(0.08)
+        await asyncio.sleep(0.4)
         return CaptureArtifact(
             requested_url=url,
             final_url=url,
@@ -91,7 +91,7 @@ class SlowPageExecutor:
 class ShortLeaseRepository(FakeRepository):
     async def renew(self, claim: TaskClaim) -> TaskClaim:
         self.renewals += 1
-        return replace(claim, lease_until=time.time() + 0.06)
+        return replace(claim, lease_until=time.time() + 0.3)
 
 
 class ShortLeaseCapacity(FakeCapacity):

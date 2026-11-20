@@ -56,7 +56,7 @@ async def test_worker_renews_task_and_capacity_leases_during_capture(tmp_path: P
         ),
         attempt_id="attempt-1",
         fence=1,
-        lease_until=time.time() + 0.06,
+        lease_until=time.time() + 0.3,
     )
     repository = ShortLeaseRepository(claim)
     capacity = ShortLeaseCapacity()
@@ -85,7 +85,7 @@ async def test_worker_stops_capture_when_task_lease_renewal_fails(tmp_path: Path
         ),
         attempt_id="attempt-1",
         fence=1,
-        lease_until=time.time() + 0.06,
+        lease_until=time.time() + 0.3,
     )
     repository = ExpiringRepository(claim)
     artifacts = FakeArtifactStore(tmp_path)
@@ -121,7 +121,7 @@ async def test_worker_stops_capture_when_capacity_lease_renewal_fails(tmp_path: 
         ),
         attempt_id="attempt-1",
         fence=1,
-        lease_until=time.time() + 0.06,
+        lease_until=time.time() + 0.3,
     )
     repository = FakeRepository(claim)
     artifacts = FakeArtifactStore(tmp_path)
