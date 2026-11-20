@@ -14,6 +14,22 @@ async def test_capture_follows_redirect(local_site: LocalSite, tmp_path: Path) -
     local_site.stop()
 
     assert capture.final_url.endswith("/page")
+    assert capture.redirect_chain == (
+        f"{local_site.base_url}/start",
+        f"{local_site.base_url}/redirected",
+        f"{local_site.base_url}/page",
+    )
+
+
+async def test_capture_preserves_http_error_response(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/missing", tmp_path)
+    local_site.stop()
+
+    assert capture.status_code == 404
+    assert capture.warc_files
 
 
 async def test_capture_returns_successful_response(local_site: LocalSite, tmp_path: Path) -> None:
