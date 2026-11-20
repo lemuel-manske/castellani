@@ -1,27 +1,27 @@
 import asyncio
-import ipaddress
 import os
-import socket
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin
 
-from playwright.async_api import async_playwright, Route, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Route, async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
+from utils.http import is_safe_request_url, is_valid_url
 
 NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
 NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
 VIEWPORT_WIDTH = 1365
 VIEWPORT_HEIGHT = 768
 
-HTTP_SCHEMES = {"http", "https"}
 DEFAULT_MAX_REQUESTS = 500
 DEFAULT_MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
 DEFAULT_MAX_DISCOVERED_LINKS = 1_000
+DEFAULT_ALLOW_PRIVATE_NETWORKS = False
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,10 @@ class CaptureLimits:
     max_requests: int = DEFAULT_MAX_REQUESTS
     max_document_bytes: int = DEFAULT_MAX_DOCUMENT_BYTES
     max_discovered_links: int = DEFAULT_MAX_DISCOVERED_LINKS
-    allow_private_networks: bool = False
+    allow_private_networks: bool = DEFAULT_ALLOW_PRIVATE_NETWORKS
+
+
+DEFAULT_LIMITS = CaptureLimits()
 
 
 @dataclass(frozen=True)
@@ -58,9 +61,12 @@ class UnsafeCaptureRequest(RuntimeError):
 class RequestGuard:
     def __init__(self, limits: CaptureLimits) -> None:
         self.limits = limits
+
         self.request_count = 0
+
         self.blocked_urls: list[str] = []
         self.blocked_navigation_url: str | None = None
+
         self.request_limit_exceeded = False
 
     async def handle(self, route: Route) -> None:
@@ -104,6 +110,7 @@ def extract_links(
     max_links: int = DEFAULT_MAX_DISCOVERED_LINKS,
 ) -> tuple[str, ...]:
     document = HTMLParser(html)
+
     discovered: dict[str, None] = {}
 
     for anchor in document.css("a[href]"):
@@ -123,22 +130,24 @@ def extract_links(
             continue
 
         if len(discovered) >= max_links:
-            raise CaptureLimitExceeded(
-                f"page exceeded the discovered-link limit of {max_links}"
-            )
+            raise CaptureLimitExceeded(f"page exceeded the discovered-link limit of {max_links}")
 
         discovered.setdefault(absolute_url, None)
 
     return tuple(discovered)
 
 
-async def capture_page(
-    url: str,
-    output_dir: Path,
-    limits: CaptureLimits | None = None,
-) -> PageCapture:
-    limits = limits or CaptureLimits()
+async def capture_local_page(url: str, output_dir: Path) -> PageCapture:
+    return await capture_page(
+        url,
+        output_dir,
+        limits=CaptureLimits(allow_private_networks=True),
+    )
 
+
+async def capture_page(
+    url: str, output_dir: Path, limits: CaptureLimits = DEFAULT_LIMITS
+) -> PageCapture:
     if not is_valid_url(url):
         raise ValueError("capture URL must be an absolute HTTP or HTTPS URL without credentials")
 
@@ -197,8 +206,7 @@ async def capture_page(
 
                 if document_bytes > limits.max_document_bytes:
                     raise CaptureLimitExceeded(
-                        "page document exceeded the "
-                        f"{limits.max_document_bytes}-byte limit"
+                        f"page document exceeded the {limits.max_document_bytes}-byte limit"
                     )
 
                 html = await page.content()
@@ -212,11 +220,13 @@ async def capture_page(
                     status_code = None
 
                 final_url = page.url
+
                 discovered_urls = extract_links(
                     html,
                     final_url,
                     max_links=limits.max_discovered_links,
                 )
+
                 captured_at = datetime.now(UTC)
             finally:
                 await context.close()
@@ -239,45 +249,6 @@ async def capture_page(
         blocked_urls=tuple(request_guard.blocked_urls),
         warc_files=warc_files,
     )
-
-
-async def is_safe_request_url(url: str, allow_private_networks: bool = False) -> bool:
-    """Reject unsafe destinations; production egress policy must enforce IPs too.
-
-    The recorder resolves hostnames independently, so this application-level DNS check
-    is defense in depth and does not by itself prevent DNS rebinding.
-    """
-    if not is_valid_url(url):
-        return False
-
-    if allow_private_networks:
-        return True
-
-    parsed_url = urlsplit(url)
-    hostname = parsed_url.hostname
-
-    if hostname is None:
-        return False
-
-    try:
-        address = ipaddress.ip_address(hostname)
-    except ValueError:
-        port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
-
-        try:
-            records = await asyncio.get_running_loop().getaddrinfo(
-                hostname,
-                port,
-                type=socket.SOCK_STREAM,
-            )
-        except OSError:
-            return False
-
-        addresses = {ipaddress.ip_address(record[4][0]) for record in records}
-
-        return bool(addresses) and all(address.is_global for address in addresses)
-
-    return address.is_global
 
 
 async def trust_certificate(certificate_path: Path, browser_home: Path) -> None:
@@ -312,25 +283,3 @@ async def trust_certificate(certificate_path: Path, browser_home: Path) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
-
-
-def is_valid_url(url: str) -> bool:
-    try:
-        parsed_url = urlsplit(url)
-
-        if (
-            parsed_url.scheme not in HTTP_SCHEMES
-            or not parsed_url.hostname
-            or parsed_url.username is not None
-            or parsed_url.password is not None
-        ):
-            return False
-
-        port = parsed_url.port
-
-        if port is not None and not 0 <= port <= 65_535:
-            return False
-    except ValueError:
-        return False
-
-    return True

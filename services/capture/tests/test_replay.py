@@ -2,7 +2,9 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from support.recording import DOWNLOAD, LocalSite, capture_local_page, replay_page
+from support.recording import DOWNLOAD, LocalSite, replay_page
+
+from capture.browser import capture_local_page
 
 pytestmark = pytest.mark.integration
 

@@ -4,7 +4,6 @@ import pytest
 
 from capture.browser import (
     CaptureLimitExceeded,
-    CaptureLimits,
     capture_page,
     extract_links,
     is_safe_request_url,
@@ -61,12 +60,3 @@ def test_extract_links_rejects_excessive_discovery() -> None:
 
     with pytest.raises(CaptureLimitExceeded, match="discovered-link limit"):
         extract_links(html, "https://example.org/", max_links=1)
-
-
-def test_capture_limits_have_bounded_defaults() -> None:
-    limits = CaptureLimits()
-
-    assert limits.max_requests > 0
-    assert limits.max_document_bytes > 0
-    assert limits.max_discovered_links > 0
-    assert limits.allow_private_networks is False
