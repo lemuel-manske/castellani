@@ -24,6 +24,7 @@ class FakeRepository:
 
     async def renew(self, claim: TaskClaim) -> TaskClaim:
         self.renewals += 1
+
         return replace(claim, lease_until=time.time() + 60)
 
     async def complete(
