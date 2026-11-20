@@ -54,6 +54,7 @@ DEFAULT_LIMITS = CaptureLimits()
 class PageCapture:
     requested_url: str
     final_url: str
+    redirect_chain: tuple[str, ...]
     status_code: int | None
     content_type: str | None
     title: str
@@ -154,6 +155,17 @@ class RequestGuard:
             raise UnsafeCaptureRequest(
                 f"navigation to a disallowed URL was blocked: {self.blocked_navigation_url}"
             )
+
+
+def extract_redirect_chain(request: Request) -> tuple[str, ...]:
+    chain: list[str] = []
+    current: Request | None = request
+
+    while current is not None:
+        chain.append(current.url)
+        current = current.redirected_from
+
+    return tuple(reversed(chain))
 
 
 def extract_links(
@@ -344,6 +356,10 @@ async def capture_page(
 
                     request_guard.raise_if_rejected()
 
+                    redirect_chain = (
+                        extract_redirect_chain(response.request) if response is not None else ()
+                    )
+
                     if response:
                         content_type = response.headers.get("content-type")
                         status_code = response.status
@@ -407,6 +423,7 @@ async def capture_page(
     return PageCapture(
         requested_url=url,
         final_url=final_url,
+        redirect_chain=redirect_chain,
         status_code=status_code,
         content_type=content_type,
         title=title,
