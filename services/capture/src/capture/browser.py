@@ -44,7 +44,10 @@ def extract_links(html: str, base_url: str) -> tuple[str, ...]:
 
         href = href.strip()
 
-        absolute_url = urljoin(base_url, href)
+        try:
+            absolute_url = urljoin(base_url, href)
+        except ValueError:
+            continue
 
         if not is_valid_url(absolute_url):
             continue
@@ -103,11 +106,8 @@ async def capture_page(url: str, output_dir: Path) -> PageCapture:
                     content_type = None
                     status_code = None
 
-
                 final_url = page.url
-
                 discovered_urls = extract_links(html, final_url)
-
                 captured_at = datetime.now(timezone.utc)
             finally:
                 await context.close()
@@ -164,6 +164,16 @@ async def trust_certificate(certificate_path: Path, browser_home: Path) -> None:
         stderr=subprocess.PIPE,
     )
 
+
 def is_valid_url(url: str) -> bool:
-    parsed_url = urlsplit(url)
-    return parsed_url.scheme in HTTP_SCHEMES and bool(parsed_url.netloc)
+    try:
+        parsed_url = urlsplit(url)
+
+        if parsed_url.scheme not in HTTP_SCHEMES or not parsed_url.hostname:
+            return False
+
+        parsed_url.port
+    except ValueError:
+        return False
+
+    return True

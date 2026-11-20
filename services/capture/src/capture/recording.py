@@ -1,9 +1,10 @@
 import asyncio
-import httpx
+import json
 import signal
 import socket
-
 from pathlib import Path
+
+import httpx
 
 from utils.template import template
 
@@ -35,7 +36,6 @@ recorder:
 """
 
 
-
 def available_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind((HOST, 0))
@@ -57,7 +57,7 @@ class PyWBRecorder:
 
     @property
     def proxy_url(self) -> str:
-        return f"{HOST}:{self.port}"
+        return f"http://{HOST}:{self.port}"
 
     @property
     def warc_files(self) -> tuple[Path, ...]:
@@ -109,9 +109,9 @@ class PyWBRecorder:
 
     def _write_config(self) -> None:
         config = template(CONFIG_TEMPLATE) \
-            .r("ROOT", str(self.collections_dir)) \
+            .r("ROOT", json.dumps(str(self.collections_dir))) \
             .r("COLLECTION_NAME", COLLECTION_NAME) \
-            .r("CA_FILE_CACHE", str(self.ca_certificate_path))
+            .r("CA_FILE_CACHE", json.dumps(str(self.ca_certificate_path)))
 
         self.config_path.write_text(str(config), encoding="utf-8")
 
