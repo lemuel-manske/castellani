@@ -77,8 +77,20 @@ def start_local_site() -> LocalSite:
 
             if path == "/start":
                 self.send_response(302)
+                self.send_header("Location", "/redirected")
+                self.end_headers()
+
+                return
+
+            if path == "/redirected":
+                self.send_response(302)
                 self.send_header("Location", "/page")
                 self.end_headers()
+
+                return
+
+            if path == "/missing":
+                self.send_error(404)
 
                 return
 
