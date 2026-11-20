@@ -1,10 +1,12 @@
 import asyncio
 from pathlib import Path
 
+import httpx
 import pytest
-from support.recording import DOWNLOAD, LocalSite, replay_page
+from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
 
 from capture.browser import capture_local_page
+from capture.recording import PyWBReplayServer
 
 pytestmark = pytest.mark.integration
 
@@ -82,3 +84,43 @@ async def test_concurrent_captures_replay_only_their_own_pages(
         "First capture",
         "Second capture",
     )
+
+
+
+async def test_replay_serves_direct_download(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/assets/download.bin", tmp_path)
+    local_site.stop()
+
+    replay_server = await PyWBReplayServer(tmp_path, tmp_path / "replay").start()
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(replay_server.replay_url(capture.final_url))
+
+        assert response.status_code == 200
+        assert response.content == DOWNLOAD.encode()
+    finally:
+        await replay_server.stop()
+
+
+async def test_replay_serves_direct_pdf(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/assets/document.pdf", tmp_path)
+    local_site.stop()
+
+    replay_server = await PyWBReplayServer(tmp_path, tmp_path / "replay").start()
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(replay_server.replay_url(capture.final_url))
+
+        assert response.status_code == 200
+        assert response.content == PDF
+        assert response.headers["content-type"].startswith("application/pdf")
+    finally:
+        await replay_server.stop()

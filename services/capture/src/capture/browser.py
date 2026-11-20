@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin
 
-from playwright.async_api import Route, async_playwright
+from playwright.async_api import Download, Error as PlaywrightError, Request, Response, Route, async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from selectolax.parser import HTMLParser
 
@@ -23,6 +23,7 @@ DEFAULT_MAX_REQUESTS = 500
 DEFAULT_MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
 DEFAULT_MAX_DISCOVERED_LINKS = 1_000
 DEFAULT_ALLOW_PRIVATE_NETWORKS = False
+DOWNLOAD_EVENT_TIMEOUT_SECONDS = 2
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,15 @@ class RequestGuard:
             )
 
 
+def is_html_content_type(content_type: str | None) -> bool:
+    if content_type is None:
+        return True
+
+    media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
+
+    return media_type in {"text/html", "application/xhtml+xml"}
+
+
 def extract_links(
     html: str,
     base_url: str,
@@ -178,57 +188,128 @@ async def capture_page(
 
                 page = context.pages[0] if context.pages else await context.new_page()
 
+                loop = asyncio.get_running_loop()
+                download_future: asyncio.Future[Download] = loop.create_future()
+                main_request_finished = asyncio.Event()
+                main_response: Response | None = None
+
+                def record_download(download: Download) -> None:
+                    if not download_future.done():
+                        download_future.set_result(download)
+
+                def record_main_response(response: Response) -> None:
+                    nonlocal main_response
+
+                    request = response.request
+
+                    if request.is_navigation_request() and request.frame == page.main_frame:
+                        main_response = response
+
+                def record_main_request_finished(request: Request) -> None:
+                    if request.is_navigation_request() and request.frame == page.main_frame:
+                        main_request_finished.set()
+
+                page.on("download", record_download)
+                page.on("response", record_main_response)
+                page.on("requestfinished", record_main_request_finished)
+
                 try:
-                    response = await page.goto(
-                        url,
-                        wait_until="domcontentloaded",
-                        timeout=limits.navigation_timeout_milliseconds,
-                    )
-                except Exception:
+                    try:
+                        response = await page.goto(
+                            url,
+                            wait_until="domcontentloaded",
+                            timeout=limits.navigation_timeout_milliseconds,
+                        )
+                    except PlaywrightError as navigation_error:
+                        request_guard.raise_if_rejected()
+
+                        if not download_future.done():
+                            try:
+                                await asyncio.wait_for(
+                                    asyncio.shield(download_future),
+                                    timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
+                                )
+                            except TimeoutError:
+                                pass
+
+                        if download_future.done():
+                            download = download_future.result()
+                            await download.path()
+                            response = main_response
+                            final_url = download.url
+                        elif (
+                            main_response is not None
+                            and main_response.headers.get("content-type", "")
+                            .split(";", maxsplit=1)[0]
+                            .strip()
+                            .lower()
+                            == "application/pdf"
+                        ):
+                            try:
+                                await asyncio.wait_for(
+                                    main_request_finished.wait(),
+                                    timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
+                                )
+                            except TimeoutError:
+                                raise navigation_error
+
+                            response = main_response
+                            final_url = main_response.url
+                        else:
+                            raise
+                    else:
+                        response = response or main_response
+                        final_url = page.url
+
                     request_guard.raise_if_rejected()
-                    raise
 
-                request_guard.raise_if_rejected()
+                    if response:
+                        content_type = response.headers.get("content-type")
+                        status_code = response.status
+                    else:
+                        content_type = None
+                        status_code = None
 
-                try:
-                    await page.wait_for_load_state(
-                        "networkidle",
-                        timeout=limits.network_idle_timeout_milliseconds,
-                    )
-                except PlaywrightTimeoutError:
-                    pass
+                    if is_html_content_type(content_type) and not download_future.done():
+                        try:
+                            await page.wait_for_load_state(
+                                "networkidle",
+                                timeout=limits.network_idle_timeout_milliseconds,
+                            )
+                        except PlaywrightTimeoutError:
+                            pass
 
-                request_guard.raise_if_rejected()
+                        request_guard.raise_if_rejected()
 
-                document_bytes = await page.evaluate(
-                    "() => new TextEncoder().encode("
-                    "document.documentElement?.outerHTML ?? '').byteLength"
-                )
+                        document_bytes = await page.evaluate(
+                            "() => new TextEncoder().encode("
+                            "document.documentElement?.outerHTML ?? '').byteLength"
+                        )
 
-                if document_bytes > limits.max_document_bytes:
-                    raise CaptureLimitExceeded(
-                        f"page document exceeded the {limits.max_document_bytes}-byte limit"
-                    )
+                        if document_bytes > limits.max_document_bytes:
+                            raise CaptureLimitExceeded(
+                                f"page document exceeded the {limits.max_document_bytes}-byte limit"
+                            )
 
-                html = await page.content()
-                title = await page.title()
+                        html = await page.content()
+                        title = await page.title()
 
-                if response:
-                    content_type = response.headers.get("content-type")
-                    status_code = response.status
-                else:
-                    content_type = None
-                    status_code = None
+                        discovered_urls = extract_links(
+                            html,
+                            final_url,
+                            max_links=limits.max_discovered_links,
+                        )
+                    else:
+                        title = ""
+                        discovered_urls = ()
 
-                final_url = page.url
-
-                discovered_urls = extract_links(
-                    html,
-                    final_url,
-                    max_links=limits.max_discovered_links,
-                )
-
-                captured_at = datetime.now(UTC)
+                    captured_at = datetime.now(UTC)
+                finally:
+                    page.remove_listener("download", record_download)
+                    page.remove_listener("response", record_main_response)
+                    page.remove_listener("requestfinished", record_main_request_finished)
+                    if not download_future.done():
+                        download_future.cancel()
             finally:
                 await complete_before_cancellation(context.close())
     finally:
