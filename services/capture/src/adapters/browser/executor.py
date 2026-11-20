@@ -5,6 +5,8 @@ from capture.browser import CaptureLimits, capture_page
 
 
 class BrowserPageExecutor:
+    """Adapts the browser capture engine to the worker's page-execution port."""
+
     def __init__(self, limits: CaptureLimits | None = None) -> None:
         self.limits = limits or CaptureLimits()
 

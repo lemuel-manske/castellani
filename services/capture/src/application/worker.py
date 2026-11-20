@@ -8,6 +8,7 @@ from application.contracts import (
     CaptureOutcome,
     DiscoveryPublisher,
     PageExecutor,
+    PageTaskConsumer,
     TaskRepository,
 )
 from domain.task import TaskClaim
@@ -16,6 +17,8 @@ WORKER_POLL_INTERVAL_SECONDS = 1
 
 
 class Worker:
+    """Coordinates the lifecycle of a claimed page capture."""
+
     def __init__(
         self,
         repository: TaskRepository,
@@ -87,9 +90,6 @@ class Worker:
             if reservation_id is not None:
                 await self.capacity.release(claim.attempt_id, reservation_id)
 
-            if directory is not None and not terminal:
-                await self._discard_attempt(claim, directory)
-
     async def _discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         try:
             await self.artifacts.discard_attempt(claim, directory)
@@ -102,19 +102,15 @@ class Worker:
 
 
 class WorkerRuntime:
+    """Runs the capture worker as a consumer of page-task messages."""
+
     def __init__(
         self,
         worker: Worker,
-        receive: Callable[[], Awaitable[object | None]],
-        acknowledge: Callable[[object], Awaitable[None]],
-        reject: Callable[[object], Awaitable[None]],
-        delivery_parser: Callable[[object], tuple[str, str]],
+        consumer: PageTaskConsumer,
     ) -> None:
         self.worker = worker
-        self.receive = receive
-        self.acknowledge = acknowledge
-        self.reject = reject
-        self.delivery_parser = delivery_parser
+        self.consumer = consumer
         self._stopping = asyncio.Event()
 
     def stop(self) -> None:
@@ -122,22 +118,22 @@ class WorkerRuntime:
 
     async def run(self) -> None:
         while not self._stopping.is_set():
-            delivery = await self.receive()
+            message = await self.consumer.receive()
 
-            if delivery is None:
+            if message is None:
                 await self._wait_for_work()
                 continue
 
             try:
-                archive_id, url_key = self.delivery_parser(delivery)
-                await self.worker.execute(archive_id, url_key)
+                delivery = message.delivery
+                await self.worker.execute(delivery.archive_id, delivery.url_key)
             except asyncio.CancelledError:
                 raise
             except Exception:
-                await self.reject(delivery)
+                await message.reject()
                 continue
 
-            await self.acknowledge(delivery)
+            await message.acknowledge()
 
     async def _wait_for_work(self) -> None:
         try:

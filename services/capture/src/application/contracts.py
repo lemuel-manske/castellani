@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from domain.task import PageTask, TaskClaim
+from domain.task import TaskClaim
 
 
 @dataclass(frozen=True)
 class CaptureArtifact:
+    """Metadata and files produced by capturing one page."""
+
     requested_url: str
     final_url: str
     redirect_chain: tuple[str, ...]
@@ -22,6 +24,8 @@ class CaptureArtifact:
 
 @dataclass(frozen=True)
 class CaptureOutcome:
+    """A completed capture attempt ready to be committed to task state."""
+
     archive_id: str
     url_key: str
     attempt_id: str
@@ -31,11 +35,32 @@ class CaptureOutcome:
 
 @dataclass(frozen=True)
 class PageTaskDelivery:
+    """Application-level identity of a page task sent to a capture worker."""
+
     archive_id: str
     url_key: str
 
 
+class PageTaskMessage(Protocol):
+    """A received task and the settlement operations for its broker delivery."""
+
+    @property
+    def delivery(self) -> PageTaskDelivery: ...
+
+    async def acknowledge(self) -> None: ...
+
+    async def reject(self) -> None: ...
+
+
+class PageTaskConsumer(Protocol):
+    """Inbound port for receiving page tasks from the messaging system."""
+
+    async def receive(self) -> PageTaskMessage | None: ...
+
+
 class TaskRepository(Protocol):
+    """Owns authoritative task claims and capture-attempt state."""
+
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None: ...
 
     async def renew(self, claim: TaskClaim) -> TaskClaim: ...
@@ -48,22 +73,30 @@ class TaskRepository(Protocol):
 
 
 class BrowserCapacity(Protocol):
+    """Controls the number of page captures running concurrently."""
+
     async def reserve(self, attempt_id: str) -> str | None: ...
 
     async def release(self, attempt_id: str, reservation_id: str) -> None: ...
 
 
 class PageExecutor(Protocol):
+    """Executes a browser capture and returns its resulting artifacts."""
+
     async def execute(self, url: str, output_dir: Path) -> CaptureArtifact: ...
 
 
 class ArtifactStore(Protocol):
+    """Manages temporary storage for individual capture attempts."""
+
     async def create_attempt_directory(self, claim: TaskClaim) -> Path: ...
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None: ...
 
 
 class DiscoveryPublisher(Protocol):
+    """Publishes URLs discovered during a page capture."""
+
     async def publish_discovered(
         self,
         claim: TaskClaim,
