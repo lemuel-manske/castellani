@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/unnamed/services/coordinator/messaging/dispatcher"
 	"github.com/lemuel-manske/unnamed/services/coordinator/messaging/rabbitmq"
 )
 
@@ -17,7 +18,7 @@ const (
 func StartWorkers(
 	ctx context.Context,
 	logger *slog.Logger,
-	dispatcher *application.Dispatcher,
+	dispatcher *dispatcher.Dispatcher,
 	consumer *rabbitmq.RabbitConsumer,
 	app *application.Application,
 	reconcileInterval time.Duration,
