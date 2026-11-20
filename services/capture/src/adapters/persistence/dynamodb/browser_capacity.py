@@ -2,11 +2,59 @@ import asyncio
 import time
 from collections.abc import Callable
 from hashlib import sha256
-from typing import Any
+from typing import Any, TypedDict
 
 from botocore.exceptions import ClientError
 
 from application.contracts import BrowserReservation
+
+
+class ClientErrorResponse(TypedDict):
+    """
+    Just for type-safety.
+    """
+
+    Error: dict[str, str]
+
+
+def new_reservation_id(attempt_id: str) -> str:
+    digest = sha256(attempt_id.encode("utf-8")).hexdigest()
+
+    return f"browser-{digest}"
+
+
+def to_number(item: dict[str, Any], name: str) -> float:
+    try:
+        return float(item[name]["N"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError(f"DynamoDB browser slot has invalid {name}") from error
+
+
+def reservation_from_item(
+    slot_id: str,
+    item: dict[str, Any],
+) -> BrowserReservation:
+    try:
+        attempt_id = item["ownerAttemptId"]["S"]
+        reservation_id = item["reservationId"]["S"]
+        fence = int(to_number(item, "fence"))
+        lease_until = to_number(item, "leaseUntil")
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError("DynamoDB returned an invalid browser slot") from error
+
+    return BrowserReservation(
+        attempt_id=attempt_id,
+        reservation_id=reservation_id,
+        slot_id=slot_id,
+        fence=fence,
+        lease_until=lease_until,
+    )
+
+
+def is_conditional_failure(error: ClientError) -> bool:
+    response: ClientErrorResponse = error.response
+
+    return response["Error"]["Code"] == "ConditionalCheckFailedException"
 
 
 class BrowserReservationLostError(RuntimeError):
@@ -43,7 +91,7 @@ class DynamoDBBrowserCapacity:
         if not attempt_id:
             raise ValueError("attempt_id must not be empty")
 
-        reservation_id = self._reservation_id(attempt_id)
+        reservation_id = new_reservation_id(attempt_id)
 
         return await asyncio.to_thread(
             self._reserve,
@@ -69,6 +117,7 @@ class DynamoDBBrowserCapacity:
 
         for slot_number in range(self.slot_count):
             slot_id = str(slot_number)
+
             now = self.clock()
             lease_until = now + self.lease_duration
 
@@ -100,7 +149,7 @@ class DynamoDBBrowserCapacity:
                     ReturnValues="ALL_NEW",
                 )
             except ClientError as error:
-                if not self._is_conditional_failure(error):
+                if not is_conditional_failure(error):
                     raise
 
                 existing = self._read_slot(slot_id)
@@ -108,13 +157,13 @@ class DynamoDBBrowserCapacity:
                     existing is not None
                     and existing.get("ownerAttemptId", {}).get("S") == attempt_id
                     and existing.get("reservationId", {}).get("S") == reservation_id
-                    and self._number(existing, "leaseUntil") > self.clock()
+                    and to_number(existing, "leaseUntil") > self.clock()
                 ):
-                    return self._reservation_from_item(slot_id, existing)
+                    return reservation_from_item(slot_id, existing)
 
                 continue
 
-            return self._reservation_from_item(slot_id, response["Attributes"])
+            return reservation_from_item(slot_id, response["Attributes"])
 
         return None
 
@@ -147,14 +196,14 @@ class DynamoDBBrowserCapacity:
                 ReturnValues="ALL_NEW",
             )
         except ClientError as error:
-            if self._is_conditional_failure(error):
+            if is_conditional_failure(error):
                 raise BrowserReservationLostError(
                     "browser capacity reservation is no longer owned"
                 ) from error
 
             raise
 
-        renewed = self._reservation_from_item(reservation.slot_id, response["Attributes"])
+        renewed = reservation_from_item(reservation.slot_id, response["Attributes"])
 
         if renewed.lease_until <= max(reservation.lease_until, now):
             raise BrowserReservationLostError(
@@ -185,7 +234,7 @@ class DynamoDBBrowserCapacity:
                 },
             )
         except ClientError as error:
-            if not self._is_conditional_failure(error):
+            if not is_conditional_failure(error):
                 raise
 
     def _find_existing_reservation(
@@ -195,15 +244,16 @@ class DynamoDBBrowserCapacity:
     ) -> BrowserReservation | None:
         for slot_number in range(self.slot_count):
             slot_id = str(slot_number)
+
             item = self._read_slot(slot_id)
 
             if (
                 item is not None
                 and item.get("ownerAttemptId", {}).get("S") == attempt_id
                 and item.get("reservationId", {}).get("S") == reservation_id
-                and self._number(item, "leaseUntil") > self.clock()
+                and to_number(item, "leaseUntil") > self.clock()
             ):
-                return self._reservation_from_item(slot_id, item)
+                return reservation_from_item(slot_id, item)
 
         return None
 
@@ -215,42 +265,5 @@ class DynamoDBBrowserCapacity:
         )
 
         item = response.get("Item")
+
         return item if item else None
-
-    @staticmethod
-    def _reservation_id(attempt_id: str) -> str:
-        digest = sha256(attempt_id.encode("utf-8")).hexdigest()
-        return f"browser-{digest}"
-
-    @staticmethod
-    def _number(item: dict[str, Any], name: str) -> float:
-        try:
-            return float(item[name]["N"])
-        except (KeyError, TypeError, ValueError) as error:
-            raise RuntimeError(f"DynamoDB browser slot has invalid {name}") from error
-
-    @classmethod
-    def _reservation_from_item(
-        cls,
-        slot_id: str,
-        item: dict[str, Any],
-    ) -> BrowserReservation:
-        try:
-            attempt_id = item["ownerAttemptId"]["S"]
-            reservation_id = item["reservationId"]["S"]
-            fence = int(cls._number(item, "fence"))
-            lease_until = cls._number(item, "leaseUntil")
-        except (KeyError, TypeError, ValueError) as error:
-            raise RuntimeError("DynamoDB returned an invalid browser slot") from error
-
-        return BrowserReservation(
-            attempt_id=attempt_id,
-            reservation_id=reservation_id,
-            slot_id=slot_id,
-            fence=fence,
-            lease_until=lease_until,
-        )
-
-    @staticmethod
-    def _is_conditional_failure(error: ClientError) -> bool:
-        return error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException"
