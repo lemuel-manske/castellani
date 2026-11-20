@@ -50,7 +50,7 @@ DEFAULT_LIMITS = CaptureLimits()
 
 
 @dataclass(frozen=True)
-class PageCapture:
+class BrowserCaptureResult:
     requested_url: str
     final_url: str
     redirect_chain: tuple[str, ...]
@@ -203,7 +203,7 @@ def extract_links(
     return tuple(discovered)
 
 
-async def capture_local_page(url: str, output_dir: Path) -> PageCapture:
+async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:
     return await capture_page(
         url,
         output_dir,
@@ -414,7 +414,7 @@ async def capture_page(
     if not warc_files:
         raise CaptureRecordingFailed("pywb recorder produced no WARC artifacts")
 
-    return PageCapture(
+    return BrowserCaptureResult(
         requested_url=url,
         final_url=final_url,
         redirect_chain=redirect_chain,
