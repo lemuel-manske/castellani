@@ -75,7 +75,10 @@ class BrowserCapacity(Protocol):
 
 
 class PageExecutor(Protocol):
-    """Executes a browser capture and returns its resulting artifacts."""
+    """Executes a browser capture and returns its resulting artifacts.
+
+    Implementations must stop underlying browser work when execution is cancelled.
+    """
 
     async def execute(self, url: str, output_dir: Path) -> CaptureArtifact: ...
 
