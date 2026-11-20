@@ -1,7 +1,7 @@
 import asyncio
+import time
 from dataclasses import replace
 from pathlib import Path
-import time
 
 from application.contracts import BrowserReservation, CaptureArtifact, CaptureOutcome
 from domain.task import TaskClaim

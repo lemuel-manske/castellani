@@ -1,7 +1,7 @@
 import asyncio
+import time
 from collections.abc import Callable
 from hashlib import sha256
-import time
 from typing import Any
 
 from botocore.exceptions import ClientError

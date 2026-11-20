@@ -1,5 +1,5 @@
-from copy import deepcopy
 import threading
+from copy import deepcopy
 from typing import Any
 
 from botocore.exceptions import ClientError
