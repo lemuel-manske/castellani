@@ -18,7 +18,7 @@ CA_DOWNLOAD_PATH = "/wsgiprox/download/pem"
 PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 10
 STARTUP_TIMEOUT_SECONDS = 15
 
-CONFIG_TEMPLATE = """
+RECORD_CONFIG_TEMPLATE = """
 collections_root: {{ROOT}}
 archive_paths:
   - archive
@@ -34,6 +34,15 @@ proxy:
 recorder:
   source_coll: live
   filename_template: "capture-{{timestamp}}-{{hostname}}-{{random}}.warc.gz"
+"""
+
+REPLAY_CONFIG_TEMPLATE = """
+collections_root: {{ROOT}}
+archive_paths:
+  - archive
+index_paths:
+  - indexes
+framed_replay: false
 """
 
 
@@ -144,7 +153,7 @@ class PyWBRecorder:
 
     def _write_config(self) -> None:
         config = (
-            template(CONFIG_TEMPLATE)
+            template(RECORD_CONFIG_TEMPLATE)
             .r("ROOT", json.dumps(str(self.collections_dir)))
             .r("COLLECTION_NAME", COLLECTION_NAME)
             .r("CA_FILE_CACHE", json.dumps(str(self.ca_certificate_path)))
@@ -189,13 +198,22 @@ class PyWBReplayServer:
     def __init__(self, capture_dir: Path, replay_dir: Path) -> None:
         self.capture_dir = capture_dir
         self.replay_dir = replay_dir
+
+        self.collections_dir = capture_dir / "collections"
+        self.config_path = replay_dir / "config.yaml"
+
         self.port = available_port()
+
         self.process: asyncio.subprocess.Process | None = None
+
+    def replay_url(self, page_url: str) -> str:
+        return f"http://{HOST}:{self.port}/{COLLECTION_NAME}/{page_url}"
 
     async def start(self) -> "PyWBReplayServer":
         await self._reindex_collection()
 
         self.replay_dir.mkdir(parents=True, exist_ok=True)
+
         self._write_config()
 
         self.process = await asyncio.create_subprocess_exec(
@@ -210,24 +228,30 @@ class PyWBReplayServer:
         try:
             process = self.process
 
-            if process is None:
+            if not process:
                 raise RuntimeError("pywb replay process has not started")
 
             await wait_for_http_response(process, f"http://{HOST}:{self.port}/")
         except BaseException:
             await self.stop()
+
             raise
 
         return self
 
     async def stop(self) -> None:
-        if self.process is None:
+        process = self.process
+
+        if process is None:
             return
 
-        await stop_process(self.process)
+        await stop_process(process)
 
-    def replay_url(self, page_url: str) -> str:
-        return f"http://{HOST}:{self.port}/{COLLECTION_NAME}/{page_url}"
+    def _write_config(self) -> None:
+        replay_config = template(REPLAY_CONFIG_TEMPLATE) \
+            .r("ROOT", str(self.collections_dir))
+
+        self.config_path.write_text(str(replay_config), encoding="utf-8")
 
     async def _reindex_collection(self) -> None:
         process = await asyncio.create_subprocess_exec(
@@ -243,14 +267,3 @@ class PyWBReplayServer:
 
         if result != 0:
             raise RuntimeError("pywb could not reindex the recording collection")
-
-    def _write_config(self) -> None:
-        replay_config = f"""
-collections_root: {json.dumps(str(self.capture_dir / "collections"))}
-archive_paths:
-  - archive
-index_paths:
-  - indexes
-framed_replay: false
-"""
-        (self.replay_dir / "config.yaml").write_text(replay_config, encoding="utf-8")
