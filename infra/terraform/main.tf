@@ -77,6 +77,20 @@ resource "aws_dynamodb_table" "coordinator_inbox" {
   }
 }
 
+# Search-owned indexing ledger (ADR-0005, ADR-0019): one item per snapshot,
+# recording claims and terminal indexing outcomes.
+resource "aws_dynamodb_table" "search_index_ledger" {
+  name         = "search_index_ledger"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "snapshotId"
+
+  attribute {
+    name = "snapshotId"
+    type = "S"
+  }
+}
+
 resource "aws_s3_bucket" "archive_artifacts" {
   bucket        = "castellani-archive-artifacts"
   force_destroy = true
