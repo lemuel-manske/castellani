@@ -143,10 +143,12 @@ class PyWBRecorder:
         await stop_process(self.process)
 
     def _write_config(self) -> None:
-        config = template(CONFIG_TEMPLATE) \\
-            .r("ROOT", json.dumps(str(self.collections_dir))) \\
-            .r("COLLECTION_NAME", COLLECTION_NAME) \\
+        config = (
+            template(CONFIG_TEMPLATE)
+            .r("ROOT", json.dumps(str(self.collections_dir)))
+            .r("COLLECTION_NAME", COLLECTION_NAME)
             .r("CA_FILE_CACHE", json.dumps(str(self.ca_certificate_path)))
+        )
 
         self.config_path.write_text(str(config), encoding="utf-8")
 
@@ -166,8 +168,13 @@ class PyWBRecorder:
             raise RuntimeError("pywb could not initialize the recording collection")
 
     async def _wait_until_ready(self) -> None:
+        process = self.process
+
+        if process is None:
+            raise RuntimeError("pywb recorder process has not started")
+
         response = await wait_for_http_response(
-            self.process,
+            process,
             f"{self.proxy_url}{CA_DOWNLOAD_PATH}",
             lambda response: (
                 response.status_code == 200
@@ -201,7 +208,12 @@ class PyWBReplayServer:
         )
 
         try:
-            await wait_for_http_response(self.process, f"http://{HOST}:{self.port}/")
+            process = self.process
+
+            if process is None:
+                raise RuntimeError("pywb replay process has not started")
+
+            await wait_for_http_response(process, f"http://{HOST}:{self.port}/")
         except BaseException:
             await self.stop()
             raise
@@ -224,7 +236,7 @@ class PyWBReplayServer:
             COLLECTION_NAME,
             cwd=self.capture_dir,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
         )
 
         result = await process.wait()
