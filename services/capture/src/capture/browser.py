@@ -17,6 +17,8 @@ NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
 VIEWPORT_WIDTH = 1365
 VIEWPORT_HEIGHT = 768
 
+HTTP_SCHEMES = {"http", "https"}
+
 
 @dataclass(frozen=True)
 class PageCapture:
@@ -35,15 +37,16 @@ def extract_links(html: str, base_url: str) -> tuple[str, ...]:
     discovered: dict[str, None] = {}
 
     for anchor in document.css("a[href]"):
-        href = anchor.attributes.get("href", "").strip()
+        href = anchor.attributes.get("href", "")
 
         if not href:
             continue
 
-        absolute_url = urljoin(base_url, href)
-        parsed_url = urlsplit(absolute_url)
+        href = href.strip()
 
-        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        absolute_url = urljoin(base_url, href)
+
+        if not is_valid_url(absolute_url):
             continue
 
         discovered.setdefault(absolute_url, None)
@@ -52,21 +55,23 @@ def extract_links(html: str, base_url: str) -> tuple[str, ...]:
 
 
 async def capture_page(url: str, output_dir: Path) -> PageCapture:
-    parsed_url = urlsplit(url)
-
-    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+    if not is_valid_url(url):
         raise ValueError("capture URL must be an absolute HTTP or HTTPS URL")
 
-    recorder = await PyWBRecorder(output_dir).start()
+    recorder = PyWBRecorder(output_dir)
+
+    await recorder.start()
 
     try:
         browser_home = output_dir / "browser-home"
-        await _trust_recorder_certificate(recorder.ca_certificate_path, browser_home)
+        browser_profile = output_dir / "browser-profile"
+
+        await trust_certificate(recorder.ca_certificate_path, browser_home)
 
         async with async_playwright() as playwright:
             context = await playwright.chromium.launch_persistent_context(
-                user_data_dir=str(output_dir / "browser-profile"),
                 headless=True,
+                user_data_dir=browser_profile,
                 proxy={"server": recorder.proxy_url},
                 env={**os.environ, "HOME": str(browser_home)},
                 viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
@@ -89,11 +94,20 @@ async def capture_page(url: str, output_dir: Path) -> PageCapture:
                     pass
 
                 html = await page.content()
-                final_url = page.url
-                content_type = response.headers.get("content-type") if response else None
-                status_code = response.status if response else None
                 title = await page.title()
+
+                if response:
+                    content_type = response.headers.get("content-type")
+                    status_code = response.status
+                else:
+                    content_type = None
+                    status_code = None
+
+
+                final_url = page.url
+
                 discovered_urls = extract_links(html, final_url)
+
                 captured_at = datetime.now(timezone.utc)
             finally:
                 await context.close()
@@ -117,9 +131,10 @@ async def capture_page(url: str, output_dir: Path) -> PageCapture:
     )
 
 
-async def _trust_recorder_certificate(certificate_path: Path, browser_home: Path) -> None:
+async def trust_certificate(certificate_path: Path, browser_home: Path) -> None:
     database_path = browser_home / ".pki" / "nssdb"
     database_path.mkdir(parents=True, exist_ok=True)
+
     database_uri = f"sql:{database_path}"
 
     await asyncio.to_thread(
@@ -129,6 +144,7 @@ async def _trust_recorder_certificate(certificate_path: Path, browser_home: Path
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
+
     await asyncio.to_thread(
         subprocess.run,
         [
@@ -147,3 +163,7 @@ async def _trust_recorder_certificate(certificate_path: Path, browser_home: Path
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
+
+def is_valid_url(url: str) -> bool:
+    parsed_url = urlsplit(url)
+    return parsed_url.scheme in HTTP_SCHEMES and bool(parsed_url.netloc)
