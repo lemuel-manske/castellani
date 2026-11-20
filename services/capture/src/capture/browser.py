@@ -251,7 +251,7 @@ async def capture_page(
 
                 main_request_finished = asyncio.Event()
 
-                main_response_future: asyncio.Future[Response] = loop.create_future()
+                main_responses: list[Response] = []
 
                 def record_download(download: Download) -> None:
                     if not download_future.done():
@@ -260,15 +260,15 @@ async def capture_page(
                 def record_main_response(response: Response) -> None:
                     request = response.request
 
+                    if request.is_navigation_request() and request.frame == page.main_frame:
+                        main_responses.append(response)
+
+                def record_main_request_finished(request: Request) -> None:
                     if (
                         request.is_navigation_request()
                         and request.frame == page.main_frame
-                        and not main_response_future.done()
+                        and request.redirected_to is None
                     ):
-                        main_response_future.set_result(response)
-
-                def record_main_request_finished(request: Request) -> None:
-                    if request.is_navigation_request() and request.frame == page.main_frame:
                         main_request_finished.set()
 
                 page.on("download", record_download)
@@ -298,15 +298,11 @@ async def capture_page(
                             download = download_future.result()
                             final_url = download.url
 
-                            response = (
-                                main_response_future.result()
-                                if main_response_future.done()
-                                else None
-                            )
+                            response = main_responses[-1] if main_responses else None
                         elif (
-                            main_response_future.done()
+                            main_responses
                             and is_pdf_content_type(
-                                main_response_future.result().headers.get("content-type")
+                                main_responses[-1].headers.get("content-type")
                             )
                         ):
                             try:
@@ -319,18 +315,14 @@ async def capture_page(
                                     "browser did not finish the PDF navigation response"
                                 ) from navigation_error
 
-                            response = main_response_future.result()
+                            response = main_responses[-1]
                             final_url = response.url
                         else:
                             raise CaptureNavigationFailed(
                                 "browser navigation did not produce a document or downloadable resource"
                             ) from navigation_error
                     else:
-                        response = response or (
-                            main_response_future.result()
-                            if main_response_future.done()
-                            else None
-                        )
+                        response = response or (main_responses[-1] if main_responses else None)
                         final_url = page.url
 
                     if (
