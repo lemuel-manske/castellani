@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 
 from botocore.exceptions import ClientError
 
-from domain.browser_reservation import BrowserReservation
+from domain.browser_reservation import BrowserReservation, InvalidBrowserReservationRenewal
 
 
 class ClientErrorResponse(TypedDict):
