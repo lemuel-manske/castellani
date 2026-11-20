@@ -16,6 +16,7 @@ def test_task_claim_accepts_a_renewal_that_preserves_ownership_and_extends_lease
         fence=3,
         lease_until=150,
     )
+
     renewed = replace(claim, lease_until=200)
 
     claim.verify_renewal(renewed, now=100)
@@ -53,6 +54,7 @@ def test_browser_reservation_accepts_a_renewal_that_preserves_ownership() -> Non
         fence=3,
         lease_until=150,
     )
+
     renewed = replace(reservation, lease_until=200)
 
     reservation.verify_renewal(renewed, now=100)
