@@ -1,5 +1,6 @@
 import json
 from collections.abc import Awaitable, Callable
+from typing import cast
 
 from aio_pika.abc import AbstractIncomingMessage
 
@@ -30,12 +31,14 @@ class RabbitMQPageTaskConsumer:
     @staticmethod
     def _parse_delivery(body: bytes) -> tuple[str, str] | None:
         try:
-            envelope = json.loads(body)
+            decoded: object = json.loads(body)
         except (UnicodeDecodeError, json.JSONDecodeError):
             return None
 
-        if not isinstance(envelope, dict):
+        if not isinstance(decoded, dict):
             return None
+
+        envelope = cast(dict[str, object], decoded)
 
         if envelope.get("type") != "CapturePage" or envelope.get("version") != MESSAGE_VERSION:
             return None
@@ -44,6 +47,8 @@ class RabbitMQPageTaskConsumer:
 
         if not isinstance(payload, dict):
             return None
+
+        payload = cast(dict[str, object], payload)
 
         archive_id = payload.get("archiveId")
         url_key = payload.get("urlKey")
