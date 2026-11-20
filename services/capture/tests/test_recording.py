@@ -1,9 +1,16 @@
+import gzip
 from pathlib import Path
 
 import pytest
 from support.recording import DOWNLOAD, LocalSite
 
-from capture.browser import capture_local_page
+from capture.browser import (
+    CaptureFailureCode,
+    CaptureLimits,
+    CaptureNavigationFailed,
+    capture_local_page,
+    capture_page,
+)
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
@@ -19,6 +26,42 @@ async def test_capture_follows_redirect(local_site: LocalSite, tmp_path: Path) -
         f"{local_site.base_url}/redirected",
         f"{local_site.base_url}/page",
     )
+
+
+async def test_capture_fails_when_navigation_response_is_interrupted(
+    local_site: LocalSite,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("capture.browser.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
+
+    with pytest.raises(CaptureNavigationFailed) as error:
+        await capture_page(
+            f"{local_site.base_url}/slow",
+            tmp_path,
+            limits=CaptureLimits(
+                navigation_timeout_milliseconds=100,
+                allow_private_networks=True,
+            ),
+        )
+
+    assert error.value.reason_code == CaptureFailureCode.NAVIGATION_FAILED
+
+
+async def test_capture_warc_segments_are_valid_gzip_records(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
+    local_site.stop()
+
+    assert capture.warc_files
+
+    for warc_file in capture.warc_files:
+        content = gzip.decompress(warc_file.read_bytes())
+
+        assert content.startswith(b"WARC/1.")
+        assert b"WARC-Type: request" in content or b"WARC-Type: response" in content
 
 
 async def test_capture_preserves_http_error_response(
