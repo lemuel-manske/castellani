@@ -45,10 +45,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "urlKey",
-          "reasonCode"
-        ],
+        "required": ["urlKey", "reasonCode"],
         "properties": {
           "urlKey": {
             "type": "string"
@@ -64,12 +61,7 @@
     "ArtifactRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "bucket",
-        "key",
-        "sha256",
-        "sizeBytes"
-      ],
+      "required": ["bucket", "key", "sha256", "sizeBytes"],
       "properties": {
         "bucket": {
           "type": "string",
@@ -117,6 +109,13 @@
         "finalUrl": {
           "type": "string",
           "format": "uri"
+        },
+        "redirectChain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
         },
         "capturedAt": {
           "type": "string",

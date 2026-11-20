@@ -1,5 +1,5 @@
 [project]
-name = "castellani@capture"
+name = "castellani-capture"
 version = "0.1.0"
 description = "Python Capture service for Castellani."
 requires-python = "==3.13.5"
@@ -9,6 +9,7 @@ dependencies = [
     "fastapi==0.115.12",
     "httpx==0.28.1",
     "playwright==1.51.0",
+    "pywb==2.11.1",
     "selectolax==0.3.28",
     "uvicorn[standard]==0.34.0",
 ]
@@ -21,9 +22,19 @@ dev = [
     "ruff==0.11.2",
 ]
 
+[tool.uv]
+package = false
+
+[tool.castellani]
+name = "castellani@capture"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: exercises the real browser, pywb recorder, and offline replay server",
+]
 
 [tool.ruff]
 line-length = 100
