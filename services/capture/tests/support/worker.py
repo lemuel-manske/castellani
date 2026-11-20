@@ -1,9 +1,7 @@
-from dataclasses import dataclass
 from pathlib import Path
 
 from application.contracts import CaptureArtifact, CaptureOutcome
-from application.worker import Worker
-from domain.task import PageTask, TaskClaim
+from domain.task import TaskClaim
 
 
 class FakeRepository:
@@ -58,40 +56,3 @@ class FakeArtifactStore:
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         self.discarded.append((claim, directory))
-
-
-@dataclass
-class WorkerFailureScenario:
-    worker: Worker
-    claim: TaskClaim
-    repository: FakeRepository
-    artifacts: FakeArtifactStore
-
-
-def worker_failure_scenario(directory: Path) -> WorkerFailureScenario:
-    claim = TaskClaim(
-        task=PageTask(
-            archive_id="archive-1",
-            url_key="url-1",
-            url="https://example.org/",
-            depth=0,
-        ),
-        attempt_id="attempt-1",
-        fence=1,
-        lease_until=100.0,
-    )
-    repository = FakeRepository(claim)
-    artifacts = FakeArtifactStore(directory)
-    worker = Worker(
-        repository=repository,
-        capacity=FakeCapacity(),
-        executor=FailingPageExecutor(),
-        artifacts=artifacts,
-    )
-
-    return WorkerFailureScenario(
-        worker=worker,
-        claim=claim,
-        repository=repository,
-        artifacts=artifacts,
-    )

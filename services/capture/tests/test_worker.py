@@ -1,18 +1,39 @@
 from pathlib import Path
 
-from support.worker import worker_failure_scenario
+from application.worker import Worker
+from domain.task import PageTask, TaskClaim
+from support.worker import (
+    FakeArtifactStore,
+    FakeCapacity,
+    FakeRepository,
+    FailingPageExecutor,
+)
 
 
 async def test_worker_discards_attempt_artifacts_after_capture_failure(tmp_path: Path) -> None:
-    scenario = worker_failure_scenario(tmp_path)
+    claim = TaskClaim(
+        task=PageTask(
+            archive_id="archive-1",
+            url_key="url-1",
+            url="https://example.org/",
+            depth=0,
+        ),
+        attempt_id="attempt-1",
+        fence=1,
+        lease_until=100.0,
+    )
+    repository = FakeRepository(claim)
+    artifacts = FakeArtifactStore(tmp_path)
+    worker = Worker(
+        repository=repository,
+        capacity=FakeCapacity(),
+        executor=FailingPageExecutor(),
+        artifacts=artifacts,
+    )
 
-    claimed = await scenario.worker.execute("archive-1", "url-1")
+    claimed = await worker.execute("archive-1", "url-1")
 
     assert claimed
-    assert scenario.repository.failed == (
-        scenario.claim,
-        "capture_failed",
-        "browser capture failed",
-    )
-    assert scenario.artifacts.discarded == [(scenario.claim, tmp_path)]
-    assert scenario.repository.completed is None
+    assert repository.failed == (claim, "capture_failed", "browser capture failed")
+    assert artifacts.discarded == [(claim, tmp_path)]
+    assert repository.completed is None
