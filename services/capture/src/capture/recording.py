@@ -2,6 +2,7 @@ import asyncio
 import json
 import signal
 import socket
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -41,6 +42,49 @@ def available_port() -> int:
         listener.bind((HOST, 0))
 
         return int(listener.getsockname()[1])
+
+
+async def wait_for_http_response(
+    process: asyncio.subprocess.Process,
+    url: str,
+    is_ready: Callable[[httpx.Response], bool] | None = None,
+) -> httpx.Response:
+    deadline = asyncio.get_running_loop().time() + STARTUP_TIMEOUT_SECONDS
+
+    async with httpx.AsyncClient(trust_env=False, timeout=1) as client:
+        while asyncio.get_running_loop().time() < deadline:
+            if process.returncode is not None:
+                raise RuntimeError("pywb process exited before becoming ready")
+
+            try:
+                response = await client.get(url)
+            except httpx.TransportError:
+                await asyncio.sleep(0.1)
+
+                continue
+
+            if is_ready is None or is_ready(response):
+                return response
+
+            await asyncio.sleep(0.1)
+
+    raise TimeoutError("pywb process did not become ready in time")
+
+
+async def stop_process(process: asyncio.subprocess.Process) -> None:
+    if process.returncode is not None:
+        return
+
+    process.send_signal(signal.SIGINT)
+
+    try:
+        await asyncio.wait_for(
+            process.wait(),
+            timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        process.kill()
+        await process.wait()
 
 
 class PyWBRecorder:
@@ -93,24 +137,15 @@ class PyWBRecorder:
         return self
 
     async def stop(self) -> None:
-        if self.process is None or self.process.returncode is not None:
+        if self.process is None:
             return
 
-        self.process.send_signal(signal.SIGINT)
-
-        try:
-            await asyncio.wait_for(
-                self.process.wait(),
-                timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS,
-            )
-        except TimeoutError:
-            self.process.kill()
-            await self.process.wait()
+        await stop_process(self.process)
 
     def _write_config(self) -> None:
-        config = template(CONFIG_TEMPLATE) \
-            .r("ROOT", json.dumps(str(self.collections_dir))) \
-            .r("COLLECTION_NAME", COLLECTION_NAME) \
+        config = template(CONFIG_TEMPLATE) \\
+            .r("ROOT", json.dumps(str(self.collections_dir))) \\
+            .r("COLLECTION_NAME", COLLECTION_NAME) \\
             .r("CA_FILE_CACHE", json.dumps(str(self.ca_certificate_path)))
 
         self.config_path.write_text(str(config), encoding="utf-8")
@@ -131,25 +166,79 @@ class PyWBRecorder:
             raise RuntimeError("pywb could not initialize the recording collection")
 
     async def _wait_until_ready(self) -> None:
-        deadline = asyncio.get_running_loop().time() + STARTUP_TIMEOUT_SECONDS
+        response = await wait_for_http_response(
+            self.process,
+            f"{self.proxy_url}{CA_DOWNLOAD_PATH}",
+            lambda response: (
+                response.status_code == 200
+                and b"BEGIN CERTIFICATE" in response.content
+            ),
+        )
 
-        async with httpx.AsyncClient(trust_env=False, timeout=1) as client:
-            while asyncio.get_running_loop().time() < deadline:
-                if self.process is None or self.process.returncode is not None:
-                    raise RuntimeError("pywb recorder exited before becoming ready")
+        self.ca_certificate_path.write_bytes(response.content)
 
-                try:
-                    response = await client.get(f"{self.proxy_url}{CA_DOWNLOAD_PATH}")
-                except httpx.TransportError:
-                    await asyncio.sleep(0.1)
 
-                    continue
+class PyWBReplayServer:
+    def __init__(self, capture_dir: Path, replay_dir: Path) -> None:
+        self.capture_dir = capture_dir
+        self.replay_dir = replay_dir
+        self.port = available_port()
+        self.process: asyncio.subprocess.Process | None = None
 
-                if response.status_code == 200 and b"BEGIN CERTIFICATE" in response.content:
-                    self.ca_certificate_path.write_bytes(response.content)
+    async def start(self) -> "PyWBReplayServer":
+        await self._reindex_collection()
 
-                    return
+        self.replay_dir.mkdir(parents=True, exist_ok=True)
+        self._write_config()
 
-                await asyncio.sleep(0.1)
+        self.process = await asyncio.create_subprocess_exec(
+            "wayback",
+            "-p",
+            str(self.port),
+            cwd=self.replay_dir,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
 
-        raise TimeoutError("pywb recorder did not become ready in time")
+        try:
+            await wait_for_http_response(self.process, f"http://{HOST}:{self.port}/")
+        except BaseException:
+            await self.stop()
+            raise
+
+        return self
+
+    async def stop(self) -> None:
+        if self.process is None:
+            return
+
+        await stop_process(self.process)
+
+    def replay_url(self, page_url: str) -> str:
+        return f"http://{HOST}:{self.port}/{COLLECTION_NAME}/{page_url}"
+
+    async def _reindex_collection(self) -> None:
+        process = await asyncio.create_subprocess_exec(
+            "wb-manager",
+            "reindex",
+            COLLECTION_NAME,
+            cwd=self.capture_dir,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        result = await process.wait()
+
+        if result != 0:
+            raise RuntimeError("pywb could not reindex the recording collection")
+
+    def _write_config(self) -> None:
+        replay_config = f"""
+collections_root: {json.dumps(str(self.capture_dir / "collections"))}
+archive_paths:
+  - archive
+index_paths:
+  - indexes
+framed_replay: false
+"""
+        (self.replay_dir / "config.yaml").write_text(replay_config, encoding="utf-8")
