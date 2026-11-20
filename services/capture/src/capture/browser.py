@@ -21,9 +21,8 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
-from utils.http import is_safe_request_url, is_valid_url
 from utils.tasks import complete_before_cancellation
-from utils.web import is_html_content_type, is_pdf_content_type
+from utils.web import is_html_content_type, is_pdf_content_type, is_safe_request_url, is_valid_url
 
 NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
 NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
@@ -377,8 +376,7 @@ async def capture_page(
 
                         if document_bytes > limits.max_document_bytes:
                             msg = (
-                                "page document exceeded the "
-                                "{limits.max_document_bytes}-byte limit"
+                                "page document exceeded the {limits.max_document_bytes}-byte limit"
                             )
 
                             raise CaptureLimitExceeded(

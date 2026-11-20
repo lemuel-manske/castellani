@@ -30,6 +30,7 @@ class Worker:
         self.executor = executor
         self.artifacts = artifacts
         self.discovery = discovery
+
         self.on_error = on_error or self._ignore_error
 
     async def execute(self, archive_id: str, url_key: str) -> bool:

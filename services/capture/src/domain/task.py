@@ -6,7 +6,7 @@ class PageTask:
     """A page admitted to an archive's crawl frontier for capture."""
 
     archive_id: str
-    url_key: str
+    url_key: str  # the "canonical" URL key for the page... It's id, perhaps
     url: str
     depth: int
 
@@ -29,7 +29,9 @@ class TaskClaim:
     """A worker's fenced, time-limited ownership of a page task attempt."""
 
     task: PageTask
+
     attempt_id: str
+
     fence: int
     lease_until: float
 

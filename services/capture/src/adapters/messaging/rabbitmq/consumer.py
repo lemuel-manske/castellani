@@ -1,8 +1,9 @@
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from aio_pika.abc import AbstractIncomingMessage
+
+MESSAGE_VERSION = 1
 
 
 class RabbitMQPageTaskConsumer:
@@ -29,14 +30,14 @@ class RabbitMQPageTaskConsumer:
     @staticmethod
     def _parse_delivery(body: bytes) -> tuple[str, str] | None:
         try:
-            envelope: Any = json.loads(body)
+            envelope = json.loads(body)
         except (UnicodeDecodeError, json.JSONDecodeError):
             return None
 
         if not isinstance(envelope, dict):
             return None
 
-        if envelope.get("type") != "CapturePage" or envelope.get("version") != 1:
+        if envelope.get("type") != "CapturePage" or envelope.get("version") != MESSAGE_VERSION:
             return None
 
         payload = envelope.get("payload")
