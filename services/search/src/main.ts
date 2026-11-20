@@ -9,6 +9,8 @@ import { Indexer } from "./indexing/indexer.js";
 import { S3ArtifactStore } from "./indexing/s3-artifacts.js";
 import { Consumer } from "./messaging/consumer.js";
 import { Contracts } from "./messaging/contracts.js";
+import { DynamoVisibility } from "./publication/dynamodb-visibility.js";
+import { PublicationHandler } from "./publication/handler.js";
 import { OpenSearchIndex } from "./search/opensearch.js";
 
 async function main(): Promise<void> {
@@ -25,13 +27,26 @@ async function main(): Promise<void> {
   const s3 = new S3Client({ ...aws, forcePathStyle: config.awsEndpoint !== undefined });
   const index = OpenSearchIndex.connect(config.openSearchUrl, config.openSearchIndex);
   const contracts = new Contracts();
+  const visibility = new DynamoVisibility(dynamo, config.visibilityTable);
 
   const indexer = new Indexer(
     new DynamoLedger(dynamo, config.ledgerTable, config.claimLeaseMs),
     new S3ArtifactStore(s3, config.maxArtifactBytes),
     index,
+    visibility,
     { maxDocumentAttempts: config.maxDocumentAttempts },
   );
+
+  // `publication` and `consumer` reference each other: the consumer dispatches
+  // to the handler, and the handler publishes acknowledgments through the
+  // consumer's broker connection. Explicit types break the inference cycle.
+  const publication: PublicationHandler = new PublicationHandler(visibility, index, {
+    publish: (event): Promise<void> => {
+      contracts.assertOutgoing("SearchCompensated", event);
+
+      return consumer.publish(event);
+    },
+  });
 
   let indexReady = false;
 
@@ -43,7 +58,7 @@ async function main(): Promise<void> {
   });
   const log = app.log;
 
-  const consumer = new Consumer(
+  const consumer: Consumer = new Consumer(
     {
       url: config.rabbitUrl,
       exchange: config.rabbitExchange,
@@ -52,7 +67,24 @@ async function main(): Promise<void> {
       retryDelayMs: config.retryDelayMs,
     },
     contracts,
-    { PageCaptured: (message) => indexer.handle(contracts.parsePageCaptured(message)) },
+    {
+      PageCaptured: (message) => indexer.handle(contracts.parsePageCaptured(message)),
+      ArchivePublicationDecided: (message) => {
+        const event = contracts.parseArchiveFact("ArchivePublicationDecided", message);
+
+        return publication.publicationDecided(event.archiveId, event);
+      },
+      ArchivePublished: (message) => {
+        const event = contracts.parseArchiveFact("ArchivePublished", message);
+
+        return publication.archivePublished(event.archiveId, event);
+      },
+      ArchiveCompensationDecided: (message) => {
+        const event = contracts.parseCompensation(message);
+
+        return publication.compensationDecided(event.archiveId, event.decisionVersion);
+      },
+    },
     log,
   );
 

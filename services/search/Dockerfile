@@ -33,4 +33,4 @@ USER node
 
 EXPOSE 8082
 
-ENTRYPOINT ["node", "dist/main.js"]
+ENTRYPOINT ["node", "--enable-source-maps", "dist/main.js"]

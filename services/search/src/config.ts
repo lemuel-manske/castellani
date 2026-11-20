@@ -7,6 +7,7 @@ export type Config = {
   awsEndpoint: string | undefined;
 
   ledgerTable: string;
+  visibilityTable: string;
   claimLeaseMs: number;
   maxDocumentAttempts: number;
   maxArtifactBytes: number;
@@ -37,6 +38,7 @@ export function loadConfig(env: Environment): Config {
     awsEndpoint: optional(env.SEARCH_AWS_ENDPOINT),
 
     ledgerTable: env.SEARCH_LEDGER_TABLE ?? "search_index_ledger",
+    visibilityTable: env.SEARCH_VISIBILITY_TABLE ?? "search_archive_visibility",
     claimLeaseMs: duration(env, "SEARCH_CLAIM_LEASE_MS", 120_000),
     maxDocumentAttempts: integer(env, "SEARCH_MAX_DOCUMENT_ATTEMPTS", 3),
     maxArtifactBytes: integer(env, "SEARCH_MAX_ARTIFACT_BYTES", 64 * 1024 * 1024),

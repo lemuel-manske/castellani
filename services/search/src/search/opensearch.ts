@@ -1,6 +1,7 @@
 import { Client, errors } from "@opensearch-project/opensearch";
 
 import { type DocumentIndex, type SnapshotDocument, DocumentError } from "../indexing/model.js";
+import type { ArchiveIndex } from "../publication/handler.js";
 import { type SortKey, decodeCursor, encodeCursor } from "./cursor.js";
 import { type SearchQuery, fingerprint } from "./query.js";
 
@@ -22,6 +23,7 @@ export const INDEX_DEFINITION = {
       title: { type: "text" },
       content: { type: "text" },
       indexedAt: { type: "date" },
+      visible: { type: "boolean" },
     },
   },
 } as const;
@@ -52,12 +54,11 @@ type Hit = {
  * Builds the OpenSearch request for one page. Fetches `limit + 1` hits to
  * learn whether another page exists without counting the full result set.
  *
- * Publication visibility (ADR-0019/0029) is not enforced yet: every indexed
- * snapshot is searchable. It must become a filter here once Search records
- * the publication decision and replay acknowledgment.
+ * Only `visible` snapshots match: documents of staged, unpublished or
+ * compensated archives exist in the index but are never returned.
  */
 export function buildSearchBody(query: SearchQuery): Record<string, unknown> {
-  const filter: unknown[] = [];
+  const filter: unknown[] = [{ term: { visible: true } }];
 
   for (const field of ["collectionId", "archiveId", "snapshotId"] as const) {
     const value = query[field];
@@ -135,7 +136,7 @@ function toResult(hit: Hit): SearchResult {
   };
 }
 
-export class OpenSearchIndex implements DocumentIndex {
+export class OpenSearchIndex implements DocumentIndex, ArchiveIndex {
   constructor(
     private readonly client: Client,
     private readonly index: string,
@@ -145,11 +146,20 @@ export class OpenSearchIndex implements DocumentIndex {
     return new OpenSearchIndex(new Client({ node: url, requestTimeout: 10_000 }), index);
   }
 
-  /** Creates the index with its strict mapping when it does not exist. */
+  /**
+   * Creates the index with its strict mapping, or adds new fields to an
+   * existing index. Mapping changes are additive only; documents written
+   * before a field existed simply lack it (for `visible`, they stay hidden).
+   */
   async ensureIndex(): Promise<void> {
     const exists = await this.client.indices.exists({ index: this.index });
 
     if (exists.body) {
+      await this.client.indices.putMapping({
+        index: this.index,
+        body: { properties: INDEX_DEFINITION.mappings.properties },
+      });
+
       return;
     }
 
@@ -159,16 +169,6 @@ export class OpenSearchIndex implements DocumentIndex {
       if (!(error instanceof errors.ResponseError && errorType(error) === "resource_already_exists_exception")) {
         throw error;
       }
-    }
-  }
-
-  async ping(): Promise<boolean> {
-    try {
-      await this.client.cluster.health({ index: this.index, timeout: "2s" });
-
-      return true;
-    } catch {
-      return false;
     }
   }
 
@@ -182,6 +182,43 @@ export class OpenSearchIndex implements DocumentIndex {
 
       throw error;
     }
+  }
+
+  async reveal(snapshotId: string): Promise<void> {
+    await ignoreNotFound(
+      this.client.update({ index: this.index, id: snapshotId, body: { doc: { visible: true } }, retry_on_conflict: 3 }),
+    );
+  }
+
+  async remove(snapshotId: string): Promise<void> {
+    await ignoreNotFound(this.client.delete({ index: this.index, id: snapshotId }));
+  }
+
+  /**
+   * Refreshes first so documents written just before the archive's facts were
+   * recorded are visible to the query; see the ordering note on `Indexer`.
+   */
+  async activate(archiveId: string): Promise<void> {
+    await this.client.indices.refresh({ index: this.index });
+    await this.client.updateByQuery({
+      index: this.index,
+      conflicts: "proceed",
+      refresh: true,
+      body: {
+        query: { bool: { filter: [{ term: { archiveId } }], must_not: [{ term: { visible: true } }] } },
+        script: { source: "ctx._source.visible = true", lang: "painless" },
+      },
+    });
+  }
+
+  async purge(archiveId: string): Promise<void> {
+    await this.client.indices.refresh({ index: this.index });
+    await this.client.deleteByQuery({
+      index: this.index,
+      conflicts: "proceed",
+      refresh: true,
+      body: { query: { term: { archiveId } } },
+    });
   }
 
   async search(query: SearchQuery): Promise<SearchPage> {
@@ -206,4 +243,14 @@ function errorType(error: InstanceType<typeof errors.ResponseError>): string {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function ignoreNotFound(request: Promise<unknown>): Promise<void> {
+  try {
+    await request;
+  } catch (error) {
+    if (!(error instanceof errors.ResponseError && error.statusCode === 404)) {
+      throw error;
+    }
+  }
 }

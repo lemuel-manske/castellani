@@ -9,11 +9,19 @@ export const DEAD_QUEUE = "castellani.search.dead";
 export const ATTEMPT_HEADER = "x-search-attempt";
 
 /** Event types this service consumes, bound by routing key. */
-export const CONSUMED_TYPES = ["PageCaptured"] as const;
+export const CONSUMED_TYPES = [
+  "PageCaptured",
+  "ArchivePublicationDecided",
+  "ArchivePublished",
+  "ArchiveCompensationDecided",
+] as const;
 
-export type Handlers = {
-  PageCaptured(message: unknown): Promise<unknown>;
-};
+export type ConsumedType = (typeof CONSUMED_TYPES)[number];
+
+export type Handlers = Record<ConsumedType, (message: unknown) => Promise<unknown>>;
+
+/** Envelope of an event this service emits; routed by `type`. */
+export type Publication = { messageId: string; type: string } & Record<string, unknown>;
 
 export type ConsumerOptions = {
   url: string;
@@ -37,6 +45,7 @@ type Logger = {
  */
 export class Consumer {
   private connection: ChannelModel | undefined;
+  private publisher: ConfirmChannel | undefined;
   private inFlight = new Set<Promise<void>>();
   private stopping = false;
   connected = false;
@@ -75,6 +84,35 @@ export class Consumer {
     return this.stopping;
   }
 
+  /**
+   * Publishes an event to the exchange and resolves once the broker confirms
+   * it. Handlers call this before their delivery is acknowledged, so an
+   * unconfirmed publication leaves the inbound message to be redelivered.
+   */
+  publish(message: Publication): Promise<void> {
+    const publisher = this.publisher;
+
+    if (publisher === undefined || !this.connected) {
+      return Promise.reject(new Error("RabbitMQ is not connected"));
+    }
+
+    return new Promise((resolve, reject) => {
+      publisher.publish(
+        this.options.exchange,
+        message.type,
+        Buffer.from(JSON.stringify(message)),
+        { persistent: true, contentType: "application/json", messageId: message.messageId, mandatory: true },
+        (error: unknown) => {
+          if (error) {
+            reject(error instanceof Error ? error : new Error(`broker did not confirm ${message.type}`));
+          } else {
+            resolve();
+          }
+        },
+      );
+    });
+  }
+
   async stop(): Promise<void> {
     this.stopping = true;
     await Promise.allSettled(this.inFlight);
@@ -101,6 +139,13 @@ export class Consumer {
 
     const channel = await connection.createChannel();
     const publisher = await connection.createConfirmChannel();
+    this.publisher = publisher;
+
+    // `mandatory` publications that no queue accepts are returned here;
+    // log them, since an unroutable acknowledgment would otherwise vanish.
+    publisher.on("return", (returned: ConsumeMessage) => {
+      this.log.error({ routingKey: returned.fields.routingKey }, "published event was unroutable");
+    });
 
     await declareTopology(channel, this.options);
     await channel.prefetch(this.options.prefetch);
@@ -134,12 +179,12 @@ export class Consumer {
       const message: unknown = JSON.parse(delivery.content.toString("utf8"));
       const { type } = this.contracts.envelopeOf(message);
 
-      if (type !== "PageCaptured") {
+      if (!isConsumedType(type)) {
         throw new InvalidMessageError(`unexpected message type ${type}`);
       }
 
-      const result = await this.handlers.PageCaptured(message);
-      this.log.info({ messageId, attempt, result }, "handled PageCaptured");
+      const result = await this.handlers[type](message);
+      this.log.info({ messageId, type, attempt, result }, "handled event");
       channel.ack(delivery);
 
       return;
@@ -226,6 +271,10 @@ function publishConfirmed(
       },
     );
   });
+}
+
+function isConsumedType(type: string): type is ConsumedType {
+  return (CONSUMED_TYPES as readonly string[]).includes(type);
 }
 
 function attemptOf(delivery: ConsumeMessage): number {

@@ -1,4 +1,6 @@
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { type ChannelModel, connect } from "amqplib";
 import { afterAll } from "vitest";
 
@@ -25,12 +27,42 @@ const s3 = new S3Client({
   credentials: { accessKeyId: "test", secretAccessKey: "test" },
 });
 
+const dynamo = DynamoDBDocumentClient.from(
+  new DynamoDBClient({
+    region: "us-east-1",
+    endpoint: env.awsEndpoint,
+    credentials: { accessKeyId: "test", secretAccessKey: "test" },
+  }),
+);
+
 let broker: ChannelModel | undefined;
 
 afterAll(async () => {
   await broker?.close();
   s3.destroy();
+  dynamo.destroy();
 });
+
+/** Waits until Search's own ledger records `status` for a snapshot. */
+export async function ledgerReaches(snapshotId: string, status: string, timeoutMs = 20_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let current: unknown;
+
+  while (Date.now() < deadline) {
+    const { Item: item } = await dynamo.send(
+      new GetCommand({ TableName: "search_index_ledger", Key: { snapshotId }, ConsistentRead: true }),
+    );
+    current = item?.status;
+
+    if (current === status) {
+      return;
+    }
+
+    await sleep(250);
+  }
+
+  throw new Error(`snapshot ${snapshotId} did not reach ${status} within ${timeoutMs}ms (last: ${String(current)})`);
+}
 
 /** Stores a single-page WARC in the artifacts bucket, as Capture would. */
 export async function storeCapturedPage(url: string, html: string): Promise<ArtifactRef> {
@@ -54,6 +86,67 @@ export async function publish(message: Record<string, unknown>): Promise<void> {
   });
   await channel.waitForConfirms();
   await channel.close();
+}
+
+/** An archive-scoped event, as the Coordinator or Capture would publish it. */
+export function archiveEvent(type: string, archiveId: string, payload: Record<string, unknown>) {
+  return {
+    messageId: crypto.randomUUID(),
+    correlationId: archiveId,
+    type,
+    version: 1,
+    occurredAt: new Date().toISOString(),
+    payload: { archiveId, ...payload },
+  };
+}
+
+export const PACKAGE = { decisionVersion: 1, packageDigest: "sha256:integration-package" };
+
+/**
+ * Publishes the Coordinator's decision and Capture's replay acknowledgment,
+ * returning their message IDs.
+ */
+export async function publishArchive(archiveId: string): Promise<string[]> {
+  const decided = archiveEvent("ArchivePublicationDecided", archiveId, PACKAGE);
+  const published = archiveEvent("ArchivePublished", archiveId, PACKAGE);
+
+  await publish(decided);
+  await publish(published);
+
+  return [decided.messageId, published.messageId];
+}
+
+/**
+ * Binds a temporary queue to `type` on the shared exchange, so a test can
+ * observe events Search emits. Call before triggering the emission.
+ */
+export async function observe(type: string): Promise<{ next(timeoutMs?: number): Promise<Record<string, unknown>> }> {
+  broker ??= await connect(env.rabbitUrl);
+  const channel = await broker.createChannel();
+  const { queue } = await channel.assertQueue("", { exclusive: true, autoDelete: true });
+  await channel.bindQueue(queue, env.exchange, type);
+
+  return {
+    async next(timeoutMs = 15_000) {
+      const deadline = Date.now() + timeoutMs;
+
+      try {
+        while (Date.now() < deadline) {
+          const message = await channel.get(queue, { noAck: true });
+
+          if (message !== false) {
+            return JSON.parse(message.content.toString("utf8")) as Record<string, unknown>;
+          }
+
+          await sleep(250);
+        }
+
+        throw new Error(`no ${type} event within ${timeoutMs}ms`);
+      } finally {
+        await channel.close();
+      }
+    },
+  };
 }
 
 /** Raw bytes publication, for messages that are not valid JSON. */
@@ -81,12 +174,12 @@ export async function deadLettered(messageId: string, timeoutMs = 15_000): Promi
         continue;
       }
 
-      const found = message.properties.messageId === messageId;
+      // Unrelated dead letters stay unacknowledged so the next `get` moves
+      // past them (a requeue would return the same message again); closing
+      // the channel puts them back for whoever owns them.
+      if (message.properties.messageId === messageId) {
+        channel.ack(message);
 
-      // Leave unrelated dead letters in place for whoever owns them.
-      channel.nack(message, false, !found);
-
-      if (found) {
         return true;
       }
     }
