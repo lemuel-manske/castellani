@@ -1,6 +1,6 @@
 import threading
 from copy import deepcopy
-from typing import Any
+from typing import Any, NoReturn
 
 from botocore.exceptions import ClientError
 
@@ -133,6 +133,9 @@ class FakeDynamoDBFrontierClient:
             if run_condition and run_admission != run_values[":open"]["S"]:
                 self._transaction_failure("ConditionalCheckFailed", "None")
 
+            if item is None:
+                self._transaction_failure("None", "ConditionalCheckFailed")
+
             if "#state = :pending" in condition:
                 is_pending = item is not None and item.get(names["#state"]) == values[":pending"]
                 is_expired = (
@@ -142,9 +145,6 @@ class FakeDynamoDBFrontierClient:
                 )
 
                 if not is_pending and not is_expired:
-                    self._transaction_failure("None", "ConditionalCheckFailed")
-
-                if item is None:
                     self._transaction_failure("None", "ConditionalCheckFailed")
 
                 fence = int(item.get(names["#fence"], {"N": "0"})["N"]) + 1
@@ -184,7 +184,7 @@ class FakeDynamoDBFrontierClient:
             return {"Item": deepcopy(item)} if item else {}
 
     @staticmethod
-    def _transaction_failure(first: str, second: str) -> None:
+    def _transaction_failure(first: str, second: str) -> NoReturn:
         raise ClientError(
             {
                 "Error": {
