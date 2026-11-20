@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Callable, Coroutine
 from functools import partial
-from typing import ParamSpec, TypeVar, Any
+from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
 T = TypeVar("T")
