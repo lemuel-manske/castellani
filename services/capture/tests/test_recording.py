@@ -76,9 +76,7 @@ async def test_cancellation_stops_capture_recorder(
     monkeypatch.setattr(PyWBRecorder, "start", start_recorder)
     monkeypatch.setattr(PyWBRecorder, "stop", stop_recorder)
 
-    capture = asyncio.create_task(
-        capture_local_page(f"{local_site.base_url}/page", tmp_path)
-    )
+    capture = asyncio.create_task(capture_local_page(f"{local_site.base_url}/page", tmp_path))
 
     await recorder_started.wait()
     capture.cancel()

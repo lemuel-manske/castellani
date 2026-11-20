@@ -33,6 +33,7 @@ CAPTURE_PAGES = {
 }
 
 STYLESHEET = "body { font-family: sans-serif; }"
+
 SCRIPT = """
 document.querySelector("#state").textContent = "rendered";
 
@@ -42,10 +43,13 @@ fetch("/assets/download.bin")
     document.querySelector("#download").textContent = body;
   });
 """
+
 IMAGE = """<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">
   <rect width="1" height="1" fill="#000"/>
 </svg>"""
+
 DOWNLOAD = "archive-download-payload"
+
 PDF = (
     b"%PDF-1.4\\n"
     b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\\n"
@@ -205,7 +209,9 @@ class ReplayResult:
 
 
 async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> ReplayResult:
-    replay_server = await PyWBReplayServer(capture_dir, replay_dir).start()
+    replay_server = PyWBReplayServer(capture_dir, replay_dir)
+
+    await replay_server.start()
 
     try:
         async with async_playwright() as playwright:

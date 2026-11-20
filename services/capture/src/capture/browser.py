@@ -299,11 +299,8 @@ async def capture_page(
                             final_url = download.url
 
                             response = main_responses[-1] if main_responses else None
-                        elif (
-                            main_responses
-                            and is_pdf_content_type(
-                                main_responses[-1].headers.get("content-type")
-                            )
+                        elif main_responses and is_pdf_content_type(
+                            main_responses[-1].headers.get("content-type")
                         ):
                             try:
                                 await asyncio.wait_for(
@@ -318,9 +315,12 @@ async def capture_page(
                             response = main_responses[-1]
                             final_url = response.url
                         else:
-                            raise CaptureNavigationFailed(
-                                "browser navigation did not produce a document or downloadable resource"
-                            ) from navigation_error
+                            msg = (
+                                "browser navigation did not produce "
+                                "a document or downloadable resource"
+                            )
+
+                            raise CaptureNavigationFailed(msg) from navigation_error
                     else:
                         response = response or (main_responses[-1] if main_responses else None)
                         final_url = page.url
@@ -376,9 +376,13 @@ async def capture_page(
                         )
 
                         if document_bytes > limits.max_document_bytes:
+                            msg = (
+                                "page document exceeded the "
+                                "{limits.max_document_bytes}-byte limit"
+                            )
+
                             raise CaptureLimitExceeded(
-                                CaptureFailureCode.DOCUMENT_LIMIT_EXCEEDED,
-                                f"page document exceeded the {limits.max_document_bytes}-byte limit",
+                                CaptureFailureCode.DOCUMENT_LIMIT_EXCEEDED, msg
                             )
 
                         html = await page.content()
