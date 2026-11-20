@@ -172,7 +172,7 @@ def is_valid_url(url: str) -> bool:
         if parsed_url.scheme not in HTTP_SCHEMES or not parsed_url.hostname:
             return False
 
-        parsed_url.port
+        _ = parsed_url.port
     except ValueError:
         return False
 

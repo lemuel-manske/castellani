@@ -5,13 +5,14 @@ import signal
 import socket
 import subprocess
 import threading
+from collections.abc import Iterator
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
-import pytest
 from playwright.async_api import async_playwright
+import pytest
 
 from capture.browser import capture_page
 
@@ -77,7 +78,7 @@ class LocalSite:
 
 
 @pytest.fixture
-def local_site() -> LocalSite:
+def local_site() -> Iterator[LocalSite]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             path = self.path.split("?", maxsplit=1)[0]
