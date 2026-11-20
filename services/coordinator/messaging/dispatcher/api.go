@@ -2,7 +2,7 @@
 package dispatcher
 
 import (
-	"github.com/lemuel-manske/unnamed/services/coordinator/messaging"
+	"github.com/lemuel-manske/castellani/services/coordinator/messaging"
 )
 
 type Dispatcher struct {

@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/lemuel-manske/unnamed/services/coordinator/messaging"
+	"github.com/lemuel-manske/castellani/services/coordinator/messaging"
 )
 
 const (

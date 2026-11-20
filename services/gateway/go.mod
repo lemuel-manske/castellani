@@ -1,4 +1,4 @@
-module github.com/lemuel-manske/unnamed/services/gateway
+module github.com/lemuel-manske/castellani/services/gateway
 
 go 1.25.0
 

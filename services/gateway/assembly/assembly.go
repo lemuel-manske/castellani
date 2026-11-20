@@ -4,10 +4,10 @@ package assembly
 import (
 	"fmt"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/capture"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/search"
 )
 
 func NewApplication(

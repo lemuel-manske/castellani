@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/api"
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/castellani/services/coordinator/api"
+	"github.com/lemuel-manske/castellani/services/coordinator/application"
 )
 
 const (

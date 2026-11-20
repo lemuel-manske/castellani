@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

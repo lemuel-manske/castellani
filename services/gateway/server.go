@@ -10,11 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/api"
-	"github.com/lemuel-manske/unnamed/services/gateway/assembly"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
+	"github.com/lemuel-manske/castellani/services/gateway/api"
+	"github.com/lemuel-manske/castellani/services/gateway/assembly"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/capture"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/search"
 )
 
 const (

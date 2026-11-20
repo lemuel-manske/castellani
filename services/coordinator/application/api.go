@@ -4,7 +4,7 @@ package application
 import (
 	"errors"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
+	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
 
 var (

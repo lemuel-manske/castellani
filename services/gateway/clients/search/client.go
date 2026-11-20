@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/castellani/services/gateway/common"
 )
 
 const maxJSONBytes = 1 << 20

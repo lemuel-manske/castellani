@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
 )
 
 func Pagination(values url.Values) (application.Pagination, error) {

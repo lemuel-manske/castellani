@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/coordinator"
 )
 
 type coordinatorAdapter struct {

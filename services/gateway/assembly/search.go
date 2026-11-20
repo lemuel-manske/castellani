@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/search"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/search"
 )
 
 type searchAdapter struct {

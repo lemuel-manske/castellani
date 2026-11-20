@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
-	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
+	"github.com/lemuel-manske/castellani/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
 
 func (a *Application) SubmitArchive(

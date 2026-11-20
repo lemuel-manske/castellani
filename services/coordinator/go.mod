@@ -1,4 +1,4 @@
-module github.com/lemuel-manske/unnamed/services/coordinator
+module github.com/lemuel-manske/castellani/services/coordinator
 
 go 1.25.0
 

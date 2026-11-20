@@ -9,11 +9,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	archiveapi "github.com/lemuel-manske/unnamed/services/gateway/api/archive"
-	searchapi "github.com/lemuel-manske/unnamed/services/gateway/api/search"
-	sessionapi "github.com/lemuel-manske/unnamed/services/gateway/api/session"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	archiveapi "github.com/lemuel-manske/castellani/services/gateway/api/archive"
+	searchapi "github.com/lemuel-manske/castellani/services/gateway/api/search"
+	sessionapi "github.com/lemuel-manske/castellani/services/gateway/api/session"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/common"
 )
 
 const (

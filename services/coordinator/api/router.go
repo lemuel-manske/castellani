@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	archiveapi "github.com/lemuel-manske/unnamed/services/coordinator/api/archive"
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
-	"github.com/lemuel-manske/unnamed/services/coordinator/common"
+	archiveapi "github.com/lemuel-manske/castellani/services/coordinator/api/archive"
+	"github.com/lemuel-manske/castellani/services/coordinator/application"
+	"github.com/lemuel-manske/castellani/services/coordinator/common"
 )
 
 const (

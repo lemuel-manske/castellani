@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/clients/capture"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/capture"
 )
 
 type captureAdapter struct {

@@ -12,8 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/lemuel-manske/unnamed/services/coordinator/assembly"
-	persistence "github.com/lemuel-manske/unnamed/services/coordinator/persistence/dynamodb"
+	"github.com/lemuel-manske/castellani/services/coordinator/assembly"
+	persistence "github.com/lemuel-manske/castellani/services/coordinator/persistence/dynamodb"
 )
 
 const (

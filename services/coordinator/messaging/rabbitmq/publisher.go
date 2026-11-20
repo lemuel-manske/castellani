@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
-	"github.com/lemuel-manske/unnamed/services/coordinator/messaging"
+	"github.com/lemuel-manske/castellani/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/messaging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

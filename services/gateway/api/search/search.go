@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/api/params"
-	"github.com/lemuel-manske/unnamed/services/gateway/api/response"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/api/params"
+	"github.com/lemuel-manske/castellani/services/gateway/api/response"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
 )
 
 type Handler struct {

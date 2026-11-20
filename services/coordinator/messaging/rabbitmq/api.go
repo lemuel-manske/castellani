@@ -1,7 +1,7 @@
 // Package rabbitmq implements the Coordinator's message transport.
 package rabbitmq
 
-import "github.com/lemuel-manske/unnamed/services/coordinator/domain"
+import "github.com/lemuel-manske/castellani/services/coordinator/domain"
 
 const (
 	DeadExchange  = "castellani.dead"

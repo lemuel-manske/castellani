@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 )
 
 var (

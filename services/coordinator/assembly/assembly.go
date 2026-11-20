@@ -2,10 +2,10 @@
 package assembly
 
 import (
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
-	"github.com/lemuel-manske/unnamed/services/coordinator/messaging/dispatcher"
-	"github.com/lemuel-manske/unnamed/services/coordinator/messaging/rabbitmq"
-	persistence "github.com/lemuel-manske/unnamed/services/coordinator/persistence/dynamodb"
+	"github.com/lemuel-manske/castellani/services/coordinator/application"
+	"github.com/lemuel-manske/castellani/services/coordinator/messaging/dispatcher"
+	"github.com/lemuel-manske/castellani/services/coordinator/messaging/rabbitmq"
+	persistence "github.com/lemuel-manske/castellani/services/coordinator/persistence/dynamodb"
 )
 
 type Components struct {

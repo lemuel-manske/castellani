@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
-	"github.com/lemuel-manske/unnamed/services/coordinator/persistence"
+	"github.com/lemuel-manske/castellani/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
 
 const stalledArchiveLimit = 100

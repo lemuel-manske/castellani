@@ -5,10 +5,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/gateway/api/params"
-	"github.com/lemuel-manske/unnamed/services/gateway/api/response"
-	"github.com/lemuel-manske/unnamed/services/gateway/application"
-	"github.com/lemuel-manske/unnamed/services/gateway/common"
+	"github.com/lemuel-manske/castellani/services/gateway/api/params"
+	"github.com/lemuel-manske/castellani/services/gateway/api/response"
+	"github.com/lemuel-manske/castellani/services/gateway/application"
+	"github.com/lemuel-manske/castellani/services/gateway/common"
 )
 
 type MetadataHandler struct {

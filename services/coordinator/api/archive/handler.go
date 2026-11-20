@@ -7,9 +7,9 @@ import (
 	"net/url"
 
 	"github.com/lemuel-manske/castellani/libs/httpx"
-	"github.com/lemuel-manske/unnamed/services/coordinator/application"
-	"github.com/lemuel-manske/unnamed/services/coordinator/common"
-	"github.com/lemuel-manske/unnamed/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/application"
+	"github.com/lemuel-manske/castellani/services/coordinator/common"
+	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 )
 
 type Handler struct {
