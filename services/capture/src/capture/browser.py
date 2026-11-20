@@ -242,6 +242,11 @@ async def capture_page(
 
 
 async def is_safe_request_url(url: str, allow_private_networks: bool = False) -> bool:
+    """Reject unsafe destinations; production egress policy must enforce IPs too.
+
+    The recorder resolves hostnames independently, so this application-level DNS check
+    is defense in depth and does not by itself prevent DNS rebinding.
+    """
     if not is_valid_url(url):
         return False
 
