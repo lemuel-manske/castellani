@@ -2,6 +2,7 @@ from capture.browser import (
     CaptureFailure,
     CaptureFailureCode,
     CaptureLimitExceeded,
+    CaptureDownloadFailed,
     CaptureNavigationFailed,
     CaptureRecordingFailed,
     InvalidCaptureURL,
