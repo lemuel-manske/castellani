@@ -48,3 +48,12 @@ Use the Go system integration harness from ADR-0009, independent service unit te
 
 Implementation should validate MiniStack's DynamoDB transactional condition behavior, OpenSearch indexing/search visibility, Terraform resources, and S3 byte-range semantics against actual running services before treating provider emulation as complete.
 \n
+## Deployment and recovery boundaries
+
+Run `docker compose up --build` from the repository root. Compose starts MiniStack, RabbitMQ, Terraform provisioning, Coordinator, and Gateway. Capture and Search are independent services and can be connected through `CAPTURE_URL` and `SEARCH_URL` when their endpoints are available.
+
+The Coordinator periodically reconciles only SAGA decisions it owns. It reissues `ArchivePublicationDecided` for stalled `PUBLISH` runs and `ArchiveCompensationDecided` for stalled `COMPENSATE` runs. It does not inspect Capture's frontier or Search's indexing ledger; those services must reconcile their own side effects from their own durable state. Reconciliation updates the archive revision and writes a new outbox message in one DynamoDB transaction, so concurrent Coordinator replicas cannot continually enqueue duplicate recovery commands.
+
+The MiniStack container requires Docker socket access to launch the real OpenSearch data plane. Keep its API bound to loopback; Docker socket access grants host-level container control. MiniStack is a local-development emulator, not a production dependency.
+
+This implementation work does not execute tests or claim runtime fault-recovery verification. Validate conditional transaction behavior, publisher confirms, OpenSearch data-plane reachability, and the F1–F8 scenarios against a running stack before treating the emulator as AWS parity.
