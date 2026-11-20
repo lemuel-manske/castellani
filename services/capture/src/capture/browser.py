@@ -250,7 +250,6 @@ async def capture_page(
 
                         if download_future.done():
                             download = download_future.result()
-                            await download.path()
                             response = main_response
                             final_url = download.url
                         elif (
@@ -263,7 +262,7 @@ async def capture_page(
                                     timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
                                 )
                             except TimeoutError:
-                                raise navigation_error
+                                raise navigation_error from None
 
                             response = main_response
                             final_url = main_response.url
@@ -272,6 +271,24 @@ async def capture_page(
                     else:
                         response = response or main_response
                         final_url = page.url
+
+                    if (
+                        response is not None
+                        and "attachment" in response.headers.get("content-disposition", "").lower()
+                        and not download_future.done()
+                    ):
+                        try:
+                            await asyncio.wait_for(
+                                asyncio.shield(download_future),
+                                timeout=DOWNLOAD_EVENT_TIMEOUT_SECONDS,
+                            )
+                        except TimeoutError as error:
+                            raise RuntimeError("browser did not complete the attachment download") from error
+
+                    if download_future.done():
+                        download = download_future.result()
+                        await download.path()
+                        final_url = download.url
 
                     request_guard.raise_if_rejected()
 

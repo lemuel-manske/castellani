@@ -97,7 +97,7 @@ async def test_replay_serves_direct_download(
     replay_server = await PyWBReplayServer(tmp_path, tmp_path / "replay").start()
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.get(replay_server.replay_url(capture.final_url))
 
         assert response.status_code == 200
@@ -116,7 +116,7 @@ async def test_replay_serves_direct_pdf(
     replay_server = await PyWBReplayServer(tmp_path, tmp_path / "replay").start()
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.get(replay_server.replay_url(capture.final_url))
 
         assert response.status_code == 200

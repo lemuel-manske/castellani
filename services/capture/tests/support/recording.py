@@ -46,10 +46,10 @@ IMAGE = """<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">
 </svg>"""
 DOWNLOAD = "archive-download-payload"
 PDF = (
-    b"%PDF-1.4\n"
-    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
-    b"2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\n"
-    b"trailer<</Root 1 0 R>>\n%%EOF"
+    b"%PDF-1.4\\n"
+    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\\n"
+    b"2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\\n"
+    b"trailer<</Root 1 0 R>>\\n%%EOF"
 )
 
 

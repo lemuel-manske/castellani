@@ -75,3 +75,11 @@ def test_html_content_type_rejects_binary_media_types() -> None:
 
 def test_html_content_type_defaults_to_html_when_missing() -> None:
     assert is_html_content_type(None)
+
+
+
+def test_pdf_content_type_accepts_pdf_media_type() -> None:
+    from capture.browser import is_pdf_content_type
+
+    assert is_pdf_content_type("application/pdf; charset=binary")
+    assert not is_pdf_content_type("application/octet-stream")
