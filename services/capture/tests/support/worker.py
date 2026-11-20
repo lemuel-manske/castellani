@@ -1,6 +1,9 @@
+from dataclasses import replace
+import asyncio
 from pathlib import Path
+import time
 
-from application.contracts import CaptureArtifact, CaptureOutcome
+from application.contracts import BrowserReservation, CaptureArtifact, CaptureOutcome
 from domain.task import TaskClaim
 
 
@@ -9,12 +12,14 @@ class FakeRepository:
         self.claim_result = claim
         self.failed: tuple[TaskClaim, str, str] | None = None
         self.completed: CaptureOutcome | None = None
+        self.renewals = 0
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
         return self.claim_result
 
     async def renew(self, claim: TaskClaim) -> TaskClaim:
-        return claim
+        self.renewals += 1
+        return replace(claim, lease_until=time.time() + 60)
 
     async def complete(self, outcome: CaptureOutcome) -> None:
         self.completed = outcome
@@ -34,10 +39,18 @@ class FakeRepository:
 
 
 class FakeCapacity:
-    async def reserve(self, attempt_id: str) -> str | None:
-        return "reservation-1"
+    async def reserve(self, attempt_id: str) -> BrowserReservation | None:
+        return BrowserReservation(
+            attempt_id=attempt_id,
+            reservation_id="reservation-1",
+            fence=1,
+            lease_until=time.time() + 60,
+        )
 
-    async def release(self, attempt_id: str, reservation_id: str) -> None:
+    async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
+        return replace(reservation, lease_until=time.time() + 60)
+
+    async def release(self, reservation: BrowserReservation) -> None:
         return None
 
 
@@ -56,3 +69,63 @@ class FakeArtifactStore:
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         self.discarded.append((claim, directory))
+
+
+class SlowPageExecutor:
+    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
+        await asyncio.sleep(0.08)
+        return CaptureArtifact(
+            requested_url=url,
+            final_url=url,
+            redirect_chain=(),
+            status_code=200,
+            content_type="text/html",
+            title="Example",
+            captured_at="2026-11-20T12:00:00Z",
+            discovered_urls=(),
+            blocked_urls=(),
+            warc_files=(),
+        )
+
+
+class ShortLeaseRepository(FakeRepository):
+    async def renew(self, claim: TaskClaim) -> TaskClaim:
+        self.renewals += 1
+        return replace(claim, lease_until=time.time() + 0.06)
+
+
+class ShortLeaseCapacity(FakeCapacity):
+    def __init__(self) -> None:
+        self.renewals = 0
+
+    async def reserve(self, attempt_id: str) -> BrowserReservation:
+        return BrowserReservation(
+            attempt_id=attempt_id,
+            reservation_id="reservation-1",
+            fence=1,
+            lease_until=time.time() + 0.06,
+        )
+
+    async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
+        self.renewals += 1
+        return replace(reservation, lease_until=time.time() + 0.06)
+
+
+class ExpiringRepository(FakeRepository):
+    async def renew(self, claim: TaskClaim) -> TaskClaim:
+        raise RuntimeError("DynamoDB unavailable")
+
+
+class BlockingPageExecutor:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
+
+    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
+        self.started.set()
+
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise

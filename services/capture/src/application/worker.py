@@ -1,16 +1,22 @@
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from application.contracts import (
     ArtifactStore,
     BrowserCapacity,
+    BrowserReservation,
     CaptureOutcome,
     PageExecutor,
     TaskRepository,
 )
 from domain.task import TaskClaim
 from utils.fn import awaitable, noop
+
+
+class LeaseLostError(RuntimeError):
+    """Raised when a worker can no longer prove ownership of its execution leases."""
 
 
 class Worker:
@@ -42,56 +48,206 @@ class Worker:
         return True
 
     async def _execute_claim(self, claim: TaskClaim) -> None:
-        reservation_id: str | None = None
-        directory: Path | None = None
+        claim_state = [claim]
+        reservation_state: list[BrowserReservation | None] = [None]
+        directory_state: list[Path | None] = [None]
+        terminal_state = [False]
+        stop_heartbeat = asyncio.Event()
 
-        terminal = False
+        heartbeat = asyncio.create_task(
+            self._maintain_leases(claim_state, reservation_state, stop_heartbeat)
+        )
+        operation = asyncio.create_task(
+            self._run_claim(
+                claim_state,
+                reservation_state,
+                directory_state,
+                terminal_state,
+            )
+        )
 
         try:
-            reservation_id = await self.capacity.reserve(claim.attempt_id)
+            done, _ = await asyncio.wait(
+                (operation, heartbeat),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
 
-            if reservation_id is None:
-                await self.repository.release(claim)
+            if operation in done:
+                stop_heartbeat.set()
+                await heartbeat
 
-                terminal = True
+                try:
+                    await operation
+                except Exception as error:
+                    await self.repository.fail(
+                        claim_state[0],
+                        str(getattr(error, "reason_code", "capture_failed")),
+                        str(error),
+                    )
+
+                    await self.on_error(error)
 
                 return
 
-            directory = await self.artifacts.create_attempt_directory(claim)
-            artifact = await self.executor.execute(claim.task.url, directory)
+            heartbeat_error = heartbeat.exception()
 
-            await self.repository.admit_discovered(claim, artifact.discovered_urls)
+            operation.cancel()
+            await asyncio.gather(operation, return_exceptions=True)
 
-            outcome = CaptureOutcome(
-                archive_id=claim.task.archive_id,
-                url_key=claim.task.url_key,
-                attempt_id=claim.attempt_id,
-                fence=claim.fence,
-                artifact=artifact,
-            )
+            if heartbeat_error is not None:
+                raise heartbeat_error
 
-            await self.repository.complete(outcome)
-
-            terminal = True
+            raise LeaseLostError("lease heartbeat stopped unexpectedly")
 
         except asyncio.CancelledError:
+            stop_heartbeat.set()
+            operation.cancel()
+            heartbeat.cancel()
+            await asyncio.gather(operation, heartbeat, return_exceptions=True)
             raise
 
-        except Exception as error:
-            await self.repository.fail(
-                claim,
-                str(getattr(error, "reason_code", "capture_failed")),
-                str(error),
-            )
-
-            await self.on_error(error)
-
         finally:
-            if directory is not None and not terminal:
-                await self._discard_attempt(claim, directory)
+            stop_heartbeat.set()
 
-            if reservation_id is not None:
-                await self.capacity.release(claim.attempt_id, reservation_id)
+            if not heartbeat.done():
+                heartbeat.cancel()
+                await asyncio.gather(heartbeat, return_exceptions=True)
+
+            directory = directory_state[0]
+
+            if directory is not None and not terminal_state[0]:
+                await self._discard_attempt(claim_state[0], directory)
+
+            reservation = reservation_state[0]
+
+            if reservation is not None:
+                try:
+                    await self.capacity.release(reservation)
+                except Exception as error:
+                    await self.on_error(error)
+
+    async def _run_claim(
+        self,
+        claim_state: list[TaskClaim],
+        reservation_state: list[BrowserReservation | None],
+        directory_state: list[Path | None],
+        terminal_state: list[bool],
+    ) -> None:
+        reservation = await self.capacity.reserve(claim_state[0].attempt_id)
+
+        if reservation is None:
+            await self.repository.release(claim_state[0])
+            terminal_state[0] = True
+            return
+
+        reservation_state[0] = reservation
+
+        directory = await self.artifacts.create_attempt_directory(claim_state[0])
+        directory_state[0] = directory
+
+        artifact = await self.executor.execute(claim_state[0].task.url, directory)
+
+        await self.repository.admit_discovered(
+            claim_state[0],
+            artifact.discovered_urls,
+        )
+
+        claim = claim_state[0]
+        outcome = CaptureOutcome(
+            archive_id=claim.task.archive_id,
+            url_key=claim.task.url_key,
+            attempt_id=claim.attempt_id,
+            fence=claim.fence,
+            artifact=artifact,
+        )
+
+        await self.repository.complete(outcome)
+        terminal_state[0] = True
+
+    async def _maintain_leases(
+        self,
+        claim_state: list[TaskClaim],
+        reservation_state: list[BrowserReservation | None],
+        stop: asyncio.Event,
+    ) -> None:
+        while not stop.is_set():
+            claim = claim_state[0]
+            reservation = reservation_state[0]
+            expiries = [claim.lease_until]
+
+            if reservation is not None:
+                expiries.append(reservation.lease_until)
+
+            remaining = min(expiries) - time.time()
+
+            if remaining <= 0:
+                raise LeaseLostError("an execution lease expired before it could be renewed")
+
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=remaining / 3)
+                return
+            except TimeoutError:
+                pass
+
+            claim = claim_state[0]
+            reservation = reservation_state[0]
+            remaining = min(
+                [claim.lease_until]
+                + ([reservation.lease_until] if reservation is not None else [])
+            ) - time.time()
+
+            if remaining <= 0:
+                raise LeaseLostError("an execution lease expired before renewal began")
+
+            try:
+                if reservation is None:
+                    renewed_claim = await asyncio.wait_for(
+                        self.repository.renew(claim),
+                        timeout=remaining * 0.8,
+                    )
+                    self._verify_claim_renewal(claim, renewed_claim)
+                    claim_state[0] = renewed_claim
+                    continue
+
+                renewed_claim, renewed_reservation = await asyncio.wait_for(
+                    asyncio.gather(
+                        self.repository.renew(claim),
+                        self.capacity.renew(reservation),
+                    ),
+                    timeout=remaining * 0.8,
+                )
+
+                self._verify_claim_renewal(claim, renewed_claim)
+                self._verify_reservation_renewal(reservation, renewed_reservation)
+
+                claim_state[0] = renewed_claim
+                reservation_state[0] = renewed_reservation
+
+            except Exception as error:
+                raise LeaseLostError("failed to renew execution ownership") from error
+
+    @staticmethod
+    def _verify_claim_renewal(previous: TaskClaim, renewed: TaskClaim) -> None:
+        if (
+            renewed.attempt_id != previous.attempt_id
+            or renewed.fence != previous.fence
+            or renewed.task != previous.task
+            or renewed.lease_until <= max(previous.lease_until, time.time())
+        ):
+            raise LeaseLostError("task lease renewal returned an invalid claim")
+
+    @staticmethod
+    def _verify_reservation_renewal(
+        previous: BrowserReservation,
+        renewed: BrowserReservation,
+    ) -> None:
+        if (
+            renewed.attempt_id != previous.attempt_id
+            or renewed.reservation_id != previous.reservation_id
+            or renewed.fence != previous.fence
+            or renewed.lease_until <= max(previous.lease_until, time.time())
+        ):
+            raise LeaseLostError("browser reservation renewal returned an invalid reservation")
 
     async def _discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         try:

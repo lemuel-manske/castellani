@@ -6,6 +6,16 @@ from domain.task import TaskClaim
 
 
 @dataclass(frozen=True)
+class BrowserReservation:
+    """A fenced, time-limited reservation of global browser capacity."""
+
+    attempt_id: str
+    reservation_id: str
+    fence: int
+    lease_until: float
+
+
+@dataclass(frozen=True)
 class CaptureArtifact:
     """Metadata and files produced by capturing one page."""
 
@@ -57,9 +67,11 @@ class TaskRepository(Protocol):
 class BrowserCapacity(Protocol):
     """Controls the number of page captures running concurrently."""
 
-    async def reserve(self, attempt_id: str) -> str | None: ...
+    async def reserve(self, attempt_id: str) -> BrowserReservation | None: ...
 
-    async def release(self, attempt_id: str, reservation_id: str) -> None: ...
+    async def renew(self, reservation: BrowserReservation) -> BrowserReservation: ...
+
+    async def release(self, reservation: BrowserReservation) -> None: ...
 
 
 class PageExecutor(Protocol):
