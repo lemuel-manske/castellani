@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { Indexer, RejectedEventError, RetryableError } from "../src/indexing/indexer.js";
-import { MemoryArtifacts, MemoryLedger, RecordingIndex } from "./support/doubles.js";
+import { MemoryArtifacts, MemoryLedger, MemoryVisibility, RecordingIndex } from "./support/doubles.js";
 import { pageCaptured } from "./support/events.js";
 import { artifactRefFor, buildWarc } from "./support/warc.js";
 
@@ -18,7 +18,8 @@ function fixture() {
   const ledger = new MemoryLedger();
   const artifacts = new MemoryArtifacts();
   const index = new RecordingIndex();
-  const indexer = new Indexer(ledger, artifacts, index, { maxDocumentAttempts: 2 });
+  const visibility = new MemoryVisibility();
+  const indexer = new Indexer(ledger, artifacts, index, visibility, { maxDocumentAttempts: 2 });
 
   return { ledger, artifacts, index, indexer };
 }
@@ -31,7 +32,7 @@ async function storeWarc(artifacts: MemoryArtifacts, key: string, url: string, b
 }
 
 describe("indexing captured pages", () => {
-  test("a captured HTML page becomes a searchable snapshot document", async () => {
+  test("a captured HTML page becomes a snapshot document", async () => {
     const { artifacts, index, indexer, ledger } = fixture();
     const ref = await storeWarc(artifacts, "a.warc.gz", "https://example.org/history", ARTICLE);
     const event = pageCaptured({ url: "https://example.org/history", warcArtifacts: [ref] });

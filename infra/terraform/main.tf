@@ -91,6 +91,20 @@ resource "aws_dynamodb_table" "search_index_ledger" {
   }
 }
 
+# Search-owned publication facts per archive (ADR-0027): the Coordinator's
+# publication decision, Capture's replay acknowledgment, and compensation.
+resource "aws_dynamodb_table" "search_archive_visibility" {
+  name         = "search_archive_visibility"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "archiveId"
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
+}
+
 resource "aws_s3_bucket" "archive_artifacts" {
   bucket        = "castellani-archive-artifacts"
   force_destroy = true

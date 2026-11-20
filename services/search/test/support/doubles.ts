@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { verify } from "../../src/indexing/s3-artifacts.js";
 import type {
+  ArchiveState,
+  ArchiveVisibility,
   ArtifactRef,
   ArtifactStore,
   Claim,
@@ -11,8 +13,11 @@ import type {
   LedgerStatus,
   Outcome,
   PageCaptured,
+  PublicationFact,
   SnapshotDocument,
+  VisibilityResult,
 } from "../../src/indexing/model.js";
+import type { ArchiveIndex, EventPublisher, OutgoingEvent } from "../../src/publication/handler.js";
 
 type Entry = { archiveId: string; status: LedgerStatus; attempts: number; token?: string; reason?: string };
 
@@ -95,7 +100,7 @@ export class MemoryArtifacts implements ArtifactStore {
 }
 
 /** Search index that records documents by ID and can be switched offline. */
-export class RecordingIndex implements DocumentIndex {
+export class RecordingIndex implements DocumentIndex, ArchiveIndex {
   readonly documents = new Map<string, SnapshotDocument>();
   writes = 0;
   offline = false;
@@ -110,4 +115,114 @@ export class RecordingIndex implements DocumentIndex {
 
     return Promise.resolve();
   }
+
+  reveal(snapshotId: string): Promise<void> {
+    const document = this.documents.get(snapshotId);
+
+    if (document) {
+      this.documents.set(snapshotId, { ...document, visible: true });
+    }
+
+    return Promise.resolve();
+  }
+
+  remove(snapshotId: string): Promise<void> {
+    this.documents.delete(snapshotId);
+
+    return Promise.resolve();
+  }
+
+  activate(archiveId: string): Promise<void> {
+    for (const document of this.archive(archiveId)) {
+      this.documents.set(document.snapshotId, { ...document, visible: true });
+    }
+
+    return Promise.resolve();
+  }
+
+  purge(archiveId: string): Promise<void> {
+    for (const document of this.archive(archiveId)) {
+      this.documents.delete(document.snapshotId);
+    }
+
+    return Promise.resolve();
+  }
+
+  /** Snapshot IDs a search would return: only visible documents. */
+  searchable(): string[] {
+    return [...this.documents.values()].filter((d) => d.visible).map((d) => d.snapshotId);
+  }
+
+  private archive(archiveId: string): SnapshotDocument[] {
+    return [...this.documents.values()].filter((d) => d.archiveId === archiveId);
+  }
+}
+
+/** In-memory publication facts with the same write rules as the DynamoDB table. */
+export class MemoryVisibility implements ArchiveVisibility {
+  private readonly states = new Map<string, ArchiveState>();
+
+  get(archiveId: string): Promise<ArchiveState> {
+    return Promise.resolve({ ...(this.states.get(archiveId) ?? { archiveId }) });
+  }
+
+  recordDecision(archiveId: string, fact: PublicationFact): Promise<VisibilityResult> {
+    const state = this.stateOf(archiveId);
+
+    if (state.compensationVersion !== undefined || (state.decision && !same(state.decision, fact))) {
+      return Promise.resolve({ kind: "conflict", reason: "decision conflicts with recorded facts" });
+    }
+
+    return this.save({ ...state, decision: pick(fact) });
+  }
+
+  recordPublished(archiveId: string, fact: PublicationFact): Promise<VisibilityResult> {
+    const state = this.stateOf(archiveId);
+
+    if (state.compensationVersion !== undefined || (state.published && !same(state.published, fact))) {
+      return Promise.resolve({ kind: "conflict", reason: "publication conflicts with recorded facts" });
+    }
+
+    return this.save({ ...state, published: pick(fact) });
+  }
+
+  recordCompensation(archiveId: string, decisionVersion: number): Promise<VisibilityResult> {
+    const state = this.stateOf(archiveId);
+    const otherCompensation = state.compensationVersion !== undefined && state.compensationVersion !== decisionVersion;
+
+    if (state.decision || state.published || otherCompensation) {
+      return Promise.resolve({ kind: "conflict", reason: "compensation conflicts with recorded facts" });
+    }
+
+    return this.save({ ...state, compensationVersion: decisionVersion });
+  }
+
+  private stateOf(archiveId: string): ArchiveState {
+    return this.states.get(archiveId) ?? { archiveId };
+  }
+
+  private save(state: ArchiveState): Promise<VisibilityResult> {
+    this.states.set(state.archiveId, state);
+
+    return Promise.resolve({ kind: "recorded", state: { ...state } });
+  }
+}
+
+/** Records events the service emits, as a broker with publisher confirms would accept them. */
+export class RecordingPublisher implements EventPublisher {
+  readonly published: OutgoingEvent[] = [];
+
+  publish(message: OutgoingEvent): Promise<void> {
+    this.published.push(message);
+
+    return Promise.resolve();
+  }
+}
+
+function same(a: PublicationFact, b: PublicationFact): boolean {
+  return a.decisionVersion === b.decisionVersion && a.packageDigest === b.packageDigest;
+}
+
+function pick(fact: PublicationFact): PublicationFact {
+  return { decisionVersion: fact.decisionVersion, packageDigest: fact.packageDigest };
 }
