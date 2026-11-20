@@ -27,6 +27,11 @@ PAGE = """<!doctype html>
 </html>
 """
 
+CAPTURE_PAGES = {
+    "/capture/first": "First capture",
+    "/capture/second": "Second capture",
+}
+
 STYLESHEET = "body { font-family: sans-serif; }"
 SCRIPT = """
 document.querySelector("#state").textContent = "rendered";
@@ -74,6 +79,12 @@ def start_local_site() -> LocalSite:
 
             if path == "/page":
                 self._write(PAGE.encode(), "text/html; charset=utf-8")
+
+                return
+
+            if path in CAPTURE_PAGES:
+                page = PAGE.replace("Recorder acceptance page", CAPTURE_PAGES[path])
+                self._write(page.encode(), "text/html; charset=utf-8")
 
                 return
 
@@ -136,6 +147,7 @@ def start_local_site() -> LocalSite:
 @dataclass
 class ReplayResult:
     status_code: int
+    page_title: str
     page_state: str
     download_content: str
     image_width: int
@@ -165,6 +177,7 @@ async def replay_page(capture_dir: Path, replay_dir: Path, page_url: str) -> Rep
 
                 return ReplayResult(
                     status_code=response.status,
+                    page_title=await page.title(),
                     page_state=await page.locator("#state").inner_text(),
                     download_content=await page.locator("#download").inner_text(),
                     image_width=await page.locator("img").evaluate(

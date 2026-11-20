@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -54,3 +55,30 @@ async def test_replay_loads_page_image(
     replay = await replay_page(tmp_path, tmp_path / "replay", capture.final_url)
 
     assert replay.image_width == 1
+
+
+async def test_concurrent_captures_replay_only_their_own_pages(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    first_capture, second_capture = await asyncio.gather(
+        capture_page(f"{local_site.base_url}/capture/first", tmp_path / "first"),
+        capture_page(f"{local_site.base_url}/capture/second", tmp_path / "second"),
+    )
+    local_site.stop()
+
+    first_replay = await replay_page(
+        tmp_path / "first",
+        tmp_path / "first-replay",
+        first_capture.final_url,
+    )
+    second_replay = await replay_page(
+        tmp_path / "second",
+        tmp_path / "second-replay",
+        second_capture.final_url,
+    )
+
+    assert (first_replay.page_title, second_replay.page_title) == (
+        "First capture",
+        "Second capture",
+    )
