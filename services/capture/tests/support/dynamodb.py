@@ -117,6 +117,7 @@ class FakeDynamoDBFrontierClient:
             run_key = run_check["ConditionCheck"]["Key"]["archiveId"]["S"]
             run = self.runs.get(run_key)
             run_condition = run_check["ConditionCheck"]["ConditionExpression"]
+            run_values = run_check["ConditionCheck"]["ExpressionAttributeValues"]
             run_admission = run.get("admission", {}).get("S") if run else None
 
             update = frontier_update["Update"]
@@ -129,7 +130,7 @@ class FakeDynamoDBFrontierClient:
             values = update["ExpressionAttributeValues"]
             condition = update["ConditionExpression"]
 
-            if run_condition and run_admission != values[":open"]["S"]:
+            if run_condition and run_admission != run_values[":open"]["S"]:
                 self._transaction_failure("ConditionalCheckFailed", "None")
 
             if "#state = :pending" in condition:
