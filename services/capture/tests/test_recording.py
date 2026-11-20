@@ -123,6 +123,26 @@ async def test_capture_records_download(local_site: LocalSite, tmp_path: Path) -
     assert DOWNLOAD.encode() in warc_content
 
 
+async def test_capture_records_redirected_download(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/redirect-to-download", tmp_path)
+    local_site.stop()
+
+    assert capture.final_url.endswith("/assets/download.bin")
+    assert capture.status_code == 200
+    assert capture.content_type == "application/octet-stream"
+    assert capture.redirect_chain == (
+        f"{local_site.base_url}/redirect-to-download",
+        f"{local_site.base_url}/assets/download.bin",
+    )
+
+    warc_content = read_gzip_files(capture.warc_files)
+
+    assert DOWNLOAD.encode() in warc_content
+
+
 async def test_capture_records_direct_download(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/assets/download.bin", tmp_path)
     local_site.stop()
@@ -133,6 +153,26 @@ async def test_capture_records_direct_download(local_site: LocalSite, tmp_path: 
     warc_content = read_gzip_files(capture.warc_files)
 
     assert DOWNLOAD.encode() in warc_content
+
+
+async def test_capture_records_redirected_pdf(
+    local_site: LocalSite,
+    tmp_path: Path,
+) -> None:
+    capture = await capture_local_page(f"{local_site.base_url}/redirect-to-pdf", tmp_path)
+    local_site.stop()
+
+    assert capture.final_url.endswith("/assets/document.pdf")
+    assert capture.status_code == 200
+    assert capture.content_type == "application/pdf"
+    assert capture.redirect_chain == (
+        f"{local_site.base_url}/redirect-to-pdf",
+        f"{local_site.base_url}/assets/document.pdf",
+    )
+
+    warc_content = read_gzip_files(capture.warc_files)
+
+    assert b"%PDF-1.4" in warc_content
 
 
 async def test_capture_records_direct_pdf(local_site: LocalSite, tmp_path: Path) -> None:
