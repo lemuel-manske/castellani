@@ -1,4 +1,3 @@
-// Package dispatcher delivers messages from the Coordinator's outbox.
 package dispatcher
 
 import (
