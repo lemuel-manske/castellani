@@ -210,19 +210,29 @@ class Worker:
                     claim_state[0] = renewed_claim
                     continue
 
-                renewed_claim, renewed_reservation = await asyncio.wait_for(
+                renewals = await asyncio.wait_for(
                     asyncio.gather(
                         self.repository.renew(claim),
                         self.capacity.renew(reservation),
+                        return_exceptions=True,
                     ),
                     timeout=remaining * 0.8,
                 )
+                renewed_claim, renewed_reservation = renewals
 
-                self._verify_claim_renewal(claim, renewed_claim)
-                self._verify_reservation_renewal(reservation, renewed_reservation)
+                if not isinstance(renewed_claim, BaseException):
+                    self._verify_claim_renewal(claim, renewed_claim)
+                    claim_state[0] = renewed_claim
 
-                claim_state[0] = renewed_claim
-                reservation_state[0] = renewed_reservation
+                if not isinstance(renewed_reservation, BaseException):
+                    self._verify_reservation_renewal(reservation, renewed_reservation)
+                    reservation_state[0] = renewed_reservation
+
+                if isinstance(renewed_claim, BaseException):
+                    raise renewed_claim
+
+                if isinstance(renewed_reservation, BaseException):
+                    raise renewed_reservation
 
             except Exception as error:
                 raise LeaseLostError("failed to renew execution ownership") from error
