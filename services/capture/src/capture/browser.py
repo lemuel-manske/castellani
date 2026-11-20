@@ -241,7 +241,11 @@ async def capture_page(
                             download = download_future.result()
                             final_url = download.url
 
-                            response = main_response
+                            response = (
+                                main_response_future.result()
+                                if main_response_future.done()
+                                else None
+                            )
                         elif (
                             main_response_future.done()
                             and is_pdf_content_type(
