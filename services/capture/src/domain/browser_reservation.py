@@ -31,7 +31,7 @@ class BrowserReservation:
         if self.lease_until <= 0:
             raise ValueError("lease_until must be positive")
 
-    def verify_renewal(self, renewed: BrowserReservation, now: float) -> None:
+    def verify_renewal(self, renewed: "BrowserReservation", now: float) -> None:
         if (
             renewed.attempt_id != self.attempt_id
             or renewed.reservation_id != self.reservation_id
