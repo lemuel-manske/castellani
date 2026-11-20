@@ -58,6 +58,12 @@ class PageTaskConsumer(Protocol):
     async def receive(self) -> PageTaskMessage | None: ...
 
 
+class PageTaskProcessor(Protocol):
+    """Application capability for processing one delivered page task."""
+
+    async def execute(self, archive_id: str, url_key: str) -> bool: ...
+
+
 class TaskRepository(Protocol):
     """Owns authoritative task claims and capture-attempt state."""
 

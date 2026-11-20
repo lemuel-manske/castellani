@@ -9,6 +9,7 @@ from application.contracts import (
     DiscoveryPublisher,
     PageExecutor,
     PageTaskConsumer,
+    PageTaskProcessor,
     TaskRepository,
 )
 from domain.task import TaskClaim
@@ -106,7 +107,7 @@ class WorkerRuntime:
 
     def __init__(
         self,
-        worker: Worker,
+        worker: PageTaskProcessor,
         consumer: PageTaskConsumer,
     ) -> None:
         self.worker = worker

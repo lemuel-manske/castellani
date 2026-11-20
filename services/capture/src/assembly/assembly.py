@@ -4,6 +4,7 @@ from application.contracts import (
     DiscoveryPublisher,
     PageExecutor,
     PageTaskConsumer,
+    PageTaskProcessor,
     TaskRepository,
 )
 from application.worker import Worker, WorkerRuntime
@@ -26,7 +27,7 @@ def new_worker(
 
 
 def new_worker_runtime(
-    worker: Worker,
+    worker: PageTaskProcessor,
     consumer: PageTaskConsumer,
 ) -> WorkerRuntime:
     return WorkerRuntime(
