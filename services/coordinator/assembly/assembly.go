@@ -3,13 +3,14 @@ package assembly
 
 import (
 	"github.com/lemuel-manske/unnamed/services/coordinator/application"
+	"github.com/lemuel-manske/unnamed/services/coordinator/messaging/dispatcher"
 	"github.com/lemuel-manske/unnamed/services/coordinator/messaging/rabbitmq"
 	persistence "github.com/lemuel-manske/unnamed/services/coordinator/persistence/dynamodb"
 )
 
 type Components struct {
 	Application *application.Application
-	Dispatcher  *application.Dispatcher
+	Dispatcher  *dispatcher.Dispatcher
 	Consumer    *rabbitmq.RabbitConsumer
 }
 
@@ -22,7 +23,7 @@ func NewComponents(
 
 	return Components{
 		Application: application.NewApplication(repository),
-		Dispatcher:  application.NewDispatcher(repository, publisher),
+		Dispatcher:  dispatcher.NewDispatcher(repository, publisher),
 		Consumer: rabbitmq.NewRabbitConsumer(
 			rabbitURL,
 			rabbitExchange,
