@@ -23,7 +23,7 @@ async def test_replay_executes_page_javascript(
     local_site: LocalSite,
     tmp_path: Path,
 ) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     replay = await replay_page(tmp_path, tmp_path / "replay", capture.final_url)
@@ -35,7 +35,7 @@ async def test_replay_serves_downloaded_resource(
     local_site: LocalSite,
     tmp_path: Path,
 ) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     replay = await replay_page(tmp_path, tmp_path / "replay", capture.final_url)
@@ -47,7 +47,7 @@ async def test_replay_loads_page_image(
     local_site: LocalSite,
     tmp_path: Path,
 ) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     replay = await replay_page(tmp_path, tmp_path / "replay", capture.final_url)
@@ -60,8 +60,8 @@ async def test_concurrent_captures_replay_only_their_own_pages(
     tmp_path: Path,
 ) -> None:
     first_capture, second_capture = await asyncio.gather(
-        capture_page(f"{local_site.base_url}/capture/first", tmp_path / "first"),
-        capture_page(f"{local_site.base_url}/capture/second", tmp_path / "second"),
+        capture_local_page(f"{local_site.base_url}/capture/first", tmp_path / "first"),
+        capture_local_page(f"{local_site.base_url}/capture/second", tmp_path / "second"),
     )
     local_site.stop()
 

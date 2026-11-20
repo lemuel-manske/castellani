@@ -15,35 +15,35 @@ async def test_capture_follows_redirect(local_site: LocalSite, tmp_path: Path) -
 
 
 async def test_capture_returns_successful_response(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     assert capture.status_code == 200
 
 
 async def test_capture_extracts_page_title(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     assert capture.title == "Recorder acceptance page"
 
 
 async def test_capture_discovers_page_links(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     assert any(url.endswith("/next") for url in capture.discovered_urls)
 
 
 async def test_capture_produces_warc_artifacts(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     assert capture.warc_files
 
 
 async def test_capture_records_request_record(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
@@ -52,7 +52,7 @@ async def test_capture_records_request_record(local_site: LocalSite, tmp_path: P
 
 
 async def test_capture_records_response_record(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
@@ -61,7 +61,7 @@ async def test_capture_records_response_record(local_site: LocalSite, tmp_path: 
 
 
 async def test_capture_records_html_document(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
@@ -70,7 +70,7 @@ async def test_capture_records_html_document(local_site: LocalSite, tmp_path: Pa
 
 
 async def test_capture_records_stylesheet(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
@@ -79,7 +79,7 @@ async def test_capture_records_stylesheet(local_site: LocalSite, tmp_path: Path)
 
 
 async def test_capture_records_script(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
@@ -88,7 +88,7 @@ async def test_capture_records_script(local_site: LocalSite, tmp_path: Path) -> 
 
 
 async def test_capture_records_image(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
@@ -97,7 +97,7 @@ async def test_capture_records_image(local_site: LocalSite, tmp_path: Path) -> N
 
 
 async def test_capture_records_download(local_site: LocalSite, tmp_path: Path) -> None:
-    capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
+    capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
     warc_content = read_gzip_files(capture.warc_files)
