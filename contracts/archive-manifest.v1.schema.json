@@ -118,6 +118,13 @@
           "type": "string",
           "format": "uri"
         },
+"redirectChain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
         "capturedAt": {
           "type": "string",
           "format": "date-time"
