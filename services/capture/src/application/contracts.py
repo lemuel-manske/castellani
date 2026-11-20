@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -31,37 +30,6 @@ class CaptureOutcome:
     attempt_id: str
     fence: int
     artifact: CaptureArtifact
-
-
-@dataclass(frozen=True)
-class PageTaskDelivery:
-    """Application-level identity of a page task sent to a capture worker."""
-
-    archive_id: str
-    url_key: str
-
-
-class PageTaskMessage(Protocol):
-    """A received task and the settlement operations for its broker delivery."""
-
-    @property
-    def delivery(self) -> PageTaskDelivery: ...
-
-    async def acknowledge(self) -> None: ...
-
-    async def reject(self) -> None: ...
-
-
-class PageTaskConsumer(Protocol):
-    """Inbound port for receiving page tasks from the messaging system."""
-
-    async def receive(self) -> PageTaskMessage | None: ...
-
-
-class PageTaskProcessor(Protocol):
-    """Application capability for processing one delivered page task."""
-
-    async def execute(self, archive_id: str, url_key: str) -> bool: ...
 
 
 class TaskRepository(Protocol):
@@ -106,5 +74,5 @@ class DiscoveryPublisher(Protocol):
     async def publish_discovered(
         self,
         claim: TaskClaim,
-        discovered_urls: Sequence[str],
+        discovered_urls: tuple[str, ...],
     ) -> None: ...

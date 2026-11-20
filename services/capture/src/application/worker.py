@@ -8,13 +8,9 @@ from application.contracts import (
     CaptureOutcome,
     DiscoveryPublisher,
     PageExecutor,
-    PageTaskConsumer,
-    PageTaskProcessor,
     TaskRepository,
 )
 from domain.task import TaskClaim
-
-WORKER_POLL_INTERVAL_SECONDS = 1
 
 
 class Worker:
@@ -100,47 +96,3 @@ class Worker:
     @staticmethod
     async def _ignore_error(error: Exception) -> None:
         return None
-
-
-class WorkerRuntime:
-    """Runs the capture worker as a consumer of page-task messages."""
-
-    def __init__(
-        self,
-        worker: PageTaskProcessor,
-        consumer: PageTaskConsumer,
-    ) -> None:
-        self.worker = worker
-        self.consumer = consumer
-        self._stopping = asyncio.Event()
-
-    def stop(self) -> None:
-        self._stopping.set()
-
-    async def run(self) -> None:
-        while not self._stopping.is_set():
-            message = await self.consumer.receive()
-
-            if message is None:
-                await self._wait_for_work()
-                continue
-
-            try:
-                delivery = message.delivery
-                await self.worker.execute(delivery.archive_id, delivery.url_key)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                await message.reject()
-                continue
-
-            await message.acknowledge()
-
-    async def _wait_for_work(self) -> None:
-        try:
-            await asyncio.wait_for(
-                self._stopping.wait(),
-                timeout=WORKER_POLL_INTERVAL_SECONDS,
-            )
-        except TimeoutError:
-            return

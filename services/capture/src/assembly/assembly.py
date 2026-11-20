@@ -3,11 +3,9 @@ from application.contracts import (
     BrowserCapacity,
     DiscoveryPublisher,
     PageExecutor,
-    PageTaskConsumer,
-    PageTaskProcessor,
     TaskRepository,
 )
-from application.worker import Worker, WorkerRuntime
+from application.worker import Worker
 
 
 def new_worker(
@@ -23,14 +21,4 @@ def new_worker(
         executor=executor,
         artifacts=artifacts,
         discovery=discovery,
-    )
-
-
-def new_worker_runtime(
-    worker: PageTaskProcessor,
-    consumer: PageTaskConsumer,
-) -> WorkerRuntime:
-    return WorkerRuntime(
-        worker=worker,
-        consumer=consumer,
     )
