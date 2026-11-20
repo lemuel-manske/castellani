@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 from support.recording import DOWNLOAD, LocalSite, capture_local_page
+
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
