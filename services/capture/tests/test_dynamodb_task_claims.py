@@ -114,7 +114,7 @@ async def test_claim_requires_an_open_archive_run() -> None:
     client = FakeDynamoDBFrontierClient()
     client.runs["archive-1"] = {
         "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
+        "admission": {"S": "CLOSED"},
     }
     client.frontier[("archive-1", "url-1")] = {
         "archiveId": {"S": "archive-1"},
@@ -123,7 +123,6 @@ async def test_claim_requires_an_open_archive_run() -> None:
         "depth": {"N": "2"},
         "state": {"S": "PENDING"},
     }
-    client.runs["archive-1"]["admission"] = {"S": "CLOSED"}
     claims = DynamoDBTaskClaims(
         client=client,
         frontier_table_name="capture_frontier",
