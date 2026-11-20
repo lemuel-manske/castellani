@@ -9,7 +9,8 @@ from adapters.persistence.dynamodb.task_claims import (
 )
 
 
-def new_frontier_client() -> FakeDynamoDBFrontierClient:
+async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation() -> None:
+    clock = FakeClock()
     client = FakeDynamoDBFrontierClient()
     client.runs["archive-1"] = {
         "archiveId": {"S": "archive-1"},
@@ -22,13 +23,6 @@ def new_frontier_client() -> FakeDynamoDBFrontierClient:
         "depth": {"N": "2"},
         "state": {"S": "PENDING"},
     }
-
-    return client
-
-
-async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation() -> None:
-    clock = FakeClock()
-    client = new_frontier_client()
     claims = DynamoDBTaskClaims(
         client=client,
         frontier_table_name="capture_frontier",
