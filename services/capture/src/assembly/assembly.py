@@ -1,7 +1,6 @@
 from application.contracts import (
     ArtifactStore,
     BrowserCapacity,
-    DiscoveryPublisher,
     PageExecutor,
     TaskRepository,
 )
@@ -13,12 +12,10 @@ def new_worker(
     capacity: BrowserCapacity,
     executor: PageExecutor,
     artifacts: ArtifactStore,
-    discovery: DiscoveryPublisher,
 ) -> Worker:
     return Worker(
         repository=repository,
         capacity=capacity,
         executor=executor,
         artifacts=artifacts,
-        discovery=discovery,
     )

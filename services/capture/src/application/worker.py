@@ -6,7 +6,6 @@ from application.contracts import (
     ArtifactStore,
     BrowserCapacity,
     CaptureOutcome,
-    DiscoveryPublisher,
     PageExecutor,
     TaskRepository,
 )
@@ -22,14 +21,12 @@ class Worker:
         capacity: BrowserCapacity,
         executor: PageExecutor,
         artifacts: ArtifactStore,
-        discovery: DiscoveryPublisher,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ) -> None:
         self.repository = repository
         self.capacity = capacity
         self.executor = executor
         self.artifacts = artifacts
-        self.discovery = discovery
 
         self.on_error = on_error or self._ignore_error
 
@@ -59,7 +56,7 @@ class Worker:
             directory = await self.artifacts.create_attempt_directory(claim)
             artifact = await self.executor.execute(claim.task.url, directory)
 
-            await self.discovery.publish_discovered(claim, artifact.discovered_urls)
+            await self.repository.admit_discovered(claim, artifact.discovered_urls)
 
             outcome = CaptureOutcome(
                 archive_id=claim.task.archive_id,

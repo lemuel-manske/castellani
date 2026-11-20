@@ -45,6 +45,14 @@ class TaskRepository(Protocol):
 
     async def release(self, claim: TaskClaim) -> None: ...
 
+    async def admit_discovered(
+        self,
+        claim: TaskClaim,
+        discovered_urls: tuple[str, ...],
+    ) -> None:
+        """Durably account for discoveries before allowing parent completion."""
+        ...
+
 
 class BrowserCapacity(Protocol):
     """Controls the number of page captures running concurrently."""
@@ -66,13 +74,3 @@ class ArtifactStore(Protocol):
     async def create_attempt_directory(self, claim: TaskClaim) -> Path: ...
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None: ...
-
-
-class DiscoveryPublisher(Protocol):
-    """Publishes URLs discovered during a page capture."""
-
-    async def publish_discovered(
-        self,
-        claim: TaskClaim,
-        discovered_urls: tuple[str, ...],
-    ) -> None: ...
