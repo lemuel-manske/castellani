@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from warcio.archiveiterator import ArchiveIterator
 from support.recording import DOWNLOAD, LocalSite
 
 from capture.browser import capture_page
@@ -66,9 +67,16 @@ async def test_capture_records_redirect_response(local_site: LocalSite, tmp_path
     capture = await capture_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
 
-    warc_content = read_gzip_files(capture.warc_files)
+    with capture.warc_files[0].open("rb") as warc_file:
+        records = tuple(ArchiveIterator(warc_file))
 
-    assert b"HTTP/1.1 302" in warc_content
+    assert any(
+        record.rec_type == "response"
+        and record.rec_headers.get_header("WARC-Target-URI", "").endswith("/start")
+        and record.http_headers is not None
+        and record.http_headers.statusline.startswith("302 ")
+        for record in records
+    )
 
 
 async def test_capture_records_html_document(local_site: LocalSite, tmp_path: Path) -> None:
