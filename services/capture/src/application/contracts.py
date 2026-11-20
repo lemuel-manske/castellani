@@ -2,45 +2,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from domain.browser_reservation import BrowserReservation
+from domain.capture import CaptureOutcome, PageCapture
 from domain.task import TaskClaim
 
 
 @dataclass(frozen=True)
-class BrowserReservation:
-    """A fenced, time-limited reservation of one global browser-capacity slot."""
-
-    attempt_id: str
-    reservation_id: str
-    slot_id: str
-    fence: int
-    lease_until: float
-
-
-@dataclass(frozen=True)
 class CaptureArtifact:
-    """Metadata and files produced by capturing one page."""
+    """Browser execution output and its attempt-local WARC files."""
 
-    requested_url: str
-    final_url: str
-    redirect_chain: tuple[str, ...]
-    status_code: int | None
-    content_type: str | None
-    title: str
-    captured_at: str
-    discovered_urls: tuple[str, ...]
+    capture: PageCapture
     blocked_urls: tuple[str, ...]
     warc_files: tuple[Path, ...]
-
-
-@dataclass(frozen=True)
-class CaptureOutcome:
-    """A completed capture attempt ready to be committed to task state."""
-
-    archive_id: str
-    url_key: str
-    attempt_id: str
-    fence: int
-    artifact: CaptureArtifact
 
 
 class TaskRepository(Protocol):
@@ -50,7 +23,11 @@ class TaskRepository(Protocol):
 
     async def renew(self, claim: TaskClaim) -> TaskClaim: ...
 
-    async def complete(self, outcome: CaptureOutcome) -> None: ...
+    async def complete(
+        self,
+        outcome: CaptureOutcome,
+        warc_files: tuple[Path, ...],
+    ) -> None: ...
 
     async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None: ...
 

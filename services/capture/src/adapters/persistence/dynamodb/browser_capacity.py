@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 
 from botocore.exceptions import ClientError
 
-from application.contracts import BrowserReservation
+from domain.browser_reservation import BrowserReservation, InvalidBrowserReservationRenewal
 
 
 class ClientErrorResponse(TypedDict):
@@ -202,9 +202,6 @@ class DynamoDBBrowserCapacity:
             raise
 
         renewed = reservation_from_item(reservation.slot_id, response["Attributes"])
-
-        if renewed.lease_until <= max(reservation.lease_until, now):
-            raise BrowserReservationLostError("browser capacity renewal did not extend the lease")
 
         return renewed
 
