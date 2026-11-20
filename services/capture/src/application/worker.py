@@ -12,8 +12,7 @@ from application.contracts import (
 )
 from domain.task import TaskClaim
 
-POLL_INTERVAL_SECONDS = 1
-WORKER_SHUTDOWN_TIMEOUT_SECONDS = 30
+WORKER_POLL_INTERVAL_SECONDS = 1
 
 
 class Worker:
@@ -46,13 +45,14 @@ class Worker:
     async def _execute_claim(self, claim: TaskClaim) -> None:
         reservation_id: str | None = None
         directory: Path | None = None
-        completed = False
+        terminal = False
 
         try:
             reservation_id = await self.capacity.reserve(claim.attempt_id)
 
             if reservation_id is None:
                 await self.repository.release(claim)
+                terminal = True
                 return
 
             directory = await self.artifacts.create_attempt_directory(claim)
@@ -69,23 +69,26 @@ class Worker:
             )
 
             await self.repository.complete(outcome)
-            completed = True
+            terminal = True
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            await self._handle_failure(claim, error)
+            await self.repository.fail(
+                claim,
+                str(getattr(error, "reason_code", "capture_failed")),
+                str(error),
+            )
+            terminal = True
+            await self.on_error(error)
         finally:
-            if directory is not None and not completed:
+            if directory is not None and not terminal:
                 await self._discard_attempt(claim, directory)
 
             if reservation_id is not None:
                 await self.capacity.release(claim.attempt_id, reservation_id)
 
-    async def _handle_failure(self, claim: TaskClaim, error: Exception) -> None:
-        reason_code = getattr(error, "reason_code", "capture_failed")
-
-        await self.repository.fail(claim, str(reason_code), str(error))
-        await self.on_error(error)
+            if directory is not None and not terminal:
+                await self._discard_attempt(claim, directory)
 
     async def _discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         try:
@@ -102,14 +105,16 @@ class WorkerRuntime:
     def __init__(
         self,
         worker: Worker,
-        receive: Callable[[], Awaitable[tuple[str, str] | None]],
-        acknowledge: Callable[[str, str], Awaitable[None]],
-        reject: Callable[[str, str], Awaitable[None]],
+        receive: Callable[[], Awaitable[object | None]],
+        acknowledge: Callable[[object], Awaitable[None]],
+        reject: Callable[[object], Awaitable[None]],
+        delivery_parser: Callable[[object], tuple[str, str]],
     ) -> None:
         self.worker = worker
         self.receive = receive
         self.acknowledge = acknowledge
         self.reject = reject
+        self.delivery_parser = delivery_parser
         self._stopping = asyncio.Event()
 
     def stop(self) -> None:
@@ -123,26 +128,22 @@ class WorkerRuntime:
                 await self._wait_for_work()
                 continue
 
-            archive_id, url_key = delivery
-
             try:
-                claimed = await self.worker.execute(archive_id, url_key)
+                archive_id, url_key = self.delivery_parser(delivery)
+                await self.worker.execute(archive_id, url_key)
             except asyncio.CancelledError:
                 raise
             except Exception:
-                await self.reject(archive_id, url_key)
+                await self.reject(delivery)
                 continue
 
-            if claimed:
-                await self.acknowledge(archive_id, url_key)
-            else:
-                await self.acknowledge(archive_id, url_key)
+            await self.acknowledge(delivery)
 
     async def _wait_for_work(self) -> None:
         try:
             await asyncio.wait_for(
                 self._stopping.wait(),
-                timeout=POLL_INTERVAL_SECONDS,
+                timeout=WORKER_POLL_INTERVAL_SECONDS,
             )
         except TimeoutError:
             return
