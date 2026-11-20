@@ -43,6 +43,7 @@ class FakeCapacity:
         return BrowserReservation(
             attempt_id=attempt_id,
             reservation_id="reservation-1",
+            slot_id="slot-1",
             fence=1,
             lease_until=time.time() + 60,
         )
@@ -102,6 +103,7 @@ class ShortLeaseCapacity(FakeCapacity):
         return BrowserReservation(
             attempt_id=attempt_id,
             reservation_id="reservation-1",
+            slot_id="slot-1",
             fence=1,
             lease_until=time.time() + 0.06,
         )

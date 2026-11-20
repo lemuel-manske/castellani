@@ -255,6 +255,7 @@ class Worker:
         if (
             renewed.attempt_id != previous.attempt_id
             or renewed.reservation_id != previous.reservation_id
+            or renewed.slot_id != previous.slot_id
             or renewed.fence != previous.fence
             or renewed.lease_until <= max(previous.lease_until, time.time())
         ):

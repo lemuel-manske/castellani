@@ -7,10 +7,11 @@ from domain.task import TaskClaim
 
 @dataclass(frozen=True)
 class BrowserReservation:
-    """A fenced, time-limited reservation of global browser capacity."""
+    """A fenced, time-limited reservation of one global browser-capacity slot."""
 
     attempt_id: str
     reservation_id: str
+    slot_id: str
     fence: int
     lease_until: float
 
