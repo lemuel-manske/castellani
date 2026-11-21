@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import pytest
 from support.dynamodb import FakeClock
@@ -15,7 +16,7 @@ from adapters.persistence.dynamodb.task_claims import (
 )
 
 
-async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation(dynamodb_client) -> None:
+async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -43,7 +44,7 @@ async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation(dynam
     assert claim.lease_until == clock() + 30
 
 
-async def test_claim_does_not_replace_an_active_attempt(dynamodb_client) -> None:
+async def test_claim_does_not_replace_an_active_attempt(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     seed_run(client)
@@ -70,7 +71,7 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb_client) -> None
     assert frontier_item(client)["attemptId"] == {"S": "attempt-1"}
 
 
-async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client) -> None:
+async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -104,7 +105,7 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client) -
         await claims.renew(previous)
 
 
-async def test_claim_requires_an_open_archive_run(dynamodb_client) -> None:
+async def test_claim_requires_an_open_archive_run(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     seed_run(client, admission="CLOSED")
@@ -125,7 +126,7 @@ async def test_claim_requires_an_open_archive_run(dynamodb_client) -> None:
     assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_renewal_extends_the_lease_without_changing_attempt_or_fence(dynamodb_client) -> None:
+async def test_renewal_extends_the_lease_without_changing_attempt_or_fence(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -155,7 +156,7 @@ async def test_renewal_extends_the_lease_without_changing_attempt_or_fence(dynam
     assert renewed.lease_until > claim.lease_until
 
 
-async def test_renewal_is_rejected_after_the_archive_run_closes(dynamodb_client) -> None:
+async def test_renewal_is_rejected_after_the_archive_run_closes(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     seed_run(client)
@@ -179,7 +180,7 @@ async def test_renewal_is_rejected_after_the_archive_run_closes(dynamodb_client)
         await claims.renew(claim)
 
 
-async def test_concurrent_claims_have_exactly_one_winner_for_a_page(dynamodb_client) -> None:
+async def test_concurrent_claims_have_exactly_one_winner_for_a_page(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     seed_run(client)
