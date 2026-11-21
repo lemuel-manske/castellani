@@ -62,21 +62,25 @@ class DynamoDBOutbox:
             cursor: dict[str, Any] | None = None
 
             while True:
-                page = self.client.query(
-                    TableName=self.table_name,
-                    IndexName=OUTBOX_INDEX,
-                    KeyConditionExpression="#status = :status AND #next_attempt <= :now",
-                    ExpressionAttributeNames={
+                request: dict[str, Any] = {
+                    "TableName": self.table_name,
+                    "IndexName": OUTBOX_INDEX,
+                    "KeyConditionExpression": "#status = :status AND #next_attempt <= :now",
+                    "ExpressionAttributeNames": {
                         "#status": "status",
                         "#next_attempt": "nextAttemptAt",
                     },
-                    ExpressionAttributeValues={
+                    "ExpressionAttributeValues": {
                         ":status": {"S": status},
                         ":now": {"N": str(now)},
                     },
-                    ExclusiveStartKey=cursor,
-                    Limit=OUTBOX_CLAIM_LIMIT,
-                )
+                    "Limit": OUTBOX_CLAIM_LIMIT,
+                }
+
+                if cursor is not None:
+                    request["ExclusiveStartKey"] = cursor
+
+                page = self.client.query(**request)
 
                 for item in page.get("Items", []):
                     message = self._try_claim(item, status, now, lease_duration)
