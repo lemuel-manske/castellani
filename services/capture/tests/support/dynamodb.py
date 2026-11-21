@@ -115,14 +115,10 @@ class FakeDynamoDBFrontierClient:
     def transact_write_items(self, **request: Any) -> dict[str, Any]:
         operations = request["TransactItems"]
         run_check = next(
-            operation["ConditionCheck"]
-            for operation in operations
-            if "ConditionCheck" in operation
+            operation["ConditionCheck"] for operation in operations if "ConditionCheck" in operation
         )
         frontier_update = next(
-            operation["Update"]
-            for operation in operations
-            if "Update" in operation
+            operation["Update"] for operation in operations if "Update" in operation
         )
         outbox_put = next(
             (operation["Put"] for operation in operations if "Put" in operation),
@@ -158,11 +154,9 @@ class FakeDynamoDBFrontierClient:
 
             if "#state = :pending" in condition:
                 is_pending = updated.get(names["#state"]) == values[":pending"]
-                is_expired = (
-                    updated.get(names["#state"]) == values[":claimed"]
-                    and float(updated[names["#lease"]]["N"])
-                    <= float(values[":now"]["N"])
-                )
+                is_expired = updated.get(names["#state"]) == values[":claimed"] and float(
+                    updated[names["#lease"]]["N"]
+                ) <= float(values[":now"]["N"])
 
                 if not is_pending and not is_expired:
                     reasons = ["None"] * len(operations)
@@ -179,8 +173,7 @@ class FakeDynamoDBFrontierClient:
                     updated.get(names["#state"]) == values[":claimed"]
                     and updated.get(names["#attempt"]) == values[":attempt"]
                     and updated.get(names["#fence"]) == values[":fence"]
-                    and float(updated[names["#lease"]]["N"])
-                    > float(values[":now"]["N"])
+                    and float(updated[names["#lease"]]["N"]) > float(values[":now"]["N"])
                 )
 
                 if not owns_claim:

@@ -83,9 +83,12 @@ wheels = [
 name = "botocore-stubs"
 version = "1.37.38"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/26/0f/c7aa68bcadb0d623943cc9482f856f499c0fd58937fd69f1d920e68401c0/botocore_stubs-1.37.38.tar.gz", hash = "sha256:ba4755b50649649f3129b8f29a9cfc463d65d529605dd388f1da62f836d56067" }
+dependencies = [
+    { name = "types-awscrt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/26/0f/c7aa68bcadb0d623943cc9482f856f499c0fd58937fd69f1d920e68401c0/botocore_stubs-1.37.38.tar.gz", hash = "sha256:ba4755b50649649f3129b8f29a9cfc463d65d529605dd388f1da62f836d56067", size = 42256, upload-time = "2025-04-21T20:17:21.155Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/1e/677182b3925ecd8440ab1860184e518abc06ed40153ca7c4a3a399119e42/botocore_stubs-1.37.38-py3-none-any.whl", hash = "sha256:86bd9bdb07d6c2b3eaf6f7b464ef1dfa128debb997fff2b89ed76279123c6de9" },
+    { url = "https://files.pythonhosted.org/packages/58/1e/677182b3925ecd8440ab1860184e518abc06ed40153ca7c4a3a399119e42/botocore_stubs-1.37.38-py3-none-any.whl", hash = "sha256:86bd9bdb07d6c2b3eaf6f7b464ef1dfa128debb997fff2b89ed76279123c6de9", size = 65604, upload-time = "2025-04-21T20:17:19.363Z" },
 ]
 
 [[package]]
@@ -132,7 +135,6 @@ dev = [
 requires-dist = [
     { name = "aio-pika", specifier = "==9.5.5" },
     { name = "boto3", specifier = "==1.37.18" },
-    { name = "botocore-stubs", specifier = "==1.37.38" },
     { name = "fastapi", specifier = "==0.115.12" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "playwright", specifier = "==1.51.0" },
@@ -972,6 +974,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/fd/5d/45ece871390ccc985f821353543165bcf3784fa97d8484fd0ca5f2726612/tldextract-5.4.0.tar.gz", hash = "sha256:6c9223212c15c25c0da2bf7313893c14f175cb36b64a0c42da67a468e0c61ee3", size = 197271, upload-time = "2026-10-03T21:32:47.229Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/e0/d5760e222a7e3f3aec7ef59f6dff952af27d09ec168bcca50751d9698151/tldextract-5.4.0-py3-none-any.whl", hash = "sha256:7f02aed30bd3b6ad5717192eb859a39b20aafc7caf3917d9cf6cb00a58efb34f", size = 107482, upload-time = "2026-10-03T21:32:45.842Z" },
+]
+
+[[package]]
+name = "types-awscrt"
+version = "0.37.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/55/83325b10b3482e1b9525447546e0bb5cd2e1c7235d34cb87d04e2c9d454b/types_awscrt-0.37.0.tar.gz", hash = "sha256:41e251d39ad86e8c015cf40f0738d19377a413293717ca2202e63092a39535eb", size = 18671, upload-time = "2026-10-13T02:02:54.358Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/7c/181acf6ec51c9a89552e29d21d6472254c92a7eb53bf6d7649b7ac4cb8b2/types_awscrt-0.37.0-py3-none-any.whl", hash = "sha256:48305c4809732617cc9cfdd6f457fec448b3525bcd191212dbbb8b4f120be94b", size = 24887, upload-time = "2026-10-13T02:02:53.101Z" },
 ]
 
 [[package]]
