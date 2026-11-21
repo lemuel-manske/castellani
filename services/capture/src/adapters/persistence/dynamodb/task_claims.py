@@ -1,7 +1,7 @@
 import asyncio
 import time
-from datetime import UTC, datetime
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
@@ -175,10 +175,8 @@ class DynamoDBTaskClaims:
         ]
 
         try:
-            self._transact(
-                transaction,
-                str(uuid5(NAMESPACE_URL, f"capture-page-release:{message_id}")),
-            )
+            # The conditional outbox Put is the idempotency guard for release retries.
+            self._transact(transaction, None)
         except ConditionalWriteRejected as error:
             existing = self._read_outbox(message_id)
 
@@ -340,13 +338,19 @@ class DynamoDBTaskClaims:
 
         return renewed
 
-    def _transact(self, items: list[dict[str, Any]], request_token: str) -> None:
+    def _transact(
+        self,
+        items: list[dict[str, Any]],
+        request_token: str | None,
+    ) -> None:
         for attempt in range(5):
             try:
-                self.client.transact_write_items(
-                    TransactItems=items,
-                    ClientRequestToken=request_token,
-                )
+                request = {"TransactItems": items}
+
+                if request_token is not None:
+                    request["ClientRequestToken"] = request_token
+
+                self.client.transact_write_items(**request)
 
                 return
             except ClientError as error:
