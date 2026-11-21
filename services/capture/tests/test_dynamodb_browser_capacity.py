@@ -10,7 +10,7 @@ from adapters.persistence.dynamodb.browser_capacity import (
 )
 
 
-async def test_capacity_admits_exactly_the_configured_number_of_contenders(dynamodb_client: Any) -> None:
+async def test_capacity_limits_concurrent_reservations(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     capacity = DynamoDBBrowserCapacity(
