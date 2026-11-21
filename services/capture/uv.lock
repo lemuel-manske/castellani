@@ -143,6 +143,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "botocore-stubs", specifier = "==1.37.38" },
     { name = "pyright", specifier = "==1.1.398" },
     { name = "pytest", specifier = "==8.3.5" },
     { name = "pytest-asyncio", specifier = "==0.25.3" },
