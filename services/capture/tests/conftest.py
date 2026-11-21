@@ -4,6 +4,7 @@ import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.clock import FakeClock
 from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamodb
+from support.rabbitmq import FakeConnection
 from support.recording import LocalSite, start_local_site
 
 
@@ -37,3 +38,13 @@ def dynamodb() -> Iterator[DynamoDBClient]:
         yield client
     finally:
         cleanup_dynamodb(client)
+
+
+@pytest.fixture
+def rabbitmq() -> Iterator[FakeConnection]:
+    connection = FakeConnection()
+
+    try:
+        yield connection
+    finally:
+        pass
