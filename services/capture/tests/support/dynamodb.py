@@ -304,9 +304,9 @@ class FakeDynamoDBOutboxClient:
                 updated[names["#next_attempt"]] = deepcopy(values[":lease_until"])
                 attempts = int(updated.get(names["#attempts"], {"N": "0"})["N"]) + 1
                 updated[names["#attempts"]] = {"N": str(attempts)}
-            elif "REMOVE #lease_token" in expression and "#delivered_at" in names:
-                updated[names["#status"]] = deepcopy(values[":delivered"])
-                updated[names["#delivered_at"]] = deepcopy(values[":now"])
+            elif "REMOVE #lease_token" in expression and "#published_at" in names:
+                updated[names["#status"]] = deepcopy(values[":published"])
+                updated[names["#published_at"]] = deepcopy(values[":now"])
                 updated.pop(names["#lease_token"], None)
             else:
                 updated[names["#status"]] = deepcopy(values[":pending"])
