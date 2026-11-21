@@ -17,13 +17,14 @@ from playwright.async_api import (
 from playwright.async_api import (
     Error as PlaywrightError,
 )
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import (
+    TimeoutError as PlaywrightTimeoutError,
+)
 from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
-from utils.http import is_safe_request_url, is_valid_url
 from utils.tasks import complete_before_cancellation
-from utils.web import is_html_content_type, is_pdf_content_type
+from utils.web import is_html_content_type, is_pdf_content_type, is_safe_request_url, is_valid_url
 
 NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
 NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
@@ -51,7 +52,7 @@ DEFAULT_LIMITS = CaptureLimits()
 
 
 @dataclass(frozen=True)
-class PageCapture:
+class BrowserCaptureResult:
     requested_url: str
     final_url: str
     redirect_chain: tuple[str, ...]
@@ -204,7 +205,7 @@ def extract_links(
     return tuple(discovered)
 
 
-async def capture_local_page(url: str, output_dir: Path) -> PageCapture:
+async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:
     return await capture_page(
         url,
         output_dir,
@@ -214,7 +215,7 @@ async def capture_local_page(url: str, output_dir: Path) -> PageCapture:
 
 async def capture_page(
     url: str, output_dir: Path, limits: CaptureLimits = DEFAULT_LIMITS
-) -> PageCapture:
+) -> BrowserCaptureResult:
     if not is_valid_url(url):
         raise InvalidCaptureURL(
             "capture URL must be an absolute HTTP or HTTPS URL without credentials"
@@ -377,8 +378,7 @@ async def capture_page(
 
                         if document_bytes > limits.max_document_bytes:
                             msg = (
-                                "page document exceeded the "
-                                "{limits.max_document_bytes}-byte limit"
+                                "page document exceeded the {limits.max_document_bytes}-byte limit"
                             )
 
                             raise CaptureLimitExceeded(
@@ -416,7 +416,7 @@ async def capture_page(
     if not warc_files:
         raise CaptureRecordingFailed("pywb recorder produced no WARC artifacts")
 
-    return PageCapture(
+    return BrowserCaptureResult(
         requested_url=url,
         final_url=final_url,
         redirect_chain=redirect_chain,

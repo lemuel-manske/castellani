@@ -1,0 +1,473 @@
+import asyncio
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+from uuid import NAMESPACE_URL, uuid4, uuid5
+
+from botocore.exceptions import ClientError
+
+from domain import CaptureOutcome, PageTask, TaskClaim, TaskRepository, new_attempt_id
+
+from .error_handling import (
+    extract_cancellation_reasons,
+    is_conditional_failure,
+    is_transaction_canceled,
+)
+
+
+def claim_from_item(
+    archive_id: str,
+    url_key: str,
+    item: dict[str, Any],
+) -> TaskClaim:
+    try:
+        task = PageTask(
+            archive_id=archive_id,
+            url_key=url_key,
+            url=item["url"]["S"],
+            depth=int(item["depth"]["N"]),
+        )
+
+        return TaskClaim(
+            task=task,
+            attempt_id=item["attemptId"]["S"],
+            fence=int(item["fence"]["N"]),
+            lease_until=float(item["leaseUntil"]["N"]),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError("DynamoDB returned an invalid page-task claim") from error
+
+
+class TaskClaimLostError(RuntimeError):
+    """Raised when a worker no longer owns the current page-task attempt."""
+
+
+class ConditionalWriteRejected(RuntimeError):
+    """Raised when a DynamoDB transaction is rejected due to a conditional failure."""
+
+
+class DynamoDBTaskRepository(TaskRepository):
+    """Acquires and renews fenced page-task claims against the Capture frontier."""
+
+    def __init__(
+        self,
+        client: Any,
+        frontier_table_name: str,
+        runs_table_name: str,
+        lease_duration: float,
+        clock: Callable[[], float] = time.time,
+        attempt_id_factory: Callable[[], str] = new_attempt_id,
+        outbox_table_name: str = "capture_outbox",
+    ) -> None:
+        if not frontier_table_name:
+            raise ValueError("frontier_table_name must not be empty")
+
+        if not runs_table_name:
+            raise ValueError("runs_table_name must not be empty")
+
+        if not outbox_table_name:
+            raise ValueError("outbox_table_name must not be empty")
+
+        if lease_duration <= 0:
+            raise ValueError("lease_duration must be positive")
+
+        self.client = client
+        self.frontier_table_name = frontier_table_name
+        self.runs_table_name = runs_table_name
+        self.outbox_table_name = outbox_table_name
+        self.lease_duration = lease_duration
+
+        self.clock = clock
+        self.attempt_id_factory = attempt_id_factory
+
+    async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
+        if not archive_id:
+            raise ValueError("archive_id must not be empty")
+
+        if not url_key:
+            raise ValueError("url_key must not be empty")
+
+        attempt_id = self.attempt_id_factory()
+
+        if not attempt_id:
+            raise ValueError("attempt_id_factory returned an empty value")
+
+        return await asyncio.to_thread(self._claim, archive_id, url_key, attempt_id)
+
+    async def renew(self, claim: TaskClaim) -> TaskClaim:
+        return await asyncio.to_thread(self._renew, claim)
+
+    async def complete(
+        self,
+        outcome: CaptureOutcome,
+        warc_files: tuple[Path, ...],
+    ) -> None:
+        del warc_files
+        await asyncio.to_thread(self._complete, outcome)
+
+    async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
+        await asyncio.to_thread(self._fail, claim, reason_code, message)
+
+    async def admit_discovered(
+        self,
+        claim: TaskClaim,
+        discovered_urls: tuple[str, ...],
+    ) -> None:
+        del claim, discovered_urls
+
+    async def release(self, claim: TaskClaim) -> None:
+        await asyncio.to_thread(self._release, claim)
+
+    def _complete(self, outcome: CaptureOutcome) -> None:
+        self._finish(
+            archive_id=outcome.archive_id,
+            url_key=outcome.url_key,
+            attempt_id=outcome.attempt_id,
+            fence=outcome.fence,
+            state="COMPLETED",
+        )
+
+    def _fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
+        self._finish(
+            archive_id=claim.task.archive_id,
+            url_key=claim.task.url_key,
+            attempt_id=claim.attempt_id,
+            fence=claim.fence,
+            state="FAILED",
+            reason_code=reason_code,
+            message=message,
+        )
+
+    def _finish(
+        self,
+        archive_id: str,
+        url_key: str,
+        attempt_id: str,
+        fence: int,
+        state: str,
+        reason_code: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        names = {
+            "#state": "state",
+            "#attempt": "attemptId",
+            "#fence": "fence",
+            "#lease": "leaseUntil",
+        }
+        values: dict[str, Any] = {
+            ":claimed": {"S": "CLAIMED"},
+            ":attempt": {"S": attempt_id},
+            ":fence": {"N": str(fence)},
+            ":state": {"S": state},
+            ":now": {"N": str(self.clock())},
+        }
+        update = "SET #state = :state REMOVE #attempt, #lease"
+
+        if reason_code is not None and message is not None:
+            names.update({"#reason": "failureReason", "#message": "failureMessage"})
+            values.update(
+                {
+                    ":reason": {"S": reason_code},
+                    ":message": {"S": message},
+                }
+            )
+            update = (
+                "SET #state = :state, #reason = :reason, #message = :message "
+                "REMOVE #attempt, #lease"
+            )
+
+        try:
+            self.client.update_item(
+                TableName=self.frontier_table_name,
+                Key={"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
+                UpdateExpression=update,
+                ConditionExpression=(
+                    "#state = :claimed AND #attempt = :attempt "
+                    "AND #fence = :fence AND #lease > :now"
+                ),
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+        except ClientError as error:
+            if is_conditional_failure(error) or is_transaction_canceled(error):
+                raise TaskClaimLostError("page-task claim is no longer owned") from error
+            raise
+
+    def _release(self, claim: TaskClaim) -> None:
+        now = self.clock()
+        message_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                (
+                    f"capture-page:{claim.task.archive_id}:{claim.task.url_key}:"
+                    f"{claim.attempt_id}:{claim.fence}"
+                ),
+            )
+        )
+        occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
+
+        transaction = [
+            {
+                "ConditionCheck": {
+                    "TableName": self.runs_table_name,
+                    "Key": {"archiveId": {"S": claim.task.archive_id}},
+                    "ConditionExpression": "#admission = :open",
+                    "ExpressionAttributeNames": {"#admission": "admission"},
+                    "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self.frontier_table_name,
+                    "Key": {
+                        "archiveId": {"S": claim.task.archive_id},
+                        "urlKey": {"S": claim.task.url_key},
+                    },
+                    "UpdateExpression": "SET #state = :pending REMOVE #attempt, #lease",
+                    "ConditionExpression": (
+                        "#state = :claimed AND #attempt = :attempt "
+                        "AND #fence = :fence AND #lease > :now"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#state": "state",
+                        "#attempt": "attemptId",
+                        "#fence": "fence",
+                        "#lease": "leaseUntil",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":pending": {"S": "PENDING"},
+                        ":claimed": {"S": "CLAIMED"},
+                        ":attempt": {"S": claim.attempt_id},
+                        ":fence": {"N": str(claim.fence)},
+                        ":now": {"N": str(now)},
+                    },
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self.outbox_table_name,
+                    "Item": {
+                        "messageId": {"S": message_id},
+                        "correlationId": {"S": claim.task.archive_id},
+                        "type": {"S": "CapturePage"},
+                        "version": {"N": "1"},
+                        "occurredAt": {"S": occurred_at},
+                        "payload": {
+                            "M": {
+                                "archiveId": {"S": claim.task.archive_id},
+                                "urlKey": {"S": claim.task.url_key},
+                            }
+                        },
+                        "status": {"S": "PENDING"},
+                        "attempts": {"N": "0"},
+                        "nextAttemptAt": {"N": str(now)},
+                    },
+                    "ConditionExpression": "attribute_not_exists(#message_id)",
+                    "ExpressionAttributeNames": {"#message_id": "messageId"},
+                }
+            },
+        ]
+
+        try:
+            # The conditional outbox Put is the idempotency guard for release retries.
+            self._transact(transaction, None)
+        except ConditionalWriteRejected as error:
+            existing = self._read_outbox(message_id)
+
+            if existing is None:
+                raise TaskClaimLostError("page-task claim is no longer releasable") from error
+
+            if not self._is_release_message(existing, claim):
+                raise RuntimeError("CapturePage outbox message identity collision") from error
+
+    @staticmethod
+    def _is_release_message(item: dict[str, Any], claim: TaskClaim) -> bool:
+        payload = item.get("payload", {}).get("M", {})
+
+        return (
+            item.get("correlationId", {}).get("S") == claim.task.archive_id
+            and item.get("type", {}).get("S") == "CapturePage"
+            and payload.get("archiveId", {}).get("S") == claim.task.archive_id
+            and payload.get("urlKey", {}).get("S") == claim.task.url_key
+        )
+
+    def _read_outbox(self, message_id: str) -> dict[str, Any] | None:
+        response = self.client.get_item(
+            TableName=self.outbox_table_name,
+            Key={"messageId": {"S": message_id}},
+            ConsistentRead=True,
+        )
+
+        item = response.get("Item")
+
+        return item if item else None
+
+    def _claim(self, archive_id: str, url_key: str, attempt_id: str) -> TaskClaim | None:
+        now = self.clock()
+        lease_until = now + self.lease_duration
+
+        transaction = [
+            {
+                "ConditionCheck": {
+                    "TableName": self.runs_table_name,
+                    "Key": {"archiveId": {"S": archive_id}},
+                    "ConditionExpression": "#admission = :open",
+                    "ExpressionAttributeNames": {"#admission": "admission"},
+                    "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self.frontier_table_name,
+                    "Key": {
+                        "archiveId": {"S": archive_id},
+                        "urlKey": {"S": url_key},
+                    },
+                    "UpdateExpression": (
+                        "SET #state = :claimed, #attempt = :attempt, "
+                        "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one"
+                    ),
+                    "ConditionExpression": (
+                        "#state = :pending OR (#state = :claimed AND #lease <= :now)"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#state": "state",
+                        "#attempt": "attemptId",
+                        "#lease": "leaseUntil",
+                        "#fence": "fence",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":pending": {"S": "PENDING"},
+                        ":claimed": {"S": "CLAIMED"},
+                        ":attempt": {"S": attempt_id},
+                        ":lease": {"N": str(lease_until)},
+                        ":now": {"N": str(now)},
+                        ":zero": {"N": "0"},
+                        ":one": {"N": "1"},
+                    },
+                }
+            },
+        ]
+
+        try:
+            self._transact(transaction, str(uuid4()))
+        except ConditionalWriteRejected:
+            return None
+
+        item = self._read_frontier(archive_id, url_key)
+
+        if item is None or item.get("attemptId", {}).get("S") != attempt_id:
+            return None
+
+        return claim_from_item(archive_id, url_key, item)
+
+    def _renew(self, claim: TaskClaim) -> TaskClaim:
+        now = self.clock()
+        lease_until = now + self.lease_duration
+
+        request_token = str(uuid4())
+
+        transaction = [
+            {
+                "ConditionCheck": {
+                    "TableName": self.runs_table_name,
+                    "Key": {"archiveId": {"S": claim.task.archive_id}},
+                    "ConditionExpression": "#admission = :open",
+                    "ExpressionAttributeNames": {"#admission": "admission"},
+                    "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self.frontier_table_name,
+                    "Key": {
+                        "archiveId": {"S": claim.task.archive_id},
+                        "urlKey": {"S": claim.task.url_key},
+                    },
+                    "UpdateExpression": "SET #lease = :lease",
+                    "ConditionExpression": (
+                        "#state = :claimed AND #attempt = :attempt "
+                        "AND #fence = :fence AND #lease > :now"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#state": "state",
+                        "#attempt": "attemptId",
+                        "#fence": "fence",
+                        "#lease": "leaseUntil",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":claimed": {"S": "CLAIMED"},
+                        ":attempt": {"S": claim.attempt_id},
+                        ":fence": {"N": str(claim.fence)},
+                        ":lease": {"N": str(lease_until)},
+                        ":now": {"N": str(now)},
+                    },
+                }
+            },
+        ]
+
+        try:
+            self._transact(transaction, request_token)
+        except ConditionalWriteRejected as error:
+            raise TaskClaimLostError("page-task claim is no longer owned") from error
+
+        item = self._read_frontier(claim.task.archive_id, claim.task.url_key)
+
+        if item is None:
+            raise TaskClaimLostError("page-task disappeared after lease renewal")
+
+        renewed = claim_from_item(
+            claim.task.archive_id,
+            claim.task.url_key,
+            item,
+        )
+
+        if renewed.attempt_id != claim.attempt_id or renewed.fence != claim.fence:
+            raise TaskClaimLostError("page-task ownership changed after lease renewal")
+
+        return renewed
+
+    def _transact(
+        self,
+        items: list[dict[str, Any]],
+        request_token: str | None,
+    ) -> None:
+        for attempt in range(5):
+            try:
+                request: dict[str, Any] = {"TransactItems": items}
+
+                if request_token is not None:
+                    request["ClientRequestToken"] = request_token
+
+                self.client.transact_write_items(**request)
+
+                return
+            except ClientError as error:
+                if not is_transaction_canceled(error):
+                    raise
+
+                codes = extract_cancellation_reasons(error)
+
+                if "ConditionalCheckFailed" in codes:
+                    raise ConditionalWriteRejected from error
+
+                if "TransactionConflict" not in codes or attempt == 4:
+                    raise
+
+                time.sleep(0.01 * (2**attempt))
+
+    def _read_frontier(self, archive_id: str, url_key: str) -> dict[str, Any] | None:
+        response = self.client.get_item(
+            TableName=self.frontier_table_name,
+            Key={
+                "archiveId": {"S": archive_id},
+                "urlKey": {"S": url_key},
+            },
+            ConsistentRead=True,
+        )
+
+        item = response.get("Item")
+
+        return item if item else None

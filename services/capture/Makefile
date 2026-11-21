@@ -3,17 +3,26 @@
 install:
 	uv sync --all-groups
 
-fmt:
-	uv run ruff format .
-	uv run ruff check --fix .
+
+db-up:
+	docker compose up -d --wait dynamodb
+
+db-down:
+	docker compose down
+
 
 test-unit:
 	uv run pytest -m "not integration"
 
 test-integration:
-	uv run pytest -m integration
+	DYNAMODB_ENDPOINT_URL=http://localhost:8000 uv run pytest -m integration
 
 test: test-unit test-integration
+
+
+fmt:
+	uv run ruff format .
+	uv run ruff check --fix .
 
 check:
 	uv run ruff check .

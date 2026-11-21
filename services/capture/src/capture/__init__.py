@@ -6,12 +6,12 @@ from capture.browser import (
     CaptureNavigationFailed,
     CaptureRecordingFailed,
     InvalidCaptureURL,
-    PageCapture,
     UnsafeCaptureRequest,
     capture_page,
     extract_links,
     extract_redirect_chain,
 )
+from domain import PageCapture
 
 __all__ = [
     "CaptureDownloadFailed",
