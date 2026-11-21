@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import pytest
 from support.dynamodb import FakeClock
@@ -39,7 +40,7 @@ def outbox_item(next_attempt_at: float, status: str = OUTBOX_PENDING) -> dict:
     }
 
 
-async def test_claim_returns_due_message_and_acquires_delivery_lease(dynamodb_client) -> None:
+async def test_claim_returns_due_message_and_acquires_delivery_lease(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
@@ -72,7 +73,7 @@ async def test_claim_returns_due_message_and_acquires_delivery_lease(dynamodb_cl
     assert item["attempts"] == {"N": "1"}
 
 
-async def test_claim_skips_messages_that_are_not_due(dynamodb_client) -> None:
+async def test_claim_skips_messages_that_are_not_due(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() + 10))
@@ -87,7 +88,7 @@ async def test_claim_skips_messages_that_are_not_due(dynamodb_client) -> None:
     assert stored_item(client)["status"] == {"S": OUTBOX_PENDING}
 
 
-async def test_confirm_marks_the_message_delivered(dynamodb_client) -> None:
+async def test_confirm_marks_the_message_delivered(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
@@ -109,7 +110,7 @@ async def test_confirm_marks_the_message_delivered(dynamodb_client) -> None:
     assert "leaseToken" not in item
 
 
-async def test_reschedule_returns_message_to_pending_after_delay(dynamodb_client) -> None:
+async def test_reschedule_returns_message_to_pending_after_delay(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
@@ -143,7 +144,7 @@ async def test_reschedule_returns_message_to_pending_after_delay(dynamodb_client
 
 
 async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     clock = FakeClock()
     client = dynamodb_client
@@ -171,7 +172,7 @@ async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(
     assert stored_item(client)["status"] == {"S": OUTBOX_PUBLISHED}
 
 
-async def test_stale_lease_cannot_reschedule_a_reclaimed_message(dynamodb_client) -> None:
+async def test_stale_lease_cannot_reschedule_a_reclaimed_message(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
@@ -197,7 +198,7 @@ async def test_stale_lease_cannot_reschedule_a_reclaimed_message(dynamodb_client
 
 
 async def test_expired_lease_cannot_confirm_after_expiry(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     clock = FakeClock()
     client = dynamodb_client
@@ -221,7 +222,7 @@ async def test_expired_lease_cannot_confirm_after_expiry(
 
 
 async def test_expired_lease_cannot_reschedule_after_expiry(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     clock = FakeClock()
     client = dynamodb_client
