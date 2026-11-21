@@ -18,7 +18,23 @@ const env = {
   rabbitUrl: process.env.SEARCH_TEST_RABBITMQ_URL ?? "amqp://castellani:local-development-only@rabbitmq:5672/",
   exchange: "castellani.events",
   bucket: "castellani-archive-artifacts",
+  openSearchUrl:
+    process.env.SEARCH_TEST_OPENSEARCH_URL ?? "http://ministack-opensearch-281afe4a44d7-castellani-search:9200",
+  index: "snapshots-v1",
 };
+
+/**
+ * Deletes a snapshot's document straight from OpenSearch, bypassing Search,
+ * as a lost or rebuilt index would. The ledger still records it `INDEXED`.
+ */
+export async function loseDocument(archiveId: string, snapshotId: string): Promise<void> {
+  const id = encodeURIComponent(`${archiveId}/${snapshotId}`);
+  const response = await fetch(`${env.openSearchUrl}/${env.index}/_doc/${id}?refresh=true`, { method: "DELETE" });
+
+  if (!response.ok) {
+    throw new Error(`could not delete document ${id}: HTTP ${String(response.status)}`);
+  }
+}
 
 const s3 = new S3Client({
   region: "us-east-1",
@@ -121,10 +137,15 @@ export type SnapshotEntry = {
  * Stores the final manifest for `entries` and publishes `CrawlCompleted`,
  * as Capture does when the frontier closes. Returns the manifest digest.
  */
-export async function completeCrawl(archiveId: string, entries: SnapshotEntry[]): Promise<string> {
+export async function completeCrawl(
+  archiveId: string,
+  entries: SnapshotEntry[],
+  options: { collectionId?: string } = {},
+): Promise<string> {
   const manifest = {
     schemaVersion: 1,
     archiveId,
+    ...(options.collectionId !== undefined ? { collectionId: options.collectionId } : {}),
     normalizerVersion: "1",
     seedUrl: "https://example.org/",
     createdAt: new Date().toISOString(),

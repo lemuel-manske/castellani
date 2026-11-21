@@ -13,6 +13,7 @@ export type Config = {
   inboxRetentionMs: number;
   claimLeaseMs: number;
   reconcileIntervalMs: number;
+  repairIntervalMs: number;
   outboxIntervalMs: number;
   maxDocumentAttempts: number;
   maxArtifactBytes: number;
@@ -49,6 +50,7 @@ export function loadConfig(env: Environment): Config {
     inboxRetentionMs: duration(env, "SEARCH_INBOX_RETENTION_MS", 7 * 24 * 60 * 60 * 1_000),
     claimLeaseMs: duration(env, "SEARCH_CLAIM_LEASE_MS", 120_000),
     reconcileIntervalMs: duration(env, "SEARCH_RECONCILE_INTERVAL_MS", 30_000),
+    repairIntervalMs: duration(env, "SEARCH_REPAIR_INTERVAL_MS", 60 * 60 * 1_000),
     outboxIntervalMs: duration(env, "SEARCH_OUTBOX_INTERVAL_MS", 5_000),
     maxDocumentAttempts: integer(env, "SEARCH_MAX_DOCUMENT_ATTEMPTS", 3),
     maxArtifactBytes: integer(env, "SEARCH_MAX_ARTIFACT_BYTES", 64 * 1024 * 1024),

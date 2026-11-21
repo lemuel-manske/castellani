@@ -11,6 +11,7 @@ import {
   deadLettered,
   inboxRecord,
   ledgerReaches,
+  loseDocument,
   observe,
   outboxRecord,
   publish,
@@ -246,6 +247,39 @@ describe("manifest reconciliation through the running stack", () => {
     });
     // SearchReady promises searchable visibility: no polling needed.
     const response = await search({ q: word });
+    expect(response.body.results.map((r) => r.snapshotId)).toEqual([entry.snapshotId]);
+  });
+});
+
+describe("collections and repair through the running stack", () => {
+  test("a collection filter returns the snapshots of archives in that collection", async () => {
+    const archiveId = newArchive();
+    const collectionId = unique("collection-");
+    const word = unique("gathered");
+    await completeCrawl(archiveId, [await capturePage(archiveId, word)], { collectionId });
+    await publishArchive(archiveId);
+
+    const inCollection = await searchUntil({ q: word, collectionId }, (r) => r.body.results.length > 0);
+    const elsewhere = await search({ q: word, collectionId: unique("collection-") });
+
+    expect(inCollection.body.results).toEqual([expect.objectContaining({ archiveId, collectionId })]);
+    expect(elsewhere.body.results).toHaveLength(0);
+  });
+
+  test("a document lost from the index is restored by the next reconciliation", async () => {
+    const archiveId = newArchive();
+    const word = unique("restored");
+    const entry = await capturePage(archiveId, word);
+    await archiveAndPublish(archiveId, [entry]);
+    await searchUntil({ q: word }, (r) => r.body.results.length > 0);
+
+    await loseDocument(archiveId, entry.snapshotId);
+    expect((await search({ q: word })).body.results).toHaveLength(0);
+    // Any recorded fact requests reconciliation; the periodic repair sweep
+    // would do the same without one.
+    await publish(archiveEvent("ArchivePublished", archiveId, PACKAGE));
+
+    const response = await searchUntil({ q: word }, (r) => r.body.results.length > 0);
     expect(response.body.results.map((r) => r.snapshotId)).toEqual([entry.snapshotId]);
   });
 });

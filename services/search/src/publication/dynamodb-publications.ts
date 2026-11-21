@@ -3,11 +3,13 @@ import {
   type DynamoDBDocumentClient,
   GetCommand,
   QueryCommand,
+  ScanCommand,
   TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 import type {
+  ArchivePage,
   ArchiveState,
   ArchiveVisibility,
   ArtifactRef,
@@ -145,6 +147,28 @@ export class DynamoPublications implements ArchiveVisibility {
     );
 
     return (response.Items ?? []).map((item) => String(item.archiveId));
+  }
+
+  /**
+   * Scans for archives with a recorded manifest. `next` is the last archive ID
+   * of the page, since the table's key is `archiveId` alone.
+   */
+  async archivesWithManifest(limit: number, after?: string): Promise<ArchivePage> {
+    const response = await this.client.send(
+      new ScanCommand({
+        TableName: this.table,
+        Limit: limit,
+        ProjectionExpression: "archiveId",
+        FilterExpression: "attribute_exists(manifestDigest)",
+        ...(after !== undefined ? { ExclusiveStartKey: { archiveId: after } } : {}),
+      }),
+    );
+    const last: unknown = response.LastEvaluatedKey?.archiveId;
+
+    return {
+      archiveIds: (response.Items ?? []).map((item) => String(item.archiveId)),
+      ...(typeof last === "string" ? { next: last } : {}),
+    };
   }
 
   async clearReconcile(archiveId: string, requests: number): Promise<boolean> {

@@ -2,7 +2,7 @@ import { Client, errors } from "@opensearch-project/opensearch";
 
 import { type DocumentIndex, type SnapshotDocument, DocumentError, documentId } from "../indexing/model.js";
 import type { ArchiveIndex } from "../publication/handler.js";
-import type { SnapshotReveal } from "../reconciliation/reconciler.js";
+import type { RevealScope, SnapshotReveal } from "../reconciliation/reconciler.js";
 import { type SortKey, decodeCursor, encodeCursor } from "./cursor.js";
 import { type SearchQuery, fingerprint } from "./query.js";
 
@@ -197,13 +197,18 @@ export class OpenSearchIndex implements DocumentIndex, ArchiveIndex, SnapshotRev
     }
   }
 
-  /** Bulk-reveals snapshots and refreshes, so they are searchable on return. */
-  async reveal(archiveId: string, snapshotIds: string[]): Promise<void> {
+  /**
+   * Bulk-reveals snapshots, stamping the archive's collection from its
+   * manifest, and refreshes, so they are searchable on return.
+   */
+  async reveal(archiveId: string, snapshotIds: string[], scope: RevealScope = {}): Promise<void> {
+    const fields = { visible: true, ...(scope.collectionId !== undefined ? { collectionId: scope.collectionId } : {}) };
+
     for (let start = 0; start < snapshotIds.length; start += 500) {
       const batch = snapshotIds.slice(start, start + 500);
       const body = batch.flatMap((id) => [
         { update: { _index: this.index, _id: documentId(archiveId, id), retry_on_conflict: 3 } },
-        { doc: { visible: true } },
+        { doc: fields },
       ]);
       const response = await this.client.bulk({ body, refresh: true });
       const failures = (response.body.items as BulkItem[])
@@ -216,6 +221,31 @@ export class OpenSearchIndex implements DocumentIndex, ArchiveIndex, SnapshotRev
         );
       }
     }
+  }
+
+  /** The snapshots of the archive that have a document in the index. */
+  async present(archiveId: string, snapshotIds: string[]): Promise<Set<string>> {
+    const found = new Set<string>();
+
+    for (let start = 0; start < snapshotIds.length; start += 500) {
+      const batch = snapshotIds.slice(start, start + 500);
+      const response = await this.client.mget({
+        index: this.index,
+        _source: false,
+        body: { ids: batch.map((id) => documentId(archiveId, id)) },
+      });
+      const docs = response.body.docs as { found?: boolean }[];
+
+      docs.forEach((doc, position) => {
+        const snapshotId = batch[position];
+
+        if (doc.found === true && snapshotId !== undefined) {
+          found.add(snapshotId);
+        }
+      });
+    }
+
+    return found;
   }
 
   async remove(archiveId: string, snapshotId: string): Promise<void> {

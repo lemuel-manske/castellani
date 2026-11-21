@@ -14,7 +14,7 @@ import { DynamoOutbox } from "./outbox/dynamodb-outbox.js";
 import { type EventPublisher, OutboxDispatcher } from "./outbox/outbox.js";
 import { DynamoPublications } from "./publication/dynamodb-publications.js";
 import { PublicationHandler } from "./publication/handler.js";
-import { ReconcileScheduler, Reconciler } from "./reconciliation/reconciler.js";
+import { ReconcileScheduler, Reconciler, RepairSweep } from "./reconciliation/reconciler.js";
 import { OpenSearchIndex } from "./search/opensearch.js";
 
 /** How long a dispatcher holds an outbox record while awaiting the broker's confirm. */
@@ -74,18 +74,14 @@ async function main(): Promise<void> {
     log,
   );
 
-  const publication = new PublicationHandler(
-    visibility,
-    index,
-    {
-      // Durable first, so the periodic pass finds the request after a crash.
-      request: async (archiveId) => {
-        await visibility.requestReconcile(archiveId);
-        scheduler.schedule(archiveId);
-      },
-    },
-    reconciler,
-  );
+  // Durable first, so the periodic pass finds the request after a crash.
+  const requestReconcile = async (archiveId: string): Promise<void> => {
+    await visibility.requestReconcile(archiveId);
+    scheduler.schedule(archiveId);
+  };
+  const repair = new RepairSweep(visibility, requestReconcile, config.repairIntervalMs, log);
+
+  const publication = new PublicationHandler(visibility, index, { request: requestReconcile }, reconciler);
 
   const consumer: Consumer = new Consumer(
     {
@@ -145,7 +141,7 @@ async function main(): Promise<void> {
     indexReady = true;
     log.info({ index: config.openSearchIndex }, "search index ready");
 
-    await Promise.all([consumer.run(), scheduler.run(), dispatcher.run()]);
+    await Promise.all([consumer.run(), scheduler.run(), dispatcher.run(), repair.run()]);
   })();
 
   const shutdown = async (signal: string): Promise<void> => {
@@ -161,6 +157,7 @@ async function main(): Promise<void> {
     await app.close();
     scheduler.stop();
     dispatcher.stop();
+    repair.stop();
     await consumer.stop();
     await running.catch(() => undefined);
     s3.destroy();

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 
 import { RejectedEventError } from "../src/indexing/indexer.js";
+import { RepairSweep } from "../src/reconciliation/reconciler.js";
 import { PACKAGE, searchService } from "./support/archive.js";
+import { MemoryVisibility } from "./support/doubles.js";
 
 describe("manifest reconciliation", () => {
   test("a manifest snapshot whose PageCaptured was lost is indexed from the manifest", async () => {
@@ -195,5 +197,87 @@ describe("search readiness", () => {
     expect(service.events.ofType("SearchIndexingCompleted")).toEqual([]);
     expect(service.events.ofType("SearchReady")).toEqual([]);
     expect(service.index.documents.size).toBe(0);
+  });
+});
+
+describe("collections", () => {
+  test("revealed snapshots carry the collection of their manifest", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    const ref = service.storeManifest("archive-1", [page], "archive-1", "collection-7");
+    await service.publication.crawlCompleted("archive-1", ref, "sha256:manifest-1");
+
+    await service.publish("archive-1");
+
+    expect(service.index.document(page.entry.snapshotId)).toMatchObject({
+      collectionId: "collection-7",
+      visible: true,
+    });
+  });
+});
+
+describe("ledger and index divergence repair", () => {
+  test("an indexed snapshot whose document was lost from the index is reindexed and stays searchable", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.publish("archive-1");
+    service.index.lose("archive-1", page.entry.snapshotId);
+
+    await service.reconciler.reconcile("archive-1");
+
+    expect(service.index.searchable()).toEqual([page.entry.snapshotId]);
+    expect(service.ledger.statusOf(page.event)).toBe("INDEXED");
+  });
+
+  test("a repaired archive does not report indexing completion or readiness again", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.publish("archive-1");
+    service.index.lose("archive-1", page.entry.snapshotId);
+
+    await service.reconciler.reconcile("archive-1");
+
+    expect(service.events.ofType("SearchIndexingCompleted")).toHaveLength(1);
+    expect(service.events.ofType("SearchReady")).toHaveLength(1);
+  });
+
+  test("an unavailable index leaves the reconciliation pending without reopening any snapshot", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.visibility.requestReconcile("archive-1");
+    service.index.offline = true;
+
+    await expect(service.reconciler.reconcile("archive-1")).rejects.toThrow("ECONNREFUSED");
+
+    expect(service.ledger.statusOf(page.event)).toBe("INDEXED");
+    expect(service.visibility.isPending("archive-1")).toBe(true);
+  });
+
+  test("the repair sweep requests reconciliation of every archive with a manifest, across pages", async () => {
+    const visibility = new MemoryVisibility();
+    const ref = { bucket: "b", key: "k", sha256: "0".repeat(64), sizeBytes: 1 };
+
+    for (let n = 0; n < 150; n += 1) {
+      await visibility.recordManifest(`archive-${String(n)}`, { digest: "sha256:m", ref, expected: 1 });
+    }
+    await visibility.recordDecision("archive-without-manifest", PACKAGE);
+    const requested: string[] = [];
+    const sweep = new RepairSweep(
+      visibility,
+      (archiveId) => {
+        requested.push(archiveId);
+
+        return Promise.resolve();
+      },
+      60_000,
+      { warn: () => undefined },
+    );
+
+    expect(await sweep.sweep()).toBe(150);
+    expect(new Set(requested).size).toBe(150);
+    expect(requested).not.toContain("archive-without-manifest");
   });
 });

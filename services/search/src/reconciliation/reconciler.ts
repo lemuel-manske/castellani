@@ -29,16 +29,24 @@ export type ManifestEntry = {
   warcArtifacts: ArtifactRef[];
 };
 
-export type Manifest = { archiveId: string; snapshots: ManifestEntry[] };
+export type Manifest = { archiveId: string; collectionId?: string; snapshots: ManifestEntry[] };
 
 export interface ManifestParser {
   parseManifest(document: unknown): Manifest;
 }
 
+/** Archive-level fields stamped on documents when they are revealed. */
+export type RevealScope = { collectionId?: string };
+
 export interface SnapshotReveal {
   /** Marks indexed snapshots of the archive searchable; missing documents are skipped. */
-  reveal(archiveId: string, snapshotIds: string[]): Promise<void>;
+  reveal(archiveId: string, snapshotIds: string[], scope?: RevealScope): Promise<void>;
+  /** The snapshots of the archive that currently have a search document. */
+  present(archiveId: string, snapshotIds: string[]): Promise<Set<string>>;
 }
+
+/** Reason recorded on a ledger entry reopened by divergence repair. */
+export const MISSING_DOCUMENT_REASON = "search document missing from the index";
 
 export type ReconcileResult = "compensated" | "no-manifest" | "incomplete" | "complete";
 
@@ -49,10 +57,13 @@ type Logger = { warn(object: object, message: string): void };
  * (ADR-0019). Every step is idempotent, so reconciliation can be triggered by
  * events, repeated periodically, and run concurrently by several replicas:
  *
- * 1. Index manifest snapshots without a terminal ledger outcome from the
+ * 1. Repair divergence: a snapshot the ledger records as `INDEXED` whose
+ *    document is missing from OpenSearch (lost or rebuilt index) is reopened.
+ *    Then index manifest snapshots without a terminal ledger outcome from the
  *    manifest's own artifact references, recovering lost `PageCaptured`.
- * 2. When the archive is published, reveal its indexed manifest snapshots.
- *    Snapshots outside the manifest are never revealed.
+ * 2. When the archive is published, reveal its indexed manifest snapshots,
+ *    stamped with the manifest's collection. Snapshots outside the manifest
+ *    are never revealed.
  * 3. Once every manifest snapshot is terminal, report `SearchIndexingCompleted`;
  *    once that holds and the archive is published, report `SearchReady`. Each
  *    report and its outbox record are written in one transaction.
@@ -112,13 +123,14 @@ export class Reconciler {
 
     const manifest = await this.loadManifest(state.manifest.ref, archiveId);
     const ids = manifest.snapshots.map((entry) => entry.snapshotId);
-    const recorded = await this.ledger.statuses(archiveId, ids);
+    const recorded = await this.repairDivergence(archiveId, await this.ledger.statuses(archiveId, ids));
     const statuses = await this.indexMissing(manifest, state.manifest.digest, recorded);
 
     if (isVisible(state)) {
       await this.index.reveal(
         archiveId,
         ids.filter((id) => statuses.get(id) === "INDEXED"),
+        manifest.collectionId !== undefined ? { collectionId: manifest.collectionId } : {},
       );
     }
 
@@ -131,6 +143,39 @@ export class Reconciler {
     await this.visibility.clearReconcile(archiveId, state.reconcileRequests);
 
     return "complete";
+  }
+
+  /**
+   * Neither DynamoDB nor OpenSearch alone proves the other succeeded: reopens
+   * `INDEXED` snapshots whose document is gone, so they are indexed again.
+   */
+  private async repairDivergence(
+    archiveId: string,
+    statuses: Map<string, LedgerStatus>,
+  ): Promise<Map<string, LedgerStatus>> {
+    const indexed = [...statuses].filter(([, status]) => status === "INDEXED").map(([id]) => id);
+
+    if (indexed.length === 0) {
+      return statuses;
+    }
+
+    const present = await this.index.present(archiveId, indexed);
+    const lost = indexed.filter((id) => !present.has(id));
+
+    if (lost.length === 0) {
+      return statuses;
+    }
+
+    this.log.warn({ archiveId, snapshotIds: lost }, "indexed snapshots missing from the search index; reindexing");
+    await this.ledger.reopen(archiveId, lost, MISSING_DOCUMENT_REASON, this.clock());
+
+    const repaired = new Map(statuses);
+
+    for (const id of lost) {
+      repaired.set(id, "PENDING");
+    }
+
+    return repaired;
   }
 
   private async indexMissing(
@@ -236,6 +281,69 @@ function countOutcomes(ids: string[], statuses: Map<string, LedgerStatus>): Inde
   }
 
   return counts;
+}
+
+/**
+ * Periodically requests reconciliation of every archive with a manifest, so
+ * divergence between the ledger and OpenSearch (a lost or rebuilt index, a
+ * deleted document) is repaired even when no event arrives. The first pass
+ * runs at startup. Requests are idempotent and served by the scheduler.
+ */
+export class RepairSweep {
+  private readonly sleeper = new Wakeable();
+  private stopping = false;
+
+  constructor(
+    private readonly visibility: Pick<ArchiveVisibility, "archivesWithManifest">,
+    private readonly request: (archiveId: string) => Promise<void>,
+    private readonly intervalMs: number,
+    private readonly log: Logger,
+  ) {}
+
+  async run(): Promise<void> {
+    while (!this.isStopping()) {
+      try {
+        await this.sweep();
+      } catch (error) {
+        this.log.warn({ err: error }, "repair sweep failed; retrying on the next pass");
+      }
+
+      await this.sleeper.sleep(this.intervalMs);
+    }
+  }
+
+  stop(): void {
+    this.stopping = true;
+    this.sleeper.wake();
+  }
+
+  /** One pass over every archive with a manifest. Returns how many were requested. */
+  async sweep(): Promise<number> {
+    let requested = 0;
+    let after: string | undefined;
+
+    do {
+      const page = await this.visibility.archivesWithManifest(100, after);
+
+      for (const archiveId of page.archiveIds) {
+        if (this.isStopping()) {
+          return requested;
+        }
+
+        await this.request(archiveId);
+        requested += 1;
+      }
+
+      after = page.next;
+    } while (after !== undefined);
+
+    return requested;
+  }
+
+  /** Read through a method: `stop()` flips the flag concurrently with `run()`. */
+  private isStopping(): boolean {
+    return this.stopping;
+  }
 }
 
 /**

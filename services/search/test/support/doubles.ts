@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { verify } from "../../src/indexing/s3-artifacts.js";
 import {
+  type ArchivePage,
   type ArchiveState,
   type ArchiveVisibility,
   type ArtifactRef,
@@ -22,7 +23,7 @@ import {
 } from "../../src/indexing/model.js";
 import type { EventPublisher, OutboxClaim, OutboxStore, OutgoingEvent } from "../../src/outbox/outbox.js";
 import type { ArchiveIndex } from "../../src/publication/handler.js";
-import type { SnapshotReveal } from "../../src/reconciliation/reconciler.js";
+import type { RevealScope, SnapshotReveal } from "../../src/reconciliation/reconciler.js";
 
 type Entry = { status: LedgerStatus; attempts: number; token?: string; reason?: string };
 
@@ -75,6 +76,19 @@ export class MemoryLedger implements Ledger {
     }
 
     return Promise.resolve(result);
+  }
+
+  reopen(archiveId: string, snapshotIds: string[], reason: string): Promise<void> {
+    for (const snapshotId of snapshotIds) {
+      const key = keyOf({ archiveId, snapshotId });
+      const entry = this.entries.get(key);
+
+      if (entry?.status === "INDEXED") {
+        this.entries.set(key, { status: "PENDING", attempts: 0, reason });
+      }
+    }
+
+    return Promise.resolve();
   }
 
   /** Simulates another worker holding a live claim on the snapshot. */
@@ -154,16 +168,31 @@ export class RecordingIndex implements DocumentIndex, ArchiveIndex, SnapshotReve
     return Promise.resolve();
   }
 
-  reveal(archiveId: string, snapshotIds: string[]): Promise<void> {
+  reveal(archiveId: string, snapshotIds: string[], scope: RevealScope = {}): Promise<void> {
     for (const id of snapshotIds.map((snapshotId) => documentId(archiveId, snapshotId))) {
       const document = this.documents.get(id);
 
       if (document) {
-        this.documents.set(id, { ...document, visible: true });
+        this.documents.set(id, { ...document, ...scope, visible: true });
       }
     }
 
     return Promise.resolve();
+  }
+
+  present(archiveId: string, snapshotIds: string[]): Promise<Set<string>> {
+    if (this.offline) {
+      return Promise.reject(new Error("connect ECONNREFUSED opensearch:9200"));
+    }
+
+    return Promise.resolve(
+      new Set(snapshotIds.filter((snapshotId) => this.documents.has(documentId(archiveId, snapshotId)))),
+    );
+  }
+
+  /** Simulates a document lost from the index, as after an index rebuild. */
+  lose(archiveId: string, snapshotId: string): void {
+    this.documents.delete(documentId(archiveId, snapshotId));
   }
 
   remove(archiveId: string, snapshotId: string): Promise<void> {
@@ -269,6 +298,18 @@ export class MemoryVisibility implements ArchiveVisibility {
 
   pendingReconciliations(limit: number): Promise<string[]> {
     return Promise.resolve([...this.pending].slice(0, limit));
+  }
+
+  archivesWithManifest(limit: number, after?: string): Promise<ArchivePage> {
+    const ids = [...this.states.values()].filter((s) => s.manifest !== undefined).map((s) => s.archiveId);
+    const start = after === undefined ? 0 : ids.indexOf(after) + 1;
+    const archiveIds = ids.slice(start, start + limit);
+    const last = archiveIds.at(-1);
+
+    return Promise.resolve({
+      archiveIds,
+      ...(start + limit < ids.length && last !== undefined ? { next: last } : {}),
+    });
   }
 
   clearReconcile(archiveId: string, requests: number): Promise<boolean> {

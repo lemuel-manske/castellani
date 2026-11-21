@@ -125,6 +125,34 @@ export class DynamoLedger implements Ledger {
     return result;
   }
 
+  async reopen(archiveId: string, snapshotIds: string[], reason: string, now: Date): Promise<void> {
+    for (const snapshotId of new Set(snapshotIds)) {
+      try {
+        await this.client.send(
+          new UpdateCommand({
+            TableName: this.table,
+            Key: { archiveId, snapshotId },
+            UpdateExpression: "SET #status = :pending, attempts = :zero, reason = :reason, updatedAt = :now",
+            ConditionExpression: "#status = :indexed",
+            ExpressionAttributeNames: { "#status": "status" },
+            ExpressionAttributeValues: {
+              ":pending": "PENDING",
+              ":indexed": "INDEXED",
+              ":zero": 0,
+              ":reason": reason,
+              ":now": now.toISOString(),
+            },
+          }),
+        );
+      } catch (error) {
+        // No longer INDEXED: another worker already reopened or re-indexed it.
+        if (!(error instanceof ConditionalCheckFailedException)) {
+          throw error;
+        }
+      }
+    }
+  }
+
   async release(claim: Claim, reason: string, now: Date): Promise<void> {
     await this.fenced(claim, "SET #status = :pending, reason = :reason, updatedAt = :now REMOVE leaseUntil", {
       ":pending": "PENDING",

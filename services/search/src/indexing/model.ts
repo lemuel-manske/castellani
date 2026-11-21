@@ -70,6 +70,12 @@ export interface Ledger {
   complete(claim: Claim, outcome: Outcome, now: Date): Promise<void>;
   /** Current status per snapshot of the archive; snapshots never claimed are absent. */
   statuses(archiveId: string, snapshotIds: string[]): Promise<Map<string, LedgerStatus>>;
+  /**
+   * Returns `INDEXED` snapshots to `PENDING` with fresh document attempts,
+   * because their search document was found missing. Snapshots in any other
+   * state are left untouched.
+   */
+  reopen(archiveId: string, snapshotIds: string[], reason: string, now: Date): Promise<void>;
 }
 
 /**
@@ -124,6 +130,9 @@ export type ArchiveState = {
   reconcileRequests: number;
 };
 
+/** A page of archive IDs; `next` resumes the listing after the last one. */
+export type ArchivePage = { archiveIds: string[]; next?: string };
+
 export type VisibilityResult = { kind: "recorded"; state: ArchiveState } | { kind: "conflict"; reason: string };
 
 /**
@@ -143,6 +152,8 @@ export interface ArchiveVisibility {
   requestReconcile(archiveId: string): Promise<void>;
   /** Archives with an outstanding reconciliation request. */
   pendingReconciliations(limit: number): Promise<string[]>;
+  /** One page of archives whose manifest is recorded, for the repair sweep. */
+  archivesWithManifest(limit: number, after?: string): Promise<ArchivePage>;
   /**
    * Clears the request only if no new request arrived since `requests` was
    * read, so a concurrent request is never lost. Returns whether it cleared.

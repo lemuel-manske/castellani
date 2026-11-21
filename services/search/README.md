@@ -23,11 +23,13 @@ An archive is published for search only when the manifest is known, the decision
 
 **Manifest reconciliation** ([ADR-0019](../../docs/adr/0019-incremental-indexing-completion.md)). `CrawlCompleted` reads the manifest from S3, verifies its SHA-256 and schema, records it, and requests reconciliation. Every recorded fact also requests it. A request is a durable flag on a sparse GSI (`reconcile-pending-index`), served promptly in-process and by a periodic pass (`SEARCH_RECONCILE_INTERVAL_MS`) that survives restarts. A pass:
 
-1. indexes every manifest snapshot without a terminal ledger outcome from the manifest's own artifact references, recovering lost `PageCaptured` events;
-2. when the archive is published, reveals its indexed manifest snapshots;
+1. reopens snapshots the ledger records as `INDEXED` whose document is missing from OpenSearch, then indexes every manifest snapshot without a terminal ledger outcome from the manifest's own artifact references, recovering lost `PageCaptured` events;
+2. when the archive is published, reveals its indexed manifest snapshots and stamps them with the manifest's `collectionId`;
 3. once every manifest snapshot is terminal, emits `SearchIndexingCompleted` (`expected`, `indexed`, `failed`, `unsupported`); once that holds and the archive is published, emits `SearchReady`.
 
 Both events have deterministic message IDs (`SearchIndexingCompleted:<archiveId>:<manifestDigest>`, `SearchReady:<archiveId>:<decisionVersion>`). Each report is recorded in `search_publications`, with the indexed counts, and written to the outbox in the same transaction. A pass with snapshots still in flight leaves the request pending. A request is cleared only if no new request arrived meanwhile, so a concurrent one is never lost.
+
+**Repair** ([ADR-0007](../../docs/adr/0007-opensearch-retrieval.md), [state-and-recovery](../../docs/backend/state-and-recovery.md#general-recovery-invariants)). Neither the ledger nor OpenSearch alone proves the other succeeded. Besides event-triggered passes, a repair sweep requests reconciliation of every archive with a manifest at startup and every `SEARCH_REPAIR_INTERVAL_MS`, so a lost or rebuilt index, or a deleted document, is restored from the immutable manifest without recapturing anything. Repair respects publication: a compensated archive is purged again, and an unpublished one stays hidden. Completion and readiness, already reported, are not reported again.
 
 **Compensation.** `ArchiveCompensationDecided` deletes the archive's documents, makes later `PageCaptured` events for it terminal (`DISCARDED`) without indexing, and then, in one transaction, records that the cleanup finished and enqueues `SearchCompensated` with the deterministic message ID `SearchCompensated:<archiveId>:<decisionVersion>`. A crash before that transaction re-runs the idempotent cleanup on redelivery; a repeated command enqueues nothing new. A compensated archive reports neither indexing completion nor readiness.
 
@@ -41,7 +43,7 @@ Both events have deterministic message IDs (`SearchIndexingCompleted:<archiveId>
 
 ## Known gaps
 
-- `collectionId` is accepted as a filter, but `PageCaptured` carries no collection, so it matches nothing yet.
+- The repair sweep scans `search_publications`; it is sized for local and small deployments.
 - MiniStack does not finish adding a GSI to an existing table. Adding one later needs the table recreated with `terraform apply -replace=<resource>`, or `docker compose down -v`.
 
 ## Configuration
@@ -62,6 +64,7 @@ Both events have deterministic message IDs (`SearchIndexingCompleted:<archiveId>
 | `SEARCH_INBOX_RETENTION_MS`    | `604800000`              | Inbox record lifetime (TTL cleanup)               |
 | `SEARCH_CLAIM_LEASE_MS`        | `120000`                 | Snapshot claim lease                              |
 | `SEARCH_RECONCILE_INTERVAL_MS` | `30000`                  | Periodic reconciliation pass                      |
+| `SEARCH_REPAIR_INTERVAL_MS`    | `3600000`                | Repair sweep over every archive with a manifest   |
 | `SEARCH_OUTBOX_INTERVAL_MS`    | `5000`                   | Periodic outbox dispatch pass                     |
 | `SEARCH_MAX_DOCUMENT_ATTEMPTS` | `3`                      | Attempts before a document error becomes `FAILED` |
 | `SEARCH_MAX_ARTIFACT_BYTES`    | `67108864`               | Larger artifacts are `UNSUPPORTED`                |

@@ -91,10 +91,16 @@ export function searchService() {
   }
 
   /** Writes the final manifest to the object store and returns its reference. */
-  function storeManifest(archiveId: string, pages: CapturedPage[], manifestArchiveId = archiveId): ArtifactRef {
+  function storeManifest(
+    archiveId: string,
+    pages: CapturedPage[],
+    manifestArchiveId = archiveId,
+    collectionId?: string,
+  ): ArtifactRef {
     const manifest = {
       schemaVersion: 1,
       archiveId: manifestArchiveId,
+      ...(collectionId !== undefined ? { collectionId } : {}),
       normalizerVersion: "1",
       seedUrl: "https://example.org/",
       createdAt: "2026-11-01T12:10:00Z",
