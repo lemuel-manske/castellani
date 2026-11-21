@@ -142,7 +142,9 @@ async def test_reschedule_returns_message_to_pending_after_delay(dynamodb_client
     assert stored_item(client)["attempts"] == {"N": "2"}
 
 
-async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(\n    dynamodb_client,\n) -> None:
+async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(
+    dynamodb_client,
+) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
@@ -194,7 +196,9 @@ async def test_stale_lease_cannot_reschedule_a_reclaimed_message(dynamodb_client
     assert stored_item(client)["leaseToken"] == {"S": "lease-2"}
 
 
-async def test_expired_lease_cannot_confirm_after_expiry(\n    dynamodb_client,\n) -> None:
+async def test_expired_lease_cannot_confirm_after_expiry(
+    dynamodb_client,
+) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
@@ -216,7 +220,9 @@ async def test_expired_lease_cannot_confirm_after_expiry(\n    dynamodb_client,\
     assert stored_item(client)["status"] == {"S": OUTBOX_CLAIMED}
 
 
-async def test_expired_lease_cannot_reschedule_after_expiry(\n    dynamodb_client,\n) -> None:
+async def test_expired_lease_cannot_reschedule_after_expiry(
+    dynamodb_client,
+) -> None:
     clock = FakeClock()
     client = dynamodb_client
     client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
