@@ -162,18 +162,20 @@ class DynamoDBOutbox:
             self.client.update_item(
                 TableName=self.table_name,
                 Key={"messageId": {"S": message.message_id}},
-                ConditionExpression="#status = :claimed AND #lease_token = :lease_token",
+                ConditionExpression="#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :lease_now",
                 UpdateExpression="SET #status = :published, #published_at = :now REMOVE #lease_token",
                 ExpressionAttributeNames={
                     "#status": "status",
                     "#lease_token": "leaseToken",
                     "#published_at": "publishedAt",
+                    "#next_attempt": "nextAttemptAt",
                 },
                 ExpressionAttributeValues={
                     ":claimed": {"S": OUTBOX_CLAIMED},
                     ":lease_token": {"S": message.lease_token},
                     ":published": {"S": OUTBOX_PUBLISHED},
                     ":now": {"S": now},
+                    ":lease_now": {"N": str(self.clock())},
                 },
             )
         except ClientError as error:
@@ -189,7 +191,7 @@ class DynamoDBOutbox:
             self.client.update_item(
                 TableName=self.table_name,
                 Key={"messageId": {"S": message.message_id}},
-                ConditionExpression="#status = :claimed AND #lease_token = :lease_token",
+                ConditionExpression="#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :now",
                 UpdateExpression="SET #status = :pending, #next_attempt = :next_attempt REMOVE #lease_token",
                 ExpressionAttributeNames={
                     "#status": "status",
@@ -201,6 +203,7 @@ class DynamoDBOutbox:
                     ":lease_token": {"S": message.lease_token},
                     ":pending": {"S": OUTBOX_PENDING},
                     ":next_attempt": {"N": str(next_attempt_at)},
+                    ":now": {"N": str(self.clock())},
                 },
             )
         except ClientError as error:
