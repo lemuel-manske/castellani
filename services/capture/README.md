@@ -11,9 +11,9 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. On Linux,
 Run `make test` for fast service tests, `make test-integration` for the local WARC recording and offline replay acceptance test, and `make check` for linting and type checking. Integration tests require the Playwright Chromium browser and `certutil`. The broader WARC fidelity acceptance gate is documented in [ADR-0026](../../docs/adr/0026-capture-local-warc-recording.md).
 
 
-## DynamoDB adapter tests
+## DynamoDB outbox tests
 
-The DynamoDB adapter tests use AWS DynamoDB Local rather than a hand-written client fake.
+The outbox adapter tests use AWS DynamoDB Local rather than a hand-written client fake.
 Start the pinned local database from this directory before running those tests:
 
 ```sh
