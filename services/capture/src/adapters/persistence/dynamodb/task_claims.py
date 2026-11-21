@@ -345,7 +345,7 @@ class DynamoDBTaskClaims:
     ) -> None:
         for attempt in range(5):
             try:
-                request = {"TransactItems": items}
+                request: dict[str, Any] = {"TransactItems": items}
 
                 if request_token is not None:
                     request["ClientRequestToken"] = request_token
