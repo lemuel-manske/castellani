@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 from collections.abc import Callable
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -14,7 +14,6 @@ from adapters.persistence.dynamodb.values import (
     string_from_item,
 )
 from domain import OutboxMessage
-
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
@@ -236,4 +235,3 @@ class DynamoDBOutbox:
             "occurredAt": string_from_item(item, "occurredAt", "outbox record"),
             "payload": deserialize_attribute(item.get("payload", {})),
         }
-

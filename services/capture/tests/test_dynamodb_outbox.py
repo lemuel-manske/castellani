@@ -1,15 +1,15 @@
 import json
 
 import pytest
+from support.dynamodb import FakeClock
 
 from adapters.persistence.dynamodb.outbox import (
-    DynamoDBOutbox,
     OUTBOX_CLAIMED,
     OUTBOX_PENDING,
     OUTBOX_PUBLISHED,
+    DynamoDBOutbox,
     OutboxLeaseLostError,
 )
-from support.dynamodb import FakeClock
 
 
 def stored_item(client) -> dict:

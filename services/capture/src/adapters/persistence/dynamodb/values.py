@@ -34,10 +34,7 @@ def deserialize_attribute(attribute: dict[str, Any]) -> Any:
         return None
 
     if "M" in attribute:
-        return {
-            key: deserialize_attribute(value)
-            for key, value in attribute["M"].items()
-        }
+        return {key: deserialize_attribute(value) for key, value in attribute["M"].items()}
 
     if "L" in attribute:
         return [deserialize_attribute(value) for value in attribute["L"]]

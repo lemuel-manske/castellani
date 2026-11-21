@@ -5,7 +5,6 @@ from typing import Any
 import boto3
 import pytest
 
-
 TABLES = (
     {
         "TableName": "capture_browser_slots",
