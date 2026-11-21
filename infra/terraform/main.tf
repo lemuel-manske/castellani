@@ -178,3 +178,32 @@ resource "aws_dynamodb_table" "capture_frontier" {
     type = "S"
   }
 }
+
+resource "aws_dynamodb_table" "capture_outbox" {
+  name         = "capture_outbox"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "messageId"
+
+  attribute {
+    name = "messageId"
+    type = "S"
+  }
+
+  attribute {
+    name = "status"
+    type = "S"
+  }
+
+  attribute {
+    name = "nextAttemptAt"
+    type = "N"
+  }
+
+  global_secondary_index {
+    name            = "status-nextAttemptAt-index"
+    hash_key        = "status"
+    range_key       = "nextAttemptAt"
+    projection_type = "ALL"
+  }
+}
