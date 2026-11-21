@@ -8,6 +8,7 @@ from .api import (
     CaptureRunner,
     LeaseLostError,
 )
+from .artifacts import LocalArtifactStore
 from .worker import ConcreteCaptureWorker
 
 
@@ -31,5 +32,6 @@ __all__ = [
     "CaptureExecutor",
     "CaptureRunner",
     "LeaseLostError",
+    "LocalArtifactStore",
     "new_worker",
 ]

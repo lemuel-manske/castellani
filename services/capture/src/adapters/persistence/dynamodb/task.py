@@ -2,15 +2,17 @@ import asyncio
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from botocore.exceptions import ClientError
 
-from domain import PageTask, TaskClaim, TaskRepository, new_attempt_id
+from domain import CaptureOutcome, PageTask, TaskClaim, TaskRepository, new_attempt_id
 
 from .error_handling import (
     extract_cancellation_reasons,
+    is_conditional_failure,
     is_transaction_canceled,
 )
 
@@ -97,8 +99,101 @@ class DynamoDBTaskRepository(TaskRepository):
     async def renew(self, claim: TaskClaim) -> TaskClaim:
         return await asyncio.to_thread(self._renew, claim)
 
+    async def complete(
+        self,
+        outcome: CaptureOutcome,
+        warc_files: tuple[Path, ...],
+    ) -> None:
+        del warc_files
+        await asyncio.to_thread(self._complete, outcome)
+
+    async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
+        await asyncio.to_thread(self._fail, claim, reason_code, message)
+
+    async def admit_discovered(
+        self,
+        claim: TaskClaim,
+        discovered_urls: tuple[str, ...],
+    ) -> None:
+        del claim, discovered_urls
+
     async def release(self, claim: TaskClaim) -> None:
         await asyncio.to_thread(self._release, claim)
+
+    def _complete(self, outcome: CaptureOutcome) -> None:
+        self._finish(
+            archive_id=outcome.archive_id,
+            url_key=outcome.url_key,
+            attempt_id=outcome.attempt_id,
+            fence=outcome.fence,
+            state="COMPLETED",
+        )
+
+    def _fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
+        self._finish(
+            archive_id=claim.task.archive_id,
+            url_key=claim.task.url_key,
+            attempt_id=claim.attempt_id,
+            fence=claim.fence,
+            state="FAILED",
+            reason_code=reason_code,
+            message=message,
+        )
+
+    def _finish(
+        self,
+        archive_id: str,
+        url_key: str,
+        attempt_id: str,
+        fence: int,
+        state: str,
+        reason_code: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        names = {
+            "#state": "state",
+            "#attempt": "attemptId",
+            "#fence": "fence",
+            "#lease": "leaseUntil",
+        }
+        values: dict[str, Any] = {
+            ":claimed": {"S": "CLAIMED"},
+            ":attempt": {"S": attempt_id},
+            ":fence": {"N": str(fence)},
+            ":state": {"S": state},
+            ":now": {"N": str(self.clock())},
+        }
+        update = "SET #state = :state REMOVE #attempt, #lease"
+
+        if reason_code is not None and message is not None:
+            names.update({"#reason": "failureReason", "#message": "failureMessage"})
+            values.update(
+                {
+                    ":reason": {"S": reason_code},
+                    ":message": {"S": message},
+                }
+            )
+            update = (
+                "SET #state = :state, #reason = :reason, #message = :message "
+                "REMOVE #attempt, #lease"
+            )
+
+        try:
+            self.client.update_item(
+                TableName=self.frontier_table_name,
+                Key={"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
+                UpdateExpression=update,
+                ConditionExpression=(
+                    "#state = :claimed AND #attempt = :attempt "
+                    "AND #fence = :fence AND #lease > :now"
+                ),
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+        except ClientError as error:
+            if is_conditional_failure(error) or is_transaction_canceled(error):
+                raise TaskClaimLostError("page-task claim is no longer owned") from error
+            raise
 
     def _release(self, claim: TaskClaim) -> None:
         now = self.clock()

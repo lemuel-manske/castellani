@@ -1,30 +1,30 @@
 import asyncio
-from typing import Any
 
 import pytest
-from support.dynamodb import FakeClock
-from support.local_dynamodb import (
+from mypy_boto3_dynamodb.client import DynamoDBClient
+from support.clock import FakeClock
+from support.dynamodb import (
     frontier_item,
     seed_frontier,
     seed_run,
     set_run_admission,
 )
 
-from adapters.persistence.dynamodb.task_claims import (
-    DynamoDBTaskClaims,
+from adapters.persistence.dynamodb.task import (
+    DynamoDBTaskRepository,
     TaskClaimLostError,
 )
 
 
-async def test_claim_sets_new_fence_for_pending_task(dynamodb_client: Any) -> None:
+async def test_claim_sets_new_fence_for_pending_task(dynamodb: DynamoDBClient) -> None:
     clock = FakeClock()
-    client = dynamodb_client
+    client = dynamodb
 
     seed_run(client)
 
     seed_frontier(client, depth=2)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -44,8 +44,8 @@ async def test_claim_sets_new_fence_for_pending_task(dynamodb_client: Any) -> No
     assert claim.lease_until == clock() + 30
 
 
-async def test_claim_does_not_replace_an_active_attempt(dynamodb_client: Any) -> None:
-    client = dynamodb_client
+async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient) -> None:
+    client = dynamodb
 
     seed_run(client)
 
@@ -53,7 +53,7 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb_client: Any) ->
 
     attempt_ids = iter(("attempt-1", "attempt-2"))
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -71,9 +71,11 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb_client: Any) ->
     assert frontier_item(client)["attemptId"] == {"S": "attempt-1"}
 
 
-async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client: Any) -> None:
+async def test_expired_claim_is_reclaimed_with_a_higher_fence(
+    dynamodb: DynamoDBClient,
+) -> None:
     clock = FakeClock()
-    client = dynamodb_client
+    client = dynamodb
 
     seed_run(client)
 
@@ -81,7 +83,7 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client: A
 
     attempt_ids = iter(("attempt-1", "attempt-2"))
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -105,14 +107,14 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client: A
         await claims.renew(previous)
 
 
-async def test_claim_requires_an_open_archive_run(dynamodb_client: Any) -> None:
-    client = dynamodb_client
+async def test_claim_requires_an_open_archive_run(dynamodb: DynamoDBClient) -> None:
+    client = dynamodb
 
     seed_run(client, admission="CLOSED")
 
     seed_frontier(client, depth=2)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -126,15 +128,17 @@ async def test_claim_requires_an_open_archive_run(dynamodb_client: Any) -> None:
     assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_renewal_extends_lease_preserving_owner_and_fence(dynamodb_client: Any) -> None:
+async def test_renewal_extends_lease_preserving_owner_and_fence(
+    dynamodb: DynamoDBClient,
+) -> None:
     clock = FakeClock()
-    client = dynamodb_client
+    client = dynamodb
 
     seed_run(client)
 
     seed_frontier(client, depth=2)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -156,14 +160,16 @@ async def test_renewal_extends_lease_preserving_owner_and_fence(dynamodb_client:
     assert renewed.lease_until > claim.lease_until
 
 
-async def test_renewal_is_rejected_after_the_archive_run_closes(dynamodb_client: Any) -> None:
-    client = dynamodb_client
+async def test_renewal_is_rejected_after_the_archive_run_closes(
+    dynamodb: DynamoDBClient,
+) -> None:
+    client = dynamodb
 
     seed_run(client)
 
     seed_frontier(client, depth=2)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -180,8 +186,10 @@ async def test_renewal_is_rejected_after_the_archive_run_closes(dynamodb_client:
         await claims.renew(claim)
 
 
-async def test_concurrent_claims_have_exactly_one_winner_for_a_page(dynamodb_client: Any) -> None:
-    client = dynamodb_client
+async def test_concurrent_claims_have_exactly_one_winner_for_a_page(
+    dynamodb: DynamoDBClient,
+) -> None:
+    client = dynamodb
 
     seed_run(client)
 
@@ -189,7 +197,7 @@ async def test_concurrent_claims_have_exactly_one_winner_for_a_page(dynamodb_cli
 
     attempt_ids = iter(f"attempt-{number}" for number in range(20))
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",

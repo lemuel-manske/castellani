@@ -1,149 +1,123 @@
-import time
+from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
-from support.worker import (
-    BlockingPageExecutor,
-    ExpiringCapacity,
-    ExpiringRepository,
-    FailingPageExecutor,
-    FakeArtifactStore,
-    FakeCapacity,
-    FakeRepository,
-    ShortLeaseCapacity,
-    ShortLeaseRepository,
-    SlowPageExecutor,
-)
+from mypy_boto3_dynamodb.client import DynamoDBClient
+from support.dynamodb import frontier_item, outbox_items, seed_frontier, seed_run
 
-from application.worker import ConcreteCaptureWorker, LeaseLostError
-from domain import PageTask, TaskClaim
+from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
+from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
+from domain import PageCapture
+from worker import CaptureArtifact, LocalArtifactStore
+from worker.worker import ConcreteCaptureWorker
 
 
-async def test_worker_discards_attempt_artifacts_after_capture_failure(tmp_path: Path) -> None:
-    claim = TaskClaim(
-        task=PageTask(
-            archive_id="archive-1",
-            url_key="url-1",
-            url="https://example.org/",
-            depth=0,
+class FailingExecutor:
+    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
+        raise RuntimeError("browser capture failed")
+
+
+class SuccessfulExecutor:
+    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
+        (output_dir / "capture.warc.gz").write_bytes(b"capture")
+
+        return CaptureArtifact(
+            capture=PageCapture(
+                requested_url=url,
+                final_url=url,
+                redirect_chain=(),
+                status_code=200,
+                content_type="text/html",
+                title="Example",
+                captured_at=datetime(2026, 11, 21, 12, 0, tzinfo=UTC),
+                discovered_urls=(),
+            ),
+            blocked_urls=(),
+            warc_files=(output_dir / "capture.warc.gz",),
+        )
+
+
+class UnexpectedExecutor:
+    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
+        raise AssertionError("the executor must not run when capacity is unavailable")
+
+
+def new_worker(
+    dynamodb: DynamoDBClient,
+    artifacts: LocalArtifactStore,
+    executor: FailingExecutor | SuccessfulExecutor | UnexpectedExecutor,
+) -> ConcreteCaptureWorker:
+    return ConcreteCaptureWorker(
+        task_repository=DynamoDBTaskRepository(
+            client=dynamodb,
+            frontier_table_name="capture_frontier",
+            runs_table_name="capture_runs",
+            lease_duration=30,
+            attempt_id_factory=lambda: "attempt-1",
         ),
-        attempt_id="attempt-1",
-        fence=1,
-        lease_until=time.time() + 60,
-    )
-
-    repository = FakeRepository(claim)
-    artifacts = FakeArtifactStore(tmp_path)
-
-    worker = ConcreteCaptureWorker(
-        repository=repository,
-        alloc=FakeCapacity(),
-        executor=FailingPageExecutor(),
-        artifacts=artifacts,
-    )
-
-    claimed = await worker("archive-1", "url-1")
-
-    assert claimed
-    assert repository.failed == (claim, "capture_failed", "browser capture failed")
-    assert artifacts.discarded == [(claim, tmp_path)]
-    assert repository.completed is None
-
-
-async def test_worker_renews_task_and_capacity_leases_during_capture(tmp_path: Path) -> None:
-    claim = TaskClaim(
-        task=PageTask(
-            archive_id="archive-1",
-            url_key="url-1",
-            url="https://example.org/",
-            depth=0,
+        capture_allocator=DynamoDBCaptureAllocator(
+            client=dynamodb,
+            table_name="capture_browser_slots",
+            slot_count=1,
+            lease_duration=30,
         ),
-        attempt_id="attempt-1",
-        fence=1,
-        lease_until=time.time() + 0.3,
-    )
-
-    repository = ShortLeaseRepository(claim)
-    capacity = ShortLeaseCapacity()
-
-    worker = ConcreteCaptureWorker(
-        repository=repository,
-        alloc=capacity,
-        executor=SlowPageExecutor(),
-        artifacts=FakeArtifactStore(tmp_path),
-    )
-
-    claimed = await worker("archive-1", "url-1")
-
-    assert claimed
-    assert repository.renewals >= 1
-    assert capacity.renewals >= 1
-    assert repository.completed is not None
-
-
-async def test_worker_stops_capture_when_task_lease_renewal_fails(tmp_path: Path) -> None:
-    claim = TaskClaim(
-        task=PageTask(
-            archive_id="archive-1",
-            url_key="url-1",
-            url="https://example.org/",
-            depth=0,
-        ),
-        attempt_id="attempt-1",
-        fence=1,
-        lease_until=time.time() + 0.3,
-    )
-
-    repository = ExpiringRepository(claim)
-    artifacts = FakeArtifactStore(tmp_path)
-    executor = BlockingPageExecutor()
-
-    worker = ConcreteCaptureWorker(
-        repository=repository,
-        alloc=FakeCapacity(),
         executor=executor,
         artifacts=artifacts,
     )
 
-    with pytest.raises(LeaseLostError):
-        await worker("archive-1", "url-1")
 
-    assert executor.started.is_set()
-    assert executor.cancelled.is_set()
-    assert repository.failed is None
-    assert repository.completed is None
-    assert artifacts.discarded == [(claim, tmp_path)]
+async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
+    dynamodb: DynamoDBClient,
+    tmp_path: Path,
+) -> None:
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    artifacts = LocalArtifactStore(tmp_path)
+    worker = new_worker(dynamodb, artifacts, FailingExecutor())
+
+    assert await worker("archive-1", "url-1")
+
+    task = frontier_item(dynamodb)
+    assert task["state"] == {"S": "FAILED"}
+    assert task["failureReason"] == {"S": "capture_failed"}
+    assert task["failureMessage"] == {"S": "browser capture failed"}
+    assert not (tmp_path / "attempt-1").exists()
 
 
-async def test_worker_stops_capture_when_capacity_lease_renewal_fails(tmp_path: Path) -> None:
-    claim = TaskClaim(
-        task=PageTask(
-            archive_id="archive-1",
-            url_key="url-1",
-            url="https://example.org/",
-            depth=0,
-        ),
-        attempt_id="attempt-1",
-        fence=1,
-        lease_until=time.time() + 0.3,
+async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
+    dynamodb: DynamoDBClient,
+    tmp_path: Path,
+) -> None:
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    artifacts = LocalArtifactStore(tmp_path)
+    worker = new_worker(dynamodb, artifacts, SuccessfulExecutor())
+
+    assert await worker("archive-1", "url-1")
+
+    assert frontier_item(dynamodb)["state"] == {"S": "COMPLETED"}
+    assert (tmp_path / "attempt-1" / "capture.warc.gz").read_bytes() == b"capture"
+
+
+async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
+    dynamodb: DynamoDBClient,
+    tmp_path: Path,
+) -> None:
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    allocator = DynamoDBCaptureAllocator(
+        client=dynamodb,
+        table_name="capture_browser_slots",
+        slot_count=1,
+        lease_duration=30,
     )
+    held = await allocator.reserve("other-attempt")
+    assert held is not None
 
-    repository = FakeRepository(claim)
-    artifacts = FakeArtifactStore(tmp_path)
-    executor = BlockingPageExecutor()
+    worker = new_worker(dynamodb, LocalArtifactStore(tmp_path), UnexpectedExecutor())
 
-    worker = ConcreteCaptureWorker(
-        repository=repository,
-        alloc=ExpiringCapacity(),
-        executor=executor,
-        artifacts=artifacts,
-    )
-
-    with pytest.raises(LeaseLostError):
-        await worker("archive-1", "url-1")
-
-    assert executor.started.is_set()
-    assert executor.cancelled.is_set()
-    assert repository.failed is None
-    assert repository.completed is None
-    assert artifacts.discarded == [(claim, tmp_path)]
+    assert await worker("archive-1", "url-1")
+    assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
+    assert len(outbox_items(dynamodb)) == 1

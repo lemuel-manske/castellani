@@ -1,20 +1,18 @@
 import asyncio
-from typing import Any
 
 import pytest
-from support.dynamodb import FakeClock
+from mypy_boto3_dynamodb.client import DynamoDBClient
+from support.clock import FakeClock
 
-from adapters.persistence.dynamodb.browser_capacity import (
-    BrowserReservationLostError,
-    DynamoDBBrowserCapacity,
+from adapters.persistence.dynamodb.alloc import (
+    CaptureReservationLostError,
+    DynamoDBCaptureAllocator,
 )
 
 
-async def test_capacity_limits_concurrent_reservations(dynamodb_client: Any) -> None:
-    client = dynamodb_client
-
-    capacity = DynamoDBBrowserCapacity(
-        client=client,
+async def test_capacity_limits_concurrent_reservations(dynamodb: DynamoDBClient) -> None:
+    capacity = DynamoDBCaptureAllocator(
+        client=dynamodb,
         table_name="capture_browser_slots",
         slot_count=10,
         lease_duration=30,
@@ -32,13 +30,12 @@ async def test_capacity_limits_concurrent_reservations(dynamodb_client: Any) -> 
 
 
 async def test_reservation_renewal_preserves_its_fence(
-    dynamodb_client: Any,
+    dynamodb: DynamoDBClient,
 ) -> None:
     clock = FakeClock()
-    client = dynamodb_client
 
-    capacity = DynamoDBBrowserCapacity(
-        client=client,
+    capacity = DynamoDBCaptureAllocator(
+        client=dynamodb,
         table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
@@ -58,12 +55,13 @@ async def test_reservation_renewal_preserves_its_fence(
     assert renewed.lease_until > reservation.lease_until
 
 
-async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client: Any) -> None:
+async def test_expired_reservation_is_reclaimed_with_a_new_fence(
+    dynamodb: DynamoDBClient,
+) -> None:
     clock = FakeClock()
-    client = dynamodb_client
 
-    capacity = DynamoDBBrowserCapacity(
-        client=client,
+    capacity = DynamoDBCaptureAllocator(
+        client=dynamodb,
         table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
@@ -82,7 +80,7 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client
     assert current.slot_id == previous.slot_id
     assert current.fence == previous.fence + 1
 
-    with pytest.raises(BrowserReservationLostError):
+    with pytest.raises(CaptureReservationLostError):
         await capacity.renew(previous)
 
     await capacity.release(previous)
@@ -90,13 +88,12 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client
 
 
 async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
-    dynamodb_client: Any,
+    dynamodb: DynamoDBClient,
 ) -> None:
     clock = FakeClock()
-    client = dynamodb_client
 
-    capacity = DynamoDBBrowserCapacity(
-        client=client,
+    capacity = DynamoDBCaptureAllocator(
+        client=dynamodb,
         table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
@@ -118,23 +115,19 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
     assert await capacity.reserve("attempt-3") is None
 
 
-def test_capacity_rejects_invalid_configuration(dynamodb_client: Any) -> None:
-    client = dynamodb_client
+def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient) -> None:
+    with pytest.raises(ValueError):
+        DynamoDBCaptureAllocator(dynamodb, "capture_browser_slots", 0, 30)
 
     with pytest.raises(ValueError):
-        DynamoDBBrowserCapacity(client, "capture_browser_slots", 0, 30)
-
-    with pytest.raises(ValueError):
-        DynamoDBBrowserCapacity(client, "capture_browser_slots", 1, 0)
+        DynamoDBCaptureAllocator(dynamodb, "capture_browser_slots", 1, 0)
 
 
 async def test_repeated_reservation_reuses_existing_slot(
-    dynamodb_client: Any,
+    dynamodb: DynamoDBClient,
 ) -> None:
-    client = dynamodb_client
-
-    capacity = DynamoDBBrowserCapacity(
-        client=client,
+    capacity = DynamoDBCaptureAllocator(
+        client=dynamodb,
         table_name="capture_browser_slots",
         slot_count=2,
         lease_duration=30,

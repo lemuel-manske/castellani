@@ -1,31 +1,30 @@
-from typing import Any
-
 import pytest
+from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.dynamodb import (
-    FakeClock,
     frontier_item,
     outbox_items,
     seed_frontier,
     seed_run,
     set_run_admission,
 )
+from support.clock import FakeClock
 
-from adapters.persistence.dynamodb.task_claims import (
-    DynamoDBTaskClaims,
+from adapters.persistence.dynamodb.task import (
+    DynamoDBTaskRepository,
     TaskClaimLostError,
 )
 
 
 async def test_release_requeues_and_records_capture_page(
-    dynamodb_client: Any,
+    dynamodb: DynamoDBClient,
 ) -> None:
     clock = FakeClock()
-    client = dynamodb_client
+    client = dynamodb
 
     seed_run(client)
     seed_frontier(client, depth=2)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -62,13 +61,15 @@ async def test_release_requeues_and_records_capture_page(
     assert message["nextAttemptAt"] == {"N": str(clock())}
 
 
-async def test_releasing_the_same_claim_twice_is_idempotent(dynamodb_client: Any) -> None:
+async def test_releasing_the_same_claim_twice_is_idempotent(
+    dynamodb: DynamoDBClient,
+) -> None:
     clock = FakeClock()
-    client = dynamodb_client
+    client = dynamodb
     seed_run(client)
     seed_frontier(client, depth=0)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -88,14 +89,16 @@ async def test_releasing_the_same_claim_twice_is_idempotent(dynamodb_client: Any
     assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_stale_claim_cannot_release_reclaimed_task(dynamodb_client: Any) -> None:
+async def test_stale_claim_cannot_release_reclaimed_task(
+    dynamodb: DynamoDBClient,
+) -> None:
     clock = FakeClock()
-    client = dynamodb_client
+    client = dynamodb
     seed_run(client)
     seed_frontier(client, depth=0)
 
     attempt_ids = iter(("attempt-1", "attempt-2"))
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
@@ -122,13 +125,13 @@ async def test_stale_claim_cannot_release_reclaimed_task(dynamodb_client: Any) -
 
 
 async def test_release_does_not_requeue_a_task_after_run_admission_closes(
-    dynamodb_client: Any,
+    dynamodb: DynamoDBClient,
 ) -> None:
-    client = dynamodb_client
+    client = dynamodb
     seed_run(client)
     seed_frontier(client, depth=0)
 
-    claims = DynamoDBTaskClaims(
+    claims = DynamoDBTaskRepository(
         client=client,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
