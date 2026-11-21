@@ -20,21 +20,21 @@ class ConcreteCaptureWorker(CaptureRunner):
 
     def __init__(
         self,
-        repository: TaskRepository,
+        task_repository: TaskRepository,
         capture_allocator: CaptureAllocator,
         executor: CaptureExecutor,
         artifacts: ArtifactStore,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ) -> None:
-        self.repository = repository
-        self.capacity = capture_allocator
+        self.task_repository = task_repository
+        self.capacity_allocator = capture_allocator
         self.executor = executor
         self.artifacts = artifacts
 
         self.on_error = on_error or awaitable(noop)
 
     async def __call__(self, archive_id: str, url_key: str) -> bool:
-        claim = await self.repository.claim(archive_id, url_key)
+        claim = await self.task_repository.claim(archive_id, url_key)
 
         if claim is None:
             return False
@@ -89,7 +89,7 @@ class ConcreteCaptureWorker(CaptureRunner):
                 try:
                     await operation
                 except Exception as error:
-                    await self.repository.fail(
+                    await self.task_repository.fail(
                         claim_state[0],
                         str(getattr(error, "reason_code", "capture_failed")),
                         str(error),
@@ -144,7 +144,7 @@ class ConcreteCaptureWorker(CaptureRunner):
 
             if reservation is not None:
                 try:
-                    await self.capacity.release(reservation)
+                    await self.capacity_allocator.release(reservation)
                 except Exception as error:
                     await self.on_error(error)
 
@@ -157,10 +157,10 @@ class ConcreteCaptureWorker(CaptureRunner):
         terminal_state: list[bool],
         lease_changed: asyncio.Event,
     ) -> None:
-        reservation = await self.capacity.reserve(claim_state[0].attempt_id)
+        reservation = await self.capacity_allocator.reserve(claim_state[0].attempt_id)
 
         if reservation is None:
-            await self.repository.release(claim_state[0])
+            await self.task_repository.release(claim_state[0])
 
             terminal_state[0] = True
 
@@ -182,7 +182,7 @@ class ConcreteCaptureWorker(CaptureRunner):
             directory,
         )
 
-        await self.repository.admit_discovered(
+        await self.task_repository.admit_discovered(
             claim_state[0],
             artifact.capture.discovered_urls,
         )
@@ -197,7 +197,7 @@ class ConcreteCaptureWorker(CaptureRunner):
             capture=artifact.capture,
         )
 
-        await self.repository.complete(outcome, artifact.warc_files)
+        await self.task_repository.complete(outcome, artifact.warc_files)
 
         terminal_state[0] = True
 
@@ -252,7 +252,7 @@ class ConcreteCaptureWorker(CaptureRunner):
             try:
                 if reservation is None:
                     renewed_claim = await asyncio.wait_for(
-                        self.repository.renew(claim),
+                        self.task_repository.renew(claim),
                         timeout=remaining * 0.8,
                     )
 
@@ -264,8 +264,8 @@ class ConcreteCaptureWorker(CaptureRunner):
 
                 renewals = await asyncio.wait_for(
                     asyncio.gather(
-                        self.repository.renew(claim),
-                        self.capacity.renew(reservation),
+                        self.task_repository.renew(claim),
+                        self.capacity_allocator.renew(reservation),
                         return_exceptions=True,
                     ),
                     timeout=remaining * 0.8,

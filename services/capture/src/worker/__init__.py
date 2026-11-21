@@ -12,13 +12,13 @@ from .worker import ConcreteCaptureWorker
 
 
 def new_worker(
-    repository: TaskRepository,
+    task_repository: TaskRepository,
     capture_allocator: CaptureAllocator,
     executor: CaptureExecutor,
     artifacts: ArtifactStore,
 ) -> ConcreteCaptureWorker:
     return ConcreteCaptureWorker(
-        repository=repository,
+        task_repository=task_repository,
         capture_allocator=capture_allocator,
         executor=executor,
         artifacts=artifacts,
