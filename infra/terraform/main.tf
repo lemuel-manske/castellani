@@ -208,7 +208,6 @@ resource "aws_dynamodb_table" "capture_outbox" {
   }
 }
 
-
 resource "aws_dynamodb_table" "capture_browser_slots" {
   name         = "capture_browser_slots"
   billing_mode = "PAY_PER_REQUEST"
