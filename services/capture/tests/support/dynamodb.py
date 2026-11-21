@@ -2,7 +2,7 @@ import threading
 from copy import deepcopy
 from typing import Any, NoReturn
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError  # pyright: ignore[reportMissingTypeStubs]
 
 
 class FakeClock:
