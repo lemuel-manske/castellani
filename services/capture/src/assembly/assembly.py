@@ -1,10 +1,6 @@
-from application.contracts import (
-    ArtifactStore,
-    BrowserCapacity,
-    PageExecutor,
-    TaskRepository,
-)
+from application.contracts import ArtifactStore, PageExecutor
 from application.worker import Worker
+from domain import BrowserCapacity, TaskRepository
 
 
 def new_worker(

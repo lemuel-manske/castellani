@@ -11,7 +11,7 @@ from adapters.persistence.dynamodb.error_handling import (
     extract_cancellation_reasons,
     is_transaction_canceled,
 )
-from domain.task import PageTask, TaskClaim, new_attempt_id
+from domain import PageTask, TaskClaim, new_attempt_id
 
 
 def claim_from_item(

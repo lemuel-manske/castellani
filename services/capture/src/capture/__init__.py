@@ -11,7 +11,7 @@ from capture.browser import (
     extract_links,
     extract_redirect_chain,
 )
-from domain.capture import PageCapture
+from domain import PageCapture
 
 __all__ = [
     "CaptureDownloadFailed",

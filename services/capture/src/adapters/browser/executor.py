@@ -2,7 +2,7 @@ from pathlib import Path
 
 from application.contracts import CaptureArtifact
 from capture.browser import CaptureLimits, capture_page
-from domain.capture import PageCapture
+from domain import PageCapture
 
 
 class BrowserPageExecutor:

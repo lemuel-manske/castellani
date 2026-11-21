@@ -13,7 +13,7 @@ from adapters.persistence.dynamodb.values import (
     number_from_item,
     string_from_item,
 )
-from application.outbox import OutboxMessage
+from domain import OutboxMessage
 
 
 OUTBOX_PENDING = "PENDING"

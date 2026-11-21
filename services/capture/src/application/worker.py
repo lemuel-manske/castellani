@@ -3,16 +3,14 @@ import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from application.contracts import (
-    ArtifactStore,
+from application.contracts import ArtifactStore, CaptureArtifact, PageExecutor
+from domain import (
     BrowserCapacity,
-    CaptureArtifact,
-    PageExecutor,
+    BrowserReservation,
+    CaptureOutcome,
+    TaskClaim,
     TaskRepository,
 )
-from domain.browser_reservation import BrowserReservation
-from domain.capture import CaptureOutcome
-from domain.task import TaskClaim
 from utils.fn import awaitable, noop
 
 

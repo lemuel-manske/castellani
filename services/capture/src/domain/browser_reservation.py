@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Protocol
 from hashlib import sha256
 
 
@@ -49,3 +50,13 @@ class BrowserReservation:
             raise InvalidBrowserReservationRenewal(
                 "browser reservation renewal returned an invalid reservation"
             )
+
+
+class BrowserCapacity(Protocol):
+    """Controls the number of page captures running concurrently."""
+
+    async def reserve(self, attempt_id: str) -> BrowserReservation | None: ...
+
+    async def renew(self, reservation: BrowserReservation) -> BrowserReservation: ...
+
+    async def release(self, reservation: BrowserReservation) -> None: ...
