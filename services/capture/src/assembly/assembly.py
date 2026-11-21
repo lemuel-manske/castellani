@@ -1,17 +1,17 @@
-from application.contracts import ArtifactStore, PageExecutor
-from application.worker import Worker
-from domain import BrowserCapacity, TaskRepository
+from application.contracts import ArtifactStore, CaptureExecutor
+from application.worker import ConcreteCaptureWorker
+from domain import CaptureAllocator, TaskRepository
 
 
 def new_worker(
     repository: TaskRepository,
-    capacity: BrowserCapacity,
-    executor: PageExecutor,
+    capture_allocator: CaptureAllocator,
+    executor: CaptureExecutor,
     artifacts: ArtifactStore,
-) -> Worker:
-    return Worker(
+) -> ConcreteCaptureWorker:
+    return ConcreteCaptureWorker(
         repository=repository,
-        capacity=capacity,
+        alloc=capture_allocator,
         executor=executor,
         artifacts=artifacts,
     )

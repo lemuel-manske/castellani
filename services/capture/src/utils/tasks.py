@@ -6,6 +6,10 @@ T = TypeVar("T")
 
 
 async def complete_before_cancellation(awaitable: Awaitable[T]) -> T:
+    """
+    Ensures that an awaitable is given a chance to complete before a cancellation is propagated.
+    """
+
     task = asyncio.ensure_future(awaitable)
 
     try:

@@ -3,8 +3,8 @@ from dataclasses import replace
 import pytest
 
 from domain import (
-    BrowserReservation,
-    InvalidBrowserReservationRenewal,
+    CaptureReservation,
+    InvalidReservationRenewal,
     InvalidTaskClaimRenewal,
     PageTask,
     TaskClaim,
@@ -49,7 +49,7 @@ def test_task_claim_rejects_a_renewal_that_does_not_extend_the_lease() -> None:
 
 
 def test_browser_reservation_accepts_a_renewal_that_preserves_ownership() -> None:
-    reservation = BrowserReservation(
+    reservation = CaptureReservation(
         attempt_id="attempt-1",
         reservation_id="reservation-1",
         slot_id="slot-2",
@@ -63,7 +63,7 @@ def test_browser_reservation_accepts_a_renewal_that_preserves_ownership() -> Non
 
 
 def test_browser_reservation_rejects_a_renewal_for_a_different_slot() -> None:
-    reservation = BrowserReservation(
+    reservation = CaptureReservation(
         attempt_id="attempt-1",
         reservation_id="reservation-1",
         slot_id="slot-2",
@@ -71,7 +71,7 @@ def test_browser_reservation_rejects_a_renewal_for_a_different_slot() -> None:
         lease_until=150,
     )
 
-    with pytest.raises(InvalidBrowserReservationRenewal):
+    with pytest.raises(InvalidReservationRenewal):
         reservation.verify_renewal(
             replace(reservation, slot_id="slot-3", lease_until=200),
             now=100,
@@ -79,7 +79,7 @@ def test_browser_reservation_rejects_a_renewal_for_a_different_slot() -> None:
 
 
 def test_browser_reservation_rejects_a_renewal_with_an_expired_lease() -> None:
-    reservation = BrowserReservation(
+    reservation = CaptureReservation(
         attempt_id="attempt-1",
         reservation_id="reservation-1",
         slot_id="slot-2",
@@ -87,7 +87,7 @@ def test_browser_reservation_rejects_a_renewal_with_an_expired_lease() -> None:
         lease_until=150,
     )
 
-    with pytest.raises(InvalidBrowserReservationRenewal):
+    with pytest.raises(InvalidReservationRenewal):
         reservation.verify_renewal(
             replace(reservation, lease_until=140),
             now=160,

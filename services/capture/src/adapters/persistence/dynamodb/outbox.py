@@ -14,6 +14,7 @@ from adapters.persistence.dynamodb.values import (
     string_from_item,
 )
 from domain import OutboxMessage
+from domain.outbox import OutboxRepository
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
@@ -26,7 +27,7 @@ class OutboxLeaseLostError(RuntimeError):
     """Raised when an outbox message is no longer owned by this dispatcher."""
 
 
-class DynamoDBOutbox:
+class DynamoDBOutbox(OutboxRepository):
     """Claims due outbox records and records their publication outcome."""
 
     def __init__(

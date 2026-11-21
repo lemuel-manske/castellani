@@ -1,7 +1,7 @@
-from .browser_reservation import (
-    BrowserCapacity,
-    BrowserReservation,
-    InvalidBrowserReservationRenewal,
+from .alloc import (
+    CaptureAllocator,
+    CaptureReservation,
+    InvalidReservationRenewal,
     new_reservation_id,
 )
 from .capture import CaptureOutcome, PageCapture
@@ -15,10 +15,10 @@ from .task import (
 )
 
 __all__ = [
-    "BrowserCapacity",
-    "BrowserReservation",
+    "CaptureAllocator",
     "CaptureOutcome",
-    "InvalidBrowserReservationRenewal",
+    "CaptureReservation",
+    "InvalidReservationRenewal",
     "InvalidTaskClaimRenewal",
     "OutboxMessage",
     "OutboxRepository",

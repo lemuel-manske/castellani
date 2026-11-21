@@ -7,13 +7,13 @@ from botocore.exceptions import ClientError
 
 from adapters.persistence.dynamodb.error_handling import is_conditional_failure
 from adapters.persistence.dynamodb.values import number_from_item
-from domain import BrowserReservation, new_reservation_id
+from domain import CaptureAllocator, CaptureReservation, new_reservation_id
 
 
 def reservation_from_item(
     slot_id: str,
     item: dict[str, Any],
-) -> BrowserReservation:
+) -> CaptureReservation:
     try:
         attempt_id = item["ownerAttemptId"]["S"]
         reservation_id = item["reservationId"]["S"]
@@ -22,7 +22,7 @@ def reservation_from_item(
     except (KeyError, TypeError, ValueError) as error:
         raise RuntimeError("DynamoDB returned an invalid browser slot") from error
 
-    return BrowserReservation(
+    return CaptureReservation(
         attempt_id=attempt_id,
         reservation_id=reservation_id,
         slot_id=slot_id,
@@ -31,11 +31,11 @@ def reservation_from_item(
     )
 
 
-class BrowserReservationLostError(RuntimeError):
+class CaptureReservationLostError(RuntimeError):
     """Raised when a reservation can no longer be renewed by its owner."""
 
 
-class DynamoDBBrowserCapacity:
+class DynamoDBCaptureAllocator(CaptureAllocator):
     """Coordinates fenced browser-capacity reservations through DynamoDB slot rows."""
 
     def __init__(
@@ -61,7 +61,7 @@ class DynamoDBBrowserCapacity:
         self.lease_duration = lease_duration
         self.clock = clock
 
-    async def reserve(self, attempt_id: str) -> BrowserReservation | None:
+    async def reserve(self, attempt_id: str) -> CaptureReservation | None:
         if not attempt_id:
             raise ValueError("attempt_id must not be empty")
 
@@ -73,17 +73,17 @@ class DynamoDBBrowserCapacity:
             reservation_id,
         )
 
-    async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
+    async def renew(self, reservation: CaptureReservation) -> CaptureReservation:
         return await asyncio.to_thread(self._renew, reservation)
 
-    async def release(self, reservation: BrowserReservation) -> None:
+    async def release(self, reservation: CaptureReservation) -> None:
         await asyncio.to_thread(self._release, reservation)
 
     def _reserve(
         self,
         attempt_id: str,
         reservation_id: str,
-    ) -> BrowserReservation | None:
+    ) -> CaptureReservation | None:
         existing = self._find_existing_reservation(attempt_id, reservation_id)
 
         if existing is not None:
@@ -140,7 +140,7 @@ class DynamoDBBrowserCapacity:
 
         return None
 
-    def _renew(self, reservation: BrowserReservation) -> BrowserReservation:
+    def _renew(self, reservation: CaptureReservation) -> CaptureReservation:
         now = self.clock()
         lease_until = now + self.lease_duration
 
@@ -170,7 +170,7 @@ class DynamoDBBrowserCapacity:
             )
         except ClientError as error:
             if is_conditional_failure(error):
-                raise BrowserReservationLostError(
+                raise CaptureReservationLostError(
                     "browser capacity reservation is no longer owned"
                 ) from error
 
@@ -180,7 +180,7 @@ class DynamoDBBrowserCapacity:
 
         return renewed
 
-    def _release(self, reservation: BrowserReservation) -> None:
+    def _release(self, reservation: CaptureReservation) -> None:
         try:
             self.client.update_item(
                 TableName=self.table_name,
@@ -209,7 +209,7 @@ class DynamoDBBrowserCapacity:
         self,
         attempt_id: str,
         reservation_id: str,
-    ) -> BrowserReservation | None:
+    ) -> CaptureReservation | None:
         for slot_number in range(self.slot_count):
             slot_id = str(slot_number)
 

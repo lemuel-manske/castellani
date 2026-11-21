@@ -1,9 +1,72 @@
-class FakeClock:
-    def __init__(self, now: float = 1_800_000_000.0) -> None:
-        self.now = now
+import os
 
-    def __call__(self) -> float:
-        return self.now
+from boto3.session import Session
+from mypy_boto3_dynamodb.client import DynamoDBClient
+from mypy_boto3_dynamodb.type_defs import CreateTableInputTypeDef
 
-    def advance(self, seconds: float) -> None:
-        self.now += seconds
+TABLES: tuple[CreateTableInputTypeDef, ...] = (
+    {
+        "TableName": "capture_browser_slots",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [{"AttributeName": "slotId", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "slotId", "AttributeType": "S"}],
+    },
+    {
+        "TableName": "capture_runs",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [{"AttributeName": "archiveId", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "archiveId", "AttributeType": "S"}],
+    },
+    {
+        "TableName": "capture_frontier",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [
+            {"AttributeName": "archiveId", "KeyType": "HASH"},
+            {"AttributeName": "urlKey", "KeyType": "RANGE"},
+        ],
+        "AttributeDefinitions": [
+            {"AttributeName": "archiveId", "AttributeType": "S"},
+            {"AttributeName": "urlKey", "AttributeType": "S"},
+        ],
+    },
+    {
+        "TableName": "capture_outbox",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [{"AttributeName": "messageId", "KeyType": "HASH"}],
+        "AttributeDefinitions": [
+            {"AttributeName": "messageId", "AttributeType": "S"},
+            {"AttributeName": "status", "AttributeType": "S"},
+            {"AttributeName": "nextAttemptAt", "AttributeType": "N"},
+        ],
+        "GlobalSecondaryIndexes": [
+            {
+                "IndexName": "status-nextAttemptAt-index",
+                "KeySchema": [
+                    {"AttributeName": "status", "KeyType": "HASH"},
+                    {"AttributeName": "nextAttemptAt", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            }
+        ],
+    },
+)
+
+
+def new_dynamodb_client() -> DynamoDBClient:
+    return Session().client(
+        "dynamodb",
+        endpoint_url=os.environ.get("DYNAMODB_ENDPOINT_URL"),
+        region_name="us-east-1",
+        aws_access_key_id="testing",
+        aws_secret_access_key="testing",
+    )
+
+
+def setup_dynamodb(client: DynamoDBClient) -> None:
+    for table in TABLES:
+        client.create_table(**table)
+
+
+def cleanup_dynamodb(client: DynamoDBClient) -> None:
+    for table in reversed(TABLES):
+        client.delete_table(TableName=table["TableName"])

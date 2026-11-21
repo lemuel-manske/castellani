@@ -8,6 +8,10 @@ T = TypeVar("T")
 
 
 def awaitable(func: Callable[P, T]) -> Callable[P, Coroutine[None, None, T]]:
+    """
+    Wraps a function in an awaitable callable.
+    """
+
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         return await asyncio.to_thread(partial(func, *args, **kwargs))
 

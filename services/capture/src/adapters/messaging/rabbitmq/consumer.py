@@ -1,8 +1,9 @@
 import json
-from collections.abc import Awaitable, Callable
 from typing import cast
 
 from aio_pika.abc import AbstractIncomingMessage
+
+from worker.api import CaptureRunner
 
 EXPECTED_MESSAGE_TYPE = "CapturePage"
 EXPECTED_MESSAGE_VERSION = 1
@@ -49,9 +50,9 @@ class RabbitMQPageTaskConsumer:
 
     def __init__(
         self,
-        process_page: Callable[[str, str], Awaitable[bool]],
+        page_capturer: CaptureRunner,
     ) -> None:
-        self.process_page = process_page
+        self.process_page = page_capturer
 
     async def handle(self, message: AbstractIncomingMessage) -> None:
         delivery = parse_delivery(message.body)

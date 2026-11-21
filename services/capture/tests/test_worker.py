@@ -15,7 +15,7 @@ from support.worker import (
     SlowPageExecutor,
 )
 
-from application.worker import LeaseLostError, Worker
+from application.worker import ConcreteCaptureWorker, LeaseLostError
 from domain import PageTask, TaskClaim
 
 
@@ -35,14 +35,14 @@ async def test_worker_discards_attempt_artifacts_after_capture_failure(tmp_path:
     repository = FakeRepository(claim)
     artifacts = FakeArtifactStore(tmp_path)
 
-    worker = Worker(
+    worker = ConcreteCaptureWorker(
         repository=repository,
-        capacity=FakeCapacity(),
+        alloc=FakeCapacity(),
         executor=FailingPageExecutor(),
         artifacts=artifacts,
     )
 
-    claimed = await worker.execute("archive-1", "url-1")
+    claimed = await worker("archive-1", "url-1")
 
     assert claimed
     assert repository.failed == (claim, "capture_failed", "browser capture failed")
@@ -66,14 +66,14 @@ async def test_worker_renews_task_and_capacity_leases_during_capture(tmp_path: P
     repository = ShortLeaseRepository(claim)
     capacity = ShortLeaseCapacity()
 
-    worker = Worker(
+    worker = ConcreteCaptureWorker(
         repository=repository,
-        capacity=capacity,
+        alloc=capacity,
         executor=SlowPageExecutor(),
         artifacts=FakeArtifactStore(tmp_path),
     )
 
-    claimed = await worker.execute("archive-1", "url-1")
+    claimed = await worker("archive-1", "url-1")
 
     assert claimed
     assert repository.renewals >= 1
@@ -98,15 +98,15 @@ async def test_worker_stops_capture_when_task_lease_renewal_fails(tmp_path: Path
     artifacts = FakeArtifactStore(tmp_path)
     executor = BlockingPageExecutor()
 
-    worker = Worker(
+    worker = ConcreteCaptureWorker(
         repository=repository,
-        capacity=FakeCapacity(),
+        alloc=FakeCapacity(),
         executor=executor,
         artifacts=artifacts,
     )
 
     with pytest.raises(LeaseLostError):
-        await worker.execute("archive-1", "url-1")
+        await worker("archive-1", "url-1")
 
     assert executor.started.is_set()
     assert executor.cancelled.is_set()
@@ -132,15 +132,15 @@ async def test_worker_stops_capture_when_capacity_lease_renewal_fails(tmp_path: 
     artifacts = FakeArtifactStore(tmp_path)
     executor = BlockingPageExecutor()
 
-    worker = Worker(
+    worker = ConcreteCaptureWorker(
         repository=repository,
-        capacity=ExpiringCapacity(),
+        alloc=ExpiringCapacity(),
         executor=executor,
         artifacts=artifacts,
     )
 
     with pytest.raises(LeaseLostError):
-        await worker.execute("archive-1", "url-1")
+        await worker("archive-1", "url-1")
 
     assert executor.started.is_set()
     assert executor.cancelled.is_set()

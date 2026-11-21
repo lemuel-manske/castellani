@@ -1,8 +1,8 @@
 from typing import Any
 
 import pytest
-from support.dynamodb import FakeClock
-from support.local_dynamodb import (
+from support.dynamodb import (
+    FakeClock,
     frontier_item,
     outbox_items,
     seed_frontier,

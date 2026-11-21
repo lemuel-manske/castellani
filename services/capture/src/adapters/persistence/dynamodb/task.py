@@ -11,7 +11,7 @@ from adapters.persistence.dynamodb.error_handling import (
     extract_cancellation_reasons,
     is_transaction_canceled,
 )
-from domain import PageTask, TaskClaim, new_attempt_id
+from domain import PageTask, TaskClaim, TaskRepository, new_attempt_id
 
 
 def claim_from_item(
@@ -42,10 +42,10 @@ class TaskClaimLostError(RuntimeError):
 
 
 class ConditionalWriteRejected(RuntimeError):
-    pass
+    """Raised when a DynamoDB transaction is rejected due to a conditional failure."""
 
 
-class DynamoDBTaskClaims:
+class DynamoDBTaskRepository(TaskRepository):
     """Acquires and renews fenced page-task claims against the Capture frontier."""
 
     def __init__(

@@ -145,8 +145,3 @@ class BlockingPageExecutor:
             raise
 
         raise AssertionError("blocking page executor resumed unexpectedly")
-
-
-class ExpiringCapacity(FakeCapacity):
-    async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
-        raise RuntimeError("capacity store unavailable")

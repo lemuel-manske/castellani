@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from domain import PageCapture, TaskClaim
+from domain import OutboxMessage, PageCapture, TaskClaim
 
 
 @dataclass(frozen=True)
@@ -14,7 +14,17 @@ class CaptureArtifact:
     warc_files: tuple[Path, ...]
 
 
-class PageExecutor(Protocol):
+class LeaseLostError(RuntimeError):
+    """Raised when a worker can no longer prove ownership of its execution leases."""
+
+
+class CaptureRunner(Protocol):
+    """A callable that executes a page capture for a claimed task."""
+
+    async def __call__(self, archive_id: str, url_key: str) -> bool: ...
+
+
+class CaptureExecutor(Protocol):
     """
     Executes a browser capture and returns its resulting artifacts.
 
@@ -30,3 +40,9 @@ class ArtifactStore(Protocol):
     async def create_attempt_directory(self, claim: TaskClaim) -> Path: ...
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None: ...
+
+
+class MessagePublisher(Protocol):
+    """Publishes an immutable message envelope to the broker."""
+
+    async def publish(self, message: OutboxMessage) -> None: ...
