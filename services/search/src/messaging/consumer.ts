@@ -1,27 +1,34 @@
+import { randomUUID } from "node:crypto";
+
 import { type Channel, type ChannelModel, type ConfirmChannel, type ConsumeMessage, connect } from "amqplib";
 
 import { RejectedEventError } from "../indexing/indexer.js";
+import type { OutgoingEvent } from "../outbox/outbox.js";
 import { type Contracts, InvalidMessageError } from "./contracts.js";
+import type { Inbox } from "./inbox.js";
 
 export const SEARCH_QUEUE = "castellani.search";
 export const RETRY_QUEUE = "castellani.search.retry";
 export const DEAD_QUEUE = "castellani.search.dead";
 export const ATTEMPT_HEADER = "x-search-attempt";
+/** Per-publication identity, to match a broker return with its confirm. */
+const PUBLISH_HEADER = "x-search-publish-id";
 
 /** Event types this service consumes, bound by routing key. */
 export const CONSUMED_TYPES = [
   "PageCaptured",
+  "CrawlCompleted",
   "ArchivePublicationDecided",
   "ArchivePublished",
   "ArchiveCompensationDecided",
 ] as const;
 
+/** No queue was bound for the event: the broker returned it undelivered. */
+export class UnroutableError extends Error {}
+
 export type ConsumedType = (typeof CONSUMED_TYPES)[number];
 
 export type Handlers = Record<ConsumedType, (message: unknown) => Promise<unknown>>;
-
-/** Envelope of an event this service emits; routed by `type`. */
-export type Publication = { messageId: string; type: string } & Record<string, unknown>;
 
 export type ConsumerOptions = {
   url: string;
@@ -46,6 +53,7 @@ type Logger = {
 export class Consumer {
   private connection: ChannelModel | undefined;
   private publisher: ConfirmChannel | undefined;
+  private readonly returned = new Set<string>();
   private inFlight = new Set<Promise<void>>();
   private stopping = false;
   connected = false;
@@ -53,6 +61,7 @@ export class Consumer {
   constructor(
     private readonly options: ConsumerOptions,
     private readonly contracts: Contracts,
+    private readonly inbox: Inbox,
     private readonly handlers: Handlers,
     private readonly log: Logger,
   ) {}
@@ -86,25 +95,41 @@ export class Consumer {
 
   /**
    * Publishes an event to the exchange and resolves once the broker confirms
-   * it. Handlers call this before their delivery is acknowledged, so an
-   * unconfirmed publication leaves the inbound message to be redelivered.
+   * that a queue accepted it. Callers record an emission as done only after
+   * this resolves, so an unconfirmed or unroutable publication is retried.
+   *
+   * Publications are `mandatory`: RabbitMQ returns an unroutable message
+   * before confirming it, so a confirm whose publication was returned fails
+   * with `UnroutableError` instead of silently counting as delivered.
    */
-  publish(message: Publication): Promise<void> {
+  publish(message: OutgoingEvent): Promise<void> {
     const publisher = this.publisher;
 
     if (publisher === undefined || !this.connected) {
       return Promise.reject(new Error("RabbitMQ is not connected"));
     }
 
+    const publishId = randomUUID();
+
     return new Promise((resolve, reject) => {
       publisher.publish(
         this.options.exchange,
         message.type,
         Buffer.from(JSON.stringify(message)),
-        { persistent: true, contentType: "application/json", messageId: message.messageId, mandatory: true },
+        {
+          persistent: true,
+          contentType: "application/json",
+          messageId: message.messageId,
+          mandatory: true,
+          headers: { [PUBLISH_HEADER]: publishId },
+        },
         (error: unknown) => {
+          const wasReturned = this.returned.delete(publishId);
+
           if (error) {
             reject(error instanceof Error ? error : new Error(`broker did not confirm ${message.type}`));
+          } else if (wasReturned) {
+            reject(new UnroutableError(`no queue is bound for ${message.type}`));
           } else {
             resolve();
           }
@@ -141,9 +166,16 @@ export class Consumer {
     const publisher = await connection.createConfirmChannel();
     this.publisher = publisher;
 
-    // `mandatory` publications that no queue accepts are returned here;
-    // log them, since an unroutable acknowledgment would otherwise vanish.
+    // `mandatory` publications that no queue accepts are returned here,
+    // before their confirm; `publish` turns the confirm into a failure.
     publisher.on("return", (returned: ConsumeMessage) => {
+      const headers = returned.properties.headers as Record<string, unknown> | undefined;
+      const publishId = headers?.[PUBLISH_HEADER];
+
+      if (typeof publishId === "string") {
+        this.returned.add(publishId);
+      }
+
       this.log.error({ routingKey: returned.fields.routingKey }, "published event was unroutable");
     });
 
@@ -173,17 +205,27 @@ export class Consumer {
 
   private async process(channel: Channel, publisher: ConfirmChannel, delivery: ConsumeMessage): Promise<void> {
     const attempt = attemptOf(delivery);
-    const messageId = String(delivery.properties.messageId ?? "");
+    let messageId = String(delivery.properties.messageId ?? "");
 
     try {
       const message: unknown = JSON.parse(delivery.content.toString("utf8"));
-      const { type } = this.contracts.envelopeOf(message);
+      const envelope = this.contracts.envelopeOf(message);
+      const { type } = envelope;
+      messageId = envelope.messageId;
 
       if (!isConsumedType(type)) {
         throw new InvalidMessageError(`unexpected message type ${type}`);
       }
 
+      if (await this.inbox.processed(messageId)) {
+        this.log.info({ messageId, type, attempt }, "duplicate message; already processed");
+        channel.ack(delivery);
+
+        return;
+      }
+
       const result = await this.handlers[type](message);
+      await this.inbox.record(messageId, type, new Date());
       this.log.info({ messageId, type, attempt, result }, "handled event");
       channel.ack(delivery);
 

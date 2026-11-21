@@ -8,10 +8,17 @@ import { DynamoLedger } from "./indexing/dynamodb-ledger.js";
 import { Indexer } from "./indexing/indexer.js";
 import { S3ArtifactStore } from "./indexing/s3-artifacts.js";
 import { Consumer } from "./messaging/consumer.js";
-import { Contracts } from "./messaging/contracts.js";
-import { DynamoVisibility } from "./publication/dynamodb-visibility.js";
+import { Contracts, type MessageType } from "./messaging/contracts.js";
+import { DynamoInbox } from "./messaging/inbox.js";
+import { DynamoOutbox } from "./outbox/dynamodb-outbox.js";
+import { type EventPublisher, OutboxDispatcher } from "./outbox/outbox.js";
+import { DynamoPublications } from "./publication/dynamodb-publications.js";
 import { PublicationHandler } from "./publication/handler.js";
+import { ReconcileScheduler, Reconciler } from "./reconciliation/reconciler.js";
 import { OpenSearchIndex } from "./search/opensearch.js";
+
+/** How long a dispatcher holds an outbox record while awaiting the broker's confirm. */
+const OUTBOX_LEASE_MS = 30_000;
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
@@ -27,36 +34,58 @@ async function main(): Promise<void> {
   const s3 = new S3Client({ ...aws, forcePathStyle: config.awsEndpoint !== undefined });
   const index = OpenSearchIndex.connect(config.openSearchUrl, config.openSearchIndex);
   const contracts = new Contracts();
-  const visibility = new DynamoVisibility(dynamo, config.visibilityTable);
-
-  const indexer = new Indexer(
-    new DynamoLedger(dynamo, config.ledgerTable, config.claimLeaseMs),
-    new S3ArtifactStore(s3, config.maxArtifactBytes),
-    index,
-    visibility,
-    { maxDocumentAttempts: config.maxDocumentAttempts },
-  );
-
-  // `publication` and `consumer` reference each other: the consumer dispatches
-  // to the handler, and the handler publishes acknowledgments through the
-  // consumer's broker connection. Explicit types break the inference cycle.
-  const publication: PublicationHandler = new PublicationHandler(visibility, index, {
-    publish: (event): Promise<void> => {
-      contracts.assertOutgoing("SearchCompensated", event);
-
-      return consumer.publish(event);
-    },
+  // Enqueued reports wake the dispatcher, declared further down.
+  const visibility = new DynamoPublications(dynamo, config.publicationsTable, config.outboxTable, () => {
+    dispatcher.wake();
   });
+  const ledger = new DynamoLedger(dynamo, config.ledgerTable, config.claimLeaseMs);
+  const artifacts = new S3ArtifactStore(s3, config.maxArtifactBytes);
 
   let indexReady = false;
 
+  // Closures here reference `consumer` and `dispatcher`, declared further
+  // down: they only run after startup, once both are initialized.
   const app = buildServer({
     searcher: index,
-    // Only called by requests after listen(), when `consumer` is initialized.
     ready: () => indexReady && consumer.connected,
     logger: { level: process.env.SEARCH_LOG_LEVEL ?? "info" },
   });
   const log = app.log;
+
+  // Outbox records are validated against their contract, then published with
+  // confirms through the consumer's broker connection.
+  const publisher: EventPublisher = {
+    publish: (event) => {
+      contracts.assertOutgoing(event.type as MessageType, event);
+
+      return consumer.publish(event);
+    },
+  };
+
+  const indexer = new Indexer(ledger, artifacts, index, visibility, {
+    maxDocumentAttempts: config.maxDocumentAttempts,
+  });
+  const reconciler = new Reconciler(visibility, ledger, indexer, artifacts, contracts, index, log);
+  const scheduler = new ReconcileScheduler(reconciler, visibility, config.reconcileIntervalMs, log);
+  const dispatcher: OutboxDispatcher = new OutboxDispatcher(
+    new DynamoOutbox(dynamo, config.outboxTable, OUTBOX_LEASE_MS),
+    publisher,
+    { intervalMs: config.outboxIntervalMs },
+    log,
+  );
+
+  const publication = new PublicationHandler(
+    visibility,
+    index,
+    {
+      // Durable first, so the periodic pass finds the request after a crash.
+      request: async (archiveId) => {
+        await visibility.requestReconcile(archiveId);
+        scheduler.schedule(archiveId);
+      },
+    },
+    reconciler,
+  );
 
   const consumer: Consumer = new Consumer(
     {
@@ -67,8 +96,14 @@ async function main(): Promise<void> {
       retryDelayMs: config.retryDelayMs,
     },
     contracts,
+    new DynamoInbox(dynamo, config.inboxTable, config.inboxRetentionMs),
     {
       PageCaptured: (message) => indexer.handle(contracts.parsePageCaptured(message)),
+      CrawlCompleted: (message) => {
+        const event = contracts.parseCrawlCompleted(message);
+
+        return publication.crawlCompleted(event.archiveId, event.manifest, event.manifestDigest);
+      },
       ArchivePublicationDecided: (message) => {
         const event = contracts.parseArchiveFact("ArchivePublicationDecided", message);
 
@@ -94,7 +129,7 @@ async function main(): Promise<void> {
 
   // The index must exist with its strict mapping before consuming: indexing
   // into a missing index would auto-create it with a dynamic mapping.
-  const consuming = (async () => {
+  const running = (async () => {
     await retry(
       () => index.ensureIndex(),
       stopping.signal,
@@ -110,7 +145,7 @@ async function main(): Promise<void> {
     indexReady = true;
     log.info({ index: config.openSearchIndex }, "search index ready");
 
-    await consumer.run();
+    await Promise.all([consumer.run(), scheduler.run(), dispatcher.run()]);
   })();
 
   const shutdown = async (signal: string): Promise<void> => {
@@ -124,8 +159,10 @@ async function main(): Promise<void> {
     timer.unref();
 
     await app.close();
+    scheduler.stop();
+    dispatcher.stop();
     await consumer.stop();
-    await consuming.catch(() => undefined);
+    await running.catch(() => undefined);
     s3.destroy();
     dynamo.destroy();
   };

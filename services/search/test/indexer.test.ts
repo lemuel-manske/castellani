@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { Indexer, RejectedEventError, RetryableError } from "../src/indexing/indexer.js";
+import { Indexer, RetryableError } from "../src/indexing/indexer.js";
 import { MemoryArtifacts, MemoryLedger, MemoryVisibility, RecordingIndex } from "./support/doubles.js";
 import { pageCaptured } from "./support/events.js";
 import { artifactRefFor, buildWarc } from "./support/warc.js";
@@ -40,12 +40,12 @@ describe("indexing captured pages", () => {
     const result = await indexer.handle(event);
 
     expect(result).toBe("indexed");
-    const document = index.documents.get(event.snapshotId);
+    const document = index.document(event.snapshotId);
     expect(document?.archiveId).toBe(event.archiveId);
     expect(document?.title).toBe("Harbour history");
     expect(document?.content).toBe("The old harbour Fishing boats & ferries left at dawn.");
     expect(document?.capturedAt).toBe(event.capturedAt);
-    expect(ledger.statusOf(event.snapshotId)).toBe("INDEXED");
+    expect(ledger.statusOf(event)).toBe("INDEXED");
   });
 
   test("script and style content is not indexed", async () => {
@@ -55,7 +55,7 @@ describe("indexing captured pages", () => {
 
     await indexer.handle(event);
 
-    const content = index.documents.get(event.snapshotId)?.content ?? "";
+    const content = index.document(event.snapshotId)?.content ?? "";
     expect(content).not.toContain("trackVisitor");
     expect(content).not.toContain("color: red");
   });
@@ -75,7 +75,7 @@ describe("indexing captured pages", () => {
 
     await indexer.handle(event);
 
-    expect(index.documents.get(event.snapshotId)?.title).toBe("New home");
+    expect(index.document(event.snapshotId)?.title).toBe("New home");
   });
 
   test("redelivering an indexed snapshot does not index it again", async () => {
@@ -106,7 +106,7 @@ describe("indexing failures", () => {
     const result = await indexer.handle(event);
 
     expect(result).toBe("unsupported");
-    expect(ledger.statusOf(event.snapshotId)).toBe("UNSUPPORTED");
+    expect(ledger.statusOf(event)).toBe("UNSUPPORTED");
     expect(index.documents.size).toBe(0);
   });
 
@@ -119,12 +119,12 @@ describe("indexing failures", () => {
     });
 
     await expect(indexer.handle(event)).rejects.toBeInstanceOf(RetryableError);
-    expect(ledger.statusOf(event.snapshotId)).toBe("PENDING");
+    expect(ledger.statusOf(event)).toBe("PENDING");
 
     const result = await indexer.handle(event);
 
     expect(result).toBe("failed");
-    expect(ledger.statusOf(event.snapshotId)).toBe("FAILED");
+    expect(ledger.statusOf(event)).toBe("FAILED");
     expect(index.documents.size).toBe(0);
   });
 
@@ -137,13 +137,13 @@ describe("indexing failures", () => {
     await expect(indexer.handle(event)).rejects.toBeInstanceOf(RetryableError);
     await expect(indexer.handle(event)).rejects.toBeInstanceOf(RetryableError);
     await expect(indexer.handle(event)).rejects.toBeInstanceOf(RetryableError);
-    expect(ledger.statusOf(event.snapshotId)).toBe("PENDING");
+    expect(ledger.statusOf(event)).toBe("PENDING");
 
     index.offline = false;
     const result = await indexer.handle(event);
 
     expect(result).toBe("indexed");
-    expect(ledger.statusOf(event.snapshotId)).toBe("INDEXED");
+    expect(ledger.statusOf(event)).toBe("INDEXED");
   });
 
   test("a snapshot being indexed by another worker is redelivered later", async () => {
@@ -157,14 +157,19 @@ describe("indexing failures", () => {
     expect(index.writes).toBe(0);
   });
 
-  test("a snapshot ID already owned by another archive is rejected", async () => {
-    const { artifacts, index, indexer } = fixture();
+  test("the same snapshot ID in another archive is a separate snapshot and never overwrites the first", async () => {
+    const { artifacts, index, indexer, ledger } = fixture();
     const ref = await storeWarc(artifacts, "a.warc.gz", "https://example.org/history", ARTICLE);
     const event = pageCaptured({ url: "https://example.org/history", warcArtifacts: [ref] });
+    const other = { ...event, archiveId: "another-archive" };
+
     await indexer.handle(event);
+    await indexer.handle(other);
 
-    await expect(indexer.handle({ ...event, archiveId: "another-archive" })).rejects.toBeInstanceOf(RejectedEventError);
-
-    expect(index.documents.get(event.snapshotId)?.archiveId).toBe(event.archiveId);
+    expect(ledger.statusOf(event)).toBe("INDEXED");
+    expect(ledger.statusOf(other)).toBe("INDEXED");
+    expect([...index.documents.values()].map((d) => d.archiveId).sort()).toEqual(
+      [event.archiveId, "another-archive"].sort(),
+    );
   });
 });

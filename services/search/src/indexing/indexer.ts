@@ -9,7 +9,6 @@ import {
   DocumentError,
   UnsupportedContentError,
   isCompensated,
-  isVisible,
 } from "./model.js";
 
 /** The event cannot be processed now; redeliver it later. */
@@ -28,16 +27,18 @@ export type IndexerOptions = {
 const COMPENSATED_REASON = "archive was compensated";
 
 /**
- * Indexes one captured snapshot. Processing is keyed by `snapshotId`: repeated
- * or concurrent deliveries resolve through the ledger claim, and the search
- * document identity is the snapshot ID, so a crash between the OpenSearch
- * write and the ledger update is repaired by simply indexing again.
+ * Indexes one captured snapshot. Processing is keyed by `archiveId` and
+ * `snapshotId`: repeated or concurrent deliveries resolve through the ledger
+ * claim, and the search document identity derives from the same key, so a
+ * crash between the OpenSearch write and the ledger update is repaired by
+ * simply indexing again.
  *
- * Visibility follows the archive's publication facts. The indexer writes the
- * document, then re-reads those facts; archive activation and purge record
- * the facts, then update documents. Whichever runs second sees the other's
- * write, so a snapshot indexed concurrently with activation or compensation
- * cannot end up hidden or left behind.
+ * Documents are written hidden and never change visibility here: the
+ * reconciler reveals manifest snapshots once they are indexed and the archive
+ * is published. Compensation is checked before and after the write; purge
+ * records the compensation, then deletes. Whichever runs second sees the
+ * other's write, so a snapshot indexed concurrently with compensation cannot
+ * be left behind.
  */
 export class Indexer {
   private readonly clock: () => Date;
@@ -60,8 +61,6 @@ export class Indexer {
         return "duplicate";
       case "busy":
         throw new RetryableError(`snapshot ${event.snapshotId} is being indexed by another worker`);
-      case "conflict":
-        throw new RejectedEventError(claimed.reason);
       case "claimed":
         break;
     }
@@ -78,7 +77,6 @@ export class Indexer {
       const warcs = await Promise.all(event.warcArtifacts.map((ref) => this.artifacts.read(ref)));
       const targets = event.finalUrl ? [event.finalUrl, event.url] : [event.url];
       const page = await extractPage(warcs, targets);
-      const visible = isVisible(before);
 
       await this.index.put({
         snapshotId: event.snapshotId,
@@ -91,19 +89,14 @@ export class Indexer {
         ...(page.title ? { title: page.title } : {}),
         content: page.content,
         indexedAt: this.clock().toISOString(),
-        visible,
       });
 
       const after = await this.visibility.get(event.archiveId);
 
       if (isCompensated(after)) {
-        await this.index.remove(event.snapshotId);
+        await this.index.remove(event.archiveId, event.snapshotId);
 
         return await this.discard(claim);
-      }
-
-      if (!visible && isVisible(after)) {
-        await this.index.reveal(event.snapshotId);
       }
     } catch (error) {
       return this.fail(claim, error);

@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
-import { type DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchGetCommand,
+  type BatchGetCommandOutput,
+  type DynamoDBDocumentClient,
+  GetCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 import {
   type Claim,
@@ -10,13 +16,16 @@ import {
   type LedgerStatus,
   type Outcome,
   type PageCaptured,
+  documentId,
   terminalStatuses,
 } from "./model.js";
 
 /**
- * Ledger item, keyed by `snapshotId`:
- * `archiveId`, `status`, `attempts`, `claimToken`, `leaseUntil` (epoch ms),
- * `firstMessageId`, `reason`, `createdAt`, `updatedAt`.
+ * `search_indexing_ledger` item, keyed by `archiveId` (partition) and
+ * `snapshotId` (sort): `documentId` (the stable OpenSearch ID),
+ * `warcArtifacts` (the artifact references it was indexed from), `status`,
+ * `attempts`, `claimToken`, `leaseUntil` (epoch ms), `firstMessageId`,
+ * `reason`, `createdAt`, `updatedAt`.
  */
 export class DynamoLedger implements Ledger {
   constructor(
@@ -32,19 +41,19 @@ export class DynamoLedger implements Ledger {
       const result = await this.client.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: { snapshotId: event.snapshotId },
+          Key: { archiveId: event.archiveId, snapshotId: event.snapshotId },
           UpdateExpression:
-            "SET archiveId = :archiveId, #status = :processing, claimToken = :token, leaseUntil = :lease, " +
+            "SET #status = :processing, claimToken = :token, leaseUntil = :lease, documentId = :documentId, " +
             "updatedAt = :now, createdAt = if_not_exists(createdAt, :now), " +
             "firstMessageId = if_not_exists(firstMessageId, :messageId), " +
+            "warcArtifacts = if_not_exists(warcArtifacts, :artifacts), " +
             "attempts = if_not_exists(attempts, :zero) + :one",
           ConditionExpression:
-            "(attribute_not_exists(archiveId) OR archiveId = :archiveId) AND (" +
-            "attribute_not_exists(#status) OR #status = :pending OR " +
-            "(#status = :processing AND leaseUntil < :nowMs))",
+            "attribute_not_exists(#status) OR #status = :pending OR (#status = :processing AND leaseUntil < :nowMs)",
           ExpressionAttributeNames: { "#status": "status" },
           ExpressionAttributeValues: {
-            ":archiveId": event.archiveId,
+            ":documentId": documentId(event.archiveId, event.snapshotId),
+            ":artifacts": event.warcArtifacts,
             ":processing": "PROCESSING",
             ":pending": "PENDING",
             ":token": token,
@@ -61,7 +70,12 @@ export class DynamoLedger implements Ledger {
 
       return {
         kind: "claimed",
-        claim: { snapshotId: event.snapshotId, token, attempt: Number(result.Attributes?.attempts ?? 1) },
+        claim: {
+          archiveId: event.archiveId,
+          snapshotId: event.snapshotId,
+          token,
+          attempt: Number(result.Attributes?.attempts ?? 1),
+        },
       };
     } catch (error) {
       if (!(error instanceof ConditionalCheckFailedException)) {
@@ -70,6 +84,45 @@ export class DynamoLedger implements Ledger {
     }
 
     return this.explainRejectedClaim(event);
+  }
+
+  async statuses(archiveId: string, snapshotIds: string[]): Promise<Map<string, LedgerStatus>> {
+    const result = new Map<string, LedgerStatus>();
+    const unique = [...new Set(snapshotIds)];
+
+    // BatchGetItem accepts at most 100 keys; unprocessed keys are retried.
+    for (let start = 0; start < unique.length; start += 100) {
+      let keys: Record<string, unknown>[] | undefined = unique
+        .slice(start, start + 100)
+        .map((snapshotId) => ({ archiveId, snapshotId }));
+
+      for (let attempt = 0; keys !== undefined && keys.length > 0; attempt += 1) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, Math.min(50 * 2 ** attempt, 1_000)));
+        }
+
+        const response: BatchGetCommandOutput = await this.client.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [this.table]: {
+                Keys: keys,
+                ConsistentRead: true,
+                ProjectionExpression: "snapshotId, #status",
+                ExpressionAttributeNames: { "#status": "status" },
+              },
+            },
+          }),
+        );
+
+        for (const item of response.Responses?.[this.table] ?? []) {
+          result.set(String(item.snapshotId), item.status as LedgerStatus);
+        }
+
+        keys = response.UnprocessedKeys?.[this.table]?.Keys;
+      }
+    }
+
+    return result;
   }
 
   async release(claim: Claim, reason: string, now: Date): Promise<void> {
@@ -104,7 +157,7 @@ export class DynamoLedger implements Ledger {
       await this.client.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: { snapshotId: claim.snapshotId },
+          Key: { archiveId: claim.archiveId, snapshotId: claim.snapshotId },
           UpdateExpression: update,
           ConditionExpression: "#status = :processing AND claimToken = :token",
           ExpressionAttributeNames: { "#status": "status" },
@@ -120,19 +173,16 @@ export class DynamoLedger implements Ledger {
 
   private async explainRejectedClaim(event: PageCaptured): Promise<ClaimResult> {
     const { Item: item } = await this.client.send(
-      new GetCommand({ TableName: this.table, Key: { snapshotId: event.snapshotId }, ConsistentRead: true }),
+      new GetCommand({
+        TableName: this.table,
+        Key: { archiveId: event.archiveId, snapshotId: event.snapshotId },
+        ConsistentRead: true,
+      }),
     );
 
     if (item === undefined) {
       // Deleted between the conditional write and the read; try again later.
       return { kind: "busy" };
-    }
-
-    if (item.archiveId !== event.archiveId) {
-      return {
-        kind: "conflict",
-        reason: `snapshot ${event.snapshotId} belongs to archive ${String(item.archiveId)}, not ${event.archiveId}`,
-      };
     }
 
     const status = item.status as LedgerStatus;

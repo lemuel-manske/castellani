@@ -77,13 +77,21 @@ resource "aws_dynamodb_table" "coordinator_inbox" {
   }
 }
 
-# Search-owned indexing ledger (ADR-0005, ADR-0019): one item per snapshot,
-# recording claims and terminal indexing outcomes.
-resource "aws_dynamodb_table" "search_index_ledger" {
-  name         = "search_index_ledger"
+# Search-owned tables (docs/backend/state-and-recovery.md#search--index-typescript).
+
+# Indexing ledger (ADR-0005, ADR-0019): one item per archive snapshot,
+# recording claims, artifact references and terminal indexing outcomes.
+resource "aws_dynamodb_table" "search_indexing_ledger" {
+  name         = "search_indexing_ledger"
   billing_mode = "PAY_PER_REQUEST"
 
-  hash_key = "snapshotId"
+  hash_key  = "archiveId"
+  range_key = "snapshotId"
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
 
   attribute {
     name = "snapshotId"
@@ -91,10 +99,11 @@ resource "aws_dynamodb_table" "search_index_ledger" {
   }
 }
 
-# Search-owned publication facts per archive (ADR-0027): the Coordinator's
-# publication decision, Capture's replay acknowledgment, and compensation.
-resource "aws_dynamodb_table" "search_archive_visibility" {
-  name         = "search_archive_visibility"
+# Per-archive publication record (ADR-0027): manifest, publication decision,
+# Capture's replay acknowledgment, compensation, indexed counts and
+# reconciliation status.
+resource "aws_dynamodb_table" "search_publications" {
+  name         = "search_publications"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key = "archiveId"
@@ -102,6 +111,64 @@ resource "aws_dynamodb_table" "search_archive_visibility" {
   attribute {
     name = "archiveId"
     type = "S"
+  }
+
+  attribute {
+    name = "reconcilePending"
+    type = "S"
+  }
+
+  # Sparse: only archives with an outstanding reconciliation request carry
+  # `reconcilePending`, so the periodic pass queries just those.
+  global_secondary_index {
+    name            = "reconcile-pending-index"
+    hash_key        = "reconcilePending"
+    projection_type = "KEYS_ONLY"
+  }
+}
+
+# Events Search emits, written in the same transaction as the state they
+# report and dispatched with publisher confirms.
+resource "aws_dynamodb_table" "search_outbox" {
+  name         = "search_outbox"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "messageId"
+
+  attribute {
+    name = "messageId"
+    type = "S"
+  }
+
+  attribute {
+    name = "dispatchPending"
+    type = "S"
+  }
+
+  # Sparse: only records the broker has not confirmed yet.
+  global_secondary_index {
+    name            = "dispatch-pending-index"
+    hash_key        = "dispatchPending"
+    projection_type = "KEYS_ONLY"
+  }
+}
+
+# Consumed message IDs, recorded after their effect is durable. TTL only
+# cleans up old records; deduplication never depends on when they expire.
+resource "aws_dynamodb_table" "search_inbox" {
+  name         = "search_inbox"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "messageId"
+
+  attribute {
+    name = "messageId"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
   }
 }
 
