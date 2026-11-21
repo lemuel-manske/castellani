@@ -13,7 +13,7 @@ from application.outbox import OutboxMessage
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
-OUTBOX_PUBLISHED = "DELIVERED"
+OUTBOX_PUBLISHED = "PUBLISHED"
 OUTBOX_INDEX = "status-nextAttemptAt-index"
 OUTBOX_CLAIM_LIMIT = 50
 
