@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from hashlib import sha256
 from urllib.parse import quote, urlsplit, urlunsplit
 
+from utils.web import SCHEME_TO_PORT, HTTP_SCHEMES
+
 URL_IDENTITY_VERSION = 1
-HTTP_SCHEMES = {"http", "https"}
-DEFAULT_PORTS = {"http": 80, "https": 443}
+
 UNRESERVED = frozenset(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
 )
@@ -48,7 +49,7 @@ def identify_url(url: str) -> URLIdentity:
         raise InvalidURLIdentity("url must be a valid absolute HTTP(S) URL without credentials")
 
     hostname = _normalize_hostname(parsed.hostname)
-    default_port = DEFAULT_PORTS[scheme]
+    default_port = SCHEME_TO_PORT[scheme]
     authority = f"[{hostname}]" if ":" in hostname else hostname
 
     if port is not None and port != default_port:
