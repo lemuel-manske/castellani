@@ -52,6 +52,7 @@ class Worker:
         claim_state = [claim]
         reservation_state: list[BrowserReservation | None] = [None]
         directory_state: list[Path | None] = [None]
+        artifact_claim_state: list[TaskClaim | None] = [None]
         terminal_state = [False]
         stop_heartbeat = asyncio.Event()
         lease_changed = asyncio.Event()
@@ -69,6 +70,7 @@ class Worker:
                 claim_state,
                 reservation_state,
                 directory_state,
+                artifact_claim_state,
                 terminal_state,
                 lease_changed,
             )
@@ -126,8 +128,10 @@ class Worker:
 
             directory = directory_state[0]
 
-            if directory is not None and not terminal_state[0]:
-                await self._discard_attempt(claim, directory)
+            artifact_claim = artifact_claim_state[0]
+
+            if directory is not None and artifact_claim is not None and not terminal_state[0]:
+                await self._discard_attempt(artifact_claim, directory)
 
             reservation = reservation_state[0]
 
@@ -142,6 +146,7 @@ class Worker:
         claim_state: list[TaskClaim],
         reservation_state: list[BrowserReservation | None],
         directory_state: list[Path | None],
+        artifact_claim_state: list[TaskClaim | None],
         terminal_state: list[bool],
         lease_changed: asyncio.Event,
     ) -> None:
@@ -155,7 +160,9 @@ class Worker:
         reservation_state[0] = reservation
         lease_changed.set()
 
-        directory = await self.artifacts.create_attempt_directory(claim_state[0])
+        artifact_claim = claim_state[0]
+        directory = await self.artifacts.create_attempt_directory(artifact_claim)
+        artifact_claim_state[0] = artifact_claim
         directory_state[0] = directory
 
         artifact: CaptureArtifact = await self.executor.execute(
