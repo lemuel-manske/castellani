@@ -2,8 +2,8 @@ import os
 from collections.abc import Iterator
 from typing import Any, cast
 
-from botocore.session import Session
 import pytest
+from botocore.session import Session
 
 TABLES = (
     {
