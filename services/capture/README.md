@@ -11,16 +11,16 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. On Linux,
 Run `make test` for fast service tests, `make test-integration` for the local WARC recording and offline replay acceptance test, and `make check` for linting and type checking. Integration tests require the Playwright Chromium browser and `certutil`. The broader WARC fidelity acceptance gate is documented in [ADR-0026](../../docs/adr/0026-capture-local-warc-recording.md).
 
 
-## DynamoDB outbox tests
+## DynamoDB adapter tests
 
-The outbox adapter tests use AWS DynamoDB Local rather than a hand-written client fake.
+The DynamoDB adapter tests use AWS DynamoDB Local rather than hand-written client fakes.
 Start the pinned local database from this directory before running those tests:
 
 ```sh
 docker compose up -d dynamodb-local
-uv run pytest tests/test_dynamodb_outbox.py
+uv run pytest tests/test_dynamodb_*.py
 docker compose down
 ```
 
-The tests create and remove their own table. They use the local endpoint by default; set
+The tests create and remove their tables. They use the local endpoint by default; set
 `DYNAMODB_ENDPOINT_URL` to override it. CI starts the same DynamoDB Local image.
