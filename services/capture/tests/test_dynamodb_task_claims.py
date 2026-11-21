@@ -16,7 +16,7 @@ from adapters.persistence.dynamodb.task_claims import (
 )
 
 
-async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation(dynamodb_client: Any) -> None:
+async def test_claim_sets_new_fence_for_pending_task(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -126,7 +126,7 @@ async def test_claim_requires_an_open_archive_run(dynamodb_client: Any) -> None:
     assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_renewal_extends_the_lease_without_changing_attempt_or_fence(dynamodb_client: Any) -> None:
+async def test_renewal_extends_lease_preserving_owner_and_fence(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
