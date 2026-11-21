@@ -1,8 +1,13 @@
 from dataclasses import dataclass
+from uuid import uuid4
 
 
 class InvalidTaskClaimRenewal(ValueError):
     """Raised when a task claim renewal violates ownership or lease invariants."""
+
+
+def new_attempt_id() -> str:
+    return str(uuid4())
 
 
 @dataclass(frozen=True)

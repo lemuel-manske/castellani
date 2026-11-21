@@ -1,4 +1,11 @@
 from dataclasses import dataclass
+from hashlib import sha256
+
+
+def new_reservation_id(attempt_id: str) -> str:
+    digest = sha256(attempt_id.encode("utf-8")).hexdigest()
+
+    return f"browser-{digest}"
 
 
 class InvalidBrowserReservationRenewal(ValueError):

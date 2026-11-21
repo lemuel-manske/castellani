@@ -2,7 +2,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from typing import Any
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import NAMESPACE_URL, uuid5
 
 from botocore.exceptions import ClientError
 
@@ -10,11 +10,7 @@ from adapters.persistence.dynamodb.error_handling import (
     extract_cancellation_reasons,
     is_transaction_canceled,
 )
-from domain.task import PageTask, TaskClaim
-
-
-def new_attempt_id() -> str:
-    return str(uuid4())
+from domain.task import PageTask, TaskClaim, new_attempt_id
 
 
 def claim_from_item(
@@ -231,6 +227,7 @@ class DynamoDBTaskClaims:
                     TransactItems=items,
                     ClientRequestToken=request_token,
                 )
+
                 return
             except ClientError as error:
                 if is_transaction_canceled(error):

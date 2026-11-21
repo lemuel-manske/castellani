@@ -1,13 +1,12 @@
 import asyncio
 import time
 from collections.abc import Callable
-from hashlib import sha256
 from typing import Any
 
 from botocore.exceptions import ClientError
 
 from adapters.persistence.dynamodb.error_handling import is_conditional_failure
-from domain.browser_reservation import BrowserReservation
+from domain.browser_reservation import BrowserReservation, new_reservation_id
 
 
 def to_number(item: dict[str, Any], name: str) -> float:
@@ -15,12 +14,6 @@ def to_number(item: dict[str, Any], name: str) -> float:
         return float(item[name]["N"])
     except (KeyError, TypeError, ValueError) as error:
         raise RuntimeError(f"DynamoDB browser slot has invalid {name}") from error
-
-
-def new_reservation_id(attempt_id: str) -> str:
-    digest = sha256(attempt_id.encode("utf-8")).hexdigest()
-
-    return f"browser-{digest}"
 
 
 def reservation_from_item(
@@ -138,6 +131,7 @@ class DynamoDBBrowserCapacity:
                     raise
 
                 existing = self._read_slot(slot_id)
+
                 if (
                     existing is not None
                     and existing.get("ownerAttemptId", {}).get("S") == attempt_id
