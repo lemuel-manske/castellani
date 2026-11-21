@@ -55,13 +55,16 @@ TABLES = (
 
 @pytest.fixture
 def dynamodb_client() -> Iterator[Any]:
-    client = cast(Any, Session().create_client(
-        "dynamodb",
-        endpoint_url=os.environ.get("DYNAMODB_ENDPOINT_URL", "http://localhost:8000"),
-        region_name="us-east-1",
-        aws_access_key_id="testing",
-        aws_secret_access_key="testing",
-    ))
+    client = cast(
+        Any,
+        Session().create_client(
+            "dynamodb",
+            endpoint_url=os.environ.get("DYNAMODB_ENDPOINT_URL", "http://localhost:8000"),
+            region_name="us-east-1",
+            aws_access_key_id="testing",
+            aws_secret_access_key="testing",
+        ),
+    )
 
     for table in TABLES:
         client.create_table(**table)
