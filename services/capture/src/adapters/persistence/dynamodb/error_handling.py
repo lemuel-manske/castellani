@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingTypeStubs]
+from botocore.exceptions import ClientError
 
 
 class ClientErrorResponse(TypedDict):
