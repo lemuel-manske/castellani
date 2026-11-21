@@ -167,8 +167,13 @@ class DynamoDBOutbox:
             self.client.update_item(
                 TableName=self.table_name,
                 Key={"messageId": {"S": message.message_id}},
-                ConditionExpression="#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :lease_now",
-                UpdateExpression="SET #status = :published, #published_at = :now REMOVE #lease_token",
+                ConditionExpression=(
+                    "#status = :claimed AND #lease_token = :lease_token "
+                    "AND #next_attempt > :lease_now"
+                ),
+                UpdateExpression=(
+                    "SET #status = :published, #published_at = :now REMOVE #lease_token"
+                ),
                 ExpressionAttributeNames={
                     "#status": "status",
                     "#lease_token": "leaseToken",
@@ -196,8 +201,12 @@ class DynamoDBOutbox:
             self.client.update_item(
                 TableName=self.table_name,
                 Key={"messageId": {"S": message.message_id}},
-                ConditionExpression="#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :now",
-                UpdateExpression="SET #status = :pending, #next_attempt = :next_attempt REMOVE #lease_token",
+                ConditionExpression=(
+                    "#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :now"
+                ),
+                UpdateExpression=(
+                    "SET #status = :pending, #next_attempt = :next_attempt REMOVE #lease_token"
+                ),
                 ExpressionAttributeNames={
                     "#status": "status",
                     "#lease_token": "leaseToken",
