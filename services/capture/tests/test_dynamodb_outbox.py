@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from support.dynamodb import FakeClock, FakeDynamoDBOutboxClient
+from support.dynamodb import FakeClock
 
 from adapters.persistence.dynamodb.outbox import (
     DynamoDBOutbox,
@@ -10,6 +10,14 @@ from adapters.persistence.dynamodb.outbox import (
     OUTBOX_PENDING,
     OutboxLeaseLostError,
 )
+
+
+def stored_item(client) -> dict:
+    return client.get_item(
+        TableName="capture_outbox",
+        Key={"messageId": {"S": "message-1"}},
+        ConsistentRead=True,
+    )["Item"]
 
 
 def outbox_item(next_attempt_at: float, status: str = OUTBOX_PENDING) -> dict:
@@ -31,10 +39,10 @@ def outbox_item(next_attempt_at: float, status: str = OUTBOX_PENDING) -> dict:
     }
 
 
-async def test_claim_returns_due_message_and_acquires_delivery_lease() -> None:
+async def test_claim_returns_due_message_and_acquires_delivery_lease(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
 
     outbox = DynamoDBOutbox(
         client=client,
@@ -57,17 +65,17 @@ async def test_claim_returns_due_message_and_acquires_delivery_lease() -> None:
         "payload": {"archiveId": "archive-1", "urlKey": "url-1"},
     }
 
-    item = client.items["message-1"]
+    item = stored_item(client)
     assert item["status"] == {"S": OUTBOX_CLAIMED}
     assert item["leaseToken"] == {"S": "lease-1"}
     assert item["nextAttemptAt"] == {"N": str(clock() + 30)}
     assert item["attempts"] == {"N": "1"}
 
 
-async def test_claim_skips_messages_that_are_not_due() -> None:
+async def test_claim_skips_messages_that_are_not_due(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() + 10)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() + 10))
 
     outbox = DynamoDBOutbox(
         client=client,
@@ -76,13 +84,13 @@ async def test_claim_skips_messages_that_are_not_due() -> None:
     )
 
     assert await outbox.claim(30) is None
-    assert client.items["message-1"]["status"] == {"S": OUTBOX_PENDING}
+    assert stored_item(client)["status"] == {"S": OUTBOX_PENDING}
 
 
-async def test_confirm_marks_the_message_delivered() -> None:
+async def test_confirm_marks_the_message_delivered(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
     outbox = DynamoDBOutbox(
         client=client,
         table_name="capture_outbox",
@@ -95,16 +103,16 @@ async def test_confirm_marks_the_message_delivered() -> None:
 
     await outbox.confirm(message)
 
-    item = client.items["message-1"]
+    item = stored_item(client)
     assert item["status"] == {"S": OUTBOX_PUBLISHED}
     assert item["publishedAt"] == {"S": "2027-01-15T08:00:00Z"}
     assert "leaseToken" not in item
 
 
-async def test_reschedule_returns_message_to_pending_after_delay() -> None:
+async def test_reschedule_returns_message_to_pending_after_delay(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
     tokens = iter(("lease-1", "lease-2"))
     outbox = DynamoDBOutbox(
         client=client,
@@ -118,7 +126,7 @@ async def test_reschedule_returns_message_to_pending_after_delay() -> None:
 
     await outbox.reschedule(message, 15)
 
-    item = client.items["message-1"]
+    item = stored_item(client)
     assert item["status"] == {"S": OUTBOX_PENDING}
     assert item["nextAttemptAt"] == {"N": str(clock() + 15)}
     assert "leaseToken" not in item
@@ -131,13 +139,13 @@ async def test_reschedule_returns_message_to_pending_after_delay() -> None:
 
     assert retried is not None
     assert retried.lease_token == "lease-2"
-    assert client.items["message-1"]["attempts"] == {"N": "2"}
+    assert stored_item(client)["attempts"] == {"N": "2"}
 
 
-async def test_expired_claim_can_be_reclaimed_but_stale_lease_cannot_confirm() -> None:
+async def test_expired_claim_can_be_reclaimed_but_stale_lease_cannot_confirm(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
     tokens = iter(("lease-1", "lease-2"))
     outbox = DynamoDBOutbox(
         client=client,
@@ -158,13 +166,13 @@ async def test_expired_claim_can_be_reclaimed_but_stale_lease_cannot_confirm() -
         await outbox.confirm(first)
 
     await outbox.confirm(second)
-    assert client.items["message-1"]["status"] == {"S": OUTBOX_PUBLISHED}
+    assert stored_item(client)["status"] == {"S": OUTBOX_PUBLISHED}
 
 
-async def test_stale_lease_cannot_reschedule_a_reclaimed_message() -> None:
+async def test_stale_lease_cannot_reschedule_a_reclaimed_message(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
     tokens = iter(("lease-1", "lease-2"))
     outbox = DynamoDBOutbox(
         client=client,
@@ -183,13 +191,13 @@ async def test_stale_lease_cannot_reschedule_a_reclaimed_message() -> None:
     with pytest.raises(OutboxLeaseLostError):
         await outbox.reschedule(first, 5)
 
-    assert client.items["message-1"]["leaseToken"] == {"S": "lease-2"}
+    assert stored_item(client)["leaseToken"] == {"S": "lease-2"}
 
 
-async def test_expired_lease_cannot_confirm_before_another_dispatcher_reclaims_it() -> None:
+async def test_expired_lease_cannot_confirm_before_another_dispatcher_reclaims_it(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
     outbox = DynamoDBOutbox(
         client=client,
         table_name="capture_outbox",
@@ -205,13 +213,13 @@ async def test_expired_lease_cannot_confirm_before_another_dispatcher_reclaims_i
     with pytest.raises(OutboxLeaseLostError):
         await outbox.confirm(message)
 
-    assert client.items["message-1"]["status"] == {"S": OUTBOX_CLAIMED}
+    assert stored_item(client)["status"] == {"S": OUTBOX_CLAIMED}
 
 
-async def test_expired_lease_cannot_reschedule_before_another_dispatcher_reclaims_it() -> None:
+async def test_expired_lease_cannot_reschedule_before_another_dispatcher_reclaims_it(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBOutboxClient()
-    client.items["message-1"] = outbox_item(clock() - 1)
+    client = dynamodb_client
+    client.put_item(TableName="capture_outbox", Item=outbox_item(clock() - 1))
     outbox = DynamoDBOutbox(
         client=client,
         table_name="capture_outbox",
@@ -227,4 +235,4 @@ async def test_expired_lease_cannot_reschedule_before_another_dispatcher_reclaim
     with pytest.raises(OutboxLeaseLostError):
         await outbox.reschedule(message, 5)
 
-    assert client.items["message-1"]["status"] == {"S": OUTBOX_CLAIMED}
+    assert stored_item(client)["status"] == {"S": OUTBOX_CLAIMED}
