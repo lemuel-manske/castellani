@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import cast
+from typing import Any, cast
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
@@ -89,9 +89,9 @@ class RabbitMQPageTaskConsumer:
         routing_key: str = CAPTURE_ROUTING_KEY,
         ready: asyncio.Event | None = None,
     ) -> None:
-        channel = await connection.channel()
-        queue = None
-        consumer_tag = None
+        channel: Any = await connection.channel()
+        queue: Any | None = None
+        consumer_tag: str | None = None
 
         try:
             await channel.set_qos(prefetch_count=1)
@@ -111,7 +111,8 @@ class RabbitMQPageTaskConsumer:
 
             await asyncio.Event().wait()
         finally:
-            if queue is not None and consumer_tag is not None:
-                await queue.cancel(consumer_tag)
-
-            await channel.close()
+            try:
+                if queue is not None and consumer_tag is not None:
+                    await queue.cancel(consumer_tag)
+            finally:
+                await channel.close()

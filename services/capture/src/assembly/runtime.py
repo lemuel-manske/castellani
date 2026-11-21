@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import aio_pika
 import boto3
@@ -21,6 +23,9 @@ from worker import new_worker
 
 from .config import CaptureSettings
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 CONSUMER_START_TIMEOUT_SECONDS = 10
 
 
@@ -29,7 +34,7 @@ class CaptureRuntime:
 
     def __init__(self, settings: CaptureSettings) -> None:
         self.settings = settings
-        self.dynamodb_client: Any | None = None
+        self.dynamodb_client: DynamoDBClient | None = None
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
         self.consumer_task: asyncio.Task[None] | None = None
@@ -51,12 +56,21 @@ class CaptureRuntime:
             raise RuntimeError("Capture runtime has already started")
 
         try:
-            client_options: dict[str, str] = {"region_name": self.settings.aws_region}
+            session = boto3.Session()
 
-            if self.settings.dynamodb_endpoint_url is not None:
-                client_options["endpoint_url"] = self.settings.dynamodb_endpoint_url
+            if self.settings.dynamodb_endpoint_url is None:
+                dynamodb_client = session.client(
+                    "dynamodb",
+                    region_name=self.settings.aws_region,
+                )
+            else:
+                dynamodb_client = session.client(
+                    "dynamodb",
+                    region_name=self.settings.aws_region,
+                    endpoint_url=self.settings.dynamodb_endpoint_url,
+                )
 
-            self.dynamodb_client = boto3.Session().client("dynamodb", **client_options)
+            self.dynamodb_client = dynamodb_client
 
             for table_name in (
                 self.settings.frontier_table_name,
@@ -65,22 +79,25 @@ class CaptureRuntime:
                 self.settings.browser_slots_table_name,
             ):
                 await asyncio.to_thread(
-                    self.dynamodb_client.describe_table,
+                    dynamodb_client.describe_table,
                     TableName=table_name,
                 )
 
-            connection = await aio_pika.connect_robust(self.settings.rabbitmq_url)
+            connection = cast(
+                AbstractRobustConnection,
+                await cast(Any, aio_pika).connect_robust(self.settings.rabbitmq_url),
+            )
             self.connection = connection
 
             task_repository = DynamoDBTaskRepository(
-                client=self.dynamodb_client,
+                client=dynamodb_client,
                 frontier_table_name=self.settings.frontier_table_name,
                 runs_table_name=self.settings.runs_table_name,
                 lease_duration=self.settings.lease_duration,
                 outbox_table_name=self.settings.outbox_table_name,
             )
             allocator = DynamoDBCaptureAllocator(
-                client=self.dynamodb_client,
+                client=dynamodb_client,
                 table_name=self.settings.browser_slots_table_name,
                 slot_count=self.settings.browser_slot_count,
                 lease_duration=self.settings.lease_duration,
@@ -109,7 +126,7 @@ class CaptureRuntime:
 
             dispatcher = OutboxDispatcher(
                 outbox=DynamoDBOutbox(
-                    client=self.dynamodb_client,
+                    client=dynamodb_client,
                     table_name=self.settings.outbox_table_name,
                 ),
                 publisher=publisher,
