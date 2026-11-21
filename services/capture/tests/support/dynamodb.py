@@ -1,6 +1,6 @@
 import threading
 from copy import deepcopy
-from typing import Any
+from typing import Any, NoReturn
 
 from botocore.exceptions import ClientError
 
@@ -99,4 +99,97 @@ class FakeDynamoDBClient:
                 }
             },
             operation,
+        )
+
+
+class FakeDynamoDBFrontierClient:
+    """Applies the run guard and frontier update as one atomic transaction."""
+
+    def __init__(self) -> None:
+        self.runs: dict[str, dict[str, Any]] = {}
+        self.frontier: dict[tuple[str, str], dict[str, Any]] = {}
+        self.lock = threading.Lock()
+
+    def transact_write_items(self, **request: Any) -> dict[str, Any]:
+        run_check, frontier_update = request["TransactItems"]
+
+        with self.lock:
+            run_key = run_check["ConditionCheck"]["Key"]["archiveId"]["S"]
+            run = self.runs.get(run_key)
+            run_condition = run_check["ConditionCheck"]["ConditionExpression"]
+            run_values = run_check["ConditionCheck"]["ExpressionAttributeValues"]
+            run_admission = run.get("admission", {}).get("S") if run else None
+
+            update = frontier_update["Update"]
+            key = (
+                update["Key"]["archiveId"]["S"],
+                update["Key"]["urlKey"]["S"],
+            )
+            item = deepcopy(self.frontier.get(key))
+            names = update["ExpressionAttributeNames"]
+            values = update["ExpressionAttributeValues"]
+            condition = update["ConditionExpression"]
+
+            if run_condition and run_admission != run_values[":open"]["S"]:
+                self._transaction_failure("ConditionalCheckFailed", "None")
+
+            if item is None:
+                self._transaction_failure("None", "ConditionalCheckFailed")
+
+            if "#state = :pending" in condition:
+                is_pending = item is not None and item.get(names["#state"]) == values[":pending"]
+                is_expired = (
+                    item is not None
+                    and item.get(names["#state"]) == values[":claimed"]
+                    and float(item[names["#lease"]]["N"]) <= float(values[":now"]["N"])
+                )
+
+                if not is_pending and not is_expired:
+                    self._transaction_failure("None", "ConditionalCheckFailed")
+
+                fence = int(item.get(names["#fence"], {"N": "0"})["N"]) + 1
+                item[names["#state"]] = deepcopy(values[":claimed"])
+                item[names["#attempt"]] = deepcopy(values[":attempt"])
+                item[names["#lease"]] = deepcopy(values[":lease"])
+                item[names["#fence"]] = {"N": str(fence)}
+            else:
+                owns_claim = (
+                    item is not None
+                    and item.get(names["#state"]) == values[":claimed"]
+                    and item.get(names["#attempt"]) == values[":attempt"]
+                    and item.get(names["#fence"]) == values[":fence"]
+                    and float(item[names["#lease"]]["N"]) > float(values[":now"]["N"])
+                )
+
+                if not owns_claim:
+                    self._transaction_failure("None", "ConditionalCheckFailed")
+
+                item[names["#lease"]] = deepcopy(values[":lease"])
+
+            self.frontier[key] = item
+
+            return {}
+
+    def get_item(self, **request: Any) -> dict[str, Any]:
+        key = request["Key"]
+
+        with self.lock:
+            if request["TableName"] == "capture_runs":
+                item = self.runs.get(key["archiveId"]["S"])
+            else:
+                item = self.frontier.get((key["archiveId"]["S"], key["urlKey"]["S"]))
+
+            return {"Item": deepcopy(item)} if item else {}
+
+    @staticmethod
+    def _transaction_failure(first: str, second: str) -> NoReturn:
+        raise ClientError(
+            {
+                "Error": {
+                    "Code": "TransactionCanceledException",
+                    "Message": "The transaction was cancelled.",
+                },
+                "CancellationReasons": [{"Code": first}, {"Code": second}],
+            },
+            "TransactWriteItems",
         )
