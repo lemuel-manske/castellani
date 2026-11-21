@@ -42,7 +42,7 @@ async def test_release_returns_the_task_to_pending_and_records_capture_page(dyna
     assert task["fence"] == {"N": "1"}
 
     assert len(outbox_items(client)) == 1
-    message = next(iter(outbox_items(client).values()))
+    message = outbox_items(client)[0]
 
     assert message["correlationId"] == {"S": "archive-1"}
     assert message["type"] == {"S": "CapturePage"}
