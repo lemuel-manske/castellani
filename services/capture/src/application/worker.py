@@ -127,7 +127,7 @@ class Worker:
             directory = directory_state[0]
 
             if directory is not None and not terminal_state[0]:
-                await self._discard_attempt(claim_state[0], directory)
+                await self._discard_attempt(claim, directory)
 
             reservation = reservation_state[0]
 
