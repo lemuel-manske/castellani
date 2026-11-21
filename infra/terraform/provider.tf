@@ -1,8 +1,11 @@
+# LOCAL-ONLY. This provider targets the MiniStack emulator with dummy
+# credentials; `ministack_endpoint` is validated to reject anything else.
+# Do not point it at real AWS: see README.md in this directory.
 provider "aws" {
-  region                      = var.aws_region
+  region = var.aws_region
 
-  access_key                  = "test"
-  secret_key                  = "test"
+  access_key = "test"
+  secret_key = "test"
 
   s3_use_path_style           = true
   skip_credentials_validation = true

@@ -127,7 +127,7 @@ func (c *RabbitConsumer) Consume(
 }
 
 func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
-	for _, exchange := range []string{c.exchange, RetryExchange, DeadExchange} {
+	for _, exchange := range []string{c.exchange, DeadExchange} {
 		if err := channel.ExchangeDeclare(
 			exchange,
 			"topic",
@@ -175,8 +175,9 @@ func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
 		false,
 		false,
 		amqp.Table{
-			"x-message-ttl":          int32(retryDelayMilliseconds),
-			"x-dead-letter-exchange": c.exchange,
+			"x-message-ttl":             int32(retryDelayMilliseconds),
+			"x-dead-letter-exchange":    "",
+			"x-dead-letter-routing-key": CoordinatorQueue,
 		},
 	)
 
@@ -209,20 +210,6 @@ func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
 		); err != nil {
 			return fmt.Errorf(
 				"bind %s: %w",
-				eventType,
-				err,
-			)
-		}
-
-		if err := channel.QueueBind(
-			RetryQueue,
-			eventType,
-			RetryExchange,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"bind retry %s: %w",
 				eventType,
 				err,
 			)

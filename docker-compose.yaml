@@ -58,15 +58,22 @@ services:
       TF_VAR_ministack_endpoint: http://ministack:4566
       TF_VAR_aws_region: ${AWS_REGION:-us-east-1}
 
+      # State and provider cache live in a volume, never in the bind mount, so
+      # the host checkout stays clean and the state is removed together with
+      # MiniStack's data by `docker compose down -v`.
+      TF_DATA_DIR: /state/.terraform
+      TF_CLI_ARGS_init: "-input=false -lockfile=readonly -backend-config=path=/state/terraform.tfstate"
+
     volumes:
-      - ./infra/terraform:/workspace
+      - ./infra/terraform:/workspace:ro
+      - terraform-state:/state
 
     depends_on:
       ministack:
         condition: service_healthy
 
     entrypoint: ["/bin/sh", "-c"]
-    command: ["terraform init -input=false -lockfile=readonly && terraform apply -auto-approve -input=false"]
+    command: ["terraform init && terraform apply -auto-approve -input=false"]
     restart: "no"
 
   coordinator:
@@ -121,7 +128,7 @@ services:
       GATEWAY_ADDR: ":8080"
       COORDINATOR_URL: ${COORDINATOR_URL:-http://coordinator:8081}
       CAPTURE_URL: ${CAPTURE_URL:-}
-      SEARCH_URL: ${SEARCH_URL:-}
+      SEARCH_URL: ${SEARCH_URL:-http://search:8082}
       GATEWAY_UPSTREAM_TIMEOUT: ${GATEWAY_UPSTREAM_TIMEOUT:-5s}
       GATEWAY_STREAM_TIMEOUT: ${GATEWAY_STREAM_TIMEOUT:-30m}
       GATEWAY_SHUTDOWN_TIMEOUT: ${GATEWAY_SHUTDOWN_TIMEOUT:-10s}
@@ -129,6 +136,10 @@ services:
     depends_on:
       coordinator:
         condition: service_healthy
+      # Started, not healthy: search outages must not keep the Gateway (and
+      # archive admission/replay) down; the Gateway answers 503 for /search.
+      search:
+        condition: service_started
 
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
@@ -148,9 +159,59 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  search:
+    build:
+      context: .
+      dockerfile: services/search/Dockerfile
+
+    environment:
+      SEARCH_ADDR: ":8082"
+      SEARCH_AWS_REGION: ${AWS_REGION:-us-east-1}
+      SEARCH_AWS_ENDPOINT: http://ministack:4566
+      SEARCH_LEDGER_TABLE: search_indexing_ledger
+      SEARCH_PUBLICATIONS_TABLE: search_publications
+      SEARCH_OUTBOX_TABLE: search_outbox
+      SEARCH_INBOX_TABLE: search_inbox
+      # MiniStack's data-plane container name; see the `opensearch_dataplane_url`
+      # Terraform output. The hash is derived from account and region, so
+      # override this when AWS_REGION is not us-east-1.
+      SEARCH_OPENSEARCH_URL: ${SEARCH_OPENSEARCH_URL:-http://ministack-opensearch-281afe4a44d7-castellani-search:9200}
+      SEARCH_RABBITMQ_URL: amqp://castellani:${RABBITMQ_PASSWORD:-local-development-only}@rabbitmq:5672/
+      SEARCH_RABBITMQ_EXCHANGE: castellani.events
+
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_EC2_METADATA_DISABLED: "true"
+
+    depends_on:
+      provision:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/health/ready"]
+      interval: 10s
+      timeout: 3s
+      # OpenSearch can take a while to accept requests after its container starts.
+      start_period: 90s
+      retries: 3
+
+    init: true
+    read_only: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+    cap_drop:
+      - ALL
+
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   ministack-state:
   ministack-s3:
+  terraform-state:
   rabbitmq-data:
 
 networks:

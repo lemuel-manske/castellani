@@ -47,10 +47,12 @@ Use the Go system integration harness from ADR-0009, independent service unit te
 12. Confirm credentials never appear in message envelopes or logs; authenticated WARC and protected profiles require explicit authorization for access.
 
 Implementation should validate MiniStack's DynamoDB transactional condition behavior, OpenSearch indexing/search visibility, Terraform resources, and S3 byte-range semantics against actual running services before treating provider emulation as complete.
-\n
+
 ## Deployment and recovery boundaries
 
-Run `docker compose up --build` from the repository root. Compose starts MiniStack, RabbitMQ, Terraform provisioning, Coordinator, and Gateway. Capture and Search are independent services and can be connected through `CAPTURE_URL` and `SEARCH_URL` when their endpoints are available.
+Run `docker compose up --build` from the repository root. Compose starts MiniStack, RabbitMQ, Terraform provisioning, Coordinator, Search, and Gateway. The Gateway reaches Search through `SEARCH_URL` and starts without waiting for Search to be healthy, so a search outage only fails `/search`. Capture is an independent service and can be connected through `CAPTURE_URL` when its endpoint is available.
+
+Terraform state and its provider cache live in the `terraform-state` volume, next to MiniStack's own volumes; the `infra/terraform` bind mount is read-only. `docker compose down -v` therefore resets emulated resources and their state together. Run ad-hoc Terraform commands with `make -C infra plan|apply|destroy|validate|fmt`, which go through the same `provision` container and state. A checkout that previously provisioned with host-side state (`infra/terraform/terraform.tfstate`) must run `docker compose down -v` once, otherwise the first apply finds existing resources it does not track.
 
 The Coordinator periodically reconciles only SAGA decisions it owns. It reissues `ArchivePublicationDecided` for stalled `PUBLISH` runs and `ArchiveCompensationDecided` for stalled `COMPENSATE` runs. It does not inspect Capture's frontier or Search's indexing ledger; those services must reconcile their own side effects from their own durable state. Reconciliation updates the archive revision and writes a new outbox message in one DynamoDB transaction, so concurrent Coordinator replicas cannot continually enqueue duplicate recovery commands.
 
