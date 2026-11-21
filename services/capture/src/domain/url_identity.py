@@ -8,9 +8,7 @@ from utils.web import SCHEME_TO_PORT, is_valid_url
 
 URL_IDENTITY_VERSION = 1
 
-UNRESERVED = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-)
+UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
 
 class InvalidURLIdentity(ValueError):
@@ -60,9 +58,7 @@ def identify_url(url: str) -> URLIdentity:
 
     fragment = normalize_component(parsed.fragment, safe="/?:@!$&'()*+,;=-._~+")
     navigation_fragment = fragment if fragment.startswith("/") or fragment.startswith("!/") else ""
-    navigation_url = (
-        f"{fetch_url}#{navigation_fragment}" if navigation_fragment else fetch_url
-    )
+    navigation_url = f"{fetch_url}#{navigation_fragment}" if navigation_fragment else fetch_url
 
     identity = f"url-v{URL_IDENTITY_VERSION}:{navigation_url}"
 

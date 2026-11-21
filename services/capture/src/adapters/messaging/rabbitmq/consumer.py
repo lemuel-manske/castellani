@@ -10,6 +10,7 @@ from worker.api import CaptureRunner
 from .publisher import CAPTURE_ROUTING_KEY, EXCHANGE_NAME
 
 QUEUE_NAME = "castellani.capture.page"
+
 EXPECTED_MESSAGE_TYPE = "CapturePage"
 EXPECTED_MESSAGE_VERSION = 1
 
@@ -31,15 +32,10 @@ def parse_delivery(body: bytes) -> tuple[str, str] | None:
     version = envelope.get("version")
 
     if (
-        not isinstance(message_id, str)
-        or not message_id
-        or not isinstance(correlation_id, str)
+        message_id
         or not correlation_id
         or envelope.get("type") != EXPECTED_MESSAGE_TYPE
-        or not isinstance(version, int)
-        or isinstance(version, bool)
         or version != EXPECTED_MESSAGE_VERSION
-        or not isinstance(occurred_at, str)
         or not occurred_at
     ):
         return None
@@ -101,7 +97,11 @@ class RabbitMQPageTaskConsumer:
                 aio_pika.ExchangeType.DIRECT,
                 durable=True,
             )
+
             queue = await channel.declare_queue(queue_name, durable=True)
+
+            assert queue is not None
+
             await queue.bind(exchange, routing_key=routing_key)
 
             consumer_tag = await queue.consume(self.handle)

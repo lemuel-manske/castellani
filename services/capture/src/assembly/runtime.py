@@ -147,11 +147,7 @@ class CaptureRuntime:
     async def stop(self) -> None:
         self._ready = False
 
-        tasks = [
-            task
-            for task in (self.consumer_task, self.dispatcher_task)
-            if task is not None
-        ]
+        tasks = [task for task in (self.consumer_task, self.dispatcher_task) if task is not None]
 
         for task in tasks:
             task.cancel()
