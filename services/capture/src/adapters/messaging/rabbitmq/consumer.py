@@ -28,6 +28,7 @@ def parse_delivery(body: bytes) -> tuple[str, str] | None:
     message_id = envelope.get("messageId")
     correlation_id = envelope.get("correlationId")
     occurred_at = envelope.get("occurredAt")
+    version = envelope.get("version")
 
     if (
         not isinstance(message_id, str)
@@ -35,8 +36,9 @@ def parse_delivery(body: bytes) -> tuple[str, str] | None:
         or not isinstance(correlation_id, str)
         or not correlation_id
         or envelope.get("type") != EXPECTED_MESSAGE_TYPE
-        or type(envelope.get("version")) is not int
-        or envelope.get("version") != EXPECTED_MESSAGE_VERSION
+        or not isinstance(version, int)
+        or isinstance(version, bool)
+        or version != EXPECTED_MESSAGE_VERSION
         or not isinstance(occurred_at, str)
         or not occurred_at
     ):
@@ -85,22 +87,31 @@ class RabbitMQPageTaskConsumer:
         exchange_name: str = EXCHANGE_NAME,
         queue_name: str = QUEUE_NAME,
         routing_key: str = CAPTURE_ROUTING_KEY,
+        ready: asyncio.Event | None = None,
     ) -> None:
         channel = await connection.channel()
-        await channel.set_qos(prefetch_count=1)
-
-        exchange = await channel.declare_exchange(
-            exchange_name,
-            aio_pika.ExchangeType.DIRECT,
-            durable=True,
-        )
-        queue = await channel.declare_queue(queue_name, durable=True)
-        await queue.bind(exchange, routing_key=routing_key)
-
-        consumer_tag = await queue.consume(self.handle)
+        queue = None
+        consumer_tag = None
 
         try:
+            await channel.set_qos(prefetch_count=1)
+
+            exchange = await channel.declare_exchange(
+                exchange_name,
+                aio_pika.ExchangeType.DIRECT,
+                durable=True,
+            )
+            queue = await channel.declare_queue(queue_name, durable=True)
+            await queue.bind(exchange, routing_key=routing_key)
+
+            consumer_tag = await queue.consume(self.handle)
+
+            if ready is not None:
+                ready.set()
+
             await asyncio.Event().wait()
         finally:
-            await queue.cancel(consumer_tag)
+            if queue is not None and consumer_tag is not None:
+                await queue.cancel(consumer_tag)
+
             await channel.close()

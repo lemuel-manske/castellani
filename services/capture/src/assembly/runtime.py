@@ -21,6 +21,8 @@ from worker import new_worker
 
 from .config import CaptureSettings
 
+CONSUMER_START_TIMEOUT_SECONDS = 10
+
 
 class CaptureRuntime:
     """Assembles and manages the Capture worker and messaging processes."""
@@ -55,6 +57,18 @@ class CaptureRuntime:
                 client_options["endpoint_url"] = self.settings.dynamodb_endpoint_url
 
             self.dynamodb_client = boto3.Session().client("dynamodb", **client_options)
+
+            for table_name in (
+                self.settings.frontier_table_name,
+                self.settings.runs_table_name,
+                self.settings.outbox_table_name,
+                self.settings.browser_slots_table_name,
+            ):
+                await asyncio.to_thread(
+                    self.dynamodb_client.describe_table,
+                    TableName=table_name,
+                )
+
             connection = await aio_pika.connect_robust(self.settings.rabbitmq_url)
             self.connection = connection
 
@@ -78,13 +92,19 @@ class CaptureRuntime:
                 artifacts=LocalArtifactStore(Path(self.settings.artifact_directory)),
             )
 
-            self.publisher = RabbitMQMessagePublisher(connection)
-            await self.publisher.start()
+            publisher = RabbitMQMessagePublisher(connection)
+            self.publisher = publisher
+            await publisher.start()
 
+            consumer_ready = asyncio.Event()
             consumer = RabbitMQPageTaskConsumer(worker)
             self.consumer_task = asyncio.create_task(
-                consumer.run(connection, queue_name=QUEUE_NAME),
+                consumer.run(connection, queue_name=QUEUE_NAME, ready=consumer_ready),
                 name="capture-rabbitmq-consumer",
+            )
+            await asyncio.wait_for(
+                consumer_ready.wait(),
+                timeout=CONSUMER_START_TIMEOUT_SECONDS,
             )
 
             dispatcher = OutboxDispatcher(
@@ -92,7 +112,7 @@ class CaptureRuntime:
                     client=self.dynamodb_client,
                     table_name=self.settings.outbox_table_name,
                 ),
-                publisher=self.publisher,
+                publisher=publisher,
                 lease_duration=self.settings.outbox_lease_duration,
                 retry_delay=self.settings.outbox_retry_delay,
                 poll_interval=self.settings.outbox_poll_interval,
