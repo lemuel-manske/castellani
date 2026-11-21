@@ -32,10 +32,13 @@ def parse_delivery(body: bytes) -> tuple[str, str] | None:
     version = envelope.get("version")
 
     if (
-        message_id
+        not isinstance(message_id, str)
+        or not message_id
+        or not isinstance(correlation_id, str)
         or not correlation_id
         or envelope.get("type") != EXPECTED_MESSAGE_TYPE
         or version != EXPECTED_MESSAGE_VERSION
+        or not isinstance(occurred_at, str)
         or not occurred_at
     ):
         return None

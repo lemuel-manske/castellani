@@ -24,7 +24,7 @@ class FailingOutbox(FakeOutbox):
     async def confirm(self, message: OutboxMessage) -> None:
         noop(message)
 
-        raise RuntimeError()
+        raise RuntimeError("DynamoDB unavailable")
 
 
 class FakePublisher:

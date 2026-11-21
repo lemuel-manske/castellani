@@ -12,22 +12,22 @@ from adapters.messaging.rabbitmq.publisher import (
 
 
 async def test_publisher_declares_durable_exchange_and_publishes_persistent_message(
-    connection: FakeConnection,
+    rabbitmq: FakeConnection,
 ) -> None:
-    publisher = RabbitMQMessagePublisher(connection)  # type: ignore[arg-type]
+    publisher = RabbitMQMessagePublisher(rabbitmq)  # type: ignore[arg-type]
 
     await publisher.start()
     await publisher.publish("message-1", b'{"type":"CapturePage"}')
 
-    assert connection.channel_options == {
+    assert rabbitmq.channel_options == {
         "publisher_confirms": True,
         "on_return_raises": True,
     }
-    assert connection.channel_instance.declarations == [
+    assert rabbitmq.channel_instance.declarations == [
         (EXCHANGE_NAME, aio_pika.ExchangeType.DIRECT, True)
     ]
 
-    message, routing_key, mandatory = connection.channel_instance.exchange.publications[0]
+    message, routing_key, mandatory = rabbitmq.channel_instance.exchange.publications[0]
     published = cast(aio_pika.Message, message)
 
     assert published.message_id == "message-1"
@@ -39,7 +39,7 @@ async def test_publisher_declares_durable_exchange_and_publishes_persistent_mess
 
     await publisher.close()
 
-    assert connection.channel_instance.is_closed
+    assert rabbitmq.channel_instance.is_closed
 
 
 async def test_publisher_rejects_publication_before_startup() -> None:

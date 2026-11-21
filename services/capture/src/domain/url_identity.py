@@ -37,6 +37,9 @@ def identify_url(url: str) -> URLIdentity:
     assert parsed.hostname
     assert parsed.scheme
 
+    if parsed.port == 0:
+        raise InvalidURLIdentity("url port must be between 1 and 65535")
+
     hostname = normalize_hostname(parsed.hostname)
 
     default_port = SCHEME_TO_PORT[parsed.scheme]
