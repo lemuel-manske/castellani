@@ -160,7 +160,8 @@ class FakeDynamoDBFrontierClient:
                 is_pending = updated.get(names["#state"]) == values[":pending"]
                 is_expired = (
                     updated.get(names["#state"]) == values[":claimed"]
-                    and float(updated[names["#lease"]]["N"]) <= float(values[":now"]["N"])
+                    and float(updated[names["#lease"]]["N"])
+                    <= float(values[":now"]["N"])
                 )
 
                 if not is_pending and not is_expired:
@@ -183,7 +184,9 @@ class FakeDynamoDBFrontierClient:
                 )
 
                 if not owns_claim:
-                    self._transaction_failure("None", "ConditionalCheckFailed", "None")
+                    reasons = ["None"] * len(operations)
+                    reasons[1] = "ConditionalCheckFailed"
+                    self._transaction_failure(*reasons)
 
                 updated[names["#state"]] = deepcopy(values[":pending"])
                 updated.pop(names["#attempt"], None)
@@ -197,7 +200,9 @@ class FakeDynamoDBFrontierClient:
                 )
 
                 if not owns_claim:
-                    self._transaction_failure("None", "ConditionalCheckFailed", "None")
+                    reasons = ["None"] * len(operations)
+                    reasons[1] = "ConditionalCheckFailed"
+                    self._transaction_failure(*reasons)
 
                 updated[names["#lease"]] = deepcopy(values[":lease"])
 
