@@ -14,7 +14,9 @@ from adapters.persistence.dynamodb.task_claims import (
 )
 
 
-async def test_release_requeues_and_records_capture_page(\n    dynamodb_client,\n) -> None:
+async def test_release_requeues_and_records_capture_page(
+    dynamodb_client,
+) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
