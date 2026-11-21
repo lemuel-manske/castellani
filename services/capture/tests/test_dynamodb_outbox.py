@@ -184,3 +184,47 @@ async def test_stale_lease_cannot_reschedule_a_reclaimed_message() -> None:
         await outbox.reschedule(first, 5)
 
     assert client.items["message-1"]["leaseToken"] == {"S": "lease-2"}
+
+
+async def test_expired_lease_cannot_confirm_before_another_dispatcher_reclaims_it() -> None:
+    clock = FakeClock()
+    client = FakeDynamoDBOutboxClient()
+    client.items["message-1"] = outbox_item(clock() - 1)
+    outbox = DynamoDBOutbox(
+        client=client,
+        table_name="capture_outbox",
+        clock=clock,
+        lease_token_factory=lambda: "lease-1",
+    )
+
+    message = await outbox.claim(10)
+    assert message is not None
+
+    clock.advance(11)
+
+    with pytest.raises(OutboxLeaseLostError):
+        await outbox.confirm(message)
+
+    assert client.items["message-1"]["status"] == {"S": OUTBOX_CLAIMED}
+
+
+async def test_expired_lease_cannot_reschedule_before_another_dispatcher_reclaims_it() -> None:
+    clock = FakeClock()
+    client = FakeDynamoDBOutboxClient()
+    client.items["message-1"] = outbox_item(clock() - 1)
+    outbox = DynamoDBOutbox(
+        client=client,
+        table_name="capture_outbox",
+        clock=clock,
+        lease_token_factory=lambda: "lease-1",
+    )
+
+    message = await outbox.claim(10)
+    assert message is not None
+
+    clock.advance(11)
+
+    with pytest.raises(OutboxLeaseLostError):
+        await outbox.reschedule(message, 5)
+
+    assert client.items["message-1"]["status"] == {"S": OUTBOX_CLAIMED}
