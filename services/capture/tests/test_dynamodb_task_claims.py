@@ -224,9 +224,7 @@ async def test_concurrent_claims_have_exactly_one_winner_for_a_page() -> None:
         attempt_id_factory=lambda: next(attempt_ids),
     )
 
-    results = await asyncio.gather(
-        *(claims.claim("archive-1", "url-1") for _ in range(20))
-    )
+    results = await asyncio.gather(*(claims.claim("archive-1", "url-1") for _ in range(20)))
 
     acquired = [claim for claim in results if claim is not None]
 

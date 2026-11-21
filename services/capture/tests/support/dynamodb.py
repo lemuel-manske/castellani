@@ -177,9 +177,7 @@ class FakeDynamoDBFrontierClient:
             if request["TableName"] == "capture_runs":
                 item = self.runs.get(key["archiveId"]["S"])
             else:
-                item = self.frontier.get(
-                    (key["archiveId"]["S"], key["urlKey"]["S"])
-                )
+                item = self.frontier.get((key["archiveId"]["S"], key["urlKey"]["S"]))
 
             return {"Item": deepcopy(item)} if item else {}
 

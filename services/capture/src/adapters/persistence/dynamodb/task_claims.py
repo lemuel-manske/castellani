@@ -6,6 +6,10 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from botocore.exceptions import ClientError
 
+from adapters.persistence.dynamodb.error_handling import (
+    extract_cancellation_reasons,
+    is_transaction_canceled,
+)
 from domain.task import PageTask, TaskClaim
 
 
@@ -13,11 +17,34 @@ def new_attempt_id() -> str:
     return str(uuid4())
 
 
+def claim_from_item(
+    archive_id: str,
+    url_key: str,
+    item: dict[str, Any],
+) -> TaskClaim:
+    try:
+        task = PageTask(
+            archive_id=archive_id,
+            url_key=url_key,
+            url=item["url"]["S"],
+            depth=int(item["depth"]["N"]),
+        )
+
+        return TaskClaim(
+            task=task,
+            attempt_id=item["attemptId"]["S"],
+            fence=int(item["fence"]["N"]),
+            lease_until=float(item["leaseUntil"]["N"]),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError("DynamoDB returned an invalid page-task claim") from error
+
+
 class TaskClaimLostError(RuntimeError):
     """Raised when a worker no longer owns the current page-task attempt."""
 
 
-class _ConditionalWriteRejected(RuntimeError):
+class ConditionalWriteRejected(RuntimeError):
     pass
 
 
@@ -46,6 +73,7 @@ class DynamoDBTaskClaims:
         self.frontier_table_name = frontier_table_name
         self.runs_table_name = runs_table_name
         self.lease_duration = lease_duration
+
         self.clock = clock
         self.attempt_id_factory = attempt_id_factory
 
@@ -115,7 +143,7 @@ class DynamoDBTaskClaims:
 
         try:
             self._transact(transaction, str(uuid5(NAMESPACE_URL, attempt_id)))
-        except _ConditionalWriteRejected:
+        except ConditionalWriteRejected:
             return None
 
         item = self._read_frontier(archive_id, url_key)
@@ -123,11 +151,12 @@ class DynamoDBTaskClaims:
         if item is None or item.get("attemptId", {}).get("S") != attempt_id:
             return None
 
-        return self._claim_from_item(archive_id, url_key, item)
+        return claim_from_item(archive_id, url_key, item)
 
     def _renew(self, claim: TaskClaim) -> TaskClaim:
         now = self.clock()
         lease_until = now + self.lease_duration
+
         request_token = str(
             uuid5(
                 NAMESPACE_URL,
@@ -176,7 +205,7 @@ class DynamoDBTaskClaims:
 
         try:
             self._transact(transaction, request_token)
-        except _ConditionalWriteRejected as error:
+        except ConditionalWriteRejected as error:
             raise TaskClaimLostError("page-task claim is no longer owned") from error
 
         item = self._read_frontier(claim.task.archive_id, claim.task.url_key)
@@ -184,7 +213,7 @@ class DynamoDBTaskClaims:
         if item is None:
             raise TaskClaimLostError("page-task disappeared after lease renewal")
 
-        renewed = self._claim_from_item(
+        renewed = claim_from_item(
             claim.task.archive_id,
             claim.task.url_key,
             item,
@@ -204,14 +233,13 @@ class DynamoDBTaskClaims:
                 )
                 return
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") != "TransactionCanceledException":
+                if is_transaction_canceled(error):
                     raise
 
-                reasons = error.response.get("CancellationReasons", [])
-                codes = {reason.get("Code") for reason in reasons}
+                codes = extract_cancellation_reasons(error)
 
                 if "ConditionalCheckFailed" in codes:
-                    raise _ConditionalWriteRejected from error
+                    raise ConditionalWriteRejected from error
 
                 if "TransactionConflict" not in codes or attempt == 4:
                     raise
@@ -231,25 +259,3 @@ class DynamoDBTaskClaims:
         item = response.get("Item")
 
         return item if item else None
-
-    @staticmethod
-    def _claim_from_item(
-        archive_id: str,
-        url_key: str,
-        item: dict[str, Any],
-    ) -> TaskClaim:
-        try:
-            task = PageTask(
-                archive_id=archive_id,
-                url_key=url_key,
-                url=item["url"]["S"],
-                depth=int(item["depth"]["N"]),
-            )
-            return TaskClaim(
-                task=task,
-                attempt_id=item["attemptId"]["S"],
-                fence=int(item["fence"]["N"]),
-                lease_until=float(item["leaseUntil"]["N"]),
-            )
-        except (KeyError, TypeError, ValueError) as error:
-            raise RuntimeError("DynamoDB returned an invalid page-task claim") from error
