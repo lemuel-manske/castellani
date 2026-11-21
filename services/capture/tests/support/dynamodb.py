@@ -206,22 +206,20 @@ class FakeDynamoDBFrontierClient:
 
                 updated[names["#lease"]] = deepcopy(values[":lease"])
 
-            outbox_item: dict[str, Any] | None = None
+            if outbox_put is None:
+                self.frontier[key] = updated
+                return {}
 
-            if outbox_put is not None:
-                outbox_item = outbox_put["Item"]
-                message_id = outbox_item["messageId"]["S"]
+            outbox_item = outbox_put["Item"]
+            message_id = outbox_item["messageId"]["S"]
 
-                if message_id in self.outbox:
-                    reasons = ["None"] * len(operations)
-                    reasons[2] = "ConditionalCheckFailed"
-                    self._transaction_failure(*reasons)
+            if message_id in self.outbox:
+                reasons = ["None"] * len(operations)
+                reasons[2] = "ConditionalCheckFailed"
+                self._transaction_failure(*reasons)
 
             self.frontier[key] = updated
-
-            if outbox_item is not None:
-                message_id = outbox_item["messageId"]["S"]
-                self.outbox[message_id] = deepcopy(outbox_item)
+            self.outbox[message_id] = deepcopy(outbox_item)
 
             return {}
 
