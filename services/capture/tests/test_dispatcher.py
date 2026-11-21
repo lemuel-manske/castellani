@@ -1,7 +1,7 @@
 import pytest
-from domain import OutboxMessage
 
 from application import OutboxDispatcher
+from domain import OutboxMessage
 
 
 class FakeOutbox:
