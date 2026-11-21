@@ -146,6 +146,8 @@ class BlockingPageExecutor:
             self.cancelled.set()
             raise
 
+        raise AssertionError("blocking page executor resumed unexpectedly")
+
 
 class ExpiringCapacity(FakeCapacity):
     async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
