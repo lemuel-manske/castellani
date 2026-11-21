@@ -13,7 +13,7 @@ from application.outbox import OutboxMessage
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
-OUTBOX_DELIVERED = "DELIVERED"
+OUTBOX_PUBLISHED = "DELIVERED"
 OUTBOX_INDEX = "status-nextAttemptAt-index"
 OUTBOX_CLAIM_LIMIT = 50
 
@@ -167,12 +167,12 @@ class DynamoDBOutbox:
                 ExpressionAttributeNames={
                     "#status": "status",
                     "#lease_token": "leaseToken",
-                    "#delivered_at": "deliveredAt",
+                    "#published_at": "publishedAt",
                 },
                 ExpressionAttributeValues={
                     ":claimed": {"S": OUTBOX_CLAIMED},
                     ":lease_token": {"S": message.lease_token},
-                    ":delivered": {"S": OUTBOX_DELIVERED},
+                    ":published": {"S": OUTBOX_PUBLISHED},
                     ":now": {"S": now},
                 },
             )
