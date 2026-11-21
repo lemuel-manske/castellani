@@ -16,7 +16,7 @@ from support.worker import (
 )
 
 from application.worker import LeaseLostError, Worker
-from domain.task import PageTask, TaskClaim
+from domain import PageTask, TaskClaim
 
 
 async def test_worker_discards_attempt_artifacts_after_capture_failure(tmp_path: Path) -> None:

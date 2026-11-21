@@ -1,5 +1,9 @@
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
+
+from .capture import CaptureOutcome
 
 
 class InvalidTaskClaimRenewal(ValueError):
@@ -60,3 +64,29 @@ class TaskClaim:
             or renewed.lease_until <= max(self.lease_until, now)
         ):
             raise InvalidTaskClaimRenewal("task lease renewal returned an invalid claim")
+
+
+class TaskRepository(Protocol):
+    """Owns page-task persistence and the task's domain lifecycle."""
+
+    async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None: ...
+
+    async def renew(self, claim: TaskClaim) -> TaskClaim: ...
+
+    async def complete(
+        self,
+        outcome: CaptureOutcome,
+        warc_files: tuple[Path, ...],
+    ) -> None: ...
+
+    async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None: ...
+
+    async def release(self, claim: TaskClaim) -> None: ...
+
+    async def admit_discovered(
+        self,
+        claim: TaskClaim,
+        discovered_urls: tuple[str, ...],
+    ) -> None:
+        """Durably account for discoveries before allowing parent completion."""
+        ...

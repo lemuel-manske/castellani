@@ -2,11 +2,13 @@ from dataclasses import replace
 
 import pytest
 
-from domain.browser_reservation import (
+from domain import (
     BrowserReservation,
     InvalidBrowserReservationRenewal,
+    InvalidTaskClaimRenewal,
+    PageTask,
+    TaskClaim,
 )
-from domain.task import InvalidTaskClaimRenewal, PageTask, TaskClaim
 
 
 def test_task_claim_accepts_a_renewal_that_preserves_ownership_and_extends_lease() -> None:

@@ -5,9 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from application.contracts import CaptureArtifact
-from domain.browser_reservation import BrowserReservation
-from domain.capture import CaptureOutcome, PageCapture
-from domain.task import TaskClaim
+from domain import BrowserReservation, CaptureOutcome, PageCapture, TaskClaim
 
 
 class FakeRepository:
