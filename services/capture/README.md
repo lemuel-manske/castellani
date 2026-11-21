@@ -11,18 +11,20 @@ Install the pinned Python toolchain and dependencies with `make install`.
 
 Install the matching Playwright browser with `uv run playwright install chromium`.
 
-Start local dependencies with `make db-up`. This starts DynamoDB Local and RabbitMQ.
+For the complete local stack, run `docker compose up -d` from the repository root. The root Compose stack starts MiniStack and RabbitMQ and applies the Terraform configuration, including Capture's DynamoDB tables.
 
-Run the service locally with:
+Run the Capture API and worker runtime from this directory:
 
 ```sh
-DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
-RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
+DYNAMODB_ENDPOINT_URL=http://localhost:4566 \
+RABBITMQ_URL="amqp://castellani:${RABBITMQ_PASSWORD:-local-development-only}@localhost:5672/" \
 make run
 ```
 
+The service-local Compose file provides isolated DynamoDB Local and RabbitMQ dependencies for Capture development and tests. Use `make db-up` and `make db-down` for that environment. The integration-test fixtures create their DynamoDB tables automatically; the runtime expects tables to have been provisioned.
+
 - `make install`: download dependencies.
-- `make db-up`: start DynamoDB Local and RabbitMQ.
+- `make db-up`: start isolated DynamoDB Local and RabbitMQ.
 - `make db-down`: stop local dependencies.
 - `make run`: start the Capture API and background worker runtime.
 - `make fmt`: format and lint the Python service.

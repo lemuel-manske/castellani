@@ -8,7 +8,7 @@ class CaptureSettings:
 
     aws_region: str = "us-east-1"
     dynamodb_endpoint_url: str | None = None
-    rabbitmq_url: str = "amqp://castellani:castellani@localhost:5672/"
+    rabbitmq_url: str = "amqp://castellani:local-development-only@localhost:5672/"
     frontier_table_name: str = "capture_frontier"
     runs_table_name: str = "capture_runs"
     outbox_table_name: str = "capture_outbox"
@@ -27,7 +27,7 @@ class CaptureSettings:
             dynamodb_endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL") or None,
             rabbitmq_url=os.getenv(
                 "RABBITMQ_URL",
-                "amqp://castellani:castellani@localhost:5672/",
+                "amqp://castellani:local-development-only@localhost:5672/",
             ),
             frontier_table_name=os.getenv("CAPTURE_FRONTIER_TABLE", "capture_frontier"),
             runs_table_name=os.getenv("CAPTURE_RUNS_TABLE", "capture_runs"),
