@@ -45,10 +45,12 @@ func (p *RabbitPublisher) PublishRetry(
 		},
 	}
 
+	// The default exchange routes by queue name: the retry reaches only the
+	// Coordinator's own delay queue.
 	return p.publish(
 		ctx,
-		RetryExchange,
-		event.Type,
+		"",
+		RetryQueue,
 		publishing,
 	)
 }
