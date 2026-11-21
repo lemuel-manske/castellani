@@ -1,6 +1,7 @@
+from collections.abc import Iterator
+
 import pytest
 
-from collections.abc import Iterator
 from support.recording import LocalSite, start_local_site
 
 
