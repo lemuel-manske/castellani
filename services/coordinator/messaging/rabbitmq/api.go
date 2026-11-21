@@ -4,12 +4,20 @@ package rabbitmq
 import "github.com/lemuel-manske/castellani/services/coordinator/domain"
 
 const (
-	DeadExchange  = "castellani.dead"
-	RetryExchange = "castellani.retry"
+	DeadExchange = "castellani.dead"
 
 	CoordinatorQueue = "castellani.coordinator"
 	DeadQueue        = "castellani.coordinator.dead"
-	RetryQueue       = "castellani.coordinator.retry"
+
+	// RetryQueue delays a failed delivery and then dead-letters it through
+	// the default exchange to CoordinatorQueue only. Retries must never go
+	// back through the shared event exchange, which would fan the event out
+	// again to every consumer bound to its type.
+	//
+	// It replaces "castellani.coordinator.retry", which dead-lettered to the
+	// event exchange. Queue arguments cannot change on redeclaration, hence
+	// the new name; the legacy queue receives nothing new and only drains.
+	RetryQueue = "castellani.coordinator.retry.v2"
 
 	HeaderAttempt = "x-coordinator-attempt"
 )
