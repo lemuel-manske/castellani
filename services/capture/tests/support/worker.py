@@ -13,8 +13,10 @@ from domain.task import TaskClaim
 class FakeRepository:
     def __init__(self, claim: TaskClaim) -> None:
         self.claim_result = claim
+
         self.failed: tuple[TaskClaim, str, str] | None = None
         self.completed: tuple[CaptureOutcome, tuple[Path, ...]] | None = None
+
         self.renewals = 0
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
@@ -22,6 +24,7 @@ class FakeRepository:
 
     async def renew(self, claim: TaskClaim) -> TaskClaim:
         self.renewals += 1
+
         return replace(claim, lease_until=time.time() + 60)
 
     async def complete(
@@ -101,6 +104,7 @@ class SlowPageExecutor:
 class ShortLeaseRepository(FakeRepository):
     async def renew(self, claim: TaskClaim) -> TaskClaim:
         self.renewals += 1
+
         return replace(claim, lease_until=time.time() + 0.3)
 
 
@@ -119,6 +123,7 @@ class ShortLeaseCapacity(FakeCapacity):
 
     async def renew(self, reservation: BrowserReservation) -> BrowserReservation:
         self.renewals += 1
+
         return replace(reservation, lease_until=time.time() + 0.06)
 
 

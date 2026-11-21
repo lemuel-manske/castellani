@@ -21,6 +21,7 @@ class FakeDynamoDBClient:
 
     def __init__(self) -> None:
         self.items: dict[str, dict[str, Any]] = {}
+
         self.lock = threading.Lock()
 
     def update_item(self, **request: Any) -> dict[str, Any]:
