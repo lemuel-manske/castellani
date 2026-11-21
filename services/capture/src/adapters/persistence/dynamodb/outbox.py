@@ -3,7 +3,7 @@ import json
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
@@ -151,7 +151,7 @@ class DynamoDBOutbox:
         if not isinstance(claimed, dict):
             raise RuntimeError("DynamoDB did not return the claimed outbox record")
 
-        envelope = self._envelope(claimed)
+        envelope = self._envelope(cast(dict[str, Any], claimed))
 
         return OutboxMessage(
             message_id=message_id,
