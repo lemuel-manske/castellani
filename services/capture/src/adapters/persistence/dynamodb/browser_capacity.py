@@ -6,14 +6,8 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from adapters.persistence.dynamodb.error_handling import is_conditional_failure
+from adapters.persistence.dynamodb.values import number_from_item
 from domain.browser_reservation import BrowserReservation, new_reservation_id
-
-
-def to_number(item: dict[str, Any], name: str) -> float:
-    try:
-        return float(item[name]["N"])
-    except (KeyError, TypeError, ValueError) as error:
-        raise RuntimeError(f"DynamoDB browser slot has invalid {name}") from error
 
 
 def reservation_from_item(
@@ -23,8 +17,8 @@ def reservation_from_item(
     try:
         attempt_id = item["ownerAttemptId"]["S"]
         reservation_id = item["reservationId"]["S"]
-        fence = int(to_number(item, "fence"))
-        lease_until = to_number(item, "leaseUntil")
+        fence = int(number_from_item(item, "fence", "browser slot"))
+        lease_until = number_from_item(item, "leaseUntil", "browser slot")
     except (KeyError, TypeError, ValueError) as error:
         raise RuntimeError("DynamoDB returned an invalid browser slot") from error
 
@@ -136,7 +130,7 @@ class DynamoDBBrowserCapacity:
                     existing is not None
                     and existing.get("ownerAttemptId", {}).get("S") == attempt_id
                     and existing.get("reservationId", {}).get("S") == reservation_id
-                    and to_number(existing, "leaseUntil") > self.clock()
+                    and number_from_item(existing, "leaseUntil", "browser slot") > self.clock()
                 ):
                     return reservation_from_item(slot_id, existing)
 
@@ -225,7 +219,7 @@ class DynamoDBBrowserCapacity:
                 item is not None
                 and item.get("ownerAttemptId", {}).get("S") == attempt_id
                 and item.get("reservationId", {}).get("S") == reservation_id
-                and to_number(item, "leaseUntil") > self.clock()
+                and number_from_item(item, "leaseUntil", "browser slot") > self.clock()
             ):
                 return reservation_from_item(slot_id, item)
 
