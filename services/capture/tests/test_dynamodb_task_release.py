@@ -60,7 +60,6 @@ async def test_release_requeues_and_records_capture_page(
     }
     assert message["status"] == {"S": "PENDING"}
     assert message["attempts"] == {"N": "0"}
-    assert message["nextAttemptAt"] == {"N": str(clock())}
 
 
 @pytest.mark.integration

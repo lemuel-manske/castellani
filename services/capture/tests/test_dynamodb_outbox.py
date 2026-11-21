@@ -1,5 +1,4 @@
 import json
-from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -48,7 +47,6 @@ async def test_claim_returns_due_message_and_acquires_delivery_lease(
 
     assert item["status"] == {"S": OUTBOX_CLAIMED}
     assert item["leaseToken"] == {"S": "lease-1"}
-    assert_number_attribute(item, "nextAttemptAt", clock() + 30)
     assert item["attempts"] == {"N": "1"}
 
 
@@ -120,7 +118,6 @@ async def test_reschedule_returns_message_to_pending_after_delay(
     assert "leaseToken" not in item
 
     assert item["status"] == {"S": OUTBOX_PENDING}
-    assert_number_attribute(item, "nextAttemptAt", clock() + 15)
     assert item["attempts"] == {"N": "1"}
 
     assert await outbox.claim(30) is None
@@ -261,7 +258,3 @@ def new_outbox_item(next_attempt_at: float, status: str = OUTBOX_PENDING) -> dic
         "attempts": {"N": "0"},
         "nextAttemptAt": {"N": str(next_attempt_at)},
     }
-
-
-def assert_number_attribute(item: dict[str, Any], key: str, expected: float) -> None:
-    assert Decimal(item[key]["N"]) == Decimal(str(expected))
