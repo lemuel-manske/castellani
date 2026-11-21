@@ -61,6 +61,7 @@ async def test_release_returns_the_task_to_pending_and_records_capture_page() ->
 
 
 async def test_releasing_the_same_claim_twice_is_idempotent() -> None:
+    clock = FakeClock()
     client = FakeDynamoDBFrontierClient()
     client.runs["archive-1"] = {
         "archiveId": {"S": "archive-1"},
@@ -79,6 +80,7 @@ async def test_releasing_the_same_claim_twice_is_idempotent() -> None:
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
+        clock=clock,
         attempt_id_factory=lambda: "attempt-1",
     )
 
@@ -86,6 +88,7 @@ async def test_releasing_the_same_claim_twice_is_idempotent() -> None:
     assert claim is not None
 
     await claims.release(claim)
+    clock.advance(1)
     await claims.release(claim)
 
     assert len(client.outbox) == 1
