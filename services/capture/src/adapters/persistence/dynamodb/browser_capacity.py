@@ -3,7 +3,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingTypeStubs]
+from botocore.exceptions import ClientError
 
 from adapters.persistence.dynamodb.error_handling import is_conditional_failure
 from domain.browser_reservation import BrowserReservation, new_reservation_id
