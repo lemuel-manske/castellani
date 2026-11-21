@@ -30,7 +30,7 @@ async def test_capacity_admits_exactly_the_configured_number_of_contenders(dynam
     assert len({reservation.reservation_id for reservation in acquired}) == 10
 
 
-async def test_reservation_renewal_extends_the_lease_without_changing_its_fence(dynamodb_client) -> None:
+async def test_reservation_renewal_extends_the_lease_without_changing_its_fence(\n    dynamodb_client,\n) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -86,7 +86,7 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client
     assert await capacity.reserve("attempt-3") is None
 
 
-async def test_release_is_idempotent_and_stale_release_cannot_free_a_new_owner(dynamodb_client) -> None:
+async def test_release_is_idempotent_and_stale_release_cannot_free_a_new_owner(\n    dynamodb_client,\n) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -123,7 +123,7 @@ def test_capacity_rejects_invalid_configuration(dynamodb_client) -> None:
         DynamoDBBrowserCapacity(client, "capture_browser_slots", 1, 0)
 
 
-async def test_repeated_reservation_returns_the_existing_slot_after_an_earlier_slot_frees(dynamodb_client) -> None:
+async def test_repeated_reservation_returns_the_existing_slot_after_an_earlier_slot_frees(\n    dynamodb_client,\n) -> None:
     client = dynamodb_client
 
     capacity = DynamoDBBrowserCapacity(
