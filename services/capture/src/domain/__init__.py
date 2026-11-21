@@ -1,5 +1,5 @@
-from .browser_capacity import BrowserCapacity
 from .browser_reservation import (
+    BrowserCapacity,
     BrowserReservation,
     InvalidBrowserReservationRenewal,
     new_reservation_id,
