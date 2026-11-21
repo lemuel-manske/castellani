@@ -1,7 +1,14 @@
 import asyncio
 
 import pytest
-from support.dynamodb import FakeClock, FakeDynamoDBFrontierClient
+from support.dynamodb import FakeClock
+from support.local_dynamodb import (
+    frontier_item,
+    outbox_items,
+    seed_frontier,
+    seed_run,
+    set_run_admission,
+)
 
 from adapters.persistence.dynamodb.task_claims import (
     DynamoDBTaskClaims,
@@ -9,22 +16,13 @@ from adapters.persistence.dynamodb.task_claims import (
 )
 
 
-async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation() -> None:
+async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBFrontierClient()
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
-    }
+    seed_run(client)
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     claims = DynamoDBTaskClaims(
         client=client,
@@ -46,21 +44,12 @@ async def test_claim_acquires_a_pending_task_with_a_new_fencing_generation() -> 
     assert claim.lease_until == clock() + 30
 
 
-async def test_claim_does_not_replace_an_active_attempt() -> None:
-    client = FakeDynamoDBFrontierClient()
+async def test_claim_does_not_replace_an_active_attempt(dynamodb_client) -> None:
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
-    }
+    seed_run(client)
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     attempt_ids = iter(("attempt-1", "attempt-2"))
 
@@ -79,25 +68,16 @@ async def test_claim_does_not_replace_an_active_attempt() -> None:
 
     assert second is None
 
-    assert client.frontier[("archive-1", "url-1")]["attemptId"] == {"S": "attempt-1"}
+    assert frontier_item(client)["attemptId"] == {"S": "attempt-1"}
 
 
-async def test_expired_claim_is_reclaimed_with_a_higher_fence() -> None:
+async def test_expired_claim_is_reclaimed_with_a_higher_fence(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBFrontierClient()
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
-    }
+    seed_run(client)
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     attempt_ids = iter(("attempt-1", "attempt-2"))
 
@@ -125,21 +105,12 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence() -> None:
         await claims.renew(previous)
 
 
-async def test_claim_requires_an_open_archive_run() -> None:
-    client = FakeDynamoDBFrontierClient()
+async def test_claim_requires_an_open_archive_run(dynamodb_client) -> None:
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "CLOSED"},
-    }
+    seed_run(client, admission="CLOSED")
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     claims = DynamoDBTaskClaims(
         client=client,
@@ -152,25 +123,16 @@ async def test_claim_requires_an_open_archive_run() -> None:
     claim = await claims.claim("archive-1", "url-1")
     assert claim is None
 
-    assert client.frontier[("archive-1", "url-1")]["state"] == {"S": "PENDING"}
+    assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_renewal_extends_the_lease_without_changing_attempt_or_fence() -> None:
+async def test_renewal_extends_the_lease_without_changing_attempt_or_fence(dynamodb_client) -> None:
     clock = FakeClock()
-    client = FakeDynamoDBFrontierClient()
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
-    }
+    seed_run(client)
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     claims = DynamoDBTaskClaims(
         client=client,
@@ -194,21 +156,12 @@ async def test_renewal_extends_the_lease_without_changing_attempt_or_fence() -> 
     assert renewed.lease_until > claim.lease_until
 
 
-async def test_renewal_is_rejected_after_the_archive_run_closes() -> None:
-    client = FakeDynamoDBFrontierClient()
+async def test_renewal_is_rejected_after_the_archive_run_closes(dynamodb_client) -> None:
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
-    }
+    seed_run(client)
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     claims = DynamoDBTaskClaims(
         client=client,
@@ -221,27 +174,18 @@ async def test_renewal_is_rejected_after_the_archive_run_closes() -> None:
     claim = await claims.claim("archive-1", "url-1")
     assert claim is not None
 
-    client.runs["archive-1"]["admission"] = {"S": "CLOSED"}
+    set_run_admission(client, "CLOSED")
 
     with pytest.raises(TaskClaimLostError):
         await claims.renew(claim)
 
 
-async def test_concurrent_claims_have_exactly_one_winner_for_a_page() -> None:
-    client = FakeDynamoDBFrontierClient()
+async def test_concurrent_claims_have_exactly_one_winner_for_a_page(dynamodb_client) -> None:
+    client = dynamodb_client
 
-    client.runs["archive-1"] = {
-        "archiveId": {"S": "archive-1"},
-        "admission": {"S": "OPEN"},
-    }
+    seed_run(client)
 
-    client.frontier[("archive-1", "url-1")] = {
-        "archiveId": {"S": "archive-1"},
-        "urlKey": {"S": "url-1"},
-        "url": {"S": "https://example.org/"},
-        "depth": {"N": "2"},
-        "state": {"S": "PENDING"},
-    }
+    seed_frontier(client, depth=2)
 
     attempt_ids = iter(f"attempt-{number}" for number in range(20))
 
