@@ -8,6 +8,5 @@ class FakeClock:
     def advance(self, seconds: float) -> None:
         self.now += seconds
 
-
-def clock() -> FakeClock:
-    return FakeClock()
+    def restart(self) -> None:
+        self.now = 1_800_000_000.0

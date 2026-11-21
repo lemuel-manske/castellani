@@ -30,10 +30,8 @@ async def test_capacity_limits_concurrent_reservations(dynamodb: DynamoDBClient)
 
 
 async def test_reservation_renewal_preserves_its_fence(
-    dynamodb: DynamoDBClient,
+    dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
-    clock = FakeClock()
-
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
         table_name="capture_browser_slots",
@@ -56,10 +54,8 @@ async def test_reservation_renewal_preserves_its_fence(
 
 
 async def test_expired_reservation_is_reclaimed_with_a_new_fence(
-    dynamodb: DynamoDBClient,
+    dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
-    clock = FakeClock()
-
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
         table_name="capture_browser_slots",
@@ -88,10 +84,8 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(
 
 
 async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
-    dynamodb: DynamoDBClient,
+    dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
-    clock = FakeClock()
-
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
         table_name="capture_browser_slots",

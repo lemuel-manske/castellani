@@ -1,13 +1,13 @@
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.dynamodb import (
+from support.clock import FakeClock
+from support.domain import (
     frontier_item,
     outbox_items,
     seed_frontier,
     seed_run,
     set_run_admission,
 )
-from support.clock import FakeClock
 
 from adapters.persistence.dynamodb.task import (
     DynamoDBTaskRepository,
@@ -17,15 +17,13 @@ from adapters.persistence.dynamodb.task import (
 
 async def test_release_requeues_and_records_capture_page(
     dynamodb: DynamoDBClient,
+    clock: FakeClock,
 ) -> None:
-    clock = FakeClock()
-    client = dynamodb
-
-    seed_run(client)
-    seed_frontier(client, depth=2)
+    seed_run(dynamodb)
+    seed_frontier(dynamodb, depth=2)
 
     claims = DynamoDBTaskRepository(
-        client=client,
+        client=dynamodb,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
@@ -38,14 +36,17 @@ async def test_release_requeues_and_records_capture_page(
 
     await claims.release(claim)
 
-    task = frontier_item(client)
-    assert task["state"] == {"S": "PENDING"}
+    task = frontier_item(dynamodb)
+
     assert "attemptId" not in task
     assert "leaseUntil" not in task
+
+    assert task["state"] == {"S": "PENDING"}
     assert task["fence"] == {"N": "1"}
 
-    assert len(outbox_items(client)) == 1
-    message = outbox_items(client)[0]
+    assert len(outbox_items(dynamodb)) == 1
+
+    message = outbox_items(dynamodb)[0]
 
     assert message["correlationId"] == {"S": "archive-1"}
     assert message["type"] == {"S": "CapturePage"}
@@ -63,14 +64,13 @@ async def test_release_requeues_and_records_capture_page(
 
 async def test_releasing_the_same_claim_twice_is_idempotent(
     dynamodb: DynamoDBClient,
+    clock: FakeClock,
 ) -> None:
-    clock = FakeClock()
-    client = dynamodb
-    seed_run(client)
-    seed_frontier(client, depth=0)
+    seed_run(dynamodb)
+    seed_frontier(dynamodb, depth=0)
 
     claims = DynamoDBTaskRepository(
-        client=client,
+        client=dynamodb,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
@@ -82,24 +82,26 @@ async def test_releasing_the_same_claim_twice_is_idempotent(
     assert claim is not None
 
     await claims.release(claim)
+
     clock.advance(1)
+
     await claims.release(claim)
 
-    assert len(outbox_items(client)) == 1
-    assert frontier_item(client)["state"] == {"S": "PENDING"}
+    assert len(outbox_items(dynamodb)) == 1
+    assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
 
 
 async def test_stale_claim_cannot_release_reclaimed_task(
     dynamodb: DynamoDBClient,
+    clock: FakeClock,
 ) -> None:
-    clock = FakeClock()
-    client = dynamodb
-    seed_run(client)
-    seed_frontier(client, depth=0)
+    seed_run(dynamodb)
+    seed_frontier(dynamodb, depth=0)
 
     attempt_ids = iter(("attempt-1", "attempt-2"))
+
     claims = DynamoDBTaskRepository(
-        client=client,
+        client=dynamodb,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
@@ -118,21 +120,21 @@ async def test_stale_claim_cannot_release_reclaimed_task(
     with pytest.raises(TaskClaimLostError):
         await claims.release(stale)
 
-    task = frontier_item(client)
+    task = frontier_item(dynamodb)
+
     assert task["attemptId"] == {"S": current.attempt_id}
     assert task["fence"] == {"N": str(current.fence)}
-    assert outbox_items(client) == []
+    assert outbox_items(dynamodb) == []
 
 
 async def test_release_does_not_requeue_a_task_after_run_admission_closes(
     dynamodb: DynamoDBClient,
 ) -> None:
-    client = dynamodb
-    seed_run(client)
-    seed_frontier(client, depth=0)
+    seed_run(dynamodb)
+    seed_frontier(dynamodb, depth=0)
 
     claims = DynamoDBTaskRepository(
-        client=client,
+        client=dynamodb,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
@@ -142,10 +144,10 @@ async def test_release_does_not_requeue_a_task_after_run_admission_closes(
     claim = await claims.claim("archive-1", "url-1")
     assert claim is not None
 
-    set_run_admission(client, "CLOSED")
+    set_run_admission(dynamodb, "CLOSED")
 
     with pytest.raises(TaskClaimLostError):
         await claims.release(claim)
 
-    assert frontier_item(client)["state"] == {"S": "CLAIMED"}
-    assert outbox_items(client) == []
+    assert frontier_item(dynamodb)["state"] == {"S": "CLAIMED"}
+    assert outbox_items(dynamodb) == []

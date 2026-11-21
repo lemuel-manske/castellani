@@ -2,8 +2,19 @@ from collections.abc import Iterator
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
+from support.clock import FakeClock
 from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamodb
 from support.recording import LocalSite, start_local_site
+
+
+@pytest.fixture
+def clock() -> Iterator[FakeClock]:
+    clock = FakeClock()
+
+    try:
+        yield clock
+    finally:
+        clock.restart()
 
 
 @pytest.fixture
