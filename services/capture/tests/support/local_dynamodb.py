@@ -72,3 +72,45 @@ def dynamodb_client() -> Iterator[Any]:
     finally:
         for table in reversed(TABLES):
             client.delete_table(TableName=table["TableName"])
+
+
+def seed_run(client: Any, admission: str = "OPEN") -> None:
+    client.put_item(
+        TableName="capture_runs",
+        Item={"archiveId": {"S": "archive-1"}, "admission": {"S": admission}},
+    )
+
+
+def set_run_admission(client: Any, admission: str) -> None:
+    client.update_item(
+        TableName="capture_runs",
+        Key={"archiveId": {"S": "archive-1"}},
+        UpdateExpression="SET #admission = :admission",
+        ExpressionAttributeNames={"#admission": "admission"},
+        ExpressionAttributeValues={":admission": {"S": admission}},
+    )
+
+
+def seed_frontier(client: Any, depth: int = 0) -> None:
+    client.put_item(
+        TableName="capture_frontier",
+        Item={
+            "archiveId": {"S": "archive-1"},
+            "urlKey": {"S": "url-1"},
+            "url": {"S": "https://example.org/"},
+            "depth": {"N": str(depth)},
+            "state": {"S": "PENDING"},
+        },
+    )
+
+
+def frontier_item(client: Any) -> dict[str, Any]:
+    return client.get_item(
+        TableName="capture_frontier",
+        Key={"archiveId": {"S": "archive-1"}, "urlKey": {"S": "url-1"}},
+        ConsistentRead=True,
+    )["Item"]
+
+
+def outbox_items(client: Any) -> list[dict[str, Any]]:
+    return client.scan(TableName="capture_outbox", ConsistentRead=True)["Items"]
