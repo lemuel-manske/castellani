@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 
 from adapters.persistence.dynamodb.error_handling import is_conditional_failure
 from adapters.persistence.dynamodb.values import number_from_item
-from domain.browser_reservation import BrowserReservation, new_reservation_id
+from domain import BrowserReservation, new_reservation_id
 
 
 def reservation_from_item(

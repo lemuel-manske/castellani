@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Protocol
 from hashlib import sha256
+from typing import Protocol
 
 
 def new_reservation_id(attempt_id: str) -> str:
