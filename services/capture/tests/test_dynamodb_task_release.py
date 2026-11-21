@@ -1,5 +1,6 @@
-import pytest
 from typing import Any
+
+import pytest
 from support.dynamodb import FakeClock
 from support.local_dynamodb import (
     frontier_item,
