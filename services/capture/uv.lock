@@ -80,6 +80,15 @@ wheels = [
 ]
 
 [[package]]
+name = "botocore-stubs"
+version = "1.37.38"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/0f/c7aa68bcadb0d623943cc9482f856f499c0fd58937fd69f1d920e68401c0/botocore_stubs-1.37.38.tar.gz", hash = "sha256:ba4755b50649649f3129b8f29a9cfc463d65d529605dd388f1da62f836d56067" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/1e/677182b3925ecd8440ab1860184e518abc06ed40153ca7c4a3a399119e42/botocore_stubs-1.37.38-py3-none-any.whl", hash = "sha256:86bd9bdb07d6c2b3eaf6f7b464ef1dfa128debb997fff2b89ed76279123c6de9" },
+]
+
+[[package]]
 name = "brotlicffi"
 version = "1.2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -112,6 +121,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "botocore-stubs" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -122,6 +132,7 @@ dev = [
 requires-dist = [
     { name = "aio-pika", specifier = "==9.5.5" },
     { name = "boto3", specifier = "==1.37.18" },
+    { name = "botocore-stubs", specifier = "==1.37.38" },
     { name = "fastapi", specifier = "==0.115.12" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "playwright", specifier = "==1.51.0" },
