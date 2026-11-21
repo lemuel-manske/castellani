@@ -88,7 +88,7 @@ async def test_releasing_the_same_claim_twice_is_idempotent(dynamodb_client: Any
     assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_stale_claim_cannot_release_a_reclaimed_task(dynamodb_client: Any) -> None:
+async def test_stale_claim_cannot_release_reclaimed_task(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     seed_run(client)
