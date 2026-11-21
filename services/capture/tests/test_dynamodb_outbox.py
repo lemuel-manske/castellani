@@ -6,7 +6,7 @@ from support.dynamodb import FakeClock, FakeDynamoDBOutboxClient
 from adapters.persistence.dynamodb.outbox import (
     DynamoDBOutbox,
     OUTBOX_CLAIMED,
-    OUTBOX_DELIVERED,
+    OUTBOX_PUBLISHED,
     OUTBOX_PENDING,
     OutboxLeaseLostError,
 )
@@ -96,8 +96,8 @@ async def test_confirm_marks_the_message_delivered() -> None:
     await outbox.confirm(message)
 
     item = client.items["message-1"]
-    assert item["status"] == {"S": OUTBOX_DELIVERED}
-    assert item["deliveredAt"] == {"S": "2027-01-15T08:00:00Z"}
+    assert item["status"] == {"S": OUTBOX_PUBLISHED}
+    assert item["publishedAt"] == {"S": "2027-01-15T08:00:00Z"}
     assert "leaseToken" not in item
 
 
@@ -158,7 +158,7 @@ async def test_expired_claim_can_be_reclaimed_but_stale_lease_cannot_confirm() -
         await outbox.confirm(first)
 
     await outbox.confirm(second)
-    assert client.items["message-1"]["status"] == {"S": OUTBOX_DELIVERED}
+    assert client.items["message-1"]["status"] == {"S": OUTBOX_PUBLISHED}
 
 
 async def test_stale_lease_cannot_reschedule_a_reclaimed_message() -> None:
