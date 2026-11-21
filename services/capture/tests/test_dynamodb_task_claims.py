@@ -4,7 +4,6 @@ import pytest
 from support.dynamodb import FakeClock
 from support.local_dynamodb import (
     frontier_item,
-    outbox_items,
     seed_frontier,
     seed_run,
     set_run_admission,
