@@ -6,8 +6,8 @@ from support.dynamodb import FakeClock
 from adapters.persistence.dynamodb.outbox import (
     DynamoDBOutbox,
     OUTBOX_CLAIMED,
-    OUTBOX_PUBLISHED,
     OUTBOX_PENDING,
+    OUTBOX_PUBLISHED,
     OutboxLeaseLostError,
 )
 
