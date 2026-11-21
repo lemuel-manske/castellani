@@ -8,6 +8,11 @@ from uuid import uuid4
 
 from botocore.exceptions import ClientError
 
+from adapters.persistence.dynamodb.values import (
+    deserialize_attribute,
+    number_from_item,
+    string_from_item,
+)
 from application.outbox import OutboxMessage
 
 
@@ -215,53 +220,11 @@ class DynamoDBOutbox:
     @classmethod
     def _envelope(cls, item: dict[str, Any]) -> dict[str, Any]:
         return {
-            "messageId": cls._string(item, "messageId"),
-            "correlationId": cls._string(item, "correlationId"),
-            "type": cls._string(item, "type"),
-            "version": cls._number(item, "version"),
-            "occurredAt": cls._string(item, "occurredAt"),
-            "payload": cls._value(item.get("payload", {})),
+            "messageId": string_from_item(item, "messageId", "outbox record"),
+            "correlationId": string_from_item(item, "correlationId", "outbox record"),
+            "type": string_from_item(item, "type", "outbox record"),
+            "version": number_from_item(item, "version", "outbox record"),
+            "occurredAt": string_from_item(item, "occurredAt", "outbox record"),
+            "payload": deserialize_attribute(item.get("payload", {})),
         }
 
-    @staticmethod
-    def _string(item: dict[str, Any], key: str) -> str:
-        value = item.get(key, {}).get("S")
-
-        if not isinstance(value, str):
-            raise RuntimeError(f"DynamoDB outbox record has an invalid {key}")
-
-        return value
-
-    @staticmethod
-    def _number(item: dict[str, Any], key: str) -> int | float:
-        value = item.get(key, {}).get("N")
-
-        if value is None:
-            raise RuntimeError(f"DynamoDB outbox record has an invalid {key}")
-
-        number = float(value)
-
-        return int(number) if number.is_integer() else number
-
-    @classmethod
-    def _value(cls, attribute: dict[str, Any]) -> Any:
-        if "S" in attribute:
-            return attribute["S"]
-
-        if "N" in attribute:
-            number = float(attribute["N"])
-            return int(number) if number.is_integer() else number
-
-        if "BOOL" in attribute:
-            return attribute["BOOL"]
-
-        if "NULL" in attribute:
-            return None
-
-        if "M" in attribute:
-            return {key: cls._value(value) for key, value in attribute["M"].items()}
-
-        if "L" in attribute:
-            return [cls._value(value) for value in attribute["L"]]
-
-        raise RuntimeError("DynamoDB outbox record contains an unsupported attribute type")
