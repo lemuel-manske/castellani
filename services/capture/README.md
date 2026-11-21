@@ -16,6 +16,9 @@ For the complete local stack, run `docker compose up -d` from the repository roo
 Run the Capture API and worker runtime from this directory:
 
 ```sh
+AWS_ACCESS_KEY_ID=test \
+AWS_SECRET_ACCESS_KEY=test \
+AWS_EC2_METADATA_DISABLED=true \
 DYNAMODB_ENDPOINT_URL=http://localhost:4566 \
 RABBITMQ_URL="amqp://castellani:${RABBITMQ_PASSWORD:-local-development-only}@localhost:5672/" \
 make run
