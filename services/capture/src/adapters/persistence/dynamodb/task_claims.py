@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-from botocore.exceptions import ClientError  # pyright: ignore[reportMissingTypeStubs]
+from botocore.exceptions import ClientError
 
 from adapters.persistence.dynamodb.error_handling import (
     extract_cancellation_reasons,
