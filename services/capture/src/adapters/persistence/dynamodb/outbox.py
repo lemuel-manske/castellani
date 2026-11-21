@@ -163,7 +163,7 @@ class DynamoDBOutbox:
                 TableName=self.table_name,
                 Key={"messageId": {"S": message.message_id}},
                 ConditionExpression="#status = :claimed AND #lease_token = :lease_token",
-                UpdateExpression="SET #status = :delivered, #delivered_at = :now REMOVE #lease_token",
+                UpdateExpression="SET #status = :published, #published_at = :now REMOVE #lease_token",
                 ExpressionAttributeNames={
                     "#status": "status",
                     "#lease_token": "leaseToken",
