@@ -114,7 +114,7 @@ async def test_stale_claim_cannot_release_a_reclaimed_task(dynamodb_client) -> N
     task = frontier_item(client)
     assert task["attemptId"] == {"S": current.attempt_id}
     assert task["fence"] == {"N": str(current.fence)}
-    assert outbox_items(client) == {}
+    assert outbox_items(client) == []
 
 
 async def test_release_does_not_requeue_a_task_after_run_admission_closes(dynamodb_client) -> None:
@@ -139,4 +139,4 @@ async def test_release_does_not_requeue_a_task_after_run_admission_closes(dynamo
         await claims.release(claim)
 
     assert frontier_item(client)["state"] == {"S": "CLAIMED"}
-    assert outbox_items(client) == {}
+    assert outbox_items(client) == []
