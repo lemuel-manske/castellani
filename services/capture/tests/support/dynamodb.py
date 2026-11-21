@@ -292,6 +292,15 @@ class FakeDynamoDBOutboxClient:
                     and item.get(names["#lease_token"]) == values[":lease_token"]
                 )
 
+                if "#next_attempt > :lease_now" in condition:
+                    matches = matches and float(item[names["#next_attempt"]]["N"]) > float(
+                        values[":lease_now"]["N"]
+                    )
+                elif "#next_attempt > :now" in condition:
+                    matches = matches and float(item[names["#next_attempt"]]["N"]) > float(
+                        values[":now"]["N"]
+                    )
+
             if not matches:
                 self._conditional_failure()
 
