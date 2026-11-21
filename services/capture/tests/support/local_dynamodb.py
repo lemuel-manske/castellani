@@ -1,13 +1,13 @@
 import os
 from collections.abc import Iterator
+from typing import Any
 
 import boto3
 import pytest
-from mypy_boto3_dynamodb import DynamoDBClient
 
 
 @pytest.fixture
-def dynamodb_client() -> Iterator[DynamoDBClient]:
+def dynamodb_client() -> Iterator[Any]:
     client = boto3.client(
         "dynamodb",
         endpoint_url=os.environ.get("DYNAMODB_ENDPOINT_URL", "http://localhost:8000"),
