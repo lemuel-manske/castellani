@@ -134,10 +134,14 @@ class FakeDynamoDBFrontierClient:
             condition = frontier_update["ConditionExpression"]
 
             if run_admission != run_check["ExpressionAttributeValues"][":open"]["S"]:
-                self._transaction_failure("ConditionalCheckFailed", "None", "None")
+                reasons = ["None"] * len(operations)
+                reasons[0] = "ConditionalCheckFailed"
+                self._transaction_failure(*reasons)
 
             if item is None:
-                self._transaction_failure("None", "ConditionalCheckFailed", "None")
+                reasons = ["None"] * len(operations)
+                reasons[1] = "ConditionalCheckFailed"
+                self._transaction_failure(*reasons)
 
             updated = deepcopy(item)
 
@@ -149,7 +153,9 @@ class FakeDynamoDBFrontierClient:
                 )
 
                 if not is_pending and not is_expired:
-                    self._transaction_failure("None", "ConditionalCheckFailed", "None")
+                    reasons = ["None"] * len(operations)
+                    reasons[1] = "ConditionalCheckFailed"
+                    self._transaction_failure(*reasons)
 
                 fence = int(updated.get(names["#fence"], {"N": "0"})["N"]) + 1
                 updated[names["#state"]] = deepcopy(values[":claimed"])
@@ -190,7 +196,9 @@ class FakeDynamoDBFrontierClient:
                 message_id = outbox_item["messageId"]["S"]
 
                 if message_id in self.outbox:
-                    self._transaction_failure("None", "None", "ConditionalCheckFailed")
+                    reasons = ["None"] * len(operations)
+                    reasons[2] = "ConditionalCheckFailed"
+                    self._transaction_failure(*reasons)
 
             self.frontier[key] = updated
 
