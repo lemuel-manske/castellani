@@ -10,6 +10,7 @@ from adapters.persistence.dynamodb.alloc import (
 )
 
 
+@pytest.mark.integration
 async def test_capacity_limits_concurrent_reservations(dynamodb: DynamoDBClient) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
@@ -29,6 +30,7 @@ async def test_capacity_limits_concurrent_reservations(dynamodb: DynamoDBClient)
     assert len({reservation.reservation_id for reservation in acquired}) == 10
 
 
+@pytest.mark.integration
 async def test_reservation_renewal_preserves_its_fence(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -53,6 +55,7 @@ async def test_reservation_renewal_preserves_its_fence(
     assert renewed.lease_until > reservation.lease_until
 
 
+@pytest.mark.integration
 async def test_expired_reservation_is_reclaimed_with_a_new_fence(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -83,6 +86,7 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(
     assert await capacity.reserve("attempt-3") is None
 
 
+@pytest.mark.integration
 async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -109,6 +113,7 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
     assert await capacity.reserve("attempt-3") is None
 
 
+@pytest.mark.integration
 def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient) -> None:
     with pytest.raises(ValueError):
         DynamoDBCaptureAllocator(dynamodb, "capture_browser_slots", 0, 30)
@@ -117,6 +122,7 @@ def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient) -> Non
         DynamoDBCaptureAllocator(dynamodb, "capture_browser_slots", 1, 0)
 
 
+@pytest.mark.integration
 async def test_repeated_reservation_reuses_existing_slot(
     dynamodb: DynamoDBClient,
 ) -> None:

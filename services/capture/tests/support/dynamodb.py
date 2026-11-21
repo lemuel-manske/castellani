@@ -53,9 +53,14 @@ TABLES: tuple[CreateTableInputTypeDef, ...] = (
 
 
 def new_dynamodb_client() -> DynamoDBClient:
+    endpoint_url = os.environ.get("DYNAMODB_ENDPOINT_URL")
+
+    if not endpoint_url:
+        raise RuntimeError("DYNAMODB_ENDPOINT_URL must be configured for tests")
+
     return Session().client(
         "dynamodb",
-        endpoint_url=os.environ.get("DYNAMODB_ENDPOINT_URL"),
+        endpoint_url=endpoint_url,
         region_name="us-east-1",
         aws_access_key_id="testing",
         aws_secret_access_key="testing",

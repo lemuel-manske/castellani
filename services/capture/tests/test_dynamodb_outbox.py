@@ -15,6 +15,7 @@ from adapters.persistence.dynamodb.outbox import (
 )
 
 
+@pytest.mark.integration
 async def test_claim_returns_due_message_and_acquires_delivery_lease(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -50,6 +51,7 @@ async def test_claim_returns_due_message_and_acquires_delivery_lease(
     assert item["attempts"] == {"N": "1"}
 
 
+@pytest.mark.integration
 async def test_claim_skips_messages_that_are_not_due(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -66,6 +68,7 @@ async def test_claim_skips_messages_that_are_not_due(
     assert outbox_item(dynamodb)["status"] == {"S": OUTBOX_PENDING}
 
 
+@pytest.mark.integration
 async def test_confirm_marks_the_message_delivered(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -91,6 +94,7 @@ async def test_confirm_marks_the_message_delivered(
     assert item["publishedAt"] == {"S": "2027-01-15T08:00:00Z"}
 
 
+@pytest.mark.integration
 async def test_reschedule_returns_message_to_pending_after_delay(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -129,6 +133,7 @@ async def test_reschedule_returns_message_to_pending_after_delay(
     assert outbox_item(dynamodb)["attempts"] == {"N": "2"}
 
 
+@pytest.mark.integration
 async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -161,6 +166,7 @@ async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(
     assert outbox_item(dynamodb)["status"] == {"S": OUTBOX_PUBLISHED}
 
 
+@pytest.mark.integration
 async def test_stale_lease_cannot_reschedule_a_reclaimed_message(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -189,6 +195,7 @@ async def test_stale_lease_cannot_reschedule_a_reclaimed_message(
     assert outbox_item(dynamodb)["leaseToken"] == {"S": "lease-2"}
 
 
+@pytest.mark.integration
 async def test_expired_lease_cannot_confirm_after_expiry(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -212,6 +219,7 @@ async def test_expired_lease_cannot_confirm_after_expiry(
     assert outbox_item(dynamodb)["status"] == {"S": OUTBOX_CLAIMED}
 
 
+@pytest.mark.integration
 async def test_expired_lease_cannot_reschedule_after_expiry(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:

@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.domain import frontier_item, outbox_items, seed_frontier, seed_run
 
@@ -13,6 +14,7 @@ from worker import CaptureArtifact
 from worker.worker import ConcreteCaptureWorker
 
 
+@pytest.mark.integration
 async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
     dynamodb: DynamoDBClient,
     tmp_path: Path,
@@ -34,6 +36,7 @@ async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
     assert not (tmp_path / "attempt-1").exists()
 
 
+@pytest.mark.integration
 async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
     dynamodb: DynamoDBClient,
     tmp_path: Path,
@@ -51,6 +54,7 @@ async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
     assert (tmp_path / "attempt-1" / "capture.warc.gz").read_bytes() == b"capture"
 
 
+@pytest.mark.integration
 async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
     dynamodb: DynamoDBClient,
     tmp_path: Path,

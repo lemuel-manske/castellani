@@ -15,6 +15,7 @@ from adapters.persistence.dynamodb.task import (
 )
 
 
+@pytest.mark.integration
 async def test_release_requeues_and_records_capture_page(
     dynamodb: DynamoDBClient,
     clock: FakeClock,
@@ -62,6 +63,7 @@ async def test_release_requeues_and_records_capture_page(
     assert message["nextAttemptAt"] == {"N": str(clock())}
 
 
+@pytest.mark.integration
 async def test_releasing_the_same_claim_twice_is_idempotent(
     dynamodb: DynamoDBClient,
     clock: FakeClock,
@@ -91,6 +93,7 @@ async def test_releasing_the_same_claim_twice_is_idempotent(
     assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
 
 
+@pytest.mark.integration
 async def test_stale_claim_cannot_release_reclaimed_task(
     dynamodb: DynamoDBClient,
     clock: FakeClock,
@@ -127,6 +130,7 @@ async def test_stale_claim_cannot_release_reclaimed_task(
     assert outbox_items(dynamodb) == []
 
 
+@pytest.mark.integration
 async def test_release_does_not_requeue_a_task_after_run_admission_closes(
     dynamodb: DynamoDBClient,
 ) -> None:

@@ -16,6 +16,7 @@ from adapters.persistence.dynamodb.task import (
 )
 
 
+@pytest.mark.integration
 async def test_claim_sets_new_fence_for_pending_task(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -42,6 +43,7 @@ async def test_claim_sets_new_fence_for_pending_task(
     assert claim.lease_until == clock() + 30
 
 
+@pytest.mark.integration
 async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient) -> None:
     seed_run(dynamodb)
 
@@ -66,6 +68,7 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient
     assert frontier_item(dynamodb)["attemptId"] == {"S": "attempt-1"}
 
 
+@pytest.mark.integration
 async def test_expired_claim_is_reclaimed_with_a_higher_fence(
     dynamodb: DynamoDBClient,
     clock: FakeClock,
@@ -100,6 +103,7 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(
         await claims.renew(previous)
 
 
+@pytest.mark.integration
 async def test_claim_requires_an_open_archive_run(dynamodb: DynamoDBClient) -> None:
     seed_run(dynamodb, admission="CLOSED")
 
@@ -119,6 +123,7 @@ async def test_claim_requires_an_open_archive_run(dynamodb: DynamoDBClient) -> N
     assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
 
 
+@pytest.mark.integration
 async def test_renewal_extends_lease_preserving_owner_and_fence(
     dynamodb: DynamoDBClient, clock: FakeClock
 ) -> None:
@@ -148,6 +153,7 @@ async def test_renewal_extends_lease_preserving_owner_and_fence(
     assert renewed.lease_until > claim.lease_until
 
 
+@pytest.mark.integration
 async def test_renewal_is_rejected_after_the_archive_run_closes(
     dynamodb: DynamoDBClient,
 ) -> None:
@@ -172,6 +178,7 @@ async def test_renewal_is_rejected_after_the_archive_run_closes(
         await claims.renew(claim)
 
 
+@pytest.mark.integration
 async def test_concurrent_claims_have_exactly_one_winner_for_a_page(
     dynamodb: DynamoDBClient,
 ) -> None:
