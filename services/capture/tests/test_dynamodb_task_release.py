@@ -121,7 +121,9 @@ async def test_stale_claim_cannot_release_reclaimed_task(dynamodb_client: Any) -
     assert outbox_items(client) == []
 
 
-async def test_release_does_not_requeue_a_task_after_run_admission_closes(dynamodb_client: Any) -> None:
+async def test_release_does_not_requeue_a_task_after_run_admission_closes(
+    dynamodb_client: Any,
+) -> None:
     client = dynamodb_client
     seed_run(client)
     seed_frontier(client, depth=0)
