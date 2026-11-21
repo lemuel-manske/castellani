@@ -10,6 +10,18 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    env:
+      DYNAMODB_ENDPOINT_URL: http://localhost:8000
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:3.3.2
+        ports:
+          - 8000:8000
+        options: >-
+          --health-cmd "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000'"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
 
