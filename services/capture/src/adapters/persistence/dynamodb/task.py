@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from botocore.exceptions import ClientError
 
@@ -352,7 +352,7 @@ class DynamoDBTaskRepository(TaskRepository):
         ]
 
         try:
-            self._transact(transaction, str(uuid5(NAMESPACE_URL, attempt_id)))
+            self._transact(transaction, str(uuid4()))
         except ConditionalWriteRejected:
             return None
 
@@ -367,12 +367,7 @@ class DynamoDBTaskRepository(TaskRepository):
         now = self.clock()
         lease_until = now + self.lease_duration
 
-        request_token = str(
-            uuid5(
-                NAMESPACE_URL,
-                f"{claim.attempt_id}:{claim.fence}:{lease_until}",
-            )
-        )
+        request_token = str(uuid4())
 
         transaction = [
             {
