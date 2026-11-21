@@ -1,4 +1,5 @@
 import pytest
+from typing import Any
 from support.dynamodb import FakeClock
 from support.local_dynamodb import (
     frontier_item,
@@ -15,7 +16,7 @@ from adapters.persistence.dynamodb.task_claims import (
 
 
 async def test_release_requeues_and_records_capture_page(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     clock = FakeClock()
     client = dynamodb_client
@@ -60,7 +61,7 @@ async def test_release_requeues_and_records_capture_page(
     assert message["nextAttemptAt"] == {"N": str(clock())}
 
 
-async def test_releasing_the_same_claim_twice_is_idempotent(dynamodb_client) -> None:
+async def test_releasing_the_same_claim_twice_is_idempotent(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     seed_run(client)
@@ -86,7 +87,7 @@ async def test_releasing_the_same_claim_twice_is_idempotent(dynamodb_client) -> 
     assert frontier_item(client)["state"] == {"S": "PENDING"}
 
 
-async def test_stale_claim_cannot_release_a_reclaimed_task(dynamodb_client) -> None:
+async def test_stale_claim_cannot_release_a_reclaimed_task(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
     seed_run(client)
@@ -119,7 +120,7 @@ async def test_stale_claim_cannot_release_a_reclaimed_task(dynamodb_client) -> N
     assert outbox_items(client) == []
 
 
-async def test_release_does_not_requeue_a_task_after_run_admission_closes(dynamodb_client) -> None:
+async def test_release_does_not_requeue_a_task_after_run_admission_closes(dynamodb_client: Any) -> None:
     client = dynamodb_client
     seed_run(client)
     seed_frontier(client, depth=0)
