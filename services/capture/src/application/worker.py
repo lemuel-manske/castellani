@@ -54,9 +54,15 @@ class Worker:
         directory_state: list[Path | None] = [None]
         terminal_state = [False]
         stop_heartbeat = asyncio.Event()
+        lease_changed = asyncio.Event()
 
         heartbeat = asyncio.create_task(
-            self._maintain_leases(claim_state, reservation_state, stop_heartbeat)
+            self._maintain_leases(
+                claim_state,
+                reservation_state,
+                stop_heartbeat,
+                lease_changed,
+            )
         )
         operation = asyncio.create_task(
             self._run_claim(
@@ -64,6 +70,7 @@ class Worker:
                 reservation_state,
                 directory_state,
                 terminal_state,
+                lease_changed,
             )
         )
 
@@ -75,6 +82,7 @@ class Worker:
 
             if operation in done:
                 stop_heartbeat.set()
+                lease_changed.set()
                 await heartbeat
 
                 try:
@@ -102,6 +110,7 @@ class Worker:
 
         except asyncio.CancelledError:
             stop_heartbeat.set()
+            lease_changed.set()
             operation.cancel()
             heartbeat.cancel()
             await asyncio.gather(operation, heartbeat, return_exceptions=True)
@@ -109,6 +118,7 @@ class Worker:
 
         finally:
             stop_heartbeat.set()
+            lease_changed.set()
 
             if not heartbeat.done():
                 heartbeat.cancel()
@@ -133,6 +143,7 @@ class Worker:
         reservation_state: list[BrowserReservation | None],
         directory_state: list[Path | None],
         terminal_state: list[bool],
+        lease_changed: asyncio.Event,
     ) -> None:
         reservation = await self.capacity.reserve(claim_state[0].attempt_id)
 
@@ -142,6 +153,7 @@ class Worker:
             return
 
         reservation_state[0] = reservation
+        lease_changed.set()
 
         directory = await self.artifacts.create_attempt_directory(claim_state[0])
         directory_state[0] = directory
@@ -173,6 +185,7 @@ class Worker:
         claim_state: list[TaskClaim],
         reservation_state: list[BrowserReservation | None],
         stop: asyncio.Event,
+        lease_changed: asyncio.Event,
     ) -> None:
         while not stop.is_set():
             claim = claim_state[0]
@@ -187,9 +200,13 @@ class Worker:
             if remaining <= 0:
                 raise LeaseLostError("an execution lease expired before it could be renewed")
 
+            lease_changed.clear()
+
             try:
-                await asyncio.wait_for(stop.wait(), timeout=remaining / 3)
-                return
+                await asyncio.wait_for(lease_changed.wait(), timeout=remaining / 3)
+                if stop.is_set():
+                    return
+                continue
             except TimeoutError:
                 if stop.is_set():
                     return
