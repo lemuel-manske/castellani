@@ -114,9 +114,20 @@ class FakeDynamoDBFrontierClient:
 
     def transact_write_items(self, **request: Any) -> dict[str, Any]:
         operations = request["TransactItems"]
-        run_check = next(operation["ConditionCheck"] for operation in operations if "ConditionCheck" in operation)
-        frontier_update = next(operation["Update"] for operation in operations if "Update" in operation)
-        outbox_put = next((operation["Put"] for operation in operations if "Put" in operation), None)
+        run_check = next(
+            operation["ConditionCheck"]
+            for operation in operations
+            if "ConditionCheck" in operation
+        )
+        frontier_update = next(
+            operation["Update"]
+            for operation in operations
+            if "Update" in operation
+        )
+        outbox_put = next(
+            (operation["Put"] for operation in operations if "Put" in operation),
+            None,
+        )
 
         with self.lock:
             run_key = run_check["Key"]["archiveId"]["S"]
@@ -167,7 +178,8 @@ class FakeDynamoDBFrontierClient:
                     updated.get(names["#state"]) == values[":claimed"]
                     and updated.get(names["#attempt"]) == values[":attempt"]
                     and updated.get(names["#fence"]) == values[":fence"]
-                    and float(updated[names["#lease"]]["N"]) > float(values[":now"]["N"])
+                    and float(updated[names["#lease"]]["N"])
+                    > float(values[":now"]["N"])
                 )
 
                 if not owns_claim:
