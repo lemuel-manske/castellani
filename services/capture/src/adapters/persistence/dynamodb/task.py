@@ -7,11 +7,12 @@ from uuid import NAMESPACE_URL, uuid5
 
 from botocore.exceptions import ClientError
 
-from adapters.persistence.dynamodb.error_handling import (
+from domain import PageTask, TaskClaim, TaskRepository, new_attempt_id
+
+from .error_handling import (
     extract_cancellation_reasons,
     is_transaction_canceled,
 )
-from domain import PageTask, TaskClaim, TaskRepository, new_attempt_id
 
 
 def claim_from_item(

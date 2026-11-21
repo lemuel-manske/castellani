@@ -8,13 +8,13 @@ from uuid import uuid4
 
 from botocore.exceptions import ClientError
 
-from adapters.persistence.dynamodb.values import (
+from domain import OutboxMessage, OutboxRepository
+
+from .values import (
     deserialize_attribute,
     number_from_item,
     string_from_item,
 )
-from domain import OutboxMessage
-from domain.outbox import OutboxRepository
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"

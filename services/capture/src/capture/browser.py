@@ -17,7 +17,9 @@ from playwright.async_api import (
 from playwright.async_api import (
     Error as PlaywrightError,
 )
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import (
+    TimeoutError as PlaywrightTimeoutError,
+)
 from selectolax.parser import HTMLParser
 
 from capture.recording import PyWBRecorder
