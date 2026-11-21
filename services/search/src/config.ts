@@ -7,8 +7,13 @@ export type Config = {
   awsEndpoint: string | undefined;
 
   ledgerTable: string;
-  visibilityTable: string;
+  publicationsTable: string;
+  outboxTable: string;
+  inboxTable: string;
+  inboxRetentionMs: number;
   claimLeaseMs: number;
+  reconcileIntervalMs: number;
+  outboxIntervalMs: number;
   maxDocumentAttempts: number;
   maxArtifactBytes: number;
 
@@ -37,9 +42,14 @@ export function loadConfig(env: Environment): Config {
     awsRegion: env.SEARCH_AWS_REGION ?? "us-east-1",
     awsEndpoint: optional(env.SEARCH_AWS_ENDPOINT),
 
-    ledgerTable: env.SEARCH_LEDGER_TABLE ?? "search_index_ledger",
-    visibilityTable: env.SEARCH_VISIBILITY_TABLE ?? "search_archive_visibility",
+    ledgerTable: env.SEARCH_LEDGER_TABLE ?? "search_indexing_ledger",
+    publicationsTable: env.SEARCH_PUBLICATIONS_TABLE ?? "search_publications",
+    outboxTable: env.SEARCH_OUTBOX_TABLE ?? "search_outbox",
+    inboxTable: env.SEARCH_INBOX_TABLE ?? "search_inbox",
+    inboxRetentionMs: duration(env, "SEARCH_INBOX_RETENTION_MS", 7 * 24 * 60 * 60 * 1_000),
     claimLeaseMs: duration(env, "SEARCH_CLAIM_LEASE_MS", 120_000),
+    reconcileIntervalMs: duration(env, "SEARCH_RECONCILE_INTERVAL_MS", 30_000),
+    outboxIntervalMs: duration(env, "SEARCH_OUTBOX_INTERVAL_MS", 5_000),
     maxDocumentAttempts: integer(env, "SEARCH_MAX_DOCUMENT_ATTEMPTS", 3),
     maxArtifactBytes: integer(env, "SEARCH_MAX_ARTIFACT_BYTES", 64 * 1024 * 1024),
 

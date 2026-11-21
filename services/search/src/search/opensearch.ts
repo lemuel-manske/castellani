@@ -1,7 +1,8 @@
 import { Client, errors } from "@opensearch-project/opensearch";
 
-import { type DocumentIndex, type SnapshotDocument, DocumentError } from "../indexing/model.js";
+import { type DocumentIndex, type SnapshotDocument, DocumentError, documentId } from "../indexing/model.js";
 import type { ArchiveIndex } from "../publication/handler.js";
+import type { SnapshotReveal } from "../reconciliation/reconciler.js";
 import { type SortKey, decodeCursor, encodeCursor } from "./cursor.js";
 import { type SearchQuery, fingerprint } from "./query.js";
 
@@ -42,6 +43,8 @@ export type SearchResult = {
 export type SearchPage = { results: SearchResult[]; nextCursor: string | null };
 
 export class SearchUnavailableError extends Error {}
+
+type BulkItem = { update?: { status?: number; error?: { type?: string } } };
 
 type Hit = {
   _score?: number | null;
@@ -136,7 +139,7 @@ function toResult(hit: Hit): SearchResult {
   };
 }
 
-export class OpenSearchIndex implements DocumentIndex, ArchiveIndex {
+export class OpenSearchIndex implements DocumentIndex, ArchiveIndex, SnapshotReveal {
   constructor(
     private readonly client: Client,
     private readonly index: string,
@@ -172,9 +175,19 @@ export class OpenSearchIndex implements DocumentIndex, ArchiveIndex {
     }
   }
 
-  async put(document: SnapshotDocument): Promise<void> {
+  /**
+   * Upsert that never touches `visible` on an existing document: a new
+   * document is created hidden, and re-indexing keeps a revealed snapshot
+   * revealed (a stale worker cannot hide it again).
+   */
+  async put(document: Omit<SnapshotDocument, "visible">): Promise<void> {
     try {
-      await this.client.index({ index: this.index, id: document.snapshotId, body: document });
+      await this.client.update({
+        index: this.index,
+        id: documentId(document.archiveId, document.snapshotId),
+        retry_on_conflict: 3,
+        body: { doc: document, upsert: { ...document, visible: false } },
+      });
     } catch (error) {
       if (error instanceof errors.ResponseError && error.statusCode === 400) {
         throw new DocumentError(`OpenSearch rejected snapshot ${document.snapshotId}: ${errorType(error)}`);
@@ -184,31 +197,29 @@ export class OpenSearchIndex implements DocumentIndex, ArchiveIndex {
     }
   }
 
-  async reveal(snapshotId: string): Promise<void> {
-    await ignoreNotFound(
-      this.client.update({ index: this.index, id: snapshotId, body: { doc: { visible: true } }, retry_on_conflict: 3 }),
-    );
+  /** Bulk-reveals snapshots and refreshes, so they are searchable on return. */
+  async reveal(archiveId: string, snapshotIds: string[]): Promise<void> {
+    for (let start = 0; start < snapshotIds.length; start += 500) {
+      const batch = snapshotIds.slice(start, start + 500);
+      const body = batch.flatMap((id) => [
+        { update: { _index: this.index, _id: documentId(archiveId, id), retry_on_conflict: 3 } },
+        { doc: { visible: true } },
+      ]);
+      const response = await this.client.bulk({ body, refresh: true });
+      const failures = (response.body.items as BulkItem[])
+        .map((item) => item.update)
+        .filter((result) => result?.error !== undefined && result.status !== 404);
+
+      if (failures.length > 0) {
+        throw new Error(
+          `OpenSearch failed to reveal ${failures.length} snapshot(s): ${failures[0]?.error?.type ?? ""}`,
+        );
+      }
+    }
   }
 
-  async remove(snapshotId: string): Promise<void> {
-    await ignoreNotFound(this.client.delete({ index: this.index, id: snapshotId }));
-  }
-
-  /**
-   * Refreshes first so documents written just before the archive's facts were
-   * recorded are visible to the query; see the ordering note on `Indexer`.
-   */
-  async activate(archiveId: string): Promise<void> {
-    await this.client.indices.refresh({ index: this.index });
-    await this.client.updateByQuery({
-      index: this.index,
-      conflicts: "proceed",
-      refresh: true,
-      body: {
-        query: { bool: { filter: [{ term: { archiveId } }], must_not: [{ term: { visible: true } }] } },
-        script: { source: "ctx._source.visible = true", lang: "painless" },
-      },
-    });
+  async remove(archiveId: string, snapshotId: string): Promise<void> {
+    await ignoreNotFound(this.client.delete({ index: this.index, id: documentId(archiveId, snapshotId) }));
   }
 
   async purge(archiveId: string): Promise<void> {

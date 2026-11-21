@@ -18,5 +18,5 @@ output "opensearch_dataplane_url" {
 }
 
 output "search_ledger_table" {
-  value = aws_dynamodb_table.search_index_ledger.name
+  value = aws_dynamodb_table.search_indexing_ledger.name
 }

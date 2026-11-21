@@ -5,10 +5,14 @@ import { describe, expect, test } from "vitest";
 import { pageCapturedMessage } from "../support/events.js";
 import {
   PACKAGE,
+  type SnapshotEntry,
   archiveEvent,
+  completeCrawl,
   deadLettered,
+  inboxRecord,
   ledgerReaches,
   observe,
+  outboxRecord,
   publish,
   publishArchive,
   publishRaw,
@@ -21,34 +25,50 @@ function page(title: string, text: string): string {
   return `<html><head><title>${title}</title></head><body><p>${text}</p></body></html>`;
 }
 
-/** Captures one page of `archiveId` containing `word` and publishes PageCaptured. */
-async function capturePage(archiveId: string, word: string, path = "page") {
+/** Stores a captured page of `archiveId` containing `word`, without delivering it. */
+async function captured(archiveId: string, word: string, path = "page"): Promise<SnapshotEntry> {
   const url = `https://example.org/${path}`;
   const ref = await storeCapturedPage(url, page(path, `The ${word} at dawn`));
-  const message = pageCapturedMessage({ archiveId, url, warcArtifacts: [ref] });
+  const { payload } = pageCapturedMessage({ archiveId, url, warcArtifacts: [ref] });
 
-  await publish(message);
+  return payload as SnapshotEntry;
+}
 
-  return message.payload as Record<string, string>;
+/** Stores a captured page and publishes its `PageCaptured` event. */
+async function capturePage(archiveId: string, word: string, path = "page"): Promise<SnapshotEntry> {
+  const entry = await captured(archiveId, word, path);
+  await publish(pageCapturedMessage({ archiveId, ...entry }));
+
+  return entry;
+}
+
+/** Runs a whole archive through crawl completion and publication. */
+async function archiveAndPublish(archiveId: string, entries: SnapshotEntry[]): Promise<void> {
+  await completeCrawl(archiveId, entries);
+  await publishArchive(archiveId);
 }
 
 function unique(prefix: string): string {
   return `${prefix}${randomUUID().slice(0, 8)}`;
 }
 
+function newArchive(): string {
+  return `archive-${randomUUID()}`;
+}
+
 describe("indexing through the running stack", () => {
   test("a captured page of a published archive becomes searchable", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("harbour");
-    const captured = await capturePage(archiveId, word, "harbour");
+    const entry = await capturePage(archiveId, word, "harbour");
 
-    await publishArchive(archiveId);
+    await archiveAndPublish(archiveId, [entry]);
 
     const response = await searchUntil({ q: word }, (r) => r.body.results.length > 0);
     expect(response.body.results).toEqual([
       expect.objectContaining({
         archiveId,
-        snapshotId: captured.snapshotId,
+        snapshotId: entry.snapshotId,
         url: "https://example.org/harbour",
         capturedAt: "2026-11-01T12:00:00.000Z",
         title: "harbour",
@@ -58,35 +78,35 @@ describe("indexing through the running stack", () => {
   });
 
   test("redelivering the same snapshot does not create a duplicate result", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("lighthouse");
-    const ref = await storeCapturedPage("https://example.org/light", page("Lighthouse", word));
-    const message = pageCapturedMessage({ archiveId, url: "https://example.org/light", warcArtifacts: [ref] });
+    const entry = await captured(archiveId, word);
+    const message = pageCapturedMessage({ archiveId, ...entry });
     await publish(message);
-    await publishArchive(archiveId);
+    await archiveAndPublish(archiveId, [entry]);
     await searchUntil({ q: word }, (r) => r.body.results.length > 0);
 
     await publish({ ...message, messageId: randomUUID() });
     await publish(message);
-
-    // Settles on the duplicates being consumed; a duplicate document would
-    // appear as a second result for the same unique word.
-    const sentinel = unique("sentinel");
-    await capturePage(archiveId, sentinel, "sentinel");
-    await searchUntil({ q: sentinel }, (r) => r.body.results.length > 0);
+    await ledgerReaches({ archiveId, snapshotId: entry.snapshotId }, "INDEXED");
 
     const response = await search({ q: word });
     expect(response.body.results).toHaveLength(1);
+    // The original delivery is recorded in the inbox after its effect, with
+    // an expiry for TTL cleanup.
+    const record = await inboxRecord(String(message.messageId));
+    expect(record?.expiresAt).toBeGreaterThan(Date.now() / 1_000);
   });
 
   test("results page through an archive with a cursor without repeating snapshots", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("ferry");
+    const entries: SnapshotEntry[] = [];
 
     for (const path of ["one", "two", "three"]) {
-      await capturePage(archiveId, word, path);
+      entries.push(await capturePage(archiveId, word, path));
     }
-    await publishArchive(archiveId);
+    await archiveAndPublish(archiveId, entries);
     await searchUntil({ q: word, archiveId }, (r) => r.body.results.length === 3);
 
     const first = await search({ q: word, archiveId, limit: "2" });
@@ -102,13 +122,12 @@ describe("indexing through the running stack", () => {
   });
 
   test("an archive filter excludes snapshots from other archives", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("quay");
-    await capturePage(archiveId, word, "quay");
-    await publishArchive(archiveId);
+    await archiveAndPublish(archiveId, [await capturePage(archiveId, word)]);
     await searchUntil({ q: word }, (r) => r.body.results.length > 0);
 
-    const response = await search({ q: word, archiveId: `archive-${randomUUID()}` });
+    const response = await search({ q: word, archiveId: newArchive() });
 
     expect(response.status).toBe(200);
     expect(response.body.results).toHaveLength(0);
@@ -117,10 +136,11 @@ describe("indexing through the running stack", () => {
 
 describe("publication visibility through the running stack", () => {
   test("indexed snapshots stay hidden until the archive is published", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("staged");
-    const captured = await capturePage(archiveId, word);
-    await ledgerReaches(captured.snapshotId ?? "", "INDEXED");
+    const entry = await capturePage(archiveId, word);
+    await completeCrawl(archiveId, [entry]);
+    await ledgerReaches({ archiveId, snapshotId: entry.snapshotId }, "INDEXED");
 
     await publish(archiveEvent("ArchivePublicationDecided", archiveId, PACKAGE));
     const hidden = await search({ q: word });
@@ -134,9 +154,9 @@ describe("publication visibility through the running stack", () => {
   });
 
   test("a replay acknowledgment delivered before the decision still publishes the archive", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("reversed");
-    await capturePage(archiveId, word);
+    await completeCrawl(archiveId, [await capturePage(archiveId, word)]);
 
     await publish(archiveEvent("ArchivePublished", archiveId, PACKAGE));
     await publish(archiveEvent("ArchivePublicationDecided", archiveId, PACKAGE));
@@ -145,11 +165,24 @@ describe("publication visibility through the running stack", () => {
     expect(response.body.results).toEqual([expect.objectContaining({ archiveId })]);
   });
 
+  test("a captured snapshot missing from the manifest stays hidden after publication", async () => {
+    const archiveId = newArchive();
+    const word = unique("stray");
+    const authorized = await capturePage(archiveId, word, "authorized");
+    const stray = await capturePage(archiveId, word, "stray");
+    await ledgerReaches({ archiveId, snapshotId: stray.snapshotId }, "INDEXED");
+
+    await archiveAndPublish(archiveId, [authorized]);
+
+    const response = await searchUntil({ q: word }, (r) => r.body.results.length > 0);
+    expect(response.body.results.map((r) => r.snapshotId)).toEqual([authorized.snapshotId]);
+  });
+
   test("a compensated archive is never searchable and Search acknowledges the cleanup", async () => {
-    const archiveId = `archive-${randomUUID()}`;
+    const archiveId = newArchive();
     const word = unique("aborted");
-    const captured = await capturePage(archiveId, word);
-    await ledgerReaches(captured.snapshotId ?? "", "INDEXED");
+    const entry = await capturePage(archiveId, word);
+    await ledgerReaches({ archiveId, snapshotId: entry.snapshotId }, "INDEXED");
     const acknowledgments = await observe("SearchCompensated");
 
     await publish(
@@ -157,6 +190,8 @@ describe("publication visibility through the running stack", () => {
     );
 
     const acknowledgment = await acknowledgments.next();
+    // Emitted through the outbox, which records the broker's confirm.
+    await expect.poll(async () => (await outboxRecord(`SearchCompensated:${archiveId}:4`))?.state).toBe("SENT");
     expect(acknowledgment).toMatchObject({
       messageId: `SearchCompensated:${archiveId}:4`,
       correlationId: archiveId,
@@ -172,6 +207,46 @@ describe("publication visibility through the running stack", () => {
     expect(await deadLettered(published ?? "")).toBe(true);
     const response = await search({ q: word });
     expect(response.body.results).toHaveLength(0);
+  });
+});
+
+describe("manifest reconciliation through the running stack", () => {
+  test("a lost PageCaptured is recovered from the manifest and indexing completion is reported", async () => {
+    const archiveId = newArchive();
+    const word = unique("recovered");
+    const delivered = await capturePage(archiveId, word, "delivered");
+    const lost = await captured(archiveId, word, "lost");
+    const completions = await observe("SearchIndexingCompleted");
+
+    const digest = await completeCrawl(archiveId, [delivered, lost]);
+
+    const completion = await completions.next();
+    expect(completion).toMatchObject({
+      messageId: `SearchIndexingCompleted:${archiveId}:${digest}`,
+      correlationId: archiveId,
+      payload: { archiveId, manifestDigest: digest, expected: 2, indexed: 2, failed: 0, unsupported: 0 },
+    });
+    await ledgerReaches({ archiveId, snapshotId: lost.snapshotId }, "INDEXED");
+  });
+
+  test("SearchReady is reported once the indexed archive is published, and results are searchable", async () => {
+    const archiveId = newArchive();
+    const word = unique("ready");
+    const entry = await capturePage(archiveId, word);
+    const digest = await completeCrawl(archiveId, [entry]);
+    await ledgerReaches({ archiveId, snapshotId: entry.snapshotId }, "INDEXED");
+    const readiness = await observe("SearchReady");
+
+    await publishArchive(archiveId);
+
+    const ready = await readiness.next();
+    expect(ready).toMatchObject({
+      messageId: `SearchReady:${archiveId}:${PACKAGE.decisionVersion}`,
+      payload: { archiveId, decisionVersion: PACKAGE.decisionVersion, manifestDigest: digest },
+    });
+    // SearchReady promises searchable visibility: no polling needed.
+    const response = await search({ q: word });
+    expect(response.body.results.map((r) => r.snapshotId)).toEqual([entry.snapshotId]);
   });
 });
 

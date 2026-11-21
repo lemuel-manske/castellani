@@ -1,194 +1,208 @@
 import { describe, expect, test } from "vitest";
 
-import { Indexer, RejectedEventError } from "../src/indexing/indexer.js";
-import { PublicationHandler } from "../src/publication/handler.js";
-import {
-  MemoryArtifacts,
-  MemoryLedger,
-  MemoryVisibility,
-  RecordingIndex,
-  RecordingPublisher,
-} from "./support/doubles.js";
-import { pageCaptured } from "./support/events.js";
-import { artifactRefFor, buildWarc } from "./support/warc.js";
-
-const PACKAGE = { decisionVersion: 1, packageDigest: "sha256:package-1" };
-
-function fixture() {
-  const artifacts = new MemoryArtifacts();
-  const index = new RecordingIndex();
-  const visibility = new MemoryVisibility();
-  const events = new RecordingPublisher();
-  const indexer = new Indexer(new MemoryLedger(), artifacts, index, visibility, { maxDocumentAttempts: 2 });
-  const publication = new PublicationHandler(visibility, index, events);
-
-  /** Captures and indexes one page of `archiveId`, returning its snapshot ID. */
-  async function capture(archiveId: string, path = "page"): Promise<string> {
-    const url = `https://example.org/${path}`;
-    const warc = await buildWarc([{ url, body: `<title>${path}</title><p>${path} text</p>` }]);
-    artifacts.put(`${archiveId}/${path}`, warc);
-    const event = pageCaptured({ archiveId, url, warcArtifacts: [artifactRefFor(warc, `${archiveId}/${path}`)] });
-
-    await indexer.handle(event);
-
-    return event.snapshotId;
-  }
-
-  return { index, events, indexer, publication, capture, artifacts };
-}
+import { RejectedEventError } from "../src/indexing/indexer.js";
+import { PACKAGE, searchService } from "./support/archive.js";
 
 describe("search visibility", () => {
   test("an indexed snapshot is not searchable before its archive is published", async () => {
-    const { index, capture } = fixture();
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
 
-    const snapshotId = await capture("archive-1");
+    await service.completeCrawl("archive-1", [page]);
 
-    expect(index.documents.has(snapshotId)).toBe(true);
-    expect(index.searchable()).toEqual([]);
+    expect(service.index.document(page.entry.snapshotId)).toBeDefined();
+    expect(service.index.searchable()).toEqual([]);
   });
 
   test("a publication decision alone does not make results searchable", async () => {
-    const { index, publication, capture } = fixture();
-    await capture("archive-1");
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
 
-    const result = await publication.publicationDecided("archive-1", PACKAGE);
+    const result = await service.publication.publicationDecided("archive-1", PACKAGE);
 
     expect(result).toBe("pending");
-    expect(index.searchable()).toEqual([]);
+    expect(service.index.searchable()).toEqual([]);
   });
 
-  test("results become searchable once the decision and the replay acknowledgment match", async () => {
-    const { index, publication, capture } = fixture();
-    const snapshotId = await capture("archive-1");
-    await publication.publicationDecided("archive-1", PACKAGE);
+  test("manifest snapshots become searchable once the decision and the replay acknowledgment match", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.publication.publicationDecided("archive-1", PACKAGE);
 
-    const result = await publication.archivePublished("archive-1", PACKAGE);
+    const result = await service.publication.archivePublished("archive-1", PACKAGE);
 
     expect(result).toBe("visible");
-    expect(index.searchable()).toEqual([snapshotId]);
+    expect(service.index.searchable()).toEqual([page.entry.snapshotId]);
   });
 
   test("a replay acknowledgment delivered before the decision is honored once the decision arrives", async () => {
-    const { index, publication, capture } = fixture();
-    const snapshotId = await capture("archive-1");
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
 
-    await publication.archivePublished("archive-1", PACKAGE);
-    expect(index.searchable()).toEqual([]);
+    await service.publication.archivePublished("archive-1", PACKAGE);
+    expect(service.index.searchable()).toEqual([]);
 
-    await publication.publicationDecided("archive-1", PACKAGE);
+    await service.publication.publicationDecided("archive-1", PACKAGE);
 
-    expect(index.searchable()).toEqual([snapshotId]);
+    expect(service.index.searchable()).toEqual([page.entry.snapshotId]);
+  });
+
+  test("publication facts that arrive before the manifest take effect once it is recorded", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.publish("archive-1");
+    expect(service.index.searchable()).toEqual([]);
+
+    await service.completeCrawl("archive-1", [page]);
+
+    expect(service.index.searchable()).toEqual([page.entry.snapshotId]);
+  });
+
+  test("a captured snapshot missing from the manifest is never searchable", async () => {
+    const service = searchService();
+    const authorized = await service.captureAndDeliver("archive-1", "authorized");
+    const stale = await service.captureAndDeliver("archive-1", "stale-attempt");
+    await service.completeCrawl("archive-1", [authorized]);
+
+    await service.publish("archive-1");
+
+    expect(service.index.document(stale.entry.snapshotId)).toBeDefined();
+    expect(service.index.searchable()).toEqual([authorized.entry.snapshotId]);
   });
 
   test("a replay acknowledgment for a different package keeps results hidden", async () => {
-    const { index, publication, capture } = fixture();
-    await capture("archive-1");
-    await publication.publicationDecided("archive-1", PACKAGE);
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.publication.publicationDecided("archive-1", PACKAGE);
 
-    const result = await publication.archivePublished("archive-1", { ...PACKAGE, packageDigest: "sha256:other" });
+    const result = await service.publication.archivePublished("archive-1", {
+      ...PACKAGE,
+      packageDigest: "sha256:other",
+    });
 
     expect(result).toBe("pending");
-    expect(index.searchable()).toEqual([]);
-  });
-
-  test("a page captured after publication is searchable as soon as it is indexed", async () => {
-    const { index, publication, capture } = fixture();
-    await publication.publicationDecided("archive-1", PACKAGE);
-    await publication.archivePublished("archive-1", PACKAGE);
-
-    const snapshotId = await capture("archive-1", "late");
-
-    expect(index.searchable()).toEqual([snapshotId]);
+    expect(service.index.searchable()).toEqual([]);
   });
 
   test("publishing one archive does not reveal another archive's snapshots", async () => {
-    const { index, publication, capture } = fixture();
-    const published = await capture("archive-1");
-    await capture("archive-2");
+    const service = searchService();
+    const published = await service.captureAndDeliver("archive-1", "page");
+    const other = await service.captureAndDeliver("archive-2", "page");
+    await service.completeCrawl("archive-1", [published]);
+    await service.completeCrawl("archive-2", [other]);
 
-    await publication.publicationDecided("archive-1", PACKAGE);
-    await publication.archivePublished("archive-1", PACKAGE);
+    await service.publish("archive-1");
 
-    expect(index.searchable()).toEqual([published]);
+    expect(service.index.searchable()).toEqual([published.entry.snapshotId]);
+  });
+
+  test("re-indexing a revealed snapshot keeps it searchable", async () => {
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.publish("archive-1");
+
+    await service.index.put({ ...page.entry, archiveId: "archive-1", content: "re-indexed", indexedAt: "now" });
+
+    expect(service.index.searchable()).toEqual([page.entry.snapshotId]);
   });
 
   test("a second, different publication decision for the same archive is rejected", async () => {
-    const { publication } = fixture();
-    await publication.publicationDecided("archive-1", PACKAGE);
+    const service = searchService();
+    await service.publication.publicationDecided("archive-1", PACKAGE);
 
     await expect(
-      publication.publicationDecided("archive-1", { decisionVersion: 2, packageDigest: "sha256:package-2" }),
+      service.publication.publicationDecided("archive-1", { decisionVersion: 2, packageDigest: "sha256:package-2" }),
     ).rejects.toBeInstanceOf(RejectedEventError);
   });
 });
 
 describe("compensation", () => {
   test("compensation removes the archive's documents and acknowledges with SearchCompensated", async () => {
-    const { index, events, publication, capture } = fixture();
-    await capture("archive-1", "one");
-    await capture("archive-1", "two");
+    const service = searchService();
+    await service.captureAndDeliver("archive-1", "one");
+    await service.captureAndDeliver("archive-1", "two");
 
-    const result = await publication.compensationDecided("archive-1", 3);
+    const result = await service.publication.compensationDecided("archive-1", 3);
 
     expect(result).toBe("compensated");
-    expect(index.documents.size).toBe(0);
-    expect(events.published).toEqual([
+    expect(service.index.documents.size).toBe(0);
+    expect(service.events.ofType("SearchCompensated")).toEqual([
       expect.objectContaining({
         messageId: "SearchCompensated:archive-1:3",
         correlationId: "archive-1",
-        type: "SearchCompensated",
         version: 1,
         payload: { archiveId: "archive-1", decisionVersion: 3 },
       }),
     ]);
   });
 
-  test("a redelivered compensation command re-emits the same acknowledgment", async () => {
-    const { events, publication } = fixture();
-    await publication.compensationDecided("archive-1", 3);
+  test("a redelivered compensation command repeats the cleanup but acknowledges once", async () => {
+    const service = searchService();
+    await service.publication.compensationDecided("archive-1", 3);
 
-    await publication.compensationDecided("archive-1", 3);
+    await service.publication.compensationDecided("archive-1", 3);
 
-    expect(events.published.map((event) => event.messageId)).toEqual([
-      "SearchCompensated:archive-1:3",
+    expect(service.events.ofType("SearchCompensated").map((event) => event.messageId)).toEqual([
       "SearchCompensated:archive-1:3",
     ]);
   });
 
+  test("an acknowledgment no queue accepts stays in the outbox and is delivered once a queue is bound", async () => {
+    const service = searchService();
+    service.events.unroutable = true;
+
+    await service.publication.compensationDecided("archive-1", 3);
+
+    expect(service.events.ofType("SearchCompensated")).toEqual([]);
+    expect(service.outbox.unsent()).toEqual(["SearchCompensated:archive-1:3"]);
+
+    service.events.unroutable = false;
+    await service.advance(60_000);
+
+    expect(service.events.ofType("SearchCompensated")).toHaveLength(1);
+  });
+
   test("a page captured after compensation is never indexed", async () => {
-    const { index, publication, capture } = fixture();
-    await publication.compensationDecided("archive-1", 3);
+    const service = searchService();
+    await service.publication.compensationDecided("archive-1", 3);
 
-    await capture("archive-1", "late");
+    await service.captureAndDeliver("archive-1", "late");
 
-    expect(index.documents.size).toBe(0);
+    expect(service.index.documents.size).toBe(0);
   });
 
   test("compensation does not touch other archives", async () => {
-    const { index, publication, capture } = fixture();
-    const kept = await capture("archive-2");
+    const service = searchService();
+    const kept = await service.captureAndDeliver("archive-2", "page");
 
-    await publication.compensationDecided("archive-1", 3);
+    await service.publication.compensationDecided("archive-1", 3);
 
-    expect([...index.documents.keys()]).toEqual([kept]);
+    expect(service.index.snapshotIds()).toEqual([kept.entry.snapshotId]);
   });
 
   test("compensation after an irreversible publication decision is rejected and results stay searchable", async () => {
-    const { index, events, publication, capture } = fixture();
-    const snapshotId = await capture("archive-1");
-    await publication.publicationDecided("archive-1", PACKAGE);
-    await publication.archivePublished("archive-1", PACKAGE);
+    const service = searchService();
+    const page = await service.captureAndDeliver("archive-1", "page");
+    await service.completeCrawl("archive-1", [page]);
+    await service.publish("archive-1");
 
-    await expect(publication.compensationDecided("archive-1", 2)).rejects.toBeInstanceOf(RejectedEventError);
+    await expect(service.publication.compensationDecided("archive-1", 2)).rejects.toBeInstanceOf(RejectedEventError);
 
-    expect(index.searchable()).toEqual([snapshotId]);
-    expect(events.published).toEqual([]);
+    expect(service.index.searchable()).toEqual([page.entry.snapshotId]);
+    expect(service.events.ofType("SearchCompensated")).toEqual([]);
   });
 
   test("a publication decision after compensation is rejected", async () => {
-    const { publication } = fixture();
-    await publication.compensationDecided("archive-1", 3);
+    const service = searchService();
+    await service.publication.compensationDecided("archive-1", 3);
 
-    await expect(publication.publicationDecided("archive-1", PACKAGE)).rejects.toBeInstanceOf(RejectedEventError);
+    await expect(service.publication.publicationDecided("archive-1", PACKAGE)).rejects.toBeInstanceOf(
+      RejectedEventError,
+    );
   });
 });

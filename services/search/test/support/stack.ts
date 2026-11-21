@@ -43,14 +43,19 @@ afterAll(async () => {
   dynamo.destroy();
 });
 
-/** Waits until Search's own ledger records `status` for a snapshot. */
-export async function ledgerReaches(snapshotId: string, status: string, timeoutMs = 20_000): Promise<void> {
+/** Waits until Search's own ledger records `status` for a snapshot of the archive. */
+export async function ledgerReaches(
+  snapshot: { archiveId: string; snapshotId: string },
+  status: string,
+  timeoutMs = 20_000,
+): Promise<void> {
+  const { archiveId, snapshotId } = snapshot;
   const deadline = Date.now() + timeoutMs;
   let current: unknown;
 
   while (Date.now() < deadline) {
     const { Item: item } = await dynamo.send(
-      new GetCommand({ TableName: "search_index_ledger", Key: { snapshotId }, ConsistentRead: true }),
+      new GetCommand({ TableName: "search_indexing_ledger", Key: { archiveId, snapshotId }, ConsistentRead: true }),
     );
     current = item?.status;
 
@@ -64,6 +69,34 @@ export async function ledgerReaches(snapshotId: string, status: string, timeoutM
   throw new Error(`snapshot ${snapshotId} did not reach ${status} within ${timeoutMs}ms (last: ${String(current)})`);
 }
 
+/** Waits until Search's inbox records a consumed message, returning the record. */
+export async function inboxRecord(messageId: string, timeoutMs = 20_000): Promise<Record<string, unknown> | undefined> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const { Item: item } = await dynamo.send(
+      new GetCommand({ TableName: "search_inbox", Key: { messageId }, ConsistentRead: true }),
+    );
+
+    if (item !== undefined) {
+      return item;
+    }
+
+    await sleep(250);
+  }
+
+  return undefined;
+}
+
+/** Reads Search's outbox record for an emitted event. */
+export async function outboxRecord(messageId: string): Promise<Record<string, unknown> | undefined> {
+  const { Item: item } = await dynamo.send(
+    new GetCommand({ TableName: "search_outbox", Key: { messageId }, ConsistentRead: true }),
+  );
+
+  return item;
+}
+
 /** Stores a single-page WARC in the artifacts bucket, as Capture would. */
 export async function storeCapturedPage(url: string, html: string): Promise<ArtifactRef> {
   const warc = await buildWarc([{ url, body: html }]);
@@ -72,6 +105,57 @@ export async function storeCapturedPage(url: string, html: string): Promise<Arti
   await s3.send(new PutObjectCommand({ Bucket: env.bucket, Key: key, Body: warc }));
 
   return { ...artifactRefFor(warc, key), bucket: env.bucket };
+}
+
+/** A manifest entry, as Capture lists each authorized snapshot. */
+export type SnapshotEntry = {
+  snapshotId: string;
+  urlKey: string;
+  url: string;
+  finalUrl?: string;
+  capturedAt: string;
+  warcArtifacts: ArtifactRef[];
+};
+
+/**
+ * Stores the final manifest for `entries` and publishes `CrawlCompleted`,
+ * as Capture does when the frontier closes. Returns the manifest digest.
+ */
+export async function completeCrawl(archiveId: string, entries: SnapshotEntry[]): Promise<string> {
+  const manifest = {
+    schemaVersion: 1,
+    archiveId,
+    normalizerVersion: "1",
+    seedUrl: "https://example.org/",
+    createdAt: new Date().toISOString(),
+    // Only the fields of the manifest schema: it rejects additional properties.
+    snapshots: entries.map((entry) => ({
+      snapshotId: entry.snapshotId,
+      urlKey: entry.urlKey,
+      url: entry.url,
+      finalUrl: entry.finalUrl ?? entry.url,
+      capturedAt: entry.capturedAt,
+      warcArtifacts: entry.warcArtifacts,
+    })),
+    failedPages: [],
+  };
+  const bytes = Buffer.from(JSON.stringify(manifest));
+  const key = `test/${archiveId}/manifest.json`;
+  await s3.send(new PutObjectCommand({ Bucket: env.bucket, Key: key, Body: bytes }));
+  const ref = { ...artifactRefFor(bytes, key), bucket: env.bucket };
+  const digest = `sha256:${ref.sha256}`;
+
+  await publish(
+    archiveEvent("CrawlCompleted", archiveId, {
+      manifest: ref,
+      manifestDigest: digest,
+      seedSucceeded: true,
+      capturedCount: entries.length,
+      failedCount: 0,
+    }),
+  );
+
+  return digest;
 }
 
 /** Publishes an event to the shared exchange with confirms, routed by type. */

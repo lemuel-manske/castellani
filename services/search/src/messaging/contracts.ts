@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
-import type { PageCaptured, PublicationFact } from "../indexing/model.js";
+import { type ArtifactRef, type PageCaptured, type PublicationFact, DocumentError } from "../indexing/model.js";
+import type { Manifest, ManifestParser } from "../reconciliation/reconciler.js";
 
 /**
  * Repository `contracts/` directory. Images mirror the repository layout
@@ -17,7 +18,10 @@ const SCHEMAS = {
   ArchivePublicationDecided: "archive-publication-decided.v1.schema.json",
   ArchivePublished: "archive-published.v1.schema.json",
   ArchiveCompensationDecided: "archive-compensation-decided.v1.schema.json",
+  CrawlCompleted: "crawl-completed.v1.schema.json",
   SearchCompensated: "search-compensated.v1.schema.json",
+  SearchIndexingCompleted: "search-indexing-completed.v1.schema.json",
+  SearchReady: "search-ready.v1.schema.json",
 } as const;
 
 export type MessageType = keyof typeof SCHEMAS;
@@ -30,8 +34,16 @@ export type ArchiveFactEvent = PublicationFact & { messageId: string; archiveId:
 
 export type CompensationEvent = { messageId: string; archiveId: string; decisionVersion: number; reasonCode: string };
 
-export class Contracts {
+export type CrawlCompletedEvent = {
+  messageId: string;
+  archiveId: string;
+  manifest: ArtifactRef;
+  manifestDigest: string;
+};
+
+export class Contracts implements ManifestParser {
   private readonly envelope: ValidateFunction;
+  private readonly manifest: ValidateFunction;
   private readonly validators: Record<MessageType, ValidateFunction>;
 
   constructor(root: URL = CONTRACTS) {
@@ -44,6 +56,13 @@ export class Contracts {
     ajv.addSchema(manifest, "archive-manifest.v1.schema.json");
     ajv.addSchema({ ...manifest, $id: "../archive-manifest.v1.schema.json" });
 
+    const compiledManifest = ajv.getSchema("archive-manifest.v1.schema.json");
+
+    if (compiledManifest === undefined) {
+      throw new Error("archive manifest schema did not compile");
+    }
+
+    this.manifest = compiledManifest;
     this.envelope = ajv.compile(load(root, "messages/envelope.v1.schema.json"));
     this.validators = Object.fromEntries(
       Object.entries(SCHEMAS).map(([type, file]) => [type, ajv.compile(load(root, `messages/${file}`))]),
@@ -51,7 +70,7 @@ export class Contracts {
   }
 
   /** Validates the envelope and returns its routing identity. */
-  envelopeOf(message: unknown): { type: string } {
+  envelopeOf(message: unknown): { messageId: string; type: string } {
     if (!this.envelope(message)) {
       throw new InvalidMessageError(`invalid envelope: ${errors(this.envelope)}`);
     }
@@ -85,6 +104,26 @@ export class Contracts {
     };
 
     return { messageId, archiveId, decisionVersion, reasonCode };
+  }
+
+  parseCrawlCompleted(message: unknown): CrawlCompletedEvent {
+    const { messageId, payload } = this.validate("CrawlCompleted", message);
+    const { archiveId, manifest, manifestDigest } = payload as {
+      archiveId: string;
+      manifest: ArtifactRef;
+      manifestDigest: string;
+    };
+
+    return { messageId, archiveId, manifest, manifestDigest };
+  }
+
+  /** Validates a final crawl manifest document against its published schema. */
+  parseManifest(document: unknown): Manifest {
+    if (!this.manifest(document)) {
+      throw new DocumentError(`invalid manifest: ${errors(this.manifest)}`);
+    }
+
+    return document as Manifest;
   }
 
   /** Validates a message this service emits; a failure is a programming error. */
