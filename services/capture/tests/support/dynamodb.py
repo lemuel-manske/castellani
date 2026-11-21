@@ -104,70 +104,99 @@ class FakeDynamoDBClient:
 
 
 class FakeDynamoDBFrontierClient:
-    """Applies the run guard and frontier update as one atomic transaction."""
+    """Applies run guards, frontier transitions, and outbox writes atomically."""
 
     def __init__(self) -> None:
         self.runs: dict[str, dict[str, Any]] = {}
         self.frontier: dict[tuple[str, str], dict[str, Any]] = {}
+        self.outbox: dict[str, dict[str, Any]] = {}
         self.lock = threading.Lock()
 
     def transact_write_items(self, **request: Any) -> dict[str, Any]:
-        run_check, frontier_update = request["TransactItems"]
+        operations = request["TransactItems"]
+        run_check = next(operation["ConditionCheck"] for operation in operations if "ConditionCheck" in operation)
+        frontier_update = next(operation["Update"] for operation in operations if "Update" in operation)
+        outbox_put = next((operation["Put"] for operation in operations if "Put" in operation), None)
 
         with self.lock:
-            run_key = run_check["ConditionCheck"]["Key"]["archiveId"]["S"]
+            run_key = run_check["Key"]["archiveId"]["S"]
             run = self.runs.get(run_key)
-            run_condition = run_check["ConditionCheck"]["ConditionExpression"]
-            run_values = run_check["ConditionCheck"]["ExpressionAttributeValues"]
             run_admission = run.get("admission", {}).get("S") if run else None
 
-            update = frontier_update["Update"]
+            update_key = frontier_update["Key"]
             key = (
-                update["Key"]["archiveId"]["S"],
-                update["Key"]["urlKey"]["S"],
+                update_key["archiveId"]["S"],
+                update_key["urlKey"]["S"],
             )
             item = deepcopy(self.frontier.get(key))
-            names = update["ExpressionAttributeNames"]
-            values = update["ExpressionAttributeValues"]
-            condition = update["ConditionExpression"]
+            names = frontier_update["ExpressionAttributeNames"]
+            values = frontier_update["ExpressionAttributeValues"]
+            condition = frontier_update["ConditionExpression"]
 
-            if run_condition and run_admission != run_values[":open"]["S"]:
-                self._transaction_failure("ConditionalCheckFailed", "None")
+            if run_admission != run_check["ExpressionAttributeValues"][":open"]["S"]:
+                self._transaction_failure("ConditionalCheckFailed", "None", "None")
 
             if item is None:
-                self._transaction_failure("None", "ConditionalCheckFailed")
+                self._transaction_failure("None", "ConditionalCheckFailed", "None")
+
+            updated = deepcopy(item)
 
             if "#state = :pending" in condition:
-                is_pending = item is not None and item.get(names["#state"]) == values[":pending"]
+                is_pending = updated.get(names["#state"]) == values[":pending"]
                 is_expired = (
-                    item is not None
-                    and item.get(names["#state"]) == values[":claimed"]
-                    and float(item[names["#lease"]]["N"]) <= float(values[":now"]["N"])
+                    updated.get(names["#state"]) == values[":claimed"]
+                    and float(updated[names["#lease"]]["N"]) <= float(values[":now"]["N"])
                 )
 
                 if not is_pending and not is_expired:
-                    self._transaction_failure("None", "ConditionalCheckFailed")
+                    self._transaction_failure("None", "ConditionalCheckFailed", "None")
 
-                fence = int(item.get(names["#fence"], {"N": "0"})["N"]) + 1
-                item[names["#state"]] = deepcopy(values[":claimed"])
-                item[names["#attempt"]] = deepcopy(values[":attempt"])
-                item[names["#lease"]] = deepcopy(values[":lease"])
-                item[names["#fence"]] = {"N": str(fence)}
-            else:
+                fence = int(updated.get(names["#fence"], {"N": "0"})["N"]) + 1
+                updated[names["#state"]] = deepcopy(values[":claimed"])
+                updated[names["#attempt"]] = deepcopy(values[":attempt"])
+                updated[names["#lease"]] = deepcopy(values[":lease"])
+                updated[names["#fence"]] = {"N": str(fence)}
+            elif "REMOVE #attempt" in frontier_update["UpdateExpression"]:
                 owns_claim = (
-                    item is not None
-                    and item.get(names["#state"]) == values[":claimed"]
-                    and item.get(names["#attempt"]) == values[":attempt"]
-                    and item.get(names["#fence"]) == values[":fence"]
-                    and float(item[names["#lease"]]["N"]) > float(values[":now"]["N"])
+                    updated.get(names["#state"]) == values[":claimed"]
+                    and updated.get(names["#attempt"]) == values[":attempt"]
+                    and updated.get(names["#fence"]) == values[":fence"]
+                    and float(updated[names["#lease"]]["N"]) > float(values[":now"]["N"])
                 )
 
                 if not owns_claim:
-                    self._transaction_failure("None", "ConditionalCheckFailed")
+                    self._transaction_failure("None", "ConditionalCheckFailed", "None")
 
-                item[names["#lease"]] = deepcopy(values[":lease"])
+                updated[names["#state"]] = deepcopy(values[":pending"])
+                updated.pop(names["#attempt"], None)
+                updated.pop(names["#lease"], None)
+            else:
+                owns_claim = (
+                    updated.get(names["#state"]) == values[":claimed"]
+                    and updated.get(names["#attempt"]) == values[":attempt"]
+                    and updated.get(names["#fence"]) == values[":fence"]
+                    and float(updated[names["#lease"]]["N"]) > float(values[":now"]["N"])
+                )
 
-            self.frontier[key] = item
+                if not owns_claim:
+                    self._transaction_failure("None", "ConditionalCheckFailed", "None")
+
+                updated[names["#lease"]] = deepcopy(values[":lease"])
+
+            outbox_item: dict[str, Any] | None = None
+
+            if outbox_put is not None:
+                outbox_item = outbox_put["Item"]
+                message_id = outbox_item["messageId"]["S"]
+
+                if message_id in self.outbox:
+                    self._transaction_failure("None", "None", "ConditionalCheckFailed")
+
+            self.frontier[key] = updated
+
+            if outbox_item is not None:
+                message_id = outbox_item["messageId"]["S"]
+                self.outbox[message_id] = deepcopy(outbox_item)
 
             return {}
 
@@ -175,22 +204,26 @@ class FakeDynamoDBFrontierClient:
         key = request["Key"]
 
         with self.lock:
-            if request["TableName"] == "capture_runs":
+            table_name = request["TableName"]
+
+            if table_name == "capture_runs":
                 item = self.runs.get(key["archiveId"]["S"])
+            elif table_name == "capture_outbox":
+                item = self.outbox.get(key["messageId"]["S"])
             else:
                 item = self.frontier.get((key["archiveId"]["S"], key["urlKey"]["S"]))
 
             return {"Item": deepcopy(item)} if item else {}
 
     @staticmethod
-    def _transaction_failure(first: str, second: str) -> NoReturn:
+    def _transaction_failure(*reasons: str) -> NoReturn:
         raise ClientError(
             {
                 "Error": {
                     "Code": "TransactionCanceledException",
                     "Message": "The transaction was cancelled.",
                 },
-                "CancellationReasons": [{"Code": first}, {"Code": second}],
+                "CancellationReasons": [{"Code": reason} for reason in reasons],
             },
             "TransactWriteItems",
         )
