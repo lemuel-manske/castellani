@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 
 import pytest
-from support.local_dynamodb import dynamodb_client  # noqa: F401
+pytest_plugins = ("support.local_dynamodb",)
 from support.recording import LocalSite, start_local_site
 
 
