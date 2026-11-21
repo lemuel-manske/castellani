@@ -217,8 +217,8 @@ class DynamoDBOutbox:
 
             raise
 
-    @classmethod
-    def _envelope(cls, item: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _envelope(item: dict[str, Any]) -> dict[str, Any]:
         return {
             "messageId": string_from_item(item, "messageId", "outbox record"),
             "correlationId": string_from_item(item, "correlationId", "outbox record"),
