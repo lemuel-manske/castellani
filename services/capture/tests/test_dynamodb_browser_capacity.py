@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import pytest
 from support.dynamodb import FakeClock
@@ -9,7 +10,7 @@ from adapters.persistence.dynamodb.browser_capacity import (
 )
 
 
-async def test_capacity_admits_exactly_the_configured_number_of_contenders(dynamodb_client) -> None:
+async def test_capacity_admits_exactly_the_configured_number_of_contenders(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     capacity = DynamoDBBrowserCapacity(
@@ -31,7 +32,7 @@ async def test_capacity_admits_exactly_the_configured_number_of_contenders(dynam
 
 
 async def test_reservation_renewal_preserves_its_fence(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     clock = FakeClock()
     client = dynamodb_client
@@ -57,7 +58,7 @@ async def test_reservation_renewal_preserves_its_fence(
     assert renewed.lease_until > reservation.lease_until
 
 
-async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client) -> None:
+async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client: Any) -> None:
     clock = FakeClock()
     client = dynamodb_client
 
@@ -89,7 +90,7 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(dynamodb_client
 
 
 async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     clock = FakeClock()
     client = dynamodb_client
@@ -117,7 +118,7 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
     assert await capacity.reserve("attempt-3") is None
 
 
-def test_capacity_rejects_invalid_configuration(dynamodb_client) -> None:
+def test_capacity_rejects_invalid_configuration(dynamodb_client: Any) -> None:
     client = dynamodb_client
 
     with pytest.raises(ValueError):
@@ -128,7 +129,7 @@ def test_capacity_rejects_invalid_configuration(dynamodb_client) -> None:
 
 
 async def test_repeated_reservation_reuses_existing_slot(
-    dynamodb_client,
+    dynamodb_client: Any,
 ) -> None:
     client = dynamodb_client
 
