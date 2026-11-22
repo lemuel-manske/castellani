@@ -42,15 +42,16 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     try {
       await recordPublicationDecisionQuery(this.client, this.tableName, identity);
     } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.name !== "ConditionalCheckFailedException"
-      ) {
+      if (!isConditionalCheckFailure(error)) {
         throw error;
       }
 
       const current = await this.get(identity.archiveId);
-      recordPublicationDecision(current, identity);
+
+      if (recordPublicationDecision(current, identity) === current) {
+        return;
+      }
+
       throw new PublicationConflictError(
         "publication state changed concurrently; retry the operation",
       );
@@ -64,15 +65,16 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     try {
       await recordReplayPublishedQuery(this.client, this.tableName, identity);
     } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.name !== "ConditionalCheckFailedException"
-      ) {
+      if (!isConditionalCheckFailure(error)) {
         throw error;
       }
 
       const current = await this.get(identity.archiveId);
-      recordReplayPublished(current, identity);
+
+      if (recordReplayPublished(current, identity) === current) {
+        return;
+      }
+
       throw new PublicationConflictError(
         "publication state changed concurrently; retry the operation",
       );
@@ -88,20 +90,28 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     try {
       await recordCompensationDecisionQuery(this.client, this.tableName, decision);
     } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.name !== "ConditionalCheckFailedException"
-      ) {
+      if (!isConditionalCheckFailure(error)) {
         throw error;
       }
 
       const current = await this.get(decision.archiveId);
-      recordCompensationDecision(current, decision);
+
+      if (recordCompensationDecision(current, decision) === current) {
+        return;
+      }
+
       throw new PublicationConflictError(
         "publication state changed concurrently; retry the operation",
       );
     }
   }
+}
+
+function isConditionalCheckFailure(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === "ConditionalCheckFailedException"
+  );
 }
 
 export { DynamoDBPublicationLedger };

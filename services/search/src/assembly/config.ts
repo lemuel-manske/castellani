@@ -6,6 +6,7 @@ interface SearchSettingsOptions {
   opensearchUrl: string;
   artifactBucket: string;
   indexingLedgerTableName: string;
+  publicationLedgerTableName: string;
   searchIndexName: string;
   indexingLeaseDurationSeconds?: number;
   indexingMaxAttempts?: number;
@@ -47,6 +48,7 @@ class SearchSettings {
   readonly opensearchUrl: string;
   readonly artifactBucket: string;
   readonly indexingLedgerTableName: string;
+  readonly publicationLedgerTableName: string;
   readonly searchIndexName: string;
   readonly indexingLeaseDurationSeconds: number;
   readonly indexingMaxAttempts: number;
@@ -61,9 +63,8 @@ class SearchSettings {
     this.opensearchUrl = options.opensearchUrl;
 
     this.artifactBucket = options.artifactBucket;
-
     this.indexingLedgerTableName = options.indexingLedgerTableName;
-
+    this.publicationLedgerTableName = options.publicationLedgerTableName;
     this.searchIndexName = options.searchIndexName;
 
     this.indexingLeaseDurationSeconds =
@@ -81,6 +82,7 @@ class SearchSettings {
       !this.opensearchUrl.trim() ||
       !this.artifactBucket.trim() ||
       !this.indexingLedgerTableName.trim() ||
+      !this.publicationLedgerTableName.trim() ||
       !this.searchIndexName.trim()
     ) {
       throw new Error("Search settings must not contain empty required values");
@@ -100,7 +102,6 @@ class SearchSettings {
   static fromEnvironment(env: NodeJS.ProcessEnv = process.env): SearchSettings {
     return new SearchSettings({
       awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
-
       dynamodbEndpointUrl: required(
         "SEARCH_DYNAMODB_ENDPOINT_URL",
         env.SEARCH_DYNAMODB_ENDPOINT_URL,
@@ -114,19 +115,19 @@ class SearchSettings {
         "SEARCH_OPENSEARCH_URL",
         env.SEARCH_OPENSEARCH_URL,
       ),
-
       artifactBucket: required(
         "SEARCH_ARTIFACT_BUCKET",
         env.SEARCH_ARTIFACT_BUCKET,
       ),
-
       indexingLedgerTableName: required(
         "SEARCH_INDEXING_LEDGER_TABLE",
         env.SEARCH_INDEXING_LEDGER_TABLE,
       ),
-
+      publicationLedgerTableName: required(
+        "SEARCH_PUBLICATION_LEDGER_TABLE",
+        env.SEARCH_PUBLICATION_LEDGER_TABLE,
+      ),
       searchIndexName: required("SEARCH_INDEX_NAME", env.SEARCH_INDEX_NAME),
-
       indexingLeaseDurationSeconds: positiveInteger(
         "SEARCH_INDEXING_LEASE_DURATION_SECONDS",
         env.SEARCH_INDEXING_LEASE_DURATION_SECONDS,

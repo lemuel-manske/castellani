@@ -5,7 +5,12 @@ import {
   startPageCapturedConsumer,
   type PageCapturedConsumerTopology,
 } from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
+import {
+  startPublicationConsumer,
+  type PublicationConsumerTopology,
+} from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
 import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
+import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 
 const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
 
@@ -20,32 +25,79 @@ function createRabbitMqTestSupport() {
     deadLetterExchange: `search-integration-dead-${suffix}`,
     deadLetterQueue: `search-integration-dead-queue-${suffix}`,
   };
+  const publicationTopology: PublicationConsumerTopology = {
+    eventsExchange: `search-publication-integration-events-${suffix}`,
+    routingKeys: [
+      "ArchivePublicationDecided",
+      "ArchivePublished",
+      "ArchiveCompensationDecided",
+    ],
+    queue: `search-publication-integration-queue-${suffix}`,
+    retryExchange: `search-publication-integration-retry-${suffix}`,
+    retryQueue: `search-publication-integration-retry-queue-${suffix}`,
+    deadLetterExchange: `search-publication-integration-dead-${suffix}`,
+    deadLetterQueue: `search-publication-integration-dead-queue-${suffix}`,
+  };
 
   let connection: amqp.ChannelModel | undefined;
   let consumerChannel: amqp.ConfirmChannel | undefined;
+  let publicationConsumerChannel: amqp.ConfirmChannel | undefined;
   let publisherChannel: amqp.ConfirmChannel | undefined;
   const deadLetters: ConsumeMessage[] = [];
   const deadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
+  const publicationDeadLetters: ConsumeMessage[] = [];
+  const publicationDeadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
+
+  function receiveDeadLetter(
+    message: ConsumeMessage,
+    messages: ConsumeMessage[],
+    waiters: ((message: ConsumeMessage) => void)[],
+    channel: amqp.ConfirmChannel | undefined,
+  ): void {
+    channel?.ack(message);
+    const waiter = waiters.shift();
+    waiter ? waiter(message) : messages.push(message);
+  }
 
   return {
     async setup(
       handle: (event: PageCapturedEvent) => Promise<unknown>,
+      handlePublication: (event: PublicationEvent) => Promise<void>,
     ): Promise<void> {
       connection = await amqp.connect(
         SEARCH_RABBITMQ_URL ?? "amqp://localhost",
       );
       consumerChannel = await connection.createConfirmChannel();
+      publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
       await startPageCapturedConsumer(consumerChannel, handle, topology);
+      await startPublicationConsumer(
+        publicationConsumerChannel,
+        handlePublication,
+        publicationTopology,
+      );
       await consumerChannel.consume(topology.deadLetterQueue, (message) => {
         if (message === null) {
           return;
         }
 
-        consumerChannel?.ack(message);
-        const waiter = deadLetterWaiters.shift();
-        waiter ? waiter(message) : deadLetters.push(message);
+        receiveDeadLetter(message, deadLetters, deadLetterWaiters, consumerChannel);
       });
+      await publicationConsumerChannel.consume(
+        publicationTopology.deadLetterQueue,
+        (message) => {
+          if (message === null) {
+            return;
+          }
+
+          receiveDeadLetter(
+            message,
+            publicationDeadLetters,
+            publicationDeadLetterWaiters,
+            publicationConsumerChannel,
+          );
+        },
+      );
     },
 
     async publish(event: unknown): Promise<void> {
@@ -62,11 +114,35 @@ function createRabbitMqTestSupport() {
       await publisherChannel.waitForConfirms();
     },
 
+    async publishPublication(event: unknown, routingKey: string): Promise<void> {
+      if (publisherChannel === undefined) {
+        throw new Error("RabbitMQ integration environment is not initialized");
+      }
+
+      publisherChannel.publish(
+        publicationTopology.eventsExchange,
+        routingKey,
+        Buffer.from(JSON.stringify(event)),
+        { contentType: "application/json", persistent: true },
+      );
+      await publisherChannel.waitForConfirms();
+    },
+
     nextDeadLetter(): Promise<ConsumeMessage> {
       const message = deadLetters.shift();
 
       return message === undefined
         ? new Promise((resolve) => deadLetterWaiters.push(resolve))
+        : Promise.resolve(message);
+    },
+
+    nextPublicationDeadLetter(): Promise<ConsumeMessage> {
+      const message = publicationDeadLetters.shift();
+
+      return message === undefined
+        ? new Promise((resolve) =>
+            publicationDeadLetterWaiters.push(resolve),
+          )
         : Promise.resolve(message);
     },
 
@@ -77,25 +153,30 @@ function createRabbitMqTestSupport() {
 
       await publisherChannel?.close().catch(() => undefined);
       await consumerChannel?.close().catch(() => undefined);
+      await publicationConsumerChannel?.close().catch(() => undefined);
 
       try {
         const cleanup = await connection.createChannel();
 
         try {
-          await cleanup.deleteQueue(topology.queue).catch(() => undefined);
-          await cleanup.deleteQueue(topology.retryQueue).catch(() => undefined);
-          await cleanup
-            .deleteQueue(topology.deadLetterQueue)
-            .catch(() => undefined);
-          await cleanup
-            .deleteExchange(topology.eventsExchange)
-            .catch(() => undefined);
-          await cleanup
-            .deleteExchange(topology.retryExchange)
-            .catch(() => undefined);
-          await cleanup
-            .deleteExchange(topology.deadLetterExchange)
-            .catch(() => undefined);
+          await Promise.all([
+            topology.queue,
+            topology.retryQueue,
+            topology.deadLetterQueue,
+            publicationTopology.queue,
+            publicationTopology.retryQueue,
+            publicationTopology.deadLetterQueue,
+          ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)));
+          await Promise.all([
+            topology.eventsExchange,
+            topology.retryExchange,
+            topology.deadLetterExchange,
+            publicationTopology.eventsExchange,
+            publicationTopology.retryExchange,
+            publicationTopology.deadLetterExchange,
+          ].map((exchange) =>
+            cleanup.deleteExchange(exchange).catch(() => undefined),
+          ));
         } finally {
           await cleanup.close().catch(() => undefined);
         }

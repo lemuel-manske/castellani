@@ -6,12 +6,16 @@ import * as amqp from "amqplib";
 import { createS3ArtifactReader } from "../adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "../adapters/artifacts/warc.js";
 import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
+import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
 import { DynamoDBIndexingLedger } from "../adapters/persistence/dynamodb/indexing-ledger.js";
+import { DynamoDBPublicationLedger } from "../adapters/persistence/dynamodb/publication-ledger.js";
 import {
   createOpenSearchDocumentWriter,
   ensureSearchIndex,
 } from "../adapters/search/opensearch.js";
 import { processPageCaptured } from "../application/processPageCaptured.js";
+import { processPublicationEvent } from "../application/processPublicationEvent.js";
+import type { PublicationEvent } from "../application/processPublicationEvent.js";
 import type { SearchSettings } from "./config.js";
 
 function isSignalAborted(signal: AbortSignal): boolean {
@@ -106,12 +110,14 @@ class SearchRuntime {
       documentClient,
       this.settings.indexingLedgerTableName,
     );
-
+    const publicationLedger = new DynamoDBPublicationLedger(
+      documentClient,
+      this.settings.publicationLedgerTableName,
+    );
     const documentWriter = createOpenSearchDocumentWriter(
       opensearch,
       this.settings.searchIndexName,
     );
-
     const capturedPageReader = createWarcCapturedPageReader(
       createS3ArtifactReader(s3),
     );
@@ -119,7 +125,7 @@ class SearchRuntime {
     try {
       await ensureSearchIndex(opensearch, this.settings.searchIndexName);
       await this.runConsumer(
-        { ledger, capturedPageReader, documentWriter },
+        { ledger, capturedPageReader, documentWriter, publicationLedger },
         signal,
       );
     } finally {
@@ -130,12 +136,15 @@ class SearchRuntime {
   }
 
   private async runConsumer(
-    dependencies: Parameters<typeof processPageCaptured>[1],
+    dependencies: Parameters<typeof processPageCaptured>[1] & {
+      publicationLedger: DynamoDBPublicationLedger;
+    },
     signal: AbortSignal,
   ): Promise<void> {
     while (!isSignalAborted(signal)) {
       let connection: amqp.ChannelModel | undefined;
-      let channel: amqp.ConfirmChannel | undefined;
+      let pageCapturedChannel: amqp.ConfirmChannel | undefined;
+      let publicationChannel: amqp.ConfirmChannel | undefined;
 
       try {
         connection = await amqp.connect(this.settings.rabbitmqUrl);
@@ -145,20 +154,29 @@ class SearchRuntime {
           break;
         }
 
-        channel = await connection.createConfirmChannel();
+        pageCapturedChannel = await connection.createConfirmChannel();
+        publicationChannel = await connection.createConfirmChannel();
 
         if (isSignalAborted(signal)) {
-          await channel.close();
+          await Promise.all([
+            pageCapturedChannel.close(),
+            publicationChannel.close(),
+          ]);
           await connection.close();
           break;
         }
 
-        await startPageCapturedConsumer(channel, (event) =>
+        await startPageCapturedConsumer(pageCapturedChannel, (event) =>
           processPageCaptured(event, {
             ...dependencies,
             leaseDurationSeconds: this.settings.indexingLeaseDurationSeconds,
             maxAttempts: this.settings.indexingMaxAttempts,
           }),
+        );
+        await startPublicationConsumer(
+          publicationChannel,
+          (event: PublicationEvent) =>
+            processPublicationEvent(event, dependencies.publicationLedger),
         );
 
         await waitForConnectionOrShutdown(connection, signal);
@@ -167,7 +185,8 @@ class SearchRuntime {
           console.error("Search consumer connection failed", error);
         }
       } finally {
-        await channel?.close().catch(() => undefined);
+        await pageCapturedChannel?.close().catch(() => undefined);
+        await publicationChannel?.close().catch(() => undefined);
         await connection?.close().catch(() => undefined);
       }
 
