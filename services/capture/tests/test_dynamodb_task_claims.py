@@ -201,3 +201,4 @@ async def test_concurrent_claims_have_exactly_one_winner_for_a_page(
 
     assert len(acquired) == 1
     assert acquired[0].fence == 1
+    assert len(outbox_items(dynamodb)) == 1
