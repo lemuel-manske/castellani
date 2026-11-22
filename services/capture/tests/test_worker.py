@@ -54,6 +54,14 @@ async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
     assert completed["state"] == {"S": "COMPLETED"}
     assert completed["snapshotId"]["S"]
     assert completed["warcArtifacts"]["L"][0]["M"]["bucket"] == {"S": "local"}
+    snapshot = dynamodb.get_item(
+        TableName="capture_snapshots",
+        Key={"snapshotId": completed["snapshotId"]},
+        ConsistentRead=True,
+    )["Item"]
+    assert snapshot["archiveId"] == {"S": "archive-1"}
+    assert snapshot["urlKey"] == {"S": "url-1"}
+    assert snapshot["minDepth"] == {"N": "0"}
     assert (tmp_path / "attempt-1" / "capture.warc.gz").read_bytes() == b"capture"
 
     events = outbox_items(dynamodb)
