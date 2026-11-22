@@ -20,7 +20,6 @@ from domain import (
 
 from .error_handling import (
     extract_cancellation_reasons,
-    is_conditional_failure,
     is_transaction_canceled,
 )
 from .values import number_from_item
@@ -584,8 +583,6 @@ class DynamoDBTaskRepository(TaskRepository):
             "#last_attempt = :last_attempt, #last_fence = :last_fence "
             "REMOVE #attempt, #lease, #next_attempt"
         )
-        values[":state"] = {"S": "FAILED"}
-
         if retry:
             update = (
                 "SET #state = :pending, #failure_count = :failure_count, "
@@ -594,9 +591,10 @@ class DynamoDBTaskRepository(TaskRepository):
                 "#next_attempt = :retry_at "
                 "REMOVE #attempt, #lease"
             )
-            names["#pending"] = "state"
             values[":pending"] = {"S": "PENDING"}
             values[":retry_at"] = {"N": str(retry_at)}
+        else:
+            values[":state"] = {"S": "FAILED"}
 
         frontier_update = {
             "Update": {
@@ -690,10 +688,18 @@ class DynamoDBTaskRepository(TaskRepository):
                 and current.get("lastFailureFence", {}).get("N") == str(claim.fence)
             )
 
-            if same_failure and current.get("state", {}).get("S") == "FAILED":
+            if (
+                same_failure
+                and current is not None
+                and current.get("state", {}).get("S") == "FAILED"
+            ):
                 return
 
-            if same_failure and current.get("state", {}).get("S") == "PENDING":
+            if (
+                same_failure
+                and current is not None
+                and current.get("state", {}).get("S") == "PENDING"
+            ):
                 existing = self._read_outbox(message_id)
                 if existing is not None and self._is_retry_message(existing, claim):
                     return
