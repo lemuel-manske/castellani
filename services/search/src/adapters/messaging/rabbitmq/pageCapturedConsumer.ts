@@ -149,14 +149,14 @@ function publishDeadLetter(
       message.content,
       {
         contentType: message.properties.contentType ?? "application/json",
-        messageId: message.properties.messageId,
-        correlationId: message.properties.correlationId,
-        headers: message.properties.headers,
+        messageId: message.properties.messageId as string | undefined,
+        correlationId: message.properties.correlationId as string | undefined,
+        headers: message.properties.headers as Record<string, unknown> | undefined,
         persistent: true,
       },
       (error) => {
         if (error) {
-          reject(error);
+          reject(error instanceof Error ? error : new Error(String(error)));
           return;
         }
 
