@@ -81,6 +81,11 @@ class CaptureFailure(RuntimeError):
         super().__init__(message)
 
         self.reason_code = reason_code
+        self.retryable = reason_code in {
+            CaptureFailureCode.NAVIGATION_FAILED,
+            CaptureFailureCode.DOWNLOAD_FAILED,
+            CaptureFailureCode.RECORDING_FAILED,
+        }
 
 
 class CaptureLimitExceeded(CaptureFailure):
