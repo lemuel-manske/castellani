@@ -14,7 +14,7 @@ services:
       retries: 20
 
   localstack:
-    image: localstack/localstack:2026.10.8
+    image: localstack/localstack:4.4.0
 
     environment:
       SERVICES: s3
