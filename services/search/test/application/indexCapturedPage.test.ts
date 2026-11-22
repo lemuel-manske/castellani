@@ -64,7 +64,12 @@ it("extracts and indexes a captured page using its snapshot identity", async () 
   };
 
   await expect(
-    indexCapturedPage(page, [artifact.reference], artifact.reader, documentWriter),
+    indexCapturedPage(
+      page,
+      [artifact.reference],
+      artifact.reader,
+      documentWriter,
+    ),
   ).resolves.toEqual({ outcome: "INDEXED", snapshotId: "snapshot-1" });
 
   expect(documentWriter.index).toHaveBeenCalledWith(
