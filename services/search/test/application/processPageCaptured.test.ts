@@ -13,14 +13,17 @@ const event = {
     snapshotId: "snapshot-1",
     urlKey: "url-key",
     url: "https://example.com/",
+    finalUrl: "https://example.com/final",
+    redirectChain: ["https://example.com/", "https://example.com/final"],
     capturedAt: "2026-11-22T10:00:00.000Z",
     contentType: "text/html",
     warcArtifacts: [
       {
         bucket: "capture-artifacts",
-        key: "archive-1/snapshot-1.warc",
+        key: "capture-staging/archive-1/url-key/attempt-1/snapshot-1/page.warc.gz",
         sha256: "a".repeat(64),
         sizeBytes: 128,
+        versionId: "version-1",
       },
     ],
   },
@@ -37,13 +40,13 @@ it("claims, indexes, and records a captured snapshot outcome", async () => {
   const completeMock = vi.fn().mockResolvedValue(undefined);
   const releaseMock = vi.fn().mockResolvedValue(undefined);
   const readMock = vi.fn().mockResolvedValue({
-      archiveId: "archive-1",
-      snapshotId: "snapshot-1",
-      url: "https://example.com/",
-      capturedAt: "2026-11-22T10:00:00.000Z",
-      contentType: "text/html",
-      content: "<html><body>Indexed content</body></html>",
-    });
+    archiveId: "archive-1",
+    snapshotId: "snapshot-1",
+    url: "https://example.com/",
+    capturedAt: "2026-11-22T10:00:00.000Z",
+    contentType: "text/html",
+    content: "<html><body>Indexed content</body></html>",
+  });
   const indexMock = vi.fn().mockResolvedValue(undefined);
   const ledger: IndexingLedger = {
     claim: claimMock,
@@ -63,6 +66,7 @@ it("claims, indexes, and records a captured snapshot outcome", async () => {
     "message-1",
     120,
   );
+  expect(readMock).toHaveBeenCalledWith(event.payload, event.payload.warcArtifacts);
   expect(indexMock).toHaveBeenCalledOnce();
   expect(completeMock).toHaveBeenCalledWith(claim, "INDEXED", undefined);
 });

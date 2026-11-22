@@ -33,6 +33,7 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     value.type !== "PageCaptured" ||
     value.version !== 1 ||
     typeof value.occurredAt !== "string" ||
+    !value.occurredAt ||
     !isRecord(value.payload)
   ) {
     return null;
@@ -40,6 +41,7 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
 
   const payload = value.payload;
   const artifacts = payload.warcArtifacts;
+  const redirectChain = payload.redirectChain;
 
   if (
     typeof payload.archiveId !== "string" ||
@@ -50,9 +52,19 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     typeof payload.urlKey !== "string" ||
     !payload.urlKey ||
     typeof payload.url !== "string" ||
+    !payload.url ||
+    typeof payload.finalUrl !== "string" ||
+    !payload.finalUrl ||
     typeof payload.capturedAt !== "string" ||
+    !payload.capturedAt ||
+    !Array.isArray(redirectChain) ||
+    !redirectChain.every(
+      (url: unknown) => typeof url === "string" && url.length > 0,
+    ) ||
     !Array.isArray(artifacts) ||
-    artifacts.length === 0
+    artifacts.length === 0 ||
+    (payload.contentType !== undefined &&
+      typeof payload.contentType !== "string")
   ) {
     return null;
   }
@@ -65,9 +77,10 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
       typeof artifact.key === "string" &&
       artifact.key.length > 0 &&
       typeof artifact.sha256 === "string" &&
-      /^[a-f0-9]{64}$/i.test(artifact.sha256) &&
+      /^[a-f0-9]{64}$/.test(artifact.sha256) &&
       (artifact.versionId === undefined ||
-        typeof artifact.versionId === "string") &&
+        (typeof artifact.versionId === "string" &&
+          artifact.versionId.length > 0)) &&
       typeof artifact.sizeBytes === "number" &&
       Number.isSafeInteger(artifact.sizeBytes) &&
       artifact.sizeBytes >= 0,
@@ -86,9 +99,8 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
       snapshotId: payload.snapshotId,
       urlKey: payload.urlKey,
       url: payload.url,
-      ...(typeof payload.finalUrl === "string"
-        ? { finalUrl: payload.finalUrl }
-        : {}),
+      finalUrl: payload.finalUrl,
+      redirectChain: redirectChain as string[],
       capturedAt: payload.capturedAt,
       ...(typeof payload.contentType === "string"
         ? { contentType: payload.contentType }

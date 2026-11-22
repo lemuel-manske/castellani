@@ -13,6 +13,8 @@ interface PageCapturedEvent {
   correlationId: string;
   occurredAt: string;
   payload: CapturedPageReference & {
+    finalUrl: string;
+    redirectChain: string[];
     urlKey: string;
     warcArtifacts: ArtifactReference[];
   };
