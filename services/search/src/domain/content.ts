@@ -91,7 +91,7 @@ function extractHtml(content: string): { title: string; description: string; lan
     title,
     description,
     language,
-    text: normalizeText(root.textContent),
+    text: normalizeText((root.querySelector("body") ?? root).textContent),
   };
 }
 
