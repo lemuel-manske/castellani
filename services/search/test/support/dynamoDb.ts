@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBIndexingLedger } from "../../src/adapters/persistence/dynamodb/indexing-ledger.js";
+import { DynamoDBManifestLedger } from "../../src/adapters/persistence/dynamodb/manifest-ledger.js";
 import { DynamoDBPublicationLedger } from "../../src/adapters/persistence/dynamodb/publication-ledger.js";
 
 const SEARCH_DYNAMODB_ENDPOINT_URL = process.env.SEARCH_DYNAMODB_ENDPOINT_URL;
@@ -22,15 +23,18 @@ function createDynamoDbTestSupport(clock: () => number) {
   });
   const tableName = `search-ledger-${randomUUID().replaceAll("-", "")}`;
   const publicationTableName = `search-publication-${randomUUID().replaceAll("-", "")}`;
+  const manifestTableName = `search-manifest-${randomUUID().replaceAll("-", "")}`;
   const ledger = new DynamoDBIndexingLedger(documentClient, tableName, clock);
   const publicationLedger = new DynamoDBPublicationLedger(
     documentClient,
     publicationTableName,
   );
+  const manifestLedger = new DynamoDBManifestLedger(documentClient, manifestTableName);
 
   return {
     ledger,
     publicationLedger,
+    manifestLedger,
     async setup(): Promise<void> {
       await client.send(
         new CreateTableCommand({
@@ -71,6 +75,19 @@ function createDynamoDbTestSupport(clock: () => number) {
         { client, maxWaitTime: 20 },
         { TableName: publicationTableName },
       );
+      await client.send(new CreateTableCommand({
+        TableName: manifestTableName,
+        AttributeDefinitions: [
+          { AttributeName: "archiveId", AttributeType: "S" },
+          { AttributeName: "snapshotId", AttributeType: "S" },
+        ],
+        KeySchema: [
+          { AttributeName: "archiveId", KeyType: "HASH" },
+          { AttributeName: "snapshotId", KeyType: "RANGE" },
+        ],
+        BillingMode: "PAY_PER_REQUEST",
+      }));
+      await waitUntilTableExists({ client, maxWaitTime: 20 }, { TableName: manifestTableName });
     },
     async teardown(): Promise<void> {
       try {
@@ -79,6 +96,7 @@ function createDynamoDbTestSupport(clock: () => number) {
           client.send(
             new DeleteTableCommand({ TableName: publicationTableName }),
           ),
+          client.send(new DeleteTableCommand({ TableName: manifestTableName })),
         ]);
       } finally {
         client.destroy();

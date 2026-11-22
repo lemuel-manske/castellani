@@ -7,6 +7,7 @@ interface SearchSettingsOptions {
   artifactBucket: string;
   indexingLedgerTableName: string;
   publicationLedgerTableName: string;
+  manifestLedgerTableName: string;
   searchIndexName: string;
   indexingLeaseDurationSeconds?: number;
   indexingMaxAttempts?: number;
@@ -49,6 +50,7 @@ class SearchSettings {
   readonly artifactBucket: string;
   readonly indexingLedgerTableName: string;
   readonly publicationLedgerTableName: string;
+  readonly manifestLedgerTableName: string;
   readonly searchIndexName: string;
   readonly indexingLeaseDurationSeconds: number;
   readonly indexingMaxAttempts: number;
@@ -65,6 +67,7 @@ class SearchSettings {
     this.artifactBucket = options.artifactBucket;
     this.indexingLedgerTableName = options.indexingLedgerTableName;
     this.publicationLedgerTableName = options.publicationLedgerTableName;
+    this.manifestLedgerTableName = options.manifestLedgerTableName;
     this.searchIndexName = options.searchIndexName;
 
     this.indexingLeaseDurationSeconds =
@@ -83,6 +86,7 @@ class SearchSettings {
       !this.artifactBucket.trim() ||
       !this.indexingLedgerTableName.trim() ||
       !this.publicationLedgerTableName.trim() ||
+      !this.manifestLedgerTableName.trim() ||
       !this.searchIndexName.trim()
     ) {
       throw new Error("Search settings must not contain empty required values");
@@ -126,6 +130,10 @@ class SearchSettings {
       publicationLedgerTableName: required(
         "SEARCH_PUBLICATION_LEDGER_TABLE",
         env.SEARCH_PUBLICATION_LEDGER_TABLE,
+      ),
+      manifestLedgerTableName: required(
+        "SEARCH_MANIFEST_LEDGER_TABLE",
+        env.SEARCH_MANIFEST_LEDGER_TABLE,
       ),
       searchIndexName: required("SEARCH_INDEX_NAME", env.SEARCH_INDEX_NAME),
       indexingLeaseDurationSeconds: positiveInteger(

@@ -37,7 +37,7 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
 }
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
-  if (publicationLedgerReady) {
+  if (publicationLedgerReady && event.type !== "CrawlCompleted") {
     await processPublicationEvent(event, dynamodb.publicationLedger);
   }
 

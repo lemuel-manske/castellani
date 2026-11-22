@@ -10,6 +10,7 @@ const requiredEnvironment = {
   SEARCH_ARTIFACT_BUCKET: "search-artifacts",
   SEARCH_INDEXING_LEDGER_TABLE: "search-ledger-test",
   SEARCH_PUBLICATION_LEDGER_TABLE: "search-publication-test",
+  SEARCH_MANIFEST_LEDGER_TABLE: "search-manifest-test",
   SEARCH_INDEX_NAME: "search-index-test",
 };
 
@@ -24,6 +25,7 @@ it("loads service-specific environment settings", () => {
   expect(settings.s3EndpointUrl).toBe("http://localhost:9000");
   expect(settings.indexingLedgerTableName).toBe("search-ledger-test");
   expect(settings.publicationLedgerTableName).toBe("search-publication-test");
+  expect(settings.manifestLedgerTableName).toBe("search-manifest-test");
   expect(settings.indexingMaxAttempts).toBe(3);
 });
 

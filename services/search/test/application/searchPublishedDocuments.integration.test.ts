@@ -37,6 +37,12 @@ it("returns indexed documents only after matching publication and replay facts e
   };
 
   await Promise.all([writer.index(published), writer.index(staged)]);
+  await dynamodb.manifestLedger.record({
+    archiveId: published.archiveId,
+    manifestDigest: "published-manifest-digest",
+    collectionId: "collection-a",
+    snapshotIds: [published.snapshotId],
+  });
   await dynamodb.publicationLedger.recordPublicationDecision(identity);
   await dynamodb.publicationLedger.recordReplayPublished(identity);
   await dynamodb.publicationLedger.recordPublicationDecision({
@@ -50,6 +56,7 @@ it("returns indexed documents only after matching publication and replay facts e
     { text: "distinctive searchable publication content" },
     reader,
     dynamodb.publicationLedger,
+    dynamodb.manifestLedger,
   );
 
   expect(result.results).toHaveLength(1);

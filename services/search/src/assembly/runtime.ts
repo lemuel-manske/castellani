@@ -8,11 +8,13 @@ import { createWarcCapturedPageReader } from "../adapters/artifacts/warc.js";
 import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
 import { DynamoDBIndexingLedger } from "../adapters/persistence/dynamodb/indexing-ledger.js";
+import { DynamoDBManifestLedger } from "../adapters/persistence/dynamodb/manifest-ledger.js";
 import { DynamoDBPublicationLedger } from "../adapters/persistence/dynamodb/publication-ledger.js";
 import {
   createOpenSearchDocumentWriter,
   ensureSearchIndex,
 } from "../adapters/search/opensearch.js";
+import { processCrawlCompleted } from "../application/processCrawlCompleted.js";
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import { processPublicationEvent } from "../application/processPublicationEvent.js";
 import type { PublicationEvent } from "../application/processPublicationEvent.js";
@@ -115,18 +117,23 @@ class SearchRuntime {
       documentClient,
       this.settings.publicationLedgerTableName,
     );
+    const manifestLedger = new DynamoDBManifestLedger(
+      documentClient,
+      this.settings.manifestLedgerTableName,
+    );
+    const artifactReader = createS3ArtifactReader(s3);
     const documentWriter = createOpenSearchDocumentWriter(
       opensearch,
       this.settings.searchIndexName,
     );
     const capturedPageReader = createWarcCapturedPageReader(
-      createS3ArtifactReader(s3),
+      artifactReader,
     );
 
     try {
       await ensureSearchIndex(opensearch, this.settings.searchIndexName);
       await this.runConsumer(
-        { ledger, capturedPageReader, documentWriter, publicationLedger },
+        { ledger, capturedPageReader, documentWriter, publicationLedger, manifestLedger, artifactReader },
         signal,
       );
     } finally {
@@ -139,6 +146,8 @@ class SearchRuntime {
   private async runConsumer(
     dependencies: Parameters<typeof processPageCaptured>[1] & {
       publicationLedger: PublicationLedger;
+      manifestLedger: DynamoDBManifestLedger;
+      artifactReader: ReturnType<typeof createS3ArtifactReader>;
     },
     signal: AbortSignal,
   ): Promise<void> {
@@ -177,7 +186,13 @@ class SearchRuntime {
         await startPublicationConsumer(
           publicationChannel,
           (event: PublicationEvent) =>
-            processPublicationEvent(event, dependencies.publicationLedger),
+            event.type === "CrawlCompleted"
+              ? processCrawlCompleted(
+                  event.payload,
+                  dependencies.artifactReader,
+                  dependencies.manifestLedger,
+                )
+              : processPublicationEvent(event, dependencies.publicationLedger),
         );
 
         await waitForConnectionOrShutdown(connection, signal);

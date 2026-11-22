@@ -285,3 +285,21 @@ resource "aws_dynamodb_table" "search_publication_ledger" {
     type = "S"
   }
 }
+
+resource "aws_dynamodb_table" "search_manifest_ledger" {
+  name         = "search_manifest_ledger"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key  = "archiveId"
+  range_key = "snapshotId"
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
+
+  attribute {
+    name = "snapshotId"
+    type = "S"
+  }
+}

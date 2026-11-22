@@ -68,3 +68,35 @@ it("dead-letters malformed publication event envelopes", async () => {
     JSON.stringify({ messageId: "malformed-publication-message" }),
   );
 });
+
+it("receives CrawlCompleted manifest references from the events exchange", async () => {
+  const event = {
+    messageId: "crawl-completed-message",
+    correlationId: "crawl-completed-archive",
+    type: "CrawlCompleted",
+    version: 1,
+    occurredAt: "2026-11-22T12:00:00.000Z",
+    payload: {
+      archiveId: "crawl-completed-archive",
+      manifestDigest: "a".repeat(64),
+      manifest: {
+        bucket: "archive-manifests",
+        key: "archives/crawl-completed-archive/manifest.json",
+        sha256: "a".repeat(64),
+        sizeBytes: 128,
+      },
+    },
+  };
+  const delivered = nextPublicationEvent();
+
+  await rabbitmq.publishPublication(event, event.type);
+
+  await expect(delivered).resolves.toMatchObject({
+    type: "CrawlCompleted",
+    payload: {
+      archiveId: event.payload.archiveId,
+      manifestDigest: event.payload.manifestDigest,
+      manifest: event.payload.manifest,
+    },
+  });
+});

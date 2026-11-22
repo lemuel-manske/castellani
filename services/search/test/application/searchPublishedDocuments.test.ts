@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 import type { PublicationFacts } from "../../src/domain.js";
 import type { SearchDocument } from "../../src/domain/content.js";
+import type { ManifestLedger } from "../../src/ports/manifest-ledger.js";
 import type { PublicationLedger } from "../../src/ports/publication-ledger.js";
 import type { SearchDocumentReader } from "../../src/ports/search-reader.js";
 
@@ -82,10 +83,15 @@ it("filters uncommitted documents and continues paging until the requested resul
     recordCompensationDecision: vi.fn(),
   };
 
+  const manifestLedger: ManifestLedger = {
+    record: vi.fn(),
+    contains: vi.fn((archiveId, snapshotId) => Promise.resolve(archiveId === "published-archive" && snapshotId === "published-snapshot")),
+  };
   const result = await searchPublishedDocuments(
     { text: "published", limit: 1 },
     reader,
     publicationLedger,
+    manifestLedger,
   );
 
   expect(result).toEqual({
@@ -130,8 +136,9 @@ it("fails closed when publication authorization cannot be read", async () => {
     recordReplayPublished: vi.fn(),
     recordCompensationDecision: vi.fn(),
   };
+  const manifestLedger: ManifestLedger = { record: vi.fn(), contains: vi.fn() };
 
   await expect(
-    searchPublishedDocuments({ text: "candidate" }, reader, publicationLedger),
+    searchPublishedDocuments({ text: "candidate" }, reader, publicationLedger, manifestLedger),
   ).rejects.toThrow("DynamoDB unavailable");
 });

@@ -31,6 +31,7 @@ function createRabbitMqTestSupport() {
       "ArchivePublicationDecided",
       "ArchivePublished",
       "ArchiveCompensationDecided",
+      "CrawlCompleted",
     ],
     queue: `search-publication-integration-queue-${suffix}`,
     retryExchange: `search-publication-integration-retry-${suffix}`,
