@@ -100,7 +100,6 @@ it("rejects malformed query parameters as problem details", async () => {
   await server.close();
 });
 
-
 it("validates query parameters against the declarative route schema", async () => {
   const reader: SearchDocumentReader = { search: vi.fn() };
   const publicationLedger: PublicationLedger = {
