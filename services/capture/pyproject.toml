@@ -34,7 +34,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
-    "integration: exercises the real browser, pywb recorder, and offline replay server",
+    "integration: exercises external dependencies including DynamoDB Local, RabbitMQ, and the browser recorder",
 ]
 
 [tool.ruff]
