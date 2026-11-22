@@ -81,6 +81,7 @@ class CaptureFailure(RuntimeError):
         super().__init__(message)
 
         self.reason_code = reason_code
+
         self.retryable = reason_code in {
             CaptureFailureCode.NAVIGATION_FAILED,
             CaptureFailureCode.DOWNLOAD_FAILED,
@@ -89,19 +90,17 @@ class CaptureFailure(RuntimeError):
 
 
 class CaptureLimitExceeded(CaptureFailure):
-    retryable = False
-
+    def __init__(self, reason_code: CaptureFailureCode, message: str) -> None:
+        super().__init__(reason_code, message)
 
 class UnsafeCaptureRequest(CaptureFailure):
-    retryable = False
-
     def __init__(self, message: str) -> None:
         super().__init__(CaptureFailureCode.UNSAFE_REQUEST, message)
 
 
-class InvalidCaptureURL(ValueError):
-    reason_code = CaptureFailureCode.INVALID_URL
-    retryable = False
+class InvalidCaptureURL(CaptureFailure):
+    def __init__(self, message: str) -> None:
+        super().__init__(CaptureFailureCode.INVALID_URL, message)
 
 
 class CaptureNavigationFailed(CaptureFailure):
