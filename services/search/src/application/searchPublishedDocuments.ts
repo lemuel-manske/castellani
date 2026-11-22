@@ -115,7 +115,11 @@ async function searchPublishedDocuments(
   return { results, nextCursor };
 }
 
-export { searchPublishedDocuments };
+export {
+  DEFAULT_SEARCH_LIMIT,
+  MAX_SEARCH_LIMIT,
+  searchPublishedDocuments,
+};
 export type {
   PublishedSearchPage,
   PublishedSearchResult,
