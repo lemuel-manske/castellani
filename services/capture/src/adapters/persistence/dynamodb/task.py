@@ -290,7 +290,7 @@ class DynamoDBTaskRepository(TaskRepository):
             if run.get("admission", {}).get("S") != "OPEN":
                 raise TaskClaimLostError("Capture run admission is closed") from error
 
-            maximum = self._number_from_item(run, "maxPages")
+            maximum = number_from_item(run, "maxPages", "capture run")
             admitted = number_from_item(run, "admittedPages", "capture run", default=0)
             if maximum is None or admitted is None:
                 raise RuntimeError("Capture run is missing page accounting fields") from error
