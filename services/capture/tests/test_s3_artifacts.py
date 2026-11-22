@@ -7,46 +7,12 @@ from adapters.artifacts.s3 import S3ArtifactStore
 from domain import PageTask, TaskClaim
 
 
-class FakeS3:
-    def __init__(self) -> None:
-        self.objects: dict[tuple[str, str], tuple[bytes, dict[str, str]]] = {}
-
-    def upload_file(
-        self,
-        filename: str,
-        bucket: str,
-        key: str,
-        ExtraArgs: dict[str, Any],
-    ) -> None:
-        self.objects[(bucket, key)] = (
-            Path(filename).read_bytes(),
-            ExtraArgs["Metadata"],
-        )
-
-    def head_object(self, Bucket: str, Key: str) -> dict[str, Any]:
-        body, metadata = self.objects[(Bucket, Key)]
-        return {
-            "ContentLength": len(body),
-            "Metadata": metadata,
-            "VersionId": "version-1",
-        }
-
-
-def make_claim() -> TaskClaim:
-    return TaskClaim(
-        task=PageTask("archive/one", "url-key", "https://example.org/", 0),
-        attempt_id="attempt-1",
-        fence=1,
-        lease_until=100,
-    )
-
-
 @pytest.mark.asyncio
 async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     tmp_path: Path,
+    s3: FakeS3,
 ) -> None:
-    client = FakeS3()
-    store = S3ArtifactStore(client, "private-artifacts", tmp_path)
+    store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
     claim = make_claim()
     directory = await store.create_attempt_directory(claim)
     warc = directory / "records" / "capture.warc.gz"
@@ -68,14 +34,15 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     assert reference.sha256
     assert reference.size_bytes == len(b"warc-content")
     assert reference.version_id == "version-1"
-    assert client.objects[("private-artifacts", reference.key)][0] == b"warc-content"
+    assert s3.objects[("private-artifacts", reference.key)][0] == b"warc-content"
 
 
 @pytest.mark.asyncio
 async def test_s3_artifact_store_rejects_files_outside_attempt_directory(
     tmp_path: Path,
+    s3: FakeS3,
 ) -> None:
-    store = S3ArtifactStore(FakeS3(), "private-artifacts", tmp_path)
+    store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
     claim = make_claim()
     directory = await store.create_attempt_directory(claim)
     outside = tmp_path / "outside.warc.gz"
