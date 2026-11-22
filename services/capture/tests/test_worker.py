@@ -37,9 +37,14 @@ async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
 
     task = frontier_item(dynamodb)
 
-    assert task["state"] == {"S": "FAILED"}
+    assert task["state"] == {"S": "PENDING"}
+    assert task["failureCount"] == {"N": "1"}
     assert task["failureReason"] == {"S": "capture_failed"}
     assert task["failureMessage"] == {"S": "browser capture failed"}
+    assert float(task["nextAttemptAt"]["N"]) > 0
+
+    run = run_item(dynamodb)
+    assert run["outstandingPages"] == {"N": "1"}
 
     assert not (tmp_path / "attempt-1").exists()
 
