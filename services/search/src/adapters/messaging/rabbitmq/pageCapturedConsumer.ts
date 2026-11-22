@@ -8,9 +8,9 @@ const RETRY_DELAY_MILLISECONDS = 5_000;
 
 const EVENTS_EXCHANGE = "castellani.events";
 const PAGE_CAPTURED_ROUTING_KEY = "PageCaptured";
-const PAGE_CAPTURED_QUEUE = "castellani.search.page-captured";
+const PAGE_CAPTURED_QUEUE = "castellani.search.page-captured.v2";
 const RETRY_EXCHANGE = "castellani.search.retry";
-const RETRY_QUEUE = "castellani.search.page-captured.retry";
+const RETRY_QUEUE = "castellani.search.page-captured.retry.v2";
 const DEAD_LETTER_EXCHANGE = "castellani.search.dead";
 const DEAD_LETTER_QUEUE = "castellani.search.page-captured.dead";
 
@@ -126,7 +126,7 @@ function deliveryRetryCount(message: ConsumeMessage, retryQueue: string): number
   }
 
   const count = retryDeath.count;
-  return typeof count === "number" ? count : 0;
+  return typeof count === "number" || typeof count === "bigint"\n    ? Number(count)\n    : 0;
 }
 
 function publishDeadLetter(
@@ -164,11 +164,7 @@ async function handlePageCapturedMessage(
   const event = parsePageCaptured(message.content);
   const retries = deliveryRetryCount(message, topology.retryQueue);
 
-  if (event === null || retries >= MAX_DELIVERY_RETRIES) {
-    await publishDeadLetter(channel, topology, message);
-    channel.ack(message);
-    return;
-  }
+  if (event === null || retries >= MAX_DELIVERY_RETRIES) {\n    try {\n      await publishDeadLetter(channel, topology, message);\n      channel.ack(message);\n    } catch {\n      channel.nack(message, false, true);\n    }\n    return;\n  }
 
   try {
     const result = await handle(event);
