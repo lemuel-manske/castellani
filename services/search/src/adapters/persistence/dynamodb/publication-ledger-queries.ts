@@ -134,7 +134,7 @@ function serializeFact(
       });
 }
 
-function parseFact(value: string | undefined, name: string): unknown | null {
+function parseFact(value: string | undefined, name: string): unknown {
   if (value === undefined) {
     return null;
   }
