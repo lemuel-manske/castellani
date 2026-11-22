@@ -9,7 +9,7 @@ import { createPageCapturedEvent } from "../support/pageCaptured.js";
 describe.skipIf(!SEARCH_RABBITMQ_URL)("RabbitMQ integration", () => {
   const support = createRabbitMqTestSupport();
   let delivered: Promise<PageCapturedEvent>;
-  let resolveDelivery: (event: PageCapturedEvent) => void;
+  let resolveDelivery!: (event: PageCapturedEvent) => void;
 
   beforeAll(async () => {
     delivered = new Promise((resolve) => {
