@@ -7,7 +7,7 @@ import {
 } from "../../src/adapters/search/opensearch.js";
 import type { SearchDocument } from "../../src/domain/content.js";
 
-const node = process.env.SEARCH_TEST_OPENSEARCH_URL;
+const node = process.env.SEARCH_OPENSEARCH_URL;
 
 describe.skipIf(node === undefined)("OpenSearch indexing integration", () => {
   const client = new Client({ node: node ?? "http://localhost:9200" });

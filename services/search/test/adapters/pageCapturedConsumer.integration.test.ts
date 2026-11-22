@@ -7,7 +7,7 @@ import {
 } from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
 
-const url = process.env.SEARCH_TEST_RABBITMQ_URL;
+const url = process.env.SEARCH_RABBITMQ_URL;
 
 describe.skipIf(url === undefined)("RabbitMQ PageCaptured integration", () => {
   const suffix = randomUUID().replaceAll("-", "");
