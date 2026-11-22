@@ -44,25 +44,30 @@ describe("publication facts", () => {
     ).toThrow("conflicting publication decision");
   });
 
-  it("rejects replay acknowledgement for a different package", () => {
+  it("rejects a replay acknowledgement that conflicts with an earlier decision", () => {
     const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
     expect(() =>
       recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
-    ).not.toThrow();
-    const mismatched = recordReplayPublished(facts, { ...identity, decisionVersion: 4 });
-    expect(isPublicationAuthorized(mismatched)).toBe(false);
+    ).toThrow("replay acknowledgement conflicts");
+  });
+
+  it("rejects a decision that conflicts with an earlier replay acknowledgement", () => {
+    const facts = recordReplayPublished(emptyPublicationFacts(), identity);
+    expect(() =>
+      recordPublicationDecision(facts, { ...identity, packageDigest: "sha256:other" }),
+    ).toThrow("publication decision conflicts");
   });
 
   it("keeps compensated archives permanently ineligible", () => {
-    const facts = recordCompensation(
-      recordReplayPublished(
-        recordPublicationDecision(emptyPublicationFacts(), identity),
-        identity,
-      ),
-    );
+    const facts = recordCompensation(emptyPublicationFacts());
     expect(isPublicationAuthorized(facts)).toBe(false);
     expect(() => recordPublicationDecision(facts, identity)).toThrow(
       "a compensated archive cannot be published",
     );
+  });
+
+  it("rejects compensation after a publication fact has been recorded", () => {
+    const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
+    expect(() => recordCompensation(facts)).toThrow("a publication fact prevents compensation");
   });
 });
