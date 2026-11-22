@@ -52,6 +52,7 @@ class ConcreteCaptureWorker(CaptureRunner):
         artifact_claim_state: list[TaskClaim | None] = [None]
 
         terminal_state = [False]
+        completion_started = [False]
 
         stop_heartbeat = asyncio.Event()
         lease_changed = asyncio.Event()
@@ -72,6 +73,7 @@ class ConcreteCaptureWorker(CaptureRunner):
                 directory_state,
                 artifact_claim_state,
                 terminal_state,
+                completion_started,
                 lease_changed,
             )
         )
@@ -136,7 +138,12 @@ class ConcreteCaptureWorker(CaptureRunner):
 
             artifact_claim = artifact_claim_state[0]
 
-            if directory is not None and artifact_claim is not None and not terminal_state[0]:
+            if (
+                directory is not None
+                and artifact_claim is not None
+                and not terminal_state[0]
+                and not completion_started[0]
+            ):
                 try:
                     await self.artifacts.discard_attempt(claim, directory)
                 except Exception as error:
@@ -157,6 +164,7 @@ class ConcreteCaptureWorker(CaptureRunner):
         directory_state: list[Path | None],
         artifact_claim_state: list[TaskClaim | None],
         terminal_state: list[bool],
+        completion_started: list[bool],
         lease_changed: asyncio.Event,
     ) -> None:
         reservation = await self.capacity_allocator.reserve(claim_state[0].attempt_id)
@@ -210,6 +218,10 @@ class ConcreteCaptureWorker(CaptureRunner):
             warc_artifacts=warc_artifacts,
         )
 
+        # Once completion starts, the transaction outcome may be ambiguous. Keep
+        # attempt-scoped S3 objects for reconciliation rather than risk deleting a
+        # snapshot whose DynamoDB commit succeeded but whose response was lost.
+        completion_started[0] = True
         await self.task_repository.complete(outcome)
 
         terminal_state[0] = True
