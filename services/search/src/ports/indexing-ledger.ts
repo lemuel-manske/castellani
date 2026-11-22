@@ -1,4 +1,4 @@
-import type { IndexingOutcome } from "../domain.js";
+import type { IndexingOutcome, SnapshotLedgerEntry } from "../domain.js";
 
 interface SnapshotClaim {
   archiveId: string;
@@ -29,6 +29,7 @@ interface IndexingLedger {
     reasonCode?: string,
   ): Promise<void>;
   release(claim: SnapshotClaim, reason: string): Promise<void>;
+  listByArchive(archiveId: string): Promise<SnapshotLedgerEntry[]>;
 }
 
 export type { IndexingClaimResult, IndexingLedger, SnapshotClaim };
