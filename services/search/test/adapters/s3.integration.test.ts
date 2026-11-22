@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { expect, it } from "vitest";
 import {
   s3,
@@ -13,10 +14,9 @@ it("reads the referenced object from the real S3-compatible service", async () =
   });
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of await s3.reader.getObject(fixture.artifact)) {
-    chunks.push(chunk);
-  }
+  const chunks = await Readable.from<Uint8Array>(
+    await s3.reader.getObject(fixture.artifact),
+  ).toArray() as Uint8Array[];
 
   expect(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))).toEqual(
     fixture.bytes,
