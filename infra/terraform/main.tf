@@ -259,47 +259,4 @@ resource "aws_dynamodb_table" "search_indexing_ledger" {
     name = "snapshotId"
     type = "S"
   }
-
-  attribute {
-    name = "archiveId"
-    type = "S"
-  }
-
-  global_secondary_index {
-    name            = "archiveId-snapshotId-index"
-    hash_key        = "archiveId"
-    range_key       = "snapshotId"
-    projection_type = "ALL"
-  }
-}
-
-
-resource "aws_dynamodb_table" "search_publication_ledger" {
-  name         = "search_publication_ledger"
-  billing_mode = "PAY_PER_REQUEST"
-
-  hash_key = "archiveId"
-
-  attribute {
-    name = "archiveId"
-    type = "S"
-  }
-}
-
-resource "aws_dynamodb_table" "search_manifest_ledger" {
-  name         = "search_manifest_ledger"
-  billing_mode = "PAY_PER_REQUEST"
-
-  hash_key  = "archiveId"
-  range_key = "snapshotId"
-
-  attribute {
-    name = "archiveId"
-    type = "S"
-  }
-
-  attribute {
-    name = "snapshotId"
-    type = "S"
-  }
 }
