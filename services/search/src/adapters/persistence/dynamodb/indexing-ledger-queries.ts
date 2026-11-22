@@ -1,5 +1,5 @@
-import { GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import type { DynamoDBDocumentClient, ScanCommandInput } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import type { DynamoDBDocumentClient, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import type { IndexingOutcome, SnapshotLedgerEntry } from "../../../domain.js";
 import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";
 
@@ -131,14 +131,14 @@ async function listIndexingEntriesByArchive(
   archiveId: string,
 ): Promise<SnapshotLedgerEntry[]> {
   const entries: SnapshotLedgerEntry[] = [];
-  let lastEvaluatedKey: ScanCommandInput["ExclusiveStartKey"];
+  let lastEvaluatedKey: QueryCommandInput["ExclusiveStartKey"];
 
   do {
     const response = await client.send(
-      new ScanCommand({
+      new QueryCommand({
         TableName: tableName,
-        ConsistentRead: true,
-        FilterExpression: "#archive = :archive",
+        IndexName: "archiveId-snapshotId-index",
+        KeyConditionExpression: "#archive = :archive",
         ProjectionExpression: "#snapshot, #state",
         ExpressionAttributeNames: {
           "#archive": "archiveId",
@@ -152,10 +152,12 @@ async function listIndexingEntriesByArchive(
       }),
     );
 
-    entries.push(...(response.Items ?? []).map((item) => ({
-      snapshotId: String(item.snapshotId),
-      outcome: item.state as IndexingOutcome,
-    })));
+    entries.push(
+      ...(response.Items ?? []).map((item) => ({
+        snapshotId: String(item.snapshotId),
+        outcome: item.state as IndexingOutcome,
+      })),
+    );
     lastEvaluatedKey = response.LastEvaluatedKey;
   } while (lastEvaluatedKey !== undefined);
 

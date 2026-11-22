@@ -30,8 +30,19 @@ function createDynamoDbTestSupport(clock: () => number) {
           TableName: tableName,
           AttributeDefinitions: [
             { AttributeName: "snapshotId", AttributeType: "S" },
+            { AttributeName: "archiveId", AttributeType: "S" },
           ],
           KeySchema: [{ AttributeName: "snapshotId", KeyType: "HASH" }],
+          GlobalSecondaryIndexes: [
+            {
+              IndexName: "archiveId-snapshotId-index",
+              KeySchema: [
+                { AttributeName: "archiveId", KeyType: "HASH" },
+                { AttributeName: "snapshotId", KeyType: "RANGE" },
+              ],
+              Projection: { ProjectionType: "ALL" },
+            },
+          ],
           BillingMode: "PAY_PER_REQUEST",
         }),
       );

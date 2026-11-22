@@ -259,4 +259,16 @@ resource "aws_dynamodb_table" "search_indexing_ledger" {
     name = "snapshotId"
     type = "S"
   }
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "archiveId-snapshotId-index"
+    hash_key        = "archiveId"
+    range_key       = "snapshotId"
+    projection_type = "ALL"
+  }
 }
