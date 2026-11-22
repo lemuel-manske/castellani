@@ -60,7 +60,7 @@ function normalizeText(value: string): string {
 }
 
 function contentTypeOf(value: string | undefined): string {
-  return (value ?? "application/octet-stream").split(";", 1)[0]!.trim().toLowerCase();
+  return ((value ?? "application/octet-stream").split(";", 1)[0] ?? "application/octet-stream")\n    .trim()\n    .toLowerCase();
 }
 
 function metaContent(root: ReturnType<typeof parse>, name: string): string {
