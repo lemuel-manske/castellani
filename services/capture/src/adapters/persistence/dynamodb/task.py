@@ -224,7 +224,6 @@ class DynamoDBTaskRepository(TaskRepository):
                         ":open": {"S": "OPEN"},
                         ":zero": {"N": "0"},
                         ":one": {"N": "1"},
-                        ":max_attempts": {"N": str(self.max_attempts)},
                     },
                 }
             },
@@ -889,6 +888,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         ":now": {"N": str(now)},
                         ":zero": {"N": "0"},
                         ":one": {"N": "1"},
+                        ":max_attempts": {"N": str(self.max_attempts)},
                     },
                 }
             },
