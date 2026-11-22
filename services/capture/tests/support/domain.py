@@ -61,3 +61,15 @@ def set_run_admission(client: DynamoDBClient, admission: str) -> None:
         UpdateExpression="SET admission = :admission",
         ExpressionAttributeValues={":admission": {"S": admission}},
     )
+
+
+from domain import PageTask, TaskClaim
+
+
+def make_claim() -> TaskClaim:
+    return TaskClaim(
+        task=PageTask("archive/one", "url-key", "https://example.org/", 0),
+        attempt_id="attempt-1",
+        fence=1,
+        lease_until=100,
+    )
