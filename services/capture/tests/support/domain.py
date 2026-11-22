@@ -2,6 +2,8 @@ from typing import Any
 
 from mypy_boto3_dynamodb.client import DynamoDBClient
 
+from domain import PageTask, TaskClaim
+
 
 def seed_run(
     client: DynamoDBClient,
@@ -62,8 +64,6 @@ def set_run_admission(client: DynamoDBClient, admission: str) -> None:
         ExpressionAttributeValues={":admission": {"S": admission}},
     )
 
-
-from domain import PageTask, TaskClaim
 
 
 def make_claim() -> TaskClaim:
