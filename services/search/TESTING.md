@@ -12,7 +12,7 @@ Prefer real application services and real internal implementations. When an exte
 
 ## Infrastructure adapters
 
-Use the local services defined in `compose.yaml` for persistence, messaging, object storage, and search infrastructure. Adapter tests must verify observable behavior against those services, including conditional writes, concurrency, serialization, delivery, and query semantics. Do not substitute mocked SDK clients for these tests.
+Use the local services defined in `compose.yaml` for persistence, object storage, messaging, and search infrastructure. Adapter tests must verify observable behavior against those services, including conditional writes, concurrency, object retrieval, serialization, delivery, and query semantics. Do not substitute mocked SDK clients for these tests.
 
 ## Permitted test doubles
 
@@ -21,6 +21,6 @@ Mocks are not the default. Use them only when a failure mode cannot be reproduce
 ## Commands
 
 - `make test-unit`: pure domain tests and application tests using real internal logic with in-memory boundary implementations.
-- `make test-infra-up`: start DynamoDB Local, OpenSearch, and RabbitMQ.
+- `make test-infra-up`: start DynamoDB Local, MinIO, OpenSearch, and RabbitMQ.
 - `make test-integration`: run adapter and infrastructure integration tests; required endpoints must be configured and missing infrastructure must fail the suite.
 - `make test`: run both unit and integration suites.

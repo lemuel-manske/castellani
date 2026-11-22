@@ -4,7 +4,7 @@ install:
 	npm ci
 
 test-infra-up:
-	docker compose up -d --wait dynamodb-local opensearch rabbitmq
+	docker compose up -d --wait dynamodb-local minio opensearch rabbitmq
 
 test-infra-down:
 	docker compose down
@@ -25,6 +25,7 @@ test-unit:
 
 test-integration:
 	SEARCH_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
+		SEARCH_S3_ENDPOINT_URL=http://localhost:9000 \
 		SEARCH_OPENSEARCH_URL=http://localhost:9200 \
 		SEARCH_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
 		npm run test:integration
