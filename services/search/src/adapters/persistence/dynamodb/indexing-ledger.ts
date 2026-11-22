@@ -9,6 +9,7 @@ import type {
 import {
   claimIndexingEntry,
   completeIndexingEntry,
+  exhaustIndexingEntry,
   getIndexingEntry,
   releaseIndexingEntry,
 } from "./indexing-ledger-queries.js";
@@ -17,6 +18,8 @@ type TerminalOutcome = Extract<
   IndexingOutcome,
   "INDEXED" | "UNSUPPORTED" | "FAILED"
 >;
+
+const DEFAULT_MAX_ATTEMPTS = 5;
 
 class IndexingClaimLostError extends Error {
   constructor(snapshotId: string) {
@@ -50,6 +53,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     snapshotId: string,
     messageId: string,
     leaseDurationSeconds: number,
+    maxAttempts = DEFAULT_MAX_ATTEMPTS,
   ): Promise<IndexingClaimResult> {
     if (!archiveId || !snapshotId || !messageId) {
       throw new Error("archiveId, snapshotId, and messageId must not be empty");
@@ -57,6 +61,10 @@ class DynamoDBIndexingLedger implements IndexingLedger {
 
     if (!Number.isFinite(leaseDurationSeconds) || leaseDurationSeconds <= 0) {
       throw new Error("lease duration must be positive");
+    }
+
+    if (!Number.isSafeInteger(maxAttempts) || maxAttempts <= 0) {
+      throw new Error("maximum indexing attempts must be a positive integer");
     }
 
     const now = this.clock() / 1000;
@@ -70,6 +78,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         token,
         now,
         leaseUntil: now + leaseDurationSeconds,
+        maxAttempts,
       });
 
       if (item.attempts === undefined) {
@@ -108,6 +117,57 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         item.state === "FAILED"
       ) {
         return { status: "TERMINAL", outcome: item.state };
+      }
+
+      const leaseExpired =
+        item.state === "PENDING" ||
+        (item.state === "PROCESSING" &&
+          item.leaseUntil !== undefined &&
+          item.leaseUntil <= now);
+      const attemptsExhausted =
+        item.attempts !== undefined && item.attempts >= maxAttempts;
+
+      if (leaseExpired && attemptsExhausted) {
+        try {
+          await exhaustIndexingEntry(this.client, this.tableName, {
+            archiveId,
+            snapshotId,
+            now,
+            attempts: item.attempts!,
+            maxAttempts,
+          });
+          return { status: "TERMINAL", outcome: "FAILED" };
+        } catch (exhaustionError) {
+          if (
+            !(exhaustionError instanceof Error) ||
+            exhaustionError.name !== "ConditionalCheckFailedException"
+          ) {
+            throw exhaustionError;
+          }
+
+          const current = await getIndexingEntry(
+            this.client,
+            this.tableName,
+            snapshotId,
+          );
+
+          if (current?.archiveId !== archiveId) {
+            throw new IndexingIdentityConflictError(snapshotId);
+          }
+
+          if (
+            current?.state === "INDEXED" ||
+            current?.state === "UNSUPPORTED" ||
+            current?.state === "FAILED"
+          ) {
+            return { status: "TERMINAL", outcome: current.state };
+          }
+
+          return {
+            status: "BUSY",
+            leaseUntil: current?.leaseUntil ?? now,
+          };
+        }
       }
 
       return { status: "BUSY", leaseUntil: item.leaseUntil ?? now };
