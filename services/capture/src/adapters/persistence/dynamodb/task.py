@@ -66,6 +66,7 @@ class DynamoDBTaskRepository(TaskRepository):
         frontier_table_name: str,
         runs_table_name: str,
         lease_duration: float,
+        snapshots_table_name: str = "capture_snapshots",
         clock: Callable[[], float] = time.time,
         outbox_table_name: str = "capture_outbox",
     ) -> None:
@@ -74,6 +75,9 @@ class DynamoDBTaskRepository(TaskRepository):
 
         if not runs_table_name:
             raise ValueError("runs_table_name must not be empty")
+
+        if not snapshots_table_name:
+            raise ValueError("snapshots_table_name must not be empty")
 
         if not outbox_table_name:
             raise ValueError("outbox_table_name must not be empty")
@@ -84,6 +88,7 @@ class DynamoDBTaskRepository(TaskRepository):
         self.client = client
         self.frontier_table_name = frontier_table_name
         self.runs_table_name = runs_table_name
+        self.snapshots_table_name = snapshots_table_name
         self.outbox_table_name = outbox_table_name
         self.lease_duration = lease_duration
 
@@ -227,6 +232,24 @@ class DynamoDBTaskRepository(TaskRepository):
                     },
                     "ConditionExpression": "attribute_not_exists(#url_key)",
                     "ExpressionAttributeNames": {"#url_key": "urlKey"},
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self.snapshots_table_name,
+                    "Item": {
+                        "snapshotId": {"S": outcome.snapshot_id},
+                        "archiveId": {"S": outcome.archive_id},
+                        "urlKey": {"S": outcome.url_key},
+                        "url": {"S": outcome.capture.requested_url},
+                        "finalUrl": {"S": outcome.capture.final_url},
+                        "capturedAt": {"S": captured_at_text},
+                        "minDepth": {"N": str(self._task_depth(outcome.archive_id, outcome.url_key))},
+                        "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
+                        "warcArtifacts": {"L": artifacts},
+                    },
+                    "ConditionExpression": "attribute_not_exists(#snapshot_id)",
+                    "ExpressionAttributeNames": {"#snapshot_id": "snapshotId"},
                 }
             },
             {
