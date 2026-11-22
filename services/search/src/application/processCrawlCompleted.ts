@@ -145,7 +145,7 @@ async function processCrawlCompleted(
   });
 
   for (const snapshot of manifest.snapshots) {
-    const result = await processPageCaptured(
+    await processPageCaptured(
       {
         messageId: `manifest:${event.manifestDigest}:${snapshot.snapshotId}`,
         correlationId: manifest.archiveId,
