@@ -48,3 +48,13 @@ def rabbitmq() -> Iterator[FakeConnection]:
         yield connection
     finally:
         pass
+
+
+@pytest.fixture(autouse=True)
+def deterministic_attempt_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    from itertools import count
+
+    from adapters.persistence.dynamodb import task
+
+    identifiers = count(1)
+    monkeypatch.setattr(task, "new_attempt_id", lambda: f"attempt-{next(identifiers)}")
