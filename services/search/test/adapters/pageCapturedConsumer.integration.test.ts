@@ -23,3 +23,16 @@ it("delivers a published PageCaptured event to the real consumer", async () => {
     },
   });
 });
+
+
+it("dead-letters malformed PageCaptured envelopes", async () => {
+  const deadLetter = rabbitmq.nextDeadLetter();
+
+  await rabbitmq.publish({ messageId: "malformed-message" });
+
+  const message = await deadLetter;
+
+  expect(message.content.toString("utf8")).toBe(
+    JSON.stringify({ messageId: "malformed-message" }),
+  );
+});
