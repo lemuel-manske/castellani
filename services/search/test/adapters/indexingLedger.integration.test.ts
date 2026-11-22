@@ -25,6 +25,33 @@ it("claims a snapshot and persists its attempt count", async () => {
   });
 });
 
+it("marks a snapshot terminal when its final claim lease expires", async () => {
+  const first = await dynamodb.ledger.claim(
+    "archive-6",
+    "snapshot-6",
+    "message-6a",
+    120,
+    1,
+  );
+
+  expect(first).toMatchObject({
+    status: "CLAIMED",
+    claim: { attempts: 1 },
+  });
+
+  clock.now += 121_000;
+
+  await expect(
+    dynamodb.ledger.claim(
+      "archive-6",
+      "snapshot-6",
+      "message-6b",
+      120,
+      1,
+    ),
+  ).resolves.toEqual({ status: "TERMINAL", outcome: "FAILED" });
+});
+
 it("allows only one concurrent claim for the same snapshot", async () => {
   const results = await Promise.all([
     dynamodb.ledger.claim("archive-2", "snapshot-2", "message-2a", 120),
@@ -88,15 +115,14 @@ it("rejects completion by a worker whose lease was reclaimed", async () => {
   );
   expect(second.status).toBe("CLAIMED");
 
-  if (first.status !== "CLAIMED" || second.status !== "CLAIMED") {
-    throw new Error("Expected both lease claims to succeed");
-  }
+  const firstClaim = (first as Extract<typeof first, { status: "CLAIMED" }>).claim;
+  const secondClaim = (second as Extract<typeof second, { status: "CLAIMED" }>).claim;
 
   await expect(
-    dynamodb.ledger.complete(first.claim, "INDEXED"),
+    dynamodb.ledger.complete(firstClaim, "INDEXED"),
   ).rejects.toBeInstanceOf(IndexingClaimLostError);
 
-  await dynamodb.ledger.complete(second.claim, "INDEXED");
+  await dynamodb.ledger.complete(secondClaim, "INDEXED");
 
   await expect(
     dynamodb.ledger.claim("archive-5", "snapshot-5", "message-5c", 120),
