@@ -10,7 +10,8 @@ import {
   claimIndexingEntry,
   completeIndexingEntry,
   exhaustIndexingEntry,
-  getIndexingEntry,\n  listIndexingEntriesByArchive,
+  getIndexingEntry,
+  listIndexingEntriesByArchive,
   releaseIndexingEntry,
 } from "./indexing-ledger-queries.js";
 
