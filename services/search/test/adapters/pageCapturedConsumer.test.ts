@@ -32,6 +32,8 @@ it("parses the PageCaptured envelope emitted by Capture", () => {
   expect(parsePageCaptured(Buffer.from(JSON.stringify(event)))).toEqual({
     messageId: "message-1",
     correlationId: "archive-1",
+    type: "PageCaptured",
+    version: 1,
     occurredAt: "2026-11-22T10:00:00.000Z",
     payload: {
       archiveId: "archive-1",
