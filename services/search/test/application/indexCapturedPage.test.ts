@@ -1,13 +1,10 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import { indexCapturedPage } from "../../src/application/indexCapturedPage.js";
-import type {
-  ArtifactObjectReader,
-  ArtifactReference,
-  CapturedPageReference,
-} from "../../src/ports/artifacts.js";
+import type { SearchDocument } from "../../src/domain/content.js";
+import type { ArtifactObjectReader, ArtifactReference, CapturedPageReference } from "../../src/ports/artifacts.js";
 import type { SearchDocumentWriter } from "../../src/ports/search-index.js";
 import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
 
@@ -19,15 +16,11 @@ const page: CapturedPageReference = {
   capturedAt: "2026-11-22T10:00:00.000Z",
 };
 
-function artifactFor(
-  contentType: string,
-  content: string,
-): {
+function artifactFor(contentType: string, content: string): {
   reference: ArtifactReference;
   reader: ArtifactObjectReader;
 } {
-  const response =
-    "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n\r\n" + content;
+  const response = "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n\r\n" + content;
   const warc = [
     "WARC/1.1",
     "WARC-Type: response",
@@ -41,7 +34,6 @@ function artifactFor(
     "",
   ].join("\r\n");
   const bytes = gzipSync(Buffer.from(warc));
-
   return {
     reference: {
       bucket: "capture-artifacts",
@@ -49,57 +41,47 @@ function artifactFor(
       sha256: createHash("sha256").update(bytes).digest("hex"),
       sizeBytes: bytes.byteLength,
     },
-    reader: {
-      getObject: () => Promise.resolve(Readable.from([bytes])),
-    },
+    reader: { getObject: () => Promise.resolve(Readable.from([bytes])) },
   };
 }
 
 it("extracts and indexes a captured page using its snapshot identity", async () => {
-  const artifact = artifactFor(
-    "text/html; charset=utf-8",
-    "<html><body><h1>Indexed page</h1></body></html>",
-  );
-  const index = vi.fn().mockResolvedValue(undefined);
-  const documentWriter: SearchDocumentWriter = { index };
+  const artifact = artifactFor("text/html; charset=utf-8", "<html><body><h1>Indexed page</h1></body></html>");
+  const indexedDocuments: SearchDocument[] = [];
+  const documentWriter: SearchDocumentWriter = {
+    async index(document) {
+      indexedDocuments.push(document);
+    },
+  };
   const capturedPageReader = createWarcCapturedPageReader(artifact.reader);
 
-  await expect(
-    indexCapturedPage(
-      page,
-      [artifact.reference],
-      capturedPageReader,
-      documentWriter,
-    ),
-  ).resolves.toEqual({ outcome: "INDEXED", snapshotId: "snapshot-1" });
+  await expect(indexCapturedPage(page, [artifact.reference], capturedPageReader, documentWriter))
+    .resolves.toEqual({ outcome: "INDEXED", snapshotId: "snapshot-1" });
 
-  expect(index).toHaveBeenCalledWith(
-    expect.objectContaining({
-      archiveId: "archive-1",
-      snapshotId: "snapshot-1",
-      text: "Indexed page",
-    }),
-  );
+  expect(indexedDocuments).toHaveLength(1);
+  expect(indexedDocuments[0]).toMatchObject({
+    archiveId: "archive-1",
+    snapshotId: "snapshot-1",
+    text: "Indexed page",
+  });
 });
 
 it("accounts for unsupported captured content without writing a document", async () => {
   const artifact = artifactFor("application/pdf", "not searchable text");
-  const index = vi.fn().mockResolvedValue(undefined);
-  const documentWriter: SearchDocumentWriter = { index };
+  const indexedDocuments: SearchDocument[] = [];
+  const documentWriter: SearchDocumentWriter = {
+    async index(document) {
+      indexedDocuments.push(document);
+    },
+  };
   const capturedPageReader = createWarcCapturedPageReader(artifact.reader);
 
-  await expect(
-    indexCapturedPage(
-      page,
-      [artifact.reference],
-      capturedPageReader,
-      documentWriter,
-    ),
-  ).resolves.toEqual({
-    outcome: "UNSUPPORTED",
-    snapshotId: "snapshot-1",
-    reasonCode: "UNSUPPORTED_CONTENT_TYPE",
-  });
+  await expect(indexCapturedPage(page, [artifact.reference], capturedPageReader, documentWriter))
+    .resolves.toEqual({
+      outcome: "UNSUPPORTED",
+      snapshotId: "snapshot-1",
+      reasonCode: "UNSUPPORTED_CONTENT_TYPE",
+    });
 
-  expect(index).not.toHaveBeenCalled();
+  expect(indexedDocuments).toHaveLength(0);
 });
