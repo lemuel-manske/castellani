@@ -142,25 +142,32 @@ async function startPageCapturedConsumer(
   await channel.assertExchange(topology.eventsExchange, "topic", {
     durable: true,
   });
+
   await channel.assertExchange(topology.deadLetterExchange, "fanout", {
     durable: true,
   });
+
   await channel.assertQueue(topology.deadLetterQueue, { durable: true });
+
   await channel.bindQueue(
     topology.deadLetterQueue,
     topology.deadLetterExchange,
     "",
   );
+
   await channel.assertQueue(topology.queue, {
     durable: true,
     arguments: { "x-dead-letter-exchange": topology.deadLetterExchange },
   });
+
   await channel.bindQueue(
     topology.queue,
     topology.eventsExchange,
     topology.routingKey,
   );
+
   await channel.prefetch(1);
+
   await channel.consume(topology.queue, (message) => {
     void handlePageCapturedMessage(channel, message, handle);
   });
@@ -176,4 +183,5 @@ export {
   parsePageCaptured,
   startPageCapturedConsumer,
 };
+
 export type { PageCapturedConsumerTopology };

@@ -106,10 +106,12 @@ class SearchRuntime {
       documentClient,
       this.settings.indexingLedgerTableName,
     );
+
     const documentWriter = createOpenSearchDocumentWriter(
       opensearch,
       this.settings.searchIndexName,
     );
+
     const capturedPageReader = createWarcCapturedPageReader(
       createS3ArtifactReader(s3),
     );
