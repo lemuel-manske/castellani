@@ -193,7 +193,7 @@ async def test_non_retryable_failure_becomes_terminal_on_first_attempt(
     run = run_item(dynamodb)
     assert run["outstandingPages"] == {"N": "0"}
     assert run["failedPages"] == {"N": "1"}
-    assert outbox_items(dynamodb) == []
+    assert len(outbox_items(dynamodb)) == 3
 
 
 
@@ -210,18 +210,21 @@ async def test_expired_leases_consume_retry_budget_and_exhaust_atomically(
     first = await repository.claim("archive-1", "url-1")
     assert first is not None
     assert frontier_item(dynamodb)["attemptCount"] == {"N": "1"}
+    assert await repository.claim("archive-1", "url-1") is None
 
     clock.advance(31)
     second = await repository.claim("archive-1", "url-1")
     assert second is not None
     assert second.fence == first.fence + 1
     assert frontier_item(dynamodb)["attemptCount"] == {"N": "2"}
+    assert await repository.claim("archive-1", "url-1") is None
 
     clock.advance(31)
     third = await repository.claim("archive-1", "url-1")
     assert third is not None
     assert third.fence == second.fence + 1
     assert frontier_item(dynamodb)["attemptCount"] == {"N": "3"}
+    assert await repository.claim("archive-1", "url-1") is None
 
     clock.advance(31)
     assert await repository.claim("archive-1", "url-1") is None
