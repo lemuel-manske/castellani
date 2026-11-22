@@ -1,7 +1,7 @@
 interface SearchSettingsOptions {
   awsRegion?: string;
-  dynamodbEndpointUrl?: string;
-  s3EndpointUrl?: string;
+  dynamodbEndpointUrl?: string | undefined;
+  s3EndpointUrl?: string | undefined;
   rabbitmqUrl?: string;
   opensearchUrl?: string;
   artifactBucket?: string;
