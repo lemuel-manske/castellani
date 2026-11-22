@@ -130,6 +130,25 @@ class DynamoDBTaskRepository(TaskRepository):
         await asyncio.to_thread(self._release, claim)
 
     def _admit_discovered(self, claim: TaskClaim, pages: tuple[DiscoveredPage, ...]) -> None:
+        if not pages:
+            return
+
+        run = self._read_run(claim.task.archive_id)
+        if run is None:
+            raise RuntimeError("Capture run does not exist")
+        if run.get("admission", {}).get("S") != "OPEN":
+            raise TaskClaimLostError("Capture run admission is closed")
+
+        maximum = self._number_from_item(run, "maxPages")
+        admitted = self._number_from_item(run, "admittedPages")
+        outstanding = self._number_from_item(run, "outstandingPages")
+        if maximum is None or admitted is None or outstanding is None:
+            raise RuntimeError(
+                "Capture run is missing maxPages, admittedPages, or outstandingPages"
+            )
+        if admitted >= maximum:
+            return
+
         for page in pages:
             if page.identity.url_key == claim.task.url_key:
                 continue
@@ -184,8 +203,9 @@ class DynamoDBTaskRepository(TaskRepository):
                         "#outstanding = if_not_exists(#outstanding, :zero) + :one"
                     ),
                     "ConditionExpression": (
-                        "#admission = :open AND "
-                        "(attribute_not_exists(#admitted) OR #admitted < #maximum)"
+                        "#admission = :open AND attribute_exists(#maximum) "
+                        "AND attribute_exists(#admitted) AND attribute_exists(#outstanding) "
+                        "AND #admitted < #maximum"
                     ),
                     "ExpressionAttributeNames": {
                         "#admission": "admission",
