@@ -13,6 +13,7 @@ class CaptureSettings:
     rabbitmq_url: str = "amqp://castellani:local-development-only@localhost:5672/"
     frontier_table_name: str = "capture_frontier"
     runs_table_name: str = "capture_runs"
+    snapshots_table_name: str = "capture_snapshots"
     outbox_table_name: str = "capture_outbox"
     browser_slots_table_name: str = "capture_browser_slots"
     browser_slot_count: int = 10
@@ -35,6 +36,7 @@ class CaptureSettings:
             ),
             frontier_table_name=os.getenv("CAPTURE_FRONTIER_TABLE", "capture_frontier"),
             runs_table_name=os.getenv("CAPTURE_RUNS_TABLE", "capture_runs"),
+            snapshots_table_name=os.getenv("CAPTURE_SNAPSHOTS_TABLE", "capture_snapshots"),
             outbox_table_name=os.getenv("CAPTURE_OUTBOX_TABLE", "capture_outbox"),
             browser_slots_table_name=os.getenv(
                 "CAPTURE_BROWSER_SLOTS_TABLE",
