@@ -9,7 +9,7 @@ class CaptureSettings:
     aws_region: str = "us-east-1"
 
     dynamodb_endpoint_url: str | None = None
-    rabbitmq_url: str = "amqp://castellani:local-development-only@localhost:5672/"
+    rabbitmq_url: str = "amqp://castellani:castellani@localhost:5672/"
     s3_endpoint_url: str | None = None
 
     artifact_bucket: str = "castellani-archive-artifacts"
@@ -37,7 +37,7 @@ class CaptureSettings:
             dynamodb_endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL"),
             rabbitmq_url=os.getenv(
                 "RABBITMQ_URL",
-                "amqp://castellani:local-development-only@localhost:5672/",
+                "amqp://castellani:castellani@localhost:5672/",
             ),
             s3_endpoint_url=os.getenv("S3_ENDPOINT_URL"),
             artifact_bucket=os.getenv("CAPTURE_ARTIFACT_BUCKET", "castellani-archive-artifacts"),
