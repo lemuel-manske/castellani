@@ -60,7 +60,10 @@ function artifactFor(warc: string): {
 
 it("extracts the captured HTTP response from its WARC artifact", async () => {
   const artifact = artifactFor(
-    responseRecord(page.finalUrl ?? page.url, "<html><body>Archived page</body></html>"),
+    responseRecord(
+      page.finalUrl ?? page.url,
+      "<html><body>Archived page</body></html>",
+    ),
   );
 
   await expect(
@@ -75,10 +78,15 @@ it("extracts the captured HTTP response from its WARC artifact", async () => {
   });
 });
 
-it("selects the final URL response when the WARC contains a redirect response", async () => {
+it(
+  "selects the final URL response when the WARC contains a redirect response",
+  async () => {
   const artifact = artifactFor(
     responseRecord(page.url, "<html><body>Redirect response</body></html>") +
-      responseRecord(page.finalUrl ?? page.url, "<html><body>Final response</body></html>"),
+      responseRecord(
+        page.finalUrl ?? page.url,
+        "<html><body>Final response</body></html>",
+      ),
   );
 
   await expect(
@@ -88,7 +96,9 @@ it("selects the final URL response when the WARC contains a redirect response", 
   });
 });
 
-it("validates the complete artifact checksum before returning captured content", async () => {
+it(
+  "validates the complete artifact checksum before returning captured content",
+  async () => {
   const artifact = artifactFor(
     responseRecord(page.finalUrl ?? page.url, "<html><body>Archived page</body></html>"),
   );
@@ -102,7 +112,9 @@ it("validates the complete artifact checksum before returning captured content",
   ).rejects.toBeInstanceOf(ArtifactIntegrityError);
 });
 
-it("rejects artifacts whose declared size does not match the downloaded object", async () => {
+it(
+  "rejects artifacts whose declared size does not match the downloaded object",
+  async () => {
   const artifact = artifactFor(
     responseRecord(page.finalUrl ?? page.url, "<html><body>Archived page</body></html>"),
   );
@@ -116,9 +128,14 @@ it("rejects artifacts whose declared size does not match the downloaded object",
   ).rejects.toBeInstanceOf(ArtifactIntegrityError);
 });
 
-it("rejects an artifact without a response for the captured page URL", async () => {
+it(
+  "rejects an artifact without a response for the captured page URL",
+  async () => {
   const artifact = artifactFor(
-    responseRecord("https://example.org/other", "<html><body>Other page</body></html>"),
+    responseRecord(
+      "https://example.org/other",
+      "<html><body>Other page</body></html>",
+    ),
   );
 
   await expect(
