@@ -16,7 +16,7 @@ interface PageCapturedEvent {
 }
 
 type PageCapturedResult =
-  | { status: "COMPLETED"; outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED"> }
+  | { status: "COMPLETED"; outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED"> }
   | { status: "BUSY" }
   | { status: "DUPLICATE"; outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED"> };
 
@@ -25,6 +25,7 @@ interface ProcessPageCapturedDependencies {
   capturedPageReader: CapturedPageReader;
   documentWriter: SearchDocumentWriter;
   leaseDurationSeconds?: number;
+  maxAttempts?: number;
 }
 
 async function processPageCaptured(
@@ -63,6 +64,15 @@ async function processPageCaptured(
     return { status: "COMPLETED", outcome: result.outcome };
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown indexing error";
+    if (claimResult.claim.attempts >= (dependencies.maxAttempts ?? 5)) {
+      await dependencies.ledger.complete(
+        claimResult.claim,
+        "FAILED",
+        "INDEXING_ATTEMPTS_EXHAUSTED",
+      );
+      return { status: "COMPLETED", outcome: "FAILED" };
+    }
+
     await dependencies.ledger.release(claimResult.claim, reason);
     throw error;
   }
