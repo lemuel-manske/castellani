@@ -5,7 +5,13 @@ install:
 
 
 test-infra-up:
-	docker compose up -d --wait dynamodb-local localstack opensearch rabbitmq
+	docker compose up -d --wait dynamodb-local opensearch rabbitmq
+	docker compose up -d localstack
+	@attempt=0; until curl -fsS http://localhost:4566/_localstack/health >/dev/null; do \
+		attempt=$((attempt + 1)); \
+		if [ $attempt -ge 60 ]; then docker compose logs localstack; exit 1; fi; \
+		sleep 2; \
+	done
 
 test-infra-down:
 	docker compose down
