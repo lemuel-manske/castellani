@@ -52,7 +52,9 @@ it("extracts plain text without HTML parsing", () => {
 
 it("returns an unsupported outcome for non-text content", () => {
   expect(
-    extractSearchableContent(page({ contentType: "application/pdf", content: "binary" })),
+    extractSearchableContent(
+      page({ contentType: "application/pdf", content: "binary" }),
+    ),
   ).toEqual({ kind: "UNSUPPORTED", reasonCode: "UNSUPPORTED_CONTENT_TYPE" });
 });
 
