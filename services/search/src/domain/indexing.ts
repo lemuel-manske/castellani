@@ -48,7 +48,7 @@ function reconcileManifest(
     const outcome = ledger.get(snapshotId);
     if (outcome === undefined) {
       missingSnapshotIds.push(snapshotId);
-    } else if (outcome !== "PENDING") {
+    } else if (outcome !== "PENDING" && outcome !== "PROCESSING") {
       terminalCount += 1;
     }
   }
