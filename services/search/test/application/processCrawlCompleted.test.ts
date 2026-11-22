@@ -3,7 +3,10 @@ import { Readable } from "node:stream";
 import { expect, it, vi } from "vitest";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
 import type { ProcessPageCapturedDependencies } from "../../src/application/processPageCaptured.js";
-import type { ArtifactObjectReader } from "../../src/ports/artifacts.js";
+import type {
+  ArtifactObjectReader,
+  CapturedPageReference,
+} from "../../src/ports/artifacts.js";
 import type { ManifestLedger } from "../../src/ports/manifest-ledger.js";
 
 it(
@@ -55,33 +58,36 @@ it(
     };
     const record = vi.fn().mockResolvedValue(undefined);
     const manifestLedger: ManifestLedger = { record, contains: vi.fn() };
+    const claim = vi.fn().mockImplementation((archiveId: string, snapshotId: string) =>
+      Promise.resolve({
+        status: "CLAIMED" as const,
+        claim: { archiveId, snapshotId, token: "claim-token", attempts: 1 },
+      }),
+    );
+    const complete = vi.fn().mockResolvedValue(undefined);
+    const release = vi.fn().mockResolvedValue(undefined);
     const ledger: ProcessPageCapturedDependencies["ledger"] = {
-      claim: vi.fn().mockImplementation((archiveId: string, snapshotId: string) =>
-        Promise.resolve({
-          status: "CLAIMED" as const,
-          claim: { archiveId, snapshotId, token: "claim-token", attempts: 1 },
-        }),
-      ),
-      complete: vi.fn().mockResolvedValue(undefined),
-      release: vi.fn().mockResolvedValue(undefined),
+      claim,
+      complete,
+      release,
       listByArchive: vi.fn().mockResolvedValue([]),
     };
+    const read = vi.fn().mockImplementation((page: CapturedPageReference) =>
+      Promise.resolve({
+        archiveId: page.archiveId,
+        snapshotId: page.snapshotId,
+        url: page.url,
+        finalUrl: page.finalUrl ?? page.url,
+        capturedAt: page.capturedAt,
+        contentType: "text/html",
+        content: "<html><body>Recovered content</body></html>",
+      }),
+    );
     const capturedPageReader: ProcessPageCapturedDependencies["capturedPageReader"] =
-      {
-        read: vi.fn().mockImplementation((page) =>
-          Promise.resolve({
-            archiveId: page.archiveId,
-            snapshotId: page.snapshotId,
-            url: page.url,
-            finalUrl: page.finalUrl ?? page.url,
-            capturedAt: page.capturedAt,
-            contentType: "text/html",
-            content: "<html><body>Recovered content</body></html>",
-          }),
-        ),
-      };
+      { read };
+    const index = vi.fn().mockResolvedValue(undefined);
     const documentWriter: ProcessPageCapturedDependencies["documentWriter"] = {
-      index: vi.fn().mockResolvedValue(undefined),
+      index,
     };
     const indexing: ProcessPageCapturedDependencies = {
       ledger,
@@ -111,10 +117,10 @@ it(
       collectionId: "collection-a",
       snapshotIds: ["snapshot-a", "snapshot-b"],
     });
-    expect(ledger.claim).toHaveBeenCalledTimes(2);
-    expect(ledger.complete).toHaveBeenCalledTimes(2);
-    expect(documentWriter.index).toHaveBeenCalledTimes(2);
-    expect(capturedPageReader.read).toHaveBeenNthCalledWith(
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(index).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenNthCalledWith(
       1,
       {
         archiveId: "manifest-archive",
@@ -125,7 +131,7 @@ it(
       },
       [artifact],
     );
-    expect(ledger.claim).toHaveBeenNthCalledWith(
+    expect(claim).toHaveBeenNthCalledWith(
       1,
       "manifest-archive",
       "snapshot-a",
