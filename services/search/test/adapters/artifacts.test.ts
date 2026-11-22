@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+import { gzipSync } from "node:zlib";
 import { expect, it } from "vitest";
 import {
   ArtifactIntegrityError,
@@ -41,7 +42,7 @@ function artifactFor(warc: string): {
   reference: ArtifactReference;
   reader: ArtifactObjectReader;
 } {
-  const bytes = Buffer.from(warc);
+  const bytes = gzipSync(Buffer.from(warc));
 
   return {
     reference: {
