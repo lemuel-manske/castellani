@@ -99,7 +99,6 @@ function setupIntegrationEnvironment(
 export {
   clock,
   dynamodb,
-  publicationLedger: dynamodb.publicationLedger,
   nextPageCaptured,
   opensearch,
   rabbitmq,

@@ -8,7 +8,7 @@ import type { PublicationIdentity } from "../../src/domain.js";
 setupIntegrationEnvironment("dynamodb");
 
 const identity: PublicationIdentity = {
-  archiveId: "publication-archive-1",
+  archiveId: "publication-decision-archive",
   decisionVersion: 2,
   packageDigest: "sha256:package",
 };
@@ -36,52 +36,68 @@ it("authorizes publication only after the matching replay acknowledgement", asyn
 });
 
 it("accepts replay acknowledgement before the publication decision", async () => {
-  await dynamodb.publicationLedger.recordReplayPublished(identity);
-  await dynamodb.publicationLedger.recordPublicationDecision(identity);
+  const replayFirstIdentity = {
+    ...identity,
+    archiveId: "publication-replay-first-archive",
+  };
+  await dynamodb.publicationLedger.recordReplayPublished(replayFirstIdentity);
+  await dynamodb.publicationLedger.recordPublicationDecision(replayFirstIdentity);
 
   await expect(
-    dynamodb.publicationLedger.get(identity.archiveId),
+    dynamodb.publicationLedger.get(replayFirstIdentity.archiveId),
   ).resolves.toEqual({
-    publicationDecision: identity,
-    replayPublication: identity,
+    publicationDecision: replayFirstIdentity,
+    replayPublication: replayFirstIdentity,
     compensationDecision: null,
   });
 });
 
 it("keeps duplicate publication facts idempotent", async () => {
-  await dynamodb.publicationLedger.recordPublicationDecision(identity);
-  await dynamodb.publicationLedger.recordPublicationDecision(identity);
-  await dynamodb.publicationLedger.recordReplayPublished(identity);
-  await dynamodb.publicationLedger.recordReplayPublished(identity);
+  const duplicateIdentity = {
+    ...identity,
+    archiveId: "publication-duplicate-archive",
+  };
+  await dynamodb.publicationLedger.recordPublicationDecision(duplicateIdentity);
+  await dynamodb.publicationLedger.recordPublicationDecision(duplicateIdentity);
+  await dynamodb.publicationLedger.recordReplayPublished(duplicateIdentity);
+  await dynamodb.publicationLedger.recordReplayPublished(duplicateIdentity);
 
   await expect(
-    dynamodb.publicationLedger.get(identity.archiveId),
+    dynamodb.publicationLedger.get(duplicateIdentity.archiveId),
   ).resolves.toEqual({
-    publicationDecision: identity,
-    replayPublication: identity,
+    publicationDecision: duplicateIdentity,
+    replayPublication: duplicateIdentity,
     compensationDecision: null,
   });
 });
 
 it("rejects a conflicting publication identity", async () => {
-  await dynamodb.publicationLedger.recordPublicationDecision(identity);
+  const conflictIdentity = {
+    ...identity,
+    archiveId: "publication-conflict-archive",
+  };
+  await dynamodb.publicationLedger.recordPublicationDecision(conflictIdentity);
 
   await expect(
     dynamodb.publicationLedger.recordPublicationDecision({
-      ...identity,
+      ...conflictIdentity,
       packageDigest: "sha256:other",
     }),
   ).rejects.toThrow("conflicting publication decision");
 });
 
 it("prevents publication after compensation", async () => {
+  const compensatedIdentity = {
+    ...identity,
+    archiveId: "publication-compensated-archive",
+  };
   await dynamodb.publicationLedger.recordCompensationDecision({
-    archiveId: identity.archiveId,
-    decisionVersion: identity.decisionVersion,
+    archiveId: compensatedIdentity.archiveId,
+    decisionVersion: compensatedIdentity.decisionVersion,
     reasonCode: "capture_failed",
   });
 
   await expect(
-    dynamodb.publicationLedger.recordPublicationDecision(identity),
+    dynamodb.publicationLedger.recordPublicationDecision(compensatedIdentity),
   ).rejects.toThrow("a compensated archive cannot be published");
 });
