@@ -54,8 +54,8 @@ it(
   () => {
     const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
-  expect(() =>
-    recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
+    expect(() =>
+      recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
     ).toThrow("replay acknowledgement conflicts");
   },
 );
@@ -63,13 +63,13 @@ it(
 it(
   "rejects a decision that conflicts with an earlier replay acknowledgement",
   () => {
-  const facts = recordReplayPublished(emptyPublicationFacts(), identity);
+    const facts = recordReplayPublished(emptyPublicationFacts(), identity);
 
-  expect(() =>
-    recordPublicationDecision(
-      facts,
-      { ...identity, packageDigest: "sha256:other" },
-    ),
+    expect(() =>
+      recordPublicationDecision(
+        facts,
+        { ...identity, packageDigest: "sha256:other" },
+      ),
     ).toThrow("publication decision conflicts");
   },
 );
