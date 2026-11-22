@@ -12,9 +12,8 @@
     "start": "node --enable-source-maps dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --check .",
-    "format:fix": "prettier --write .",
+    "format": "prettier --config .prettierconfig.json --write .",
+    "format:check": "prettier --config .prettierconfig.json --check .",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
