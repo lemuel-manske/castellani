@@ -20,15 +20,15 @@ const page: CapturedPageReference = {
   capturedAt: "2026-11-22T10:00:00.000Z",
 };
 
-function artifactFor(contentType: string, content: string): {
+function artifactFor(
+  contentType: string,
+  content: string,
+): {
   reference: ArtifactReference;
   reader: ArtifactObjectReader;
 } {
   const response =
-    "HTTP/1.1 200 OK\r\nContent-Type: " +
-    contentType +
-    "\r\n\r\n" +
-    content;
+    "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n\r\n" + content;
   const warc = [
     "WARC/1.1",
     "WARC-Type: response",
