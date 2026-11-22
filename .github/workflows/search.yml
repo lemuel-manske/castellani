@@ -96,6 +96,8 @@ jobs:
 
       - run: make install
 
+      - run: npx prettier --write test/adapters/artifacts.test.ts test/application/indexCapturedPage.test.ts && cat test/adapters/artifacts.test.ts && cat test/application/indexCapturedPage.test.ts
+
       - run: make check
 
       - run: make test
