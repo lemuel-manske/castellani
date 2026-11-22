@@ -57,7 +57,12 @@ it("verifies the immutable manifest, records membership, and recovers every snap
     attempts: 1,
   };
   const ledger: ProcessPageCapturedDependencies["ledger"] = {
-    claim: vi.fn().mockResolvedValue({ status: "CLAIMED", claim }),
+    claim: vi.fn().mockImplementation((archiveId: string, snapshotId: string) =>
+      Promise.resolve({
+        status: "CLAIMED" as const,
+        claim: { archiveId, snapshotId, token: "claim-token", attempts: 1 },
+      }),
+    ),
     complete: vi.fn().mockResolvedValue(undefined),
     release: vi.fn().mockResolvedValue(undefined),
     listByArchive: vi.fn().mockResolvedValue([]),
@@ -77,7 +82,6 @@ it("verifies the immutable manifest, records membership, and recovers every snap
   };
   const documentWriter: ProcessPageCapturedDependencies["documentWriter"] = {
     index: vi.fn().mockResolvedValue(undefined),
-    delete: vi.fn().mockResolvedValue(undefined),
   };
   const indexing: ProcessPageCapturedDependencies = {
     ledger,
