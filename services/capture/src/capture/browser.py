@@ -101,6 +101,7 @@ class UnsafeCaptureRequest(CaptureFailure):
 
 class InvalidCaptureURL(ValueError):
     reason_code = CaptureFailureCode.INVALID_URL
+    retryable = False
 
 
 class CaptureNavigationFailed(CaptureFailure):
