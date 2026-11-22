@@ -190,7 +190,9 @@ class ConcreteCaptureWorker(CaptureRunner):
         )
 
         claim = claim_state[0]
+
         snapshot_id = new_snapshot_id()
+
         warc_artifacts = await self.artifacts.persist_attempt(
             claim,
             directory,
@@ -209,7 +211,9 @@ class ConcreteCaptureWorker(CaptureRunner):
         )
 
         await self.task_repository.complete(outcome)
+
         terminal_state[0] = True
+
         await self.artifacts.commit_attempt(claim, directory)
 
     async def _maintain_leases(
