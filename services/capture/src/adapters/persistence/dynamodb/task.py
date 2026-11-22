@@ -834,14 +834,16 @@ class DynamoDBTaskRepository(TaskRepository):
         lease_until = now + self.lease_duration
 
         current = self._read_frontier(archive_id, url_key)
-        if (
-            current is not None
-            and current.get("state", {}).get("S") == "CLAIMED"
-            and float(current.get("leaseUntil", {}).get("N", "0")) <= now
-            and int(current.get("attemptCount", {}).get("N", "0")) >= self.max_attempts
-        ):
-            self._fail_expired_claim(archive_id, url_key, current, now)
-            return None
+        if current is not None and current.get("state", {}).get("S") == "CLAIMED":
+            current_lease = float(current.get("leaseUntil", {}).get("N", "0"))
+
+            if current_lease > now:
+                self._schedule_lease_recheck(archive_id, url_key, current, now)
+                return None
+
+            if int(current.get("attemptCount", {}).get("N", "0")) >= self.max_attempts:
+                self._fail_expired_claim(archive_id, url_key, current, now)
+                return None
 
         transaction = [
             {
@@ -906,6 +908,57 @@ class DynamoDBTaskRepository(TaskRepository):
             return None
 
         return claim_from_item(archive_id, url_key, item)
+
+    def _schedule_lease_recheck(
+        self,
+        archive_id: str,
+        url_key: str,
+        item: dict[str, Any],
+        now: float,
+    ) -> None:
+        attempt_id = item["attemptId"]["S"]
+        fence = item["fence"]["N"]
+        lease_until = item["leaseUntil"]["N"]
+        message_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                f"capture-page-lease-recheck:{archive_id}:{url_key}:{attempt_id}:{fence}:{lease_until}",
+            )
+        )
+        occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
+
+        message = {
+            "Put": {
+                "TableName": self.outbox_table_name,
+                "Item": {
+                    "messageId": {"S": message_id},
+                    "correlationId": {"S": archive_id},
+                    "type": {"S": "CapturePage"},
+                    "version": {"N": "1"},
+                    "occurredAt": {"S": occurred_at},
+                    "payload": {
+                        "M": {
+                            "archiveId": {"S": archive_id},
+                            "urlKey": {"S": url_key},
+                        }
+                    },
+                    "status": {"S": "PENDING"},
+                    "attempts": {"N": "0"},
+                    "nextAttemptAt": {"N": lease_until},
+                },
+                "ConditionExpression": "attribute_not_exists(#message_id)",
+                "ExpressionAttributeNames": {"#message_id": "messageId"},
+            }
+        }
+
+        try:
+            self._transact([message], None)
+        except ConditionalWriteRejected as error:
+            existing = self._read_outbox(message_id)
+            claim = claim_from_item(archive_id, url_key, item)
+
+            if existing is None or not self._is_release_message(existing, claim):
+                raise RuntimeError("CapturePage lease-recheck message identity collision") from error
 
     def _fail_expired_claim(
         self,
