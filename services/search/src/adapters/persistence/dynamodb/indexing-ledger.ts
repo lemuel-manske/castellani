@@ -1,11 +1,17 @@
 import { randomUUID } from "node:crypto";
+import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { IndexingOutcome } from "../../../domain.js";
 import type {
   IndexingClaimResult,
   IndexingLedger,
   SnapshotClaim,
 } from "../../../ports/indexing-ledger.js";
-import { DynamoDBIndexingLedgerQueries } from "./indexing-ledger-queries.js";
+import {
+  claimIndexingEntry,
+  completeIndexingEntry,
+  getIndexingEntry,
+  releaseIndexingEntry,
+} from "./indexing-ledger-queries.js";
 
 type TerminalOutcome = Extract<
   IndexingOutcome,
@@ -27,14 +33,14 @@ class IndexingIdentityConflictError extends Error {
 }
 
 class DynamoDBIndexingLedger implements IndexingLedger {
-  private readonly queries: DynamoDBIndexingLedgerQueries;
-
   constructor(
-    client: ConstructorParameters<typeof DynamoDBIndexingLedgerQueries>[0],
-    tableName: string,
+    private readonly client: DynamoDBDocumentClient,
+    private readonly tableName: string,
     private readonly clock: () => number = Date.now,
   ) {
-    this.queries = new DynamoDBIndexingLedgerQueries(client, tableName);
+    if (!tableName.trim()) {
+      throw new Error("indexing ledger table name must not be empty");
+    }
   }
 
   async claim(
@@ -54,7 +60,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     const token = randomUUID();
 
     try {
-      const item = await this.queries.claim({
+      const item = await claimIndexingEntry(this.client, this.tableName, {
         archiveId,
         snapshotId,
         messageId,
@@ -79,7 +85,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         throw error;
       }
 
-      const item = await this.queries.get(snapshotId);
+      const item = await getIndexingEntry(this.client, this.tableName, snapshotId);
       if (item === undefined) {
         throw error;
       }
@@ -105,7 +111,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     reasonCode?: string,
   ): Promise<void> {
     try {
-      await this.queries.complete({
+      await completeIndexingEntry(this.client, this.tableName, {
         claim,
         outcome,
         reasonCode,
@@ -124,7 +130,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
 
   async release(claim: SnapshotClaim, reason: string): Promise<void> {
     try {
-      await this.queries.release({
+      await releaseIndexingEntry(this.client, this.tableName, {
         claim,
         reason: reason.slice(0, 1000),
         now: this.clock() / 1000,
