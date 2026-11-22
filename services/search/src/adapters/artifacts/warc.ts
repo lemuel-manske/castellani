@@ -1,0 +1,148 @@
+import { createHash } from "node:crypto";
+import { WARCParser } from "warcio";
+import type { CapturedPage } from "../../domain/content.js";
+import type {
+  ArtifactObjectReader,
+  ArtifactReference,
+  CapturedPageReader,
+  CapturedPageReference,
+} from "../../ports/artifacts.js";
+
+class ArtifactIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArtifactIntegrityError";
+  }
+}
+
+class CapturedResponseNotFoundError extends Error {
+  constructor(snapshotId: string, targetUrl: string) {
+    super(`no WARC response found for snapshot ${snapshotId} at ${targetUrl}`);
+    this.name = "CapturedResponseNotFoundError";
+  }
+}
+
+async function* verifiedChunks(
+  body: AsyncIterable<Uint8Array>,
+  reference: ArtifactReference,
+): AsyncGenerator<Uint8Array> {
+  const digest = createHash("sha256");
+  let sizeBytes = 0;
+
+  for await (const chunk of body) {
+    digest.update(chunk);
+    sizeBytes += chunk.byteLength;
+    yield chunk;
+  }
+
+  if (sizeBytes !== reference.sizeBytes) {
+    throw new ArtifactIntegrityError(
+      `artifact size mismatch for ${reference.bucket}/${reference.key}`,
+    );
+  }
+
+  if (digest.digest("hex") !== reference.sha256) {
+    throw new ArtifactIntegrityError(
+      `artifact checksum mismatch for ${reference.bucket}/${reference.key}`,
+    );
+  }
+}
+
+async function drainRecord(record: AsyncIterable<Uint8Array>): Promise<void> {
+  const iterator = record[Symbol.asyncIterator]();
+  let result = await iterator.next();
+
+  while (!result.done) {
+    result = await iterator.next();
+  }
+}
+
+async function readWarcArtifact(
+  reference: ArtifactReference,
+  targetUrl: string,
+  contentType: string | undefined,
+  reader: ArtifactObjectReader,
+): Promise<{ content: string; contentType: string } | null> {
+  const body = await reader.getObject(reference);
+  const parser = new WARCParser(verifiedChunks(body, reference));
+  let capturedResponse: { content: string; contentType: string } | null = null;
+
+  for await (const record of parser) {
+    if (record.warcType !== "response" || record.warcTargetURI !== targetUrl) {
+      await drainRecord(record);
+      continue;
+    }
+
+    const response = record.getResponseInfo();
+
+    if (response === null) {
+      throw new ArtifactIntegrityError(
+        "WARC response record has no HTTP response metadata for " + targetUrl,
+      );
+    }
+
+    capturedResponse = {
+      content: await record.contentText(),
+      contentType:
+        response.headers.get("content-type") ??
+        contentType ??
+        "application/octet-stream",
+    };
+  }
+
+  return capturedResponse;
+}
+
+async function readCapturedPage(
+  page: CapturedPageReference,
+  artifacts: readonly ArtifactReference[],
+  reader: ArtifactObjectReader,
+): Promise<CapturedPage> {
+  const finalUrl = page.finalUrl ?? page.url;
+
+  if (artifacts.length === 0) {
+    throw new ArtifactIntegrityError(
+      `snapshot ${page.snapshotId} has no WARC artifact references`,
+    );
+  }
+
+  for (const artifact of artifacts) {
+    const response = await readWarcArtifact(
+      artifact,
+      finalUrl,
+      page.contentType,
+      reader,
+    );
+
+    if (response === null) {
+      continue;
+    }
+
+    return {
+      archiveId: page.archiveId,
+      snapshotId: page.snapshotId,
+      url: page.url,
+      finalUrl,
+      capturedAt: page.capturedAt,
+      contentType: response.contentType,
+      content: response.content,
+    };
+  }
+
+  throw new CapturedResponseNotFoundError(page.snapshotId, finalUrl);
+}
+
+function createWarcCapturedPageReader(
+  reader: ArtifactObjectReader,
+): CapturedPageReader {
+  return {
+    read: (page, artifacts) => readCapturedPage(page, artifacts, reader),
+  };
+}
+
+export {
+  ArtifactIntegrityError,
+  CapturedResponseNotFoundError,
+  createWarcCapturedPageReader,
+  readCapturedPage,
+};
