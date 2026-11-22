@@ -4,8 +4,8 @@ import type {
   ManifestSnapshot,
   PublicationFacts,
   SnapshotLedgerEntry,
-} from '../domain.js';
-import { isPublicationAuthorized } from './publication.js';
+} from "../domain.js";
+import { isPublicationAuthorized } from "./publication.js";
 
 /** Reconciles the immutable Capture manifest against Search's snapshot ledger. */
 function reconcileManifest(
@@ -16,10 +16,12 @@ function reconcileManifest(
 
   for (const snapshot of manifestSnapshots) {
     if (!snapshot.snapshotId) {
-      throw new Error('manifest contains an empty snapshotId');
+      throw new Error("manifest contains an empty snapshotId");
     }
     if (expected.has(snapshot.snapshotId)) {
-      throw new Error(`manifest contains duplicate snapshotId: ${snapshot.snapshotId}`);
+      throw new Error(
+        "manifest contains duplicate snapshotId: " + snapshot.snapshotId,
+      );
     }
     expected.add(snapshot.snapshotId);
   }
@@ -27,12 +29,12 @@ function reconcileManifest(
   const ledger = new Map<string, IndexingOutcome>();
   for (const entry of ledgerEntries) {
     if (!entry.snapshotId) {
-      throw new Error('ledger contains an empty snapshotId');
+      throw new Error("ledger contains an empty snapshotId");
     }
     const previous = ledger.get(entry.snapshotId);
     if (previous !== undefined && previous !== entry.outcome) {
       throw new Error(
-        `ledger contains conflicting outcomes for snapshotId: ${entry.snapshotId}`,
+        "ledger contains conflicting outcomes for snapshotId: " + entry.snapshotId,
       );
     }
     ledger.set(entry.snapshotId, entry.outcome);
@@ -45,7 +47,7 @@ function reconcileManifest(
     const outcome = ledger.get(snapshotId);
     if (outcome === undefined) {
       missingSnapshotIds.push(snapshotId);
-    } else if (outcome !== 'PENDING') {
+    } else if (outcome !== "PENDING") {
       terminalCount += 1;
     }
   }
@@ -70,7 +72,7 @@ function canExposeSnapshot(
   outcome: IndexingOutcome,
   publication: PublicationFacts,
 ): boolean {
-  if (!snapshotId || outcome !== 'INDEXED' || !isPublicationAuthorized(publication)) {
+  if (!snapshotId || outcome !== "INDEXED" || !isPublicationAuthorized(publication)) {
     return false;
   }
 
