@@ -14,7 +14,9 @@ function createRabbitMqTestSupport() {
     eventsExchange: `search-integration-events-${suffix}`,
     routingKey: "PageCaptured",
     queue: `search-integration-queue-${suffix}`,
-    retryExchange: `search-integration-retry-${suffix}`,\n    retryQueue: `search-integration-retry-queue-${suffix}`,\n    deadLetterExchange: `search-integration-dead-${suffix}`,
+    retryExchange: `search-integration-retry-${suffix}`,
+    retryQueue: `search-integration-retry-queue-${suffix}`,
+    deadLetterExchange: `search-integration-dead-${suffix}`,
     deadLetterQueue: `search-integration-dead-queue-${suffix}`,
   };
 
@@ -60,12 +62,16 @@ function createRabbitMqTestSupport() {
         const cleanup = await connection.createChannel();
 
         try {
-          await cleanup.deleteQueue(topology.queue).catch(() => undefined);\n          await cleanup.deleteQueue(topology.retryQueue).catch(() => undefined);
+          await cleanup.deleteQueue(topology.queue).catch(() => undefined);
+          await cleanup.deleteQueue(topology.retryQueue).catch(() => undefined);
           await cleanup
             .deleteQueue(topology.deadLetterQueue)
             .catch(() => undefined);
           await cleanup
             .deleteExchange(topology.eventsExchange)
+            .catch(() => undefined);
+          await cleanup
+            .deleteExchange(topology.retryExchange)
             .catch(() => undefined);
           await cleanup
             .deleteExchange(topology.deadLetterExchange)
