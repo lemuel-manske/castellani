@@ -418,7 +418,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         "finalUrl": {"S": outcome.capture.final_url},
                         "capturedAt": {"S": captured_at_text},
                         **({"contentType": {"S": outcome.capture.content_type}} if outcome.capture.content_type is not None else {}),
-                        "minDepth": {"N": str(self._task_depth(outcome.archive_id, outcome.url_key))},
+                        "minDepth": {"N": str(depth)},
                         "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
                         "warcArtifacts": {"L": artifacts},
                     },
