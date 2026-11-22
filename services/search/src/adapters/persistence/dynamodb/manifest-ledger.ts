@@ -16,7 +16,9 @@ class DynamoDBManifestLedger implements ManifestLedger {
     if (existing && (existing.manifestDigest !== manifest.manifestDigest || existing.collectionId !== manifest.collectionId)) {
       throw new PublicationConflictError("archive manifest conflicts with the previously recorded manifest");
     }
-    await Promise.all(manifest.snapshotIds.map((id) => putSnapshot(this.client, this.tableName, manifest, id)));
+    for (const snapshotId of manifest.snapshotIds) {
+      await putSnapshot(this.client, this.tableName, manifest, snapshotId);
+    }
     await putMetadata(this.client, this.tableName, manifest);
   }
 

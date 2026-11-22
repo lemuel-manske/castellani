@@ -13,7 +13,8 @@ async function readArtifact(reader: ArtifactObjectReader, reference: ArtifactRef
 }
 function parseManifest(data: Buffer, event: CrawlCompletedEvent): ManifestDocument {
   const digest = createHash("sha256").update(data).digest("hex");
-  if (digest !== event.manifestDigest || digest !== event.manifest.sha256) throw new Error("archive manifest digest does not match its immutable reference");
+  const expectedDigest = event.manifestDigest.replace(/^sha256:/, "");
+  if (digest !== expectedDigest || digest !== event.manifest.sha256) throw new Error("archive manifest digest does not match its immutable reference");
   const manifest: unknown = JSON.parse(data.toString("utf8"));
   if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest) ||
     !("schemaVersion" in manifest) || manifest.schemaVersion !== 1 ||
