@@ -5,6 +5,7 @@ from .alloc import (
     new_reservation_id,
 )
 from .capture import CaptureOutcome, PageCapture
+from .discovery import DiscoveredPage, identify_discovered_pages
 from .outbox import OutboxMessage, OutboxRepository
 from .task import (
     InvalidTaskClaimRenewal,
@@ -19,6 +20,7 @@ __all__ = [
     "CaptureAllocator",
     "CaptureOutcome",
     "CaptureReservation",
+    "DiscoveredPage",
     "InvalidReservationRenewal",
     "InvalidTaskClaimRenewal",
     "InvalidURLIdentity",
@@ -29,6 +31,7 @@ __all__ = [
     "TaskClaim",
     "TaskRepository",
     "URLIdentity",
+    "identify_discovered_pages",
     "identify_url",
     "new_attempt_id",
     "new_reservation_id",
