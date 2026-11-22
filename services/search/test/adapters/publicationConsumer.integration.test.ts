@@ -77,6 +77,7 @@ it("recovers missing PageCaptured indexing from the immutable manifest", async (
   const fixture = createCapturedPageFixture("recovered-manifest-snapshot", {
     bucket: s3.bucketName,
   });
+
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
   const manifest = {
@@ -105,6 +106,7 @@ it("recovers missing PageCaptured indexing from the immutable manifest", async (
     .update(manifestBytes)
     .digest("hex");
   const manifestKey = "archives/manifest-recovery-archive/manifest.json";
+
   await s3.putObject(manifestBytes, manifestKey);
 
   const event = {
