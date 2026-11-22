@@ -1,6 +1,9 @@
+import Ajv, { type AnySchema } from "ajv";
 import type { Channel, ConsumeMessage } from "amqplib";
 import type { ArtifactReference } from "../../../ports/artifacts.js";
 import type { PageCapturedEvent } from "../../../application/processPageCaptured.js";
+
+const EXPECTED_VERSION = 1;
 
 const EVENTS_EXCHANGE = "castellani.events";
 const PAGE_CAPTURED_ROUTING_KEY = "PageCaptured";
@@ -24,6 +27,70 @@ const DEFAULT_TOPOLOGY: PageCapturedConsumerTopology = {
   deadLetterQueue: DEAD_LETTER_QUEUE,
 };
 
+const PAGE_CAPTURED_SCHEMA: AnySchema = {
+  type: "object",
+  required: [
+    "messageId",
+    "correlationId",
+    "type",
+    "version",
+    "occurredAt",
+    "payload",
+  ],
+  properties: {
+    messageId: { type: "string", minLength: 1 },
+    correlationId: { type: "string", minLength: 1 },
+    type: { const: "PageCaptured" },
+    version: { const: EXPECTED_VERSION },
+    occurredAt: { type: "string", minLength: 1 },
+    payload: {
+      type: "object",
+      required: [
+        "archiveId",
+        "snapshotId",
+        "urlKey",
+        "url",
+        "finalUrl",
+        "redirectChain",
+        "capturedAt",
+        "warcArtifacts",
+      ],
+      properties: {
+        archiveId: { type: "string", minLength: 1 },
+        snapshotId: { type: "string", minLength: 1 },
+        urlKey: { type: "string", minLength: 1 },
+        url: { type: "string", minLength: 1 },
+        finalUrl: { type: "string", minLength: 1 },
+        redirectChain: {
+          type: "array",
+          items: { type: "string", minLength: 1 },
+        },
+        capturedAt: { type: "string", minLength: 1 },
+        contentType: { type: "string" },
+        warcArtifacts: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["bucket", "key", "sha256", "sizeBytes"],
+            properties: {
+              bucket: { type: "string", minLength: 1 },
+              key: { type: "string", minLength: 1 },
+              sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+              sizeBytes: { type: "integer", minimum: 0 },
+              versionId: { type: "string", minLength: 1 },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const validatePageCaptured = new Ajv({ allErrors: true }).compile<PageCapturedEvent>(
+  PAGE_CAPTURED_SCHEMA,
+);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -37,93 +104,15 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     return null;
   }
 
-  if (!isRecord(value)) {
+  if (!validatePageCaptured(value)) {
     return null;
   }
 
-  if (
-    typeof value.messageId !== "string" ||
-    !value.messageId ||
-    typeof value.correlationId !== "string" ||
-    !value.correlationId ||
-    value.type !== "PageCaptured" ||
-    value.version !== 1 ||
-    typeof value.occurredAt !== "string" ||
-    !value.occurredAt ||
-    !isRecord(value.payload)
-  ) {
+  if (value.payload.archiveId !== value.correlationId) {
     return null;
   }
 
-  const payload = value.payload;
-  const artifacts = payload.warcArtifacts;
-  const redirectChain = payload.redirectChain;
-
-  if (
-    typeof payload.archiveId !== "string" ||
-    !payload.archiveId ||
-    payload.archiveId !== value.correlationId ||
-    typeof payload.snapshotId !== "string" ||
-    !payload.snapshotId ||
-    typeof payload.urlKey !== "string" ||
-    !payload.urlKey ||
-    typeof payload.url !== "string" ||
-    !payload.url ||
-    typeof payload.finalUrl !== "string" ||
-    !payload.finalUrl ||
-    typeof payload.capturedAt !== "string" ||
-    !payload.capturedAt ||
-    !Array.isArray(redirectChain) ||
-    !redirectChain.every(
-      (url: unknown) => typeof url === "string" && url.length > 0,
-    ) ||
-    !Array.isArray(artifacts) ||
-    artifacts.length === 0 ||
-    (payload.contentType !== undefined &&
-      typeof payload.contentType !== "string")
-  ) {
-    return null;
-  }
-
-  const validArtifacts = artifacts.every(
-    (artifact: unknown) =>
-      isRecord(artifact) &&
-      typeof artifact.bucket === "string" &&
-      artifact.bucket.length > 0 &&
-      typeof artifact.key === "string" &&
-      artifact.key.length > 0 &&
-      typeof artifact.sha256 === "string" &&
-      /^[a-f0-9]{64}$/.test(artifact.sha256) &&
-      (artifact.versionId === undefined ||
-        (typeof artifact.versionId === "string" &&
-          artifact.versionId.length > 0)) &&
-      typeof artifact.sizeBytes === "number" &&
-      Number.isSafeInteger(artifact.sizeBytes) &&
-      artifact.sizeBytes >= 0,
-  );
-
-  if (!validArtifacts) {
-    return null;
-  }
-
-  return {
-    messageId: value.messageId,
-    correlationId: value.correlationId,
-    occurredAt: value.occurredAt,
-    payload: {
-      archiveId: payload.archiveId,
-      snapshotId: payload.snapshotId,
-      urlKey: payload.urlKey,
-      url: payload.url,
-      finalUrl: payload.finalUrl,
-      redirectChain: redirectChain as string[],
-      capturedAt: payload.capturedAt,
-      ...(typeof payload.contentType === "string"
-        ? { contentType: payload.contentType }
-        : {}),
-      warcArtifacts: artifacts as ArtifactReference[],
-    },
-  };
+  return value;
 }
 
 async function handlePageCapturedMessage(
@@ -192,6 +181,7 @@ export {
   DEAD_LETTER_EXCHANGE,
   DEAD_LETTER_QUEUE,
   EVENTS_EXCHANGE,
+  EXPECTED_VERSION,
   PAGE_CAPTURED_QUEUE,
   PAGE_CAPTURED_ROUTING_KEY,
   parsePageCaptured,
