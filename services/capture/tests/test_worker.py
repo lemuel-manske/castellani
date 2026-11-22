@@ -117,7 +117,9 @@ async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
     worker = new_worker(dynamodb, LocalArtifactStore(tmp_path), UnexpectedExecutor())
 
     assert await worker("archive-1", "url-1")
-    assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
+    task = frontier_item(dynamodb)
+    assert task["state"] == {"S": "PENDING"}
+    assert task["attemptCount"] == {"N": "0"}
     assert len(outbox_items(dynamodb)) == 1
 
 
