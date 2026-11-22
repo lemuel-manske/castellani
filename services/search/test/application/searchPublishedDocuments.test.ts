@@ -46,7 +46,7 @@ const unpublishedFacts: PublicationFacts = {
 it("filters uncommitted documents and continues paging until the requested result count is reached", async () => {
   const search = vi
     .fn()
-      .mockResolvedValueOnce({
+    .mockResolvedValueOnce({
         candidates: [
           {
             document: document("unpublished-archive", "staged-snapshot"),
@@ -120,7 +120,7 @@ it("filters uncommitted documents and continues paging until the requested resul
 
 it("fails closed when publication authorization cannot be read", async () => {
   const search = vi.fn().mockResolvedValue({
-      candidates: [
+    candidates: [
         {
           document: document(
             "unavailable-ledger-archive",
@@ -131,8 +131,8 @@ it("fails closed when publication authorization cannot be read", async () => {
           cursor: "cursor",
         },
       ],
-      nextCursor: null,
-    });
+    nextCursor: null,
+  });
   const reader: SearchDocumentReader = { search };
   const publicationLedger: PublicationLedger = {
     get: vi.fn().mockRejectedValue(new Error("DynamoDB unavailable")),
