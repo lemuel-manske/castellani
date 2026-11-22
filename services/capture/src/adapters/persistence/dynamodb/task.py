@@ -958,7 +958,8 @@ class DynamoDBTaskRepository(TaskRepository):
             claim = claim_from_item(archive_id, url_key, item)
 
             if existing is None or not self._is_release_message(existing, claim):
-                raise RuntimeError("CapturePage lease-recheck message identity collision") from error
+                message = "CapturePage lease-recheck message identity collision"
+                raise RuntimeError(message) from error
 
     def _fail_expired_claim(
         self,
