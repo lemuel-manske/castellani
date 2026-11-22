@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { IndexingOutcome } from "../domain.js";
 import type {
   ArtifactObjectReader,
   ArtifactReference,
@@ -31,12 +30,6 @@ interface ManifestDocument {
   collectionId?: string;
   createdAt: string;
   snapshots: ManifestSnapshot[];
-}
-
-interface CrawlCompletedResult {
-  indexed: number;
-  terminal: number;
-  busy: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -140,7 +133,7 @@ async function processCrawlCompleted(
   reader: ArtifactObjectReader,
   manifestLedger: ManifestLedger,
   indexing: ProcessPageCapturedDependencies,
-): Promise<CrawlCompletedResult> {
+): Promise<void> {
   const data = await readArtifact(reader, event.manifest);
   const manifest = parseManifest(data, event);
 
@@ -150,8 +143,6 @@ async function processCrawlCompleted(
     collectionId: manifest.collectionId ?? "",
     snapshotIds: manifest.snapshots.map(({ snapshotId }) => snapshotId),
   });
-
-  const outcomes: IndexingOutcome[] = [];
 
   for (const snapshot of manifest.snapshots) {
     const result = await processPageCaptured(
@@ -177,26 +168,9 @@ async function processCrawlCompleted(
       indexing,
     );
 
-    outcomes.push(
-      result.status === "BUSY"
-        ? "PROCESSING"
-        : result.status === "COMPLETED" || result.status === "DUPLICATE"
-          ? result.outcome
-          : "PENDING",
-    );
   }
 
-  return {
-    indexed: outcomes.filter((outcome) => outcome === "INDEXED").length,
-    terminal: outcomes.filter(
-      (outcome) =>
-        outcome === "INDEXED" ||
-        outcome === "UNSUPPORTED" ||
-        outcome === "FAILED",
-    ).length,
-    busy: outcomes.filter((outcome) => outcome === "PROCESSING").length,
-  };
 }
 
 export { processCrawlCompleted };
-export type { CrawlCompletedEvent, CrawlCompletedResult };
+export type { CrawlCompletedEvent };
