@@ -1,0 +1,171 @@
+import type { Client } from "@opensearch-project/opensearch";
+import type { SearchDocument } from "../../domain/content.js";
+import type {
+  SearchDocumentCandidate,
+  SearchDocumentPage,
+  SearchDocumentReader,
+  SearchQuery,
+} from "../../ports/search-reader.js";
+
+interface SearchHit {
+  _source?: SearchDocument;
+  _score?: number | null;
+  sort?: unknown[];
+  highlight?: {
+    title?: string[];
+    text?: string[];
+    description?: string[];
+  };
+}
+
+interface SearchResponse {
+  hits?: {
+    hits?: SearchHit[];
+  };
+}
+
+function decodeCursor(cursor: string | undefined): unknown[] | undefined {
+  if (cursor === undefined) {
+    return undefined;
+  }
+
+  try {
+    const value: unknown = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    );
+
+    if (
+      !Array.isArray(value) ||
+      value.length !== 3 ||
+      typeof value[0] !== "number" ||
+      (typeof value[1] !== "string" && typeof value[1] !== "number") ||
+      typeof value[2] !== "string"
+    ) {
+      throw new Error("invalid search cursor");
+    }
+
+    return value;
+  } catch {
+    throw new Error("invalid search cursor");
+  }
+}
+
+function encodeCursor(sort: unknown[] | undefined): string {
+  if (!sort || sort.length !== 3) {
+    throw new Error("OpenSearch returned a hit without pagination sort values");
+  }
+
+  return Buffer.from(JSON.stringify(sort)).toString("base64url");
+}
+
+function snippetFromHit(hit: SearchHit, document: SearchDocument): string {
+  const fragment =
+    hit.highlight?.text?.[0] ||
+    hit.highlight?.title?.[0] ||
+    hit.highlight?.description?.[0] ||
+    document.description ||
+    document.text.slice(0, 240);
+
+  return fragment.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function createOpenSearchDocumentReader(
+  client: Client,
+  indexName: string,
+): SearchDocumentReader {
+  if (!indexName.trim()) {
+    throw new Error("OpenSearch index name must not be empty");
+  }
+
+  return {
+    async search(
+      query: SearchQuery,
+      limit: number,
+      cursor?: string,
+    ): Promise<SearchDocumentPage> {
+      const filters = [
+        ...(query.archiveId === undefined
+          ? []
+          : [{ term: { archiveId: query.archiveId } }]),
+        ...(query.snapshotId === undefined
+          ? []
+          : [{ term: { snapshotId: query.snapshotId } }]),
+        ...(query.capturedFrom === undefined && query.capturedTo === undefined
+          ? []
+          : [
+              {
+                range: {
+                  capturedAt: {
+                    ...(query.capturedFrom === undefined
+                      ? {}
+                      : { gte: query.capturedFrom }),
+                    ...(query.capturedTo === undefined
+                      ? {}
+                      : { lte: query.capturedTo }),
+                  },
+                },
+              },
+            ]),
+      ];
+      const response = (await client.search({
+        index: indexName,
+        body: {
+          size: limit,
+          query: {
+            bool: {
+              must: [
+                {
+                  multi_match: {
+                    query: query.text,
+                    fields: ["title^4", "description^2", "text"],
+                    type: "best_fields",
+                  },
+                },
+              ],
+              filter: filters,
+            },
+          },
+          sort: [
+            { _score: "desc" },
+            { capturedAt: "desc" },
+            { snapshotId: "asc" },
+          ],
+          ...(cursor === undefined
+            ? {}
+            : { search_after: decodeCursor(cursor) }),
+          highlight: {
+            fields: {
+              title: { number_of_fragments: 1, fragment_size: 160 },
+              description: { number_of_fragments: 1, fragment_size: 200 },
+              text: { number_of_fragments: 1, fragment_size: 240 },
+            },
+          },
+        },
+      })) as unknown as { body: SearchResponse };
+
+      const hits = response.body.hits?.hits ?? [];
+      const candidates: SearchDocumentCandidate[] = hits.flatMap((hit) => {
+        if (!hit._source) {
+          return [];
+        }
+
+        return [
+          {
+            document: hit._source,
+            score: hit._score ?? 0,
+            snippet: snippetFromHit(hit, hit._source),
+            cursor: encodeCursor(hit.sort),
+          },
+        ];
+      });
+      const nextCursor =
+        hits.length === limit && hits.length > 0
+          ? encodeCursor(hits[hits.length - 1]?.sort)
+          : null;
+
+      return { candidates, nextCursor };
+    },
+  };
+}
+
+export { createOpenSearchDocumentReader };

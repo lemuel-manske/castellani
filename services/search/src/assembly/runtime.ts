@@ -16,6 +16,7 @@ import {
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import { processPublicationEvent } from "../application/processPublicationEvent.js";
 import type { PublicationEvent } from "../application/processPublicationEvent.js";
+import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type { SearchSettings } from "./config.js";
 
 function isSignalAborted(signal: AbortSignal): boolean {
@@ -137,7 +138,7 @@ class SearchRuntime {
 
   private async runConsumer(
     dependencies: Parameters<typeof processPageCaptured>[1] & {
-      publicationLedger: DynamoDBPublicationLedger;
+      publicationLedger: PublicationLedger;
     },
     signal: AbortSignal,
   ): Promise<void> {

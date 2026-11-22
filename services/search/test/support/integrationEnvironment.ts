@@ -1,6 +1,7 @@
 import { afterAll, beforeAll } from "vitest";
 import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
+import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
 import {
   SEARCH_DYNAMODB_ENDPOINT_URL,
   createDynamoDbTestSupport,
@@ -21,6 +22,7 @@ const deliveries: PageCapturedEvent[] = [];
 const deliveryWaiters: ((event: PageCapturedEvent) => void)[] = [];
 const publicationDeliveries: PublicationEvent[] = [];
 const publicationDeliveryWaiters: ((event: PublicationEvent) => void)[] = [];
+let publicationLedgerReady = false;
 
 function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
   const waiter = deliveryWaiters.shift();
@@ -34,7 +36,11 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
   return Promise.resolve();
 }
 
-function receivePublicationEvent(event: PublicationEvent): Promise<void> {
+async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
+  if (publicationLedgerReady) {
+    await processPublicationEvent(event, dynamodb.publicationLedger);
+  }
+
   const waiter = publicationDeliveryWaiters.shift();
 
   if (waiter) {
@@ -42,8 +48,6 @@ function receivePublicationEvent(event: PublicationEvent): Promise<void> {
   } else {
     publicationDeliveries.push(event);
   }
-
-  return Promise.resolve();
 }
 
 function nextPageCaptured(): Promise<PageCapturedEvent> {
@@ -109,6 +113,7 @@ function setupIntegrationEnvironment(
 
     for (const service of selected) {
       await integrations[service].setup();
+      publicationLedgerReady ||= service === "dynamodb";
     }
   });
 
@@ -118,6 +123,7 @@ function setupIntegrationEnvironment(
         .reverse()
         .map((service) => integrations[service].teardown()),
     );
+    publicationLedgerReady = false;
   });
 }
 

@@ -1,33 +1,57 @@
 import { expect, it } from "vitest";
 import {
+  dynamodb,
   nextPublicationEvent,
   rabbitmq,
   setupIntegrationEnvironment,
 } from "../support/integrationEnvironment.js";
+import { isPublicationAuthorized } from "../../src/domain/publication.js";
 
-setupIntegrationEnvironment("rabbitmq");
+setupIntegrationEnvironment(["dynamodb", "rabbitmq"]);
 
-it("consumes publication decisions and replay acknowledgements from the events exchange", async () => {
-  const event = {
+it("persists publication decisions and replay acknowledgements delivered through RabbitMQ", async () => {
+  const identity = {
+    archiveId: "rabbitmq-publication-archive",
+    decisionVersion: 3,
+    packageDigest: "sha256:rabbitmq-package",
+  };
+  const publicationDecision = {
     messageId: "publication-event-message",
-    correlationId: "publication-event-archive",
+    correlationId: identity.archiveId,
     type: "ArchivePublicationDecided",
     version: 1,
     occurredAt: "2026-11-22T12:00:00.000Z",
-    payload: {
-      archiveId: "publication-event-archive",
-      decisionVersion: 3,
-      packageDigest: "sha256:package",
-    },
+    payload: identity,
   };
-  const delivered = nextPublicationEvent();
+  const replayPublished = {
+    ...publicationDecision,
+    messageId: "replay-published-event-message",
+    type: "ArchivePublished",
+  };
+  const decisionDelivery = nextPublicationEvent();
 
-  await rabbitmq.publishPublication(event, event.type);
+  await rabbitmq.publishPublication(
+    publicationDecision,
+    publicationDecision.type,
+  );
 
-  await expect(delivered).resolves.toEqual({
+  await expect(decisionDelivery).resolves.toEqual({
     type: "ArchivePublicationDecided",
-    payload: event.payload,
+    payload: identity,
   });
+
+  const replayDelivery = nextPublicationEvent();
+
+  await rabbitmq.publishPublication(replayPublished, replayPublished.type);
+
+  await expect(replayDelivery).resolves.toEqual({
+    type: "ArchivePublished",
+    payload: identity,
+  });
+
+  const facts = await dynamodb.publicationLedger.get(identity.archiveId);
+
+  expect(isPublicationAuthorized(facts)).toBe(true);
 });
 
 it("dead-letters malformed publication event envelopes", async () => {
