@@ -69,6 +69,8 @@ class DynamoDBTaskRepository(TaskRepository):
         clock: Callable[[], float] = time.time,
         outbox_table_name: str = "capture_outbox",
         snapshots_table_name: str = "capture_snapshots",
+        max_attempts: int = 3,
+        retry_base_delay: float = 30,
     ) -> None:
         if not frontier_table_name:
             raise ValueError("frontier_table_name must not be empty")
@@ -85,12 +87,20 @@ class DynamoDBTaskRepository(TaskRepository):
         if lease_duration <= 0:
             raise ValueError("lease_duration must be positive")
 
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+
+        if retry_base_delay <= 0:
+            raise ValueError("retry_base_delay must be positive")
+
         self.client = client
         self.frontier_table_name = frontier_table_name
         self.runs_table_name = runs_table_name
         self.snapshots_table_name = snapshots_table_name
         self.outbox_table_name = outbox_table_name
         self.lease_duration = lease_duration
+        self.max_attempts = max_attempts
+        self.retry_base_delay = retry_base_delay
 
         self.clock = clock
 
@@ -493,70 +503,191 @@ class DynamoDBTaskRepository(TaskRepository):
         return int(item.get("depth", {}).get("N", "0"))
 
     def _fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
-        self._finish(
-            archive_id=claim.task.archive_id,
-            url_key=claim.task.url_key,
-            attempt_id=claim.attempt_id,
-            fence=claim.fence,
-            state="FAILED",
-            reason_code=reason_code,
-            message=message,
+        now = self.clock()
+        archive_id = claim.task.archive_id
+        url_key = claim.task.url_key
+        item = self._read_frontier(archive_id, url_key)
+
+        if item is None:
+            raise TaskClaimLostError("page-task claim is no longer owned")
+
+        previous_failure_count = int(item.get("failureCount", {}).get("N", "0"))
+        failure_count = previous_failure_count + 1
+        retry = failure_count < self.max_attempts
+        retry_at = now + self.retry_base_delay * (2 ** (failure_count - 1))
+        message_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                f"capture-page-retry:{archive_id}:{url_key}:{claim.attempt_id}:{claim.fence}",
+            )
         )
 
-    def _finish(
-        self,
-        archive_id: str,
-        url_key: str,
-        attempt_id: str,
-        fence: int,
-        state: str,
-        reason_code: str | None = None,
-        message: str | None = None,
-    ) -> None:
+        # A retry of the same failure request must not enqueue another logical attempt.
+        if (
+            item.get("lastFailureAttemptId", {}).get("S") == claim.attempt_id
+            and item.get("lastFailureFence", {}).get("N") == str(claim.fence)
+        ):
+            if item.get("state", {}).get("S") == "FAILED":
+                return
+            existing = self._read_outbox(message_id)
+            if existing is not None and self._is_retry_message(existing, claim):
+                return
+
+        if (
+            item.get("state", {}).get("S") != "CLAIMED"
+            or item.get("attemptId", {}).get("S") != claim.attempt_id
+            or item.get("fence", {}).get("N") != str(claim.fence)
+            or float(item.get("leaseUntil", {}).get("N", "0")) <= now
+        ):
+            raise TaskClaimLostError("page-task claim is no longer owned")
+
         names = {
             "#state": "state",
             "#attempt": "attemptId",
             "#fence": "fence",
             "#lease": "leaseUntil",
+            "#failure_count": "failureCount",
+            "#reason": "failureReason",
+            "#message": "failureMessage",
+            "#last_attempt": "lastFailureAttemptId",
+            "#last_fence": "lastFailureFence",
+            "#next_attempt": "nextAttemptAt",
         }
         values: dict[str, Any] = {
             ":claimed": {"S": "CLAIMED"},
-            ":attempt": {"S": attempt_id},
-            ":fence": {"N": str(fence)},
-            ":state": {"S": state},
-            ":now": {"N": str(self.clock())},
+            ":attempt": {"S": claim.attempt_id},
+            ":fence": {"N": str(claim.fence)},
+            ":now": {"N": str(now)},
+            ":previous": {"N": str(previous_failure_count)},
+            ":failure_count": {"N": str(failure_count)},
+            ":reason": {"S": reason_code},
+            ":message": {"S": message},
+            ":last_attempt": {"S": claim.attempt_id},
+            ":last_fence": {"N": str(claim.fence)},
         }
-        update = "SET #state = :state REMOVE #attempt, #lease"
 
-        if reason_code is not None and message is not None:
-            names.update({"#reason": "failureReason", "#message": "failureMessage"})
-            values.update(
+        update = (
+            "SET #state = :state, #failure_count = :failure_count, "
+            "#reason = :reason, #message = :message, "
+            "#last_attempt = :last_attempt, #last_fence = :last_fence "
+            "REMOVE #attempt, #lease, #next_attempt"
+        )
+        values[":state"] = {"S": "FAILED"}
+
+        if retry:
+            update = (
+                "SET #state = :pending, #failure_count = :failure_count, "
+                "#reason = :reason, #message = :message, "
+                "#last_attempt = :last_attempt, #last_fence = :last_fence, "
+                "#next_attempt = :retry_at "
+                "REMOVE #attempt, #lease"
+            )
+            names["#pending"] = "state"
+            values[":pending"] = {"S": "PENDING"}
+            values[":retry_at"] = {"N": str(retry_at)}
+
+        frontier_update = {
+            "Update": {
+                "TableName": self.frontier_table_name,
+                "Key": {
+                    "archiveId": {"S": archive_id},
+                    "urlKey": {"S": url_key},
+                },
+                "UpdateExpression": update,
+                "ConditionExpression": (
+                    "#state = :claimed AND #attempt = :attempt "
+                    "AND #fence = :fence AND #lease > :now "
+                    "AND (attribute_not_exists(#failure_count) OR #failure_count = :previous)"
+                ),
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
+            }
+        }
+
+        transaction = [frontier_update]
+
+        if retry:
+            occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
+            transaction.append(
                 {
-                    ":reason": {"S": reason_code},
-                    ":message": {"S": message},
+                    "Put": {
+                        "TableName": self.outbox_table_name,
+                        "Item": {
+                            "messageId": {"S": message_id},
+                            "correlationId": {"S": archive_id},
+                            "type": {"S": "CapturePage"},
+                            "version": {"N": "1"},
+                            "occurredAt": {"S": occurred_at},
+                            "payload": {
+                                "M": {
+                                    "archiveId": {"S": archive_id},
+                                    "urlKey": {"S": url_key},
+                                    "retryOfAttemptId": {"S": claim.attempt_id},
+                                    "retryOfFence": {"N": str(claim.fence)},
+                                }
+                            },
+                            "status": {"S": "PENDING"},
+                            "attempts": {"N": "0"},
+                            "nextAttemptAt": {"N": str(retry_at)},
+                        },
+                        "ConditionExpression": "attribute_not_exists(#message_id)",
+                        "ExpressionAttributeNames": {"#message_id": "messageId"},
+                    }
                 }
             )
-            update = (
-                "SET #state = :state, #reason = :reason, #message = :message "
-                "REMOVE #attempt, #lease"
+        else:
+            transaction.append(
+                {
+                    "Update": {
+                        "TableName": self.runs_table_name,
+                        "Key": {"archiveId": {"S": archive_id}},
+                        "UpdateExpression": "ADD #outstanding :minus_one, #failed :one",
+                        "ConditionExpression": "#admission = :open AND #outstanding >= :one",
+                        "ExpressionAttributeNames": {
+                            "#admission": "admission",
+                            "#outstanding": "outstandingPages",
+                            "#failed": "failedPages",
+                        },
+                        "ExpressionAttributeValues": {
+                            ":open": {"S": "OPEN"},
+                            ":minus_one": {"N": "-1"},
+                            ":one": {"N": "1"},
+                        },
+                    }
+                }
             )
 
         try:
-            self.client.update_item(
-                TableName=self.frontier_table_name,
-                Key={"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
-                UpdateExpression=update,
-                ConditionExpression=(
-                    "#state = :claimed AND #attempt = :attempt "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
-                ExpressionAttributeNames=names,
-                ExpressionAttributeValues=values,
+            self._transact(transaction, None)
+        except ConditionalWriteRejected as error:
+            current = self._read_frontier(archive_id, url_key)
+            same_failure = (
+                current is not None
+                and current.get("lastFailureAttemptId", {}).get("S") == claim.attempt_id
+                and current.get("lastFailureFence", {}).get("N") == str(claim.fence)
             )
-        except ClientError as error:
-            if is_conditional_failure(error) or is_transaction_canceled(error):
-                raise TaskClaimLostError("page-task claim is no longer owned") from error
-            raise
+
+            if same_failure and current.get("state", {}).get("S") == "FAILED":
+                return
+
+            if same_failure and current.get("state", {}).get("S") == "PENDING":
+                existing = self._read_outbox(message_id)
+                if existing is not None and self._is_retry_message(existing, claim):
+                    return
+
+            raise TaskClaimLostError("page-task claim is no longer owned") from error
+
+    @staticmethod
+    def _is_retry_message(item: dict[str, Any], claim: TaskClaim) -> bool:
+        payload = item.get("payload", {}).get("M", {})
+        return (
+            item.get("correlationId", {}).get("S") == claim.task.archive_id
+            and item.get("type", {}).get("S") == "CapturePage"
+            and payload.get("archiveId", {}).get("S") == claim.task.archive_id
+            and payload.get("urlKey", {}).get("S") == claim.task.url_key
+            and payload.get("retryOfAttemptId", {}).get("S") == claim.attempt_id
+            and payload.get("retryOfFence", {}).get("N") == str(claim.fence)
+        )
 
     def _release(self, claim: TaskClaim) -> None:
         now = self.clock()
@@ -690,16 +821,20 @@ class DynamoDBTaskRepository(TaskRepository):
                     },
                     "UpdateExpression": (
                         "SET #state = :claimed, #attempt = :attempt, "
-                        "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one"
+                        "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one "
+                        "REMOVE #next_attempt"
                     ),
                     "ConditionExpression": (
-                        "#state = :pending OR (#state = :claimed AND #lease <= :now)"
+                        "(#state = :pending AND "
+                        "(attribute_not_exists(#next_attempt) OR #next_attempt <= :now)) "
+                        "OR (#state = :claimed AND #lease <= :now)"
                     ),
                     "ExpressionAttributeNames": {
                         "#state": "state",
                         "#attempt": "attemptId",
                         "#lease": "leaseUntil",
                         "#fence": "fence",
+                        "#next_attempt": "nextAttemptAt",
                     },
                     "ExpressionAttributeValues": {
                         ":pending": {"S": "PENDING"},
