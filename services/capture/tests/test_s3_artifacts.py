@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import pytest
 
 from adapters.artifacts.s3 import S3ArtifactStore
