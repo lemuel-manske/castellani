@@ -8,6 +8,8 @@ class CaptureSettings:
 
     aws_region: str = "us-east-1"
     dynamodb_endpoint_url: str | None = None
+    s3_endpoint_url: str | None = None
+    artifact_bucket: str = "castellani-archive-artifacts"
     rabbitmq_url: str = "amqp://castellani:local-development-only@localhost:5672/"
     frontier_table_name: str = "capture_frontier"
     runs_table_name: str = "capture_runs"
@@ -25,6 +27,8 @@ class CaptureSettings:
         return cls(
             aws_region=os.getenv("AWS_REGION", "us-east-1"),
             dynamodb_endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL") or None,
+            s3_endpoint_url=os.getenv("S3_ENDPOINT_URL") or os.getenv("AWS_ENDPOINT_URL_S3") or None,
+            artifact_bucket=os.getenv("CAPTURE_ARTIFACT_BUCKET", "castellani-archive-artifacts"),
             rabbitmq_url=os.getenv(
                 "RABBITMQ_URL",
                 "amqp://castellani:local-development-only@localhost:5672/",
