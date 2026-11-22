@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,30 @@ class PageCapture:
 
 
 @dataclass(frozen=True)
+class ArtifactReference:
+    """Immutable reference to a persisted capture artifact."""
+
+    bucket: str
+    key: str
+    sha256: str
+    size_bytes: int
+    version_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.bucket or not self.key:
+            raise ValueError("artifact bucket and key must not be empty")
+        if len(self.sha256) != 64 or any(char not in "0123456789abcdef" for char in self.sha256):
+            raise ValueError("artifact sha256 must be a lowercase hexadecimal digest")
+        if self.size_bytes < 0:
+            raise ValueError("artifact size_bytes must not be negative")
+
+
+def new_snapshot_id() -> str:
+    """Create the immutable identity of one successfully captured page snapshot."""
+    return str(uuid4())
+
+
+@dataclass(frozen=True)
 class CaptureOutcome:
     """A successful page capture tied to the fenced task attempt that produced it."""
 
@@ -31,7 +56,9 @@ class CaptureOutcome:
     url_key: str
     attempt_id: str
     fence: int
+    snapshot_id: str
     capture: PageCapture
+    warc_artifacts: tuple[ArtifactReference, ...]
 
     def __post_init__(self) -> None:
         if not self.archive_id:
@@ -45,3 +72,9 @@ class CaptureOutcome:
 
         if self.fence < 1:
             raise ValueError("fence must be positive")
+
+        if not self.snapshot_id:
+            raise ValueError("snapshot_id must not be empty")
+
+        if not self.warc_artifacts:
+            raise ValueError("a successful capture must contain at least one WARC artifact")
