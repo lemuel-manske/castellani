@@ -39,7 +39,11 @@ class LocalArtifactStore(ArtifactStore):
             relative = resolved.relative_to(directory.resolve(strict=True))
             if not resolved.is_file():
                 raise ValueError(f"capture artifact is not a regular file: {path}")
-            digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+            digest_builder = hashlib.sha256()
+            with resolved.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest_builder.update(chunk)
+            digest = digest_builder.hexdigest()
             references.append(
                 ArtifactReference(
                     bucket="local",
