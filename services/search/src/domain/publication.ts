@@ -2,7 +2,7 @@ import type {
   CompensationDecision,
   PublicationFacts,
   PublicationIdentity,
-} from '../domain.js';
+} from "../domain.js";
 
 const emptyPublicationFacts = (): PublicationFacts => ({
   publicationDecision: null,
@@ -13,7 +13,7 @@ const emptyPublicationFacts = (): PublicationFacts => ({
 class PublicationConflictError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'PublicationConflictError';
+    this.name = "PublicationConflictError";
   }
 }
 
@@ -32,7 +32,7 @@ function validateIdentity(identity: PublicationIdentity): void {
     !Number.isSafeInteger(identity.decisionVersion) ||
     identity.decisionVersion < 1
   ) {
-    throw new PublicationConflictError('invalid publication identity');
+    throw new PublicationConflictError("invalid publication identity");
   }
 }
 
@@ -44,16 +44,16 @@ function recordPublicationDecision(
   validateIdentity(identity);
 
   if (facts.compensationDecision !== null) {
-    throw new PublicationConflictError('a compensated archive cannot be published');
+    throw new PublicationConflictError("a compensated archive cannot be published");
   }
   if (facts.replayPublication && !sameIdentity(facts.replayPublication, identity)) {
     throw new PublicationConflictError(
-      'publication decision conflicts with replay acknowledgement',
+      "publication decision conflicts with replay acknowledgement",
     );
   }
   if (facts.publicationDecision) {
     if (!sameIdentity(facts.publicationDecision, identity)) {
-      throw new PublicationConflictError('conflicting publication decision');
+      throw new PublicationConflictError("conflicting publication decision");
     }
     return facts;
   }
@@ -69,16 +69,16 @@ function recordReplayPublished(
   validateIdentity(identity);
 
   if (facts.compensationDecision !== null) {
-    throw new PublicationConflictError('a compensated archive cannot be replay-published');
+    throw new PublicationConflictError("a compensated archive cannot be replay-published");
   }
   if (facts.publicationDecision && !sameIdentity(facts.publicationDecision, identity)) {
     throw new PublicationConflictError(
-      'replay acknowledgement conflicts with publication decision',
+      "replay acknowledgement conflicts with publication decision",
     );
   }
   if (facts.replayPublication) {
     if (!sameIdentity(facts.replayPublication, identity)) {
-      throw new PublicationConflictError('conflicting replay publication');
+      throw new PublicationConflictError("conflicting replay publication");
     }
     return facts;
   }
@@ -97,10 +97,10 @@ function recordCompensationDecision(
     !Number.isSafeInteger(decision.decisionVersion) ||
     decision.decisionVersion < 1
   ) {
-    throw new PublicationConflictError('invalid compensation decision');
+    throw new PublicationConflictError("invalid compensation decision");
   }
   if (facts.publicationDecision || facts.replayPublication) {
-    throw new PublicationConflictError('a publication fact prevents compensation');
+    throw new PublicationConflictError("a publication fact prevents compensation");
   }
   if (facts.compensationDecision) {
     const previous = facts.compensationDecision;
@@ -109,7 +109,7 @@ function recordCompensationDecision(
       previous.decisionVersion !== decision.decisionVersion ||
       previous.reasonCode !== decision.reasonCode
     ) {
-      throw new PublicationConflictError('conflicting compensation decision');
+      throw new PublicationConflictError("conflicting compensation decision");
     }
     return facts;
   }
