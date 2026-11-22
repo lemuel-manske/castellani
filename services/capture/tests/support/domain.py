@@ -3,10 +3,20 @@ from typing import Any
 from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
-def seed_run(client: DynamoDBClient, admission: str = "OPEN") -> None:
+def seed_run(
+    client: DynamoDBClient,
+    admission: str = "OPEN",
+    max_pages: int = 100,
+    admitted_pages: int = 1,
+) -> None:
     client.put_item(
         TableName="capture_runs",
-        Item={"archiveId": {"S": "archive-1"}, "admission": {"S": admission}},
+        Item={
+            "archiveId": {"S": "archive-1"},
+            "admission": {"S": admission},
+            "maxPages": {"N": str(max_pages)},
+            "admittedPages": {"N": str(admitted_pages)},
+        },
     )
 
 

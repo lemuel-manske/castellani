@@ -8,7 +8,14 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from botocore.exceptions import ClientError
 
-from domain import CaptureOutcome, PageTask, TaskClaim, TaskRepository, new_attempt_id
+from domain import (
+    CaptureOutcome,
+    PageTask,
+    TaskClaim,
+    TaskRepository,
+    identify_discovered_pages,
+    new_attempt_id,
+)
 
 from .error_handling import (
     extract_cancellation_reasons,
@@ -115,10 +122,174 @@ class DynamoDBTaskRepository(TaskRepository):
         claim: TaskClaim,
         discovered_urls: tuple[str, ...],
     ) -> None:
-        del claim, discovered_urls
+        pages = identify_discovered_pages(claim.task, discovered_urls)
+        await asyncio.to_thread(self._admit_discovered, claim, pages)
 
     async def release(self, claim: TaskClaim) -> None:
         await asyncio.to_thread(self._release, claim)
+
+    def _admit_discovered(self, claim: TaskClaim, pages: tuple[Any, ...]) -> None:
+        for page in pages:
+            if page.identity.url_key == claim.task.url_key:
+                continue
+
+            if not self._admit_discovered_page(claim, page):
+                return
+
+    def _admit_discovered_page(self, claim: TaskClaim, page: Any) -> bool:
+        now = self.clock()
+        message_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                f"capture-page:{claim.task.archive_id}:{page.identity.url_key}",
+            )
+        )
+        occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
+        archive_id = claim.task.archive_id
+        url_key = page.identity.url_key
+
+        transaction = [
+            {
+                "ConditionCheck": {
+                    "TableName": self.frontier_table_name,
+                    "Key": {
+                        "archiveId": {"S": archive_id},
+                        "urlKey": {"S": claim.task.url_key},
+                    },
+                    "ConditionExpression": (
+                        "#state = :claimed AND #attempt = :attempt "
+                        "AND #fence = :fence AND #lease > :now"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#state": "state",
+                        "#attempt": "attemptId",
+                        "#fence": "fence",
+                        "#lease": "leaseUntil",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":claimed": {"S": "CLAIMED"},
+                        ":attempt": {"S": claim.attempt_id},
+                        ":fence": {"N": str(claim.fence)},
+                        ":now": {"N": str(now)},
+                    },
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self.runs_table_name,
+                    "Key": {"archiveId": {"S": archive_id}},
+                    "UpdateExpression": (
+                        "SET #admitted = if_not_exists(#admitted, :zero) + :one"
+                    ),
+                    "ConditionExpression": (
+                        "#admission = :open AND "
+                        "(attribute_not_exists(#admitted) OR #admitted < #maximum)"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#admission": "admission",
+                        "#admitted": "admittedPages",
+                        "#maximum": "maxPages",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":open": {"S": "OPEN"},
+                        ":zero": {"N": "0"},
+                        ":one": {"N": "1"},
+                    },
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self.frontier_table_name,
+                    "Item": {
+                        "archiveId": {"S": archive_id},
+                        "urlKey": {"S": url_key},
+                        "url": {"S": page.identity.navigation_url},
+                        "navigationUrl": {"S": page.identity.navigation_url},
+                        "fetchUrl": {"S": page.identity.fetch_url},
+                        "discoveryUrl": {"S": page.identity.discovery_url},
+                        "identityVersion": {"N": "1"},
+                        "depth": {"N": str(page.depth)},
+                        "state": {"S": "PENDING"},
+                    },
+                    "ConditionExpression": "attribute_not_exists(#url_key)",
+                    "ExpressionAttributeNames": {"#url_key": "urlKey"},
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self.outbox_table_name,
+                    "Item": {
+                        "messageId": {"S": message_id},
+                        "correlationId": {"S": archive_id},
+                        "type": {"S": "CapturePage"},
+                        "version": {"N": "1"},
+                        "occurredAt": {"S": occurred_at},
+                        "payload": {
+                            "M": {
+                                "archiveId": {"S": archive_id},
+                                "urlKey": {"S": url_key},
+                            }
+                        },
+                        "status": {"S": "PENDING"},
+                        "attempts": {"N": "0"},
+                        "nextAttemptAt": {"N": str(now)},
+                    },
+                    "ConditionExpression": "attribute_not_exists(#message_id)",
+                    "ExpressionAttributeNames": {"#message_id": "messageId"},
+                }
+            },
+        ]
+
+        try:
+            self._transact(transaction, None)
+            return True
+        except ConditionalWriteRejected as error:
+            existing = self._read_frontier(archive_id, url_key)
+
+            if existing is not None:
+                stored_identity = existing.get("navigationUrl", {}).get("S")
+                if stored_identity != page.identity.navigation_url:
+                    raise RuntimeError(
+                        "URL identity hash collision: stored navigation identity differs"
+                    ) from error
+                return True
+
+            run = self._read_run(archive_id)
+            if run is None:
+                raise RuntimeError("Capture run disappeared during discovery admission") from error
+
+            if run.get("admission", {}).get("S") != "OPEN":
+                raise TaskClaimLostError("Capture run admission is closed") from error
+
+            maximum = self._number_from_item(run, "maxPages")
+            admitted = self._number_from_item(run, "admittedPages", default=0)
+            if maximum is None:
+                raise RuntimeError("Capture run is missing maxPages") from error
+
+            if admitted >= maximum:
+                return False
+
+            # The failed condition was not a duplicate or a full run. Re-raise
+            # rather than silently dropping a discovery on an unexpected conflict.
+            raise
+
+    def _read_run(self, archive_id: str) -> dict[str, Any] | None:
+        response = self.client.get_item(
+            TableName=self.runs_table_name,
+            Key={"archiveId": {"S": archive_id}},
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        return item if item else None
+
+    @staticmethod
+    def _number_from_item(
+        item: dict[str, Any],
+        key: str,
+        default: int | None = None,
+    ) -> int | None:
+        value = item.get(key, {}).get("N")
+        return int(value) if value is not None else default
 
     def _complete(self, outcome: CaptureOutcome) -> None:
         self._finish(
