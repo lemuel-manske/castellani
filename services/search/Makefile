@@ -3,14 +3,17 @@
 install:
 	npm ci
 
+
 test-infra-up:
 	docker compose up -d --wait dynamodb-local minio opensearch rabbitmq
 
 test-infra-down:
 	docker compose down
 
+
 run:
 	npm run build && npm start
+
 
 fmt:
 	npm run format
@@ -19,6 +22,7 @@ check:
 	npm run format:check
 	npm run typecheck
 	npm run lint
+
 
 test-unit:
 	npm test
