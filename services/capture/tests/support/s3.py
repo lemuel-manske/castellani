@@ -25,3 +25,23 @@ class FakeS3:
             "Metadata": metadata,
             "VersionId": "version-1",
         }
+
+    def list_object_versions(
+        self,
+        Bucket: str,
+        Prefix: str,
+        KeyMarker: str | None = None,
+        VersionIdMarker: str | None = None,
+    ) -> dict[str, Any]:
+        del KeyMarker, VersionIdMarker
+        versions = [
+            {"Key": key, "VersionId": "version-1"}
+            for bucket, key in self.objects
+            if bucket == Bucket and key.startswith(Prefix)
+        ]
+        return {"Versions": versions, "DeleteMarkers": [], "IsTruncated": False}
+
+    def delete_objects(self, Bucket: str, Delete: dict[str, Any]) -> dict[str, Any]:
+        for item in Delete["Objects"]:
+            self.objects.pop((Bucket, item["Key"]), None)
+        return {"Deleted": Delete["Objects"]}
