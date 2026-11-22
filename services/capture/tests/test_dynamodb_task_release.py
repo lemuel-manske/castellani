@@ -98,8 +98,6 @@ async def test_stale_claim_cannot_release_reclaimed_task(
     seed_run(dynamodb)
     seed_frontier(dynamodb, depth=0)
 
-    attempt_ids = iter(("attempt-1", "attempt-2"))
-
     claims = DynamoDBTaskRepository(
         client=dynamodb,
         frontier_table_name="capture_frontier",
