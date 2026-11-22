@@ -15,7 +15,10 @@ const identity: PublicationIdentity = {
 };
 
 it("does not authorize visibility until both independent facts match", () => {
-  const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), identity);
+  const decisionOnly = recordPublicationDecision(
+    emptyPublicationFacts(),
+    identity,
+  );
   expect(isPublicationAuthorized(decisionOnly)).toBe(false);
 
   const both = recordReplayPublished(decisionOnly, identity);
@@ -39,11 +42,16 @@ it("rejects conflicting decision identities", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
-    recordPublicationDecision(facts, { ...identity, packageDigest: "sha256:other" }),
+    recordPublicationDecision(
+      facts,
+      { ...identity, packageDigest: "sha256:other" },
+    ),
   ).toThrow("conflicting publication decision");
 });
 
-it("rejects a replay acknowledgement that conflicts with an earlier decision", () => {
+it(
+  "rejects a replay acknowledgement that conflicts with an earlier decision",
+  () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
@@ -51,7 +59,9 @@ it("rejects a replay acknowledgement that conflicts with an earlier decision", (
   ).toThrow("replay acknowledgement conflicts");
 });
 
-it("rejects a decision that conflicts with an earlier replay acknowledgement", () => {
+it(
+  "rejects a decision that conflicts with an earlier replay acknowledgement",
+  () => {
   const facts = recordReplayPublished(emptyPublicationFacts(), identity);
 
   expect(() =>
