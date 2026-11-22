@@ -110,7 +110,7 @@ function extractHtml(content: string): {
     title,
     description,
     language,
-    text: normalizeText((root.querySelector("body") ?? root).textContent),
+    text: normalizeText((root.querySelector("body") ?? root).structuredText),
   };
 }
 
