@@ -17,7 +17,7 @@ Install the matching Playwright browser with `uv run playwright install chromium
 - `make run`: start the Capture API and background worker runtime.
 - `make fmt`: format and lint the Python service.
 - `make test-unit`: run unit tests.
-- `make test-integration`: run tests requiring DynamoDB Local.
+- `make test-integration`: run integration tests requiring DynamoDB Local and RabbitMQ.
 - `make check`: run static analysis.
 
 The local recording prototype uses pywb as an HTTP(S) recording proxy. The runtime uses a durable RabbitMQ command queue and a DynamoDB-backed transactional outbox; publisher confirms are required before an outbox record is marked as published.
@@ -33,4 +33,4 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. The runti
 | `S3_ENDPOINT_URL` | `DYNAMODB_ENDPOINT_URL` when set | Optional S3-compatible endpoint; use `http://localhost:4566` with MiniStack |
 | `CAPTURE_SNAPSHOTS_TABLE` | `capture_snapshots` | Immutable successful page-capture metadata table |
 | `CAPTURE_ARTIFACT_BUCKET` | `castellani-archive-artifacts` | Private bucket for immutable WARC artifacts |
-| `RABBITMQ_URL` | `amqp://castellani:local-development-only@localhost:5672/` | Message broker connection |
+| `RABBITMQ_URL` | `amqp://castellani:castellani@localhost:5672/` | Message broker connection |
