@@ -1,7 +1,14 @@
-.PHONY: install run fmt test test-integration check
+.PHONY: install run fmt test test-unit test-integration check
 
 install:
 	npm ci
+
+
+test-infra-up:
+	docker compose up -d --wait opensearch rabbitmq
+
+test-infra-down:
+	docker compose down
 
 
 run:
@@ -17,8 +24,12 @@ check:
 	npm run lint
 
 
-test:
+test-unit:
 	npm test
 
 test-integration:
-	npm run test:integration
+	SEARCH_TEST_OPENSEARCH_URL=http://localhost:9200 \
+		SEARCH_TEST_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
+		npm run test:integration
+
+test: test-unit test-integration
