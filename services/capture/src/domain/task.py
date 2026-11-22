@@ -77,7 +77,13 @@ class TaskRepository(Protocol):
         outcome: CaptureOutcome,
     ) -> None: ...
 
-    async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None: ...
+    async def fail(
+        self,
+        claim: TaskClaim,
+        reason_code: str,
+        message: str,
+        retryable: bool = True,
+    ) -> None: ...
 
     async def release(self, claim: TaskClaim) -> None: ...
 
