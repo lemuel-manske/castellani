@@ -12,11 +12,28 @@ import {
 setupIntegrationEnvironment("dynamodb");
 
 it("lists only the snapshots belonging to the requested archive", async () => {
-  await dynamodb.ledger.claim("archive-list-a", "snapshot-list-a1", "message-list-a1", 120);
-  await dynamodb.ledger.claim("archive-list-a", "snapshot-list-a2", "message-list-a2", 120);
-  await dynamodb.ledger.claim("archive-list-b", "snapshot-list-b1", "message-list-b1", 120);
+  await dynamodb.ledger.claim(
+    "archive-list-a",
+    "snapshot-list-a1",
+    "message-list-a1",
+    120,
+  );
+  await dynamodb.ledger.claim(
+    "archive-list-a",
+    "snapshot-list-a2",
+    "message-list-a2",
+    120,
+  );
+  await dynamodb.ledger.claim(
+    "archive-list-b",
+    "snapshot-list-b1",
+    "message-list-b1",
+    120,
+  );
 
-  await expect(dynamodb.ledger.listByArchive("archive-list-a")).resolves.toEqual([
+  await expect(
+    dynamodb.ledger.listByArchive("archive-list-a"),
+  ).resolves.toEqual([
     { snapshotId: "snapshot-list-a1", outcome: "PROCESSING" },
     { snapshotId: "snapshot-list-a2", outcome: "PROCESSING" },
   ]);
