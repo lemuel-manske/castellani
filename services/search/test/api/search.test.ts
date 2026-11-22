@@ -99,3 +99,51 @@ it("rejects malformed query parameters as problem details", async () => {
   });
   await server.close();
 });
+
+
+it("validates query parameters against the declarative route schema", async () => {
+  const reader: SearchDocumentReader = { search: vi.fn() };
+  const publicationLedger: PublicationLedger = {
+    get: vi.fn(),
+    recordPublicationDecision: vi.fn(),
+    recordReplayPublished: vi.fn(),
+    recordCompensationDecision: vi.fn(),
+  };
+  const manifestLedger: ManifestLedger = { record: vi.fn(), contains: vi.fn() };
+  const server = createSearchServer(reader, publicationLedger, manifestLedger);
+  const response = await server.inject({
+    method: "GET",
+    url: "/search?q=searchable&limit=101&unexpected=true",
+  });
+
+  expect(response.statusCode).toBe(400);
+  expect(response.headers["content-type"]).toContain(
+    "application/problem+json",
+  );
+  expect(reader.search).not.toHaveBeenCalled();
+  await server.close();
+});
+
+it("rejects reversed capture date ranges", async () => {
+  const reader: SearchDocumentReader = { search: vi.fn() };
+  const publicationLedger: PublicationLedger = {
+    get: vi.fn(),
+    recordPublicationDecision: vi.fn(),
+    recordReplayPublished: vi.fn(),
+    recordCompensationDecision: vi.fn(),
+  };
+  const manifestLedger: ManifestLedger = { record: vi.fn(), contains: vi.fn() };
+  const server = createSearchServer(reader, publicationLedger, manifestLedger);
+  const response = await server.inject({
+    method: "GET",
+    url: "/search?q=searchable&capturedFrom=2026-11-23T00%3A00%3A00Z&capturedTo=2026-11-22T00%3A00%3A00Z",
+  });
+
+  expect(response.statusCode).toBe(400);
+  expect(response.json()).toMatchObject({
+    title: "Invalid Search",
+    status: 400,
+  });
+  expect(reader.search).not.toHaveBeenCalled();
+  await server.close();
+});
