@@ -124,16 +124,15 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         (item.state === "PROCESSING" &&
           item.leaseUntil !== undefined &&
           item.leaseUntil <= now);
-      const attemptsExhausted =
-        item.attempts !== undefined && item.attempts >= maxAttempts;
+      const attempts = item.attempts;
 
-      if (leaseExpired && attemptsExhausted) {
+      if (leaseExpired && attempts !== undefined && attempts >= maxAttempts) {
         try {
           await exhaustIndexingEntry(this.client, this.tableName, {
             archiveId,
             snapshotId,
             now,
-            attempts: item.attempts!,
+            attempts,
             maxAttempts,
           });
           return { status: "TERMINAL", outcome: "FAILED" };
