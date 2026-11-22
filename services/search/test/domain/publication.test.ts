@@ -1,20 +1,20 @@
-import { expect, it } from 'vitest';
+import { expect, it } from "vitest";
 import {
   emptyPublicationFacts,
   isPublicationAuthorized,
   recordCompensationDecision,
   recordPublicationDecision,
   recordReplayPublished,
-} from '../../src/domain/publication.js';
-import type { PublicationIdentity } from '../../src/domain.js';
+} from "../../src/domain/publication.js";
+import type { PublicationIdentity } from "../../src/domain.js";
 
 const identity: PublicationIdentity = {
-  archiveId: 'archive-1',
+  archiveId: "archive-1",
   decisionVersion: 3,
-  packageDigest: 'sha256:package',
+  packageDigest: "sha256:package",
 };
 
-it('does not authorize visibility until both independent facts match', () => {
+it("does not authorize visibility until both independent facts match", () => {
   const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), identity);
   expect(isPublicationAuthorized(decisionOnly)).toBe(false);
 
@@ -22,7 +22,7 @@ it('does not authorize visibility until both independent facts match', () => {
   expect(isPublicationAuthorized(both)).toBe(true);
 });
 
-it('accepts replay acknowledgement before the decision', () => {
+it("accepts replay acknowledgement before the decision", () => {
   const replayOnly = recordReplayPublished(emptyPublicationFacts(), identity);
   expect(isPublicationAuthorized(replayOnly)).toBe(false);
 
@@ -30,55 +30,55 @@ it('accepts replay acknowledgement before the decision', () => {
   expect(isPublicationAuthorized(both)).toBe(true);
 });
 
-it('treats duplicate deliveries as idempotent', () => {
+it("treats duplicate deliveries as idempotent", () => {
   const first = recordPublicationDecision(emptyPublicationFacts(), identity);
   expect(recordPublicationDecision(first, identity)).toBe(first);
 });
 
-it('rejects conflicting decision identities', () => {
+it("rejects conflicting decision identities", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
-    recordPublicationDecision(facts, { ...identity, packageDigest: 'sha256:other' }),
-  ).toThrow('conflicting publication decision');
+    recordPublicationDecision(facts, { ...identity, packageDigest: "sha256:other" }),
+  ).toThrow("conflicting publication decision");
 });
 
-it('rejects a replay acknowledgement that conflicts with an earlier decision', () => {
+it("rejects a replay acknowledgement that conflicts with an earlier decision", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
     recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
-  ).toThrow('replay acknowledgement conflicts');
+  ).toThrow("replay acknowledgement conflicts");
 });
 
-it('rejects a decision that conflicts with an earlier replay acknowledgement', () => {
+it("rejects a decision that conflicts with an earlier replay acknowledgement", () => {
   const facts = recordReplayPublished(emptyPublicationFacts(), identity);
 
   expect(() =>
-    recordPublicationDecision(facts, { ...identity, packageDigest: 'sha256:other' }),
-  ).toThrow('publication decision conflicts');
+    recordPublicationDecision(facts, { ...identity, packageDigest: "sha256:other" }),
+  ).toThrow("publication decision conflicts");
 });
 
-it('keeps compensated archives permanently ineligible', () => {
+it("keeps compensated archives permanently ineligible", () => {
   const facts = recordCompensationDecision(emptyPublicationFacts(), {
     archiveId: identity.archiveId,
     decisionVersion: identity.decisionVersion,
-    reasonCode: 'crawl_failed',
+    reasonCode: "crawl_failed",
   });
   expect(isPublicationAuthorized(facts)).toBe(false);
   expect(() => recordPublicationDecision(facts, identity)).toThrow(
-    'a compensated archive cannot be published',
+    "a compensated archive cannot be published",
   );
 });
 
-it('rejects compensation after a publication fact has been recorded', () => {
+it("rejects compensation after a publication fact has been recorded", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
     recordCompensationDecision(facts, {
       archiveId: identity.archiveId,
       decisionVersion: identity.decisionVersion,
-      reasonCode: 'crawl_failed',
+      reasonCode: "crawl_failed",
     }),
-  ).toThrow('a publication fact prevents compensation');
+  ).toThrow("a publication fact prevents compensation");
 });
