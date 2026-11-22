@@ -1,3 +1,4 @@
+import asyncio
 import json
 from uuid import uuid4
 
@@ -11,59 +12,59 @@ from adapters.messaging.rabbitmq.consumer import (
     RabbitMQPageTaskConsumer,
     parse_delivery,
 )
+from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 
 
 @pytest.mark.integration
-async def test_consumer_handles_a_delivery_from_real_rabbitmq(
+async def test_consumer_receives_delivery_through_its_real_queue_subscription(
     rabbitmq: AbstractRobustConnection,
 ) -> None:
-    channel = await rabbitmq.channel()
-    exchange = await channel.declare_exchange(
-        EXCHANGE_NAME,
-        aio_pika.ExchangeType.DIRECT,
-        durable=True,
-    )
-    queue = await channel.declare_queue(
-        f"{QUEUE_NAME}.test-{uuid4()}",
-        exclusive=True,
-        auto_delete=True,
-    )
-    await queue.bind(exchange, routing_key="CapturePage")
-
     processed: list[tuple[str, str]] = []
+    processed_event = asyncio.Event()
+    ready = asyncio.Event()
 
     async def capture(archive_id: str, url_key: str) -> bool:
         processed.append((archive_id, url_key))
+        processed_event.set()
         return True
 
     consumer = RabbitMQPageTaskConsumer(capture)
-    envelope = {
-        "messageId": str(uuid4()),
-        "correlationId": "archive-1",
-        "type": "CapturePage",
-        "version": 1,
-        "occurredAt": "2026-11-20T12:00:00Z",
-        "payload": {"archiveId": "archive-1", "urlKey": "url-1"},
-    }
+    queue_name = f"{QUEUE_NAME}.test-{uuid4()}"
+    consumer_task = asyncio.create_task(
+        consumer.run(
+            rabbitmq,
+            queue_name=queue_name,
+            ready=ready,
+        )
+    )
+    publisher = RabbitMQMessagePublisher(rabbitmq)
 
     try:
-        await exchange.publish(
-            aio_pika.Message(
-                body=json.dumps(envelope).encode(),
-                content_type="application/json",
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-            ),
-            routing_key="CapturePage",
-            mandatory=True,
-        )
+        await asyncio.wait_for(ready.wait(), timeout=5)
+        await publisher.start()
+        envelope = {
+            "messageId": str(uuid4()),
+            "correlationId": "archive-1",
+            "type": "CapturePage",
+            "version": 1,
+            "occurredAt": "2026-11-20T12:00:00Z",
+            "payload": {"archiveId": "archive-1", "urlKey": "url-1"},
+        }
 
-        delivery = await queue.get(timeout=5, fail=True)
-        await consumer.handle(delivery)
+        await publisher.publish(
+            envelope["messageId"],
+            json.dumps(envelope).encode(),
+        )
+        await asyncio.wait_for(processed_event.wait(), timeout=5)
 
         assert processed == [("archive-1", "url-1")]
     finally:
-        await queue.delete()
-        await channel.close()
+        consumer_task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await consumer_task
+
+        await publisher.close()
 
 
 @pytest.mark.integration
