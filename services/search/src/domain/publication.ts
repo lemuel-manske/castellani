@@ -1,9 +1,9 @@
-import type { PublicationFacts, PublicationIdentity } from "../domain.js";
+import type { CompensationDecision, PublicationFacts, PublicationIdentity } from "../domain.js";
 
 export const emptyPublicationFacts = (): PublicationFacts => ({
-  decision: null,
-  replay: null,
-  compensated: false,
+  publicationDecision: null,
+  replayPublication: null,
+  compensationDecision: null,
 });
 
 export class PublicationConflictError extends Error {
@@ -39,20 +39,20 @@ export function recordPublicationDecision(
 ): PublicationFacts {
   validateIdentity(identity);
 
-  if (facts.compensated) {
+  if (facts.compensationDecision !== null) {
     throw new PublicationConflictError("a compensated archive cannot be published");
   }
-  if (facts.replay && !sameIdentity(facts.replay, identity)) {
+  if (facts.replayPublication && !sameIdentity(facts.replayPublication, identity)) {
     throw new PublicationConflictError("publication decision conflicts with replay acknowledgement");
   }
-  if (facts.decision) {
-    if (!sameIdentity(facts.decision, identity)) {
+  if (facts.publicationDecision) {
+    if (!sameIdentity(facts.publicationDecision, identity)) {
       throw new PublicationConflictError("conflicting publication decision");
     }
     return facts;
   }
 
-  return { ...facts, decision: { ...identity } };
+  return { ...facts, publicationDecision: { ...identity } };
 }
 
 /** Records Capture's durable replay-publication acknowledgement. */
@@ -62,35 +62,57 @@ export function recordReplayPublished(
 ): PublicationFacts {
   validateIdentity(identity);
 
-  if (facts.compensated) {
+  if (facts.compensationDecision !== null) {
     throw new PublicationConflictError("a compensated archive cannot be replay-published");
   }
-  if (facts.decision && !sameIdentity(facts.decision, identity)) {
+  if (facts.publicationDecision && !sameIdentity(facts.publicationDecision, identity)) {
     throw new PublicationConflictError("replay acknowledgement conflicts with publication decision");
   }
-  if (facts.replay) {
-    if (!sameIdentity(facts.replay, identity)) {
+  if (facts.replayPublication) {
+    if (!sameIdentity(facts.replayPublication, identity)) {
       throw new PublicationConflictError("conflicting replay publication");
     }
     return facts;
   }
 
-  return { ...facts, replay: { ...identity } };
+  return { ...facts, replayPublication: { ...identity } };
 }
 
 /** Compensation and publication are mutually exclusive terminal decisions. */
-export function recordCompensation(facts: PublicationFacts): PublicationFacts {
-  if (facts.decision || facts.replay) {
+export function recordCompensationDecision(
+  facts: PublicationFacts,
+  decision: CompensationDecision,
+): PublicationFacts {
+  if (
+    !decision.archiveId ||
+    !decision.reasonCode ||
+    !Number.isSafeInteger(decision.decisionVersion) ||
+    decision.decisionVersion < 1
+  ) {
+    throw new PublicationConflictError("invalid compensation decision");
+  }
+  if (facts.publicationDecision || facts.replayPublication) {
     throw new PublicationConflictError("a publication fact prevents compensation");
   }
-  return facts.compensated ? facts : { ...facts, compensated: true };
+  if (facts.compensationDecision) {
+    const previous = facts.compensationDecision;
+    if (
+      previous.archiveId !== decision.archiveId ||
+      previous.decisionVersion !== decision.decisionVersion ||
+      previous.reasonCode !== decision.reasonCode
+    ) {
+      throw new PublicationConflictError("conflicting compensation decision");
+    }
+    return facts;
+  }
+  return { ...facts, compensationDecision: { ...decision } };
 }
 
 export function isPublicationAuthorized(facts: PublicationFacts): boolean {
   return (
-    !facts.compensated &&
-    facts.decision !== null &&
-    facts.replay !== null &&
-    sameIdentity(facts.decision, facts.replay)
+    facts.compensationDecision === null &&
+    facts.publicationDecision !== null &&
+    facts.replayPublication !== null &&
+    sameIdentity(facts.publicationDecision, facts.replayPublication)
   );
 }
