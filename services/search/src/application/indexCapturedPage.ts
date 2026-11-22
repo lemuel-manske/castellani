@@ -1,6 +1,4 @@
-import {
-  readCapturedPage,
-} from "../adapters/artifacts.js";
+import { readCapturedPage } from "../adapters/artifacts.js";
 import type {
   ArtifactObjectReader,
   ArtifactReference,
