@@ -15,83 +15,98 @@ const event = {
     url: "https://example.com/",
     capturedAt: "2026-11-22T10:00:00.000Z",
     contentType: "text/html",
-    warcArtifacts: [{
-      bucket: "capture-artifacts",
-      key: "archive-1/snapshot-1.warc",
-      sha256: "a".repeat(64),
-      sizeBytes: 128,
-    }],
+    warcArtifacts: [
+      {
+        bucket: "capture-artifacts",
+        key: "archive-1/snapshot-1.warc",
+        sha256: "a".repeat(64),
+        sizeBytes: 128,
+      },
+    ],
   },
 };
 
 it("claims, indexes, and records a captured snapshot outcome", async () => {
-  const claim = { archiveId: "archive-1", snapshotId: "snapshot-1", token: "claim-1", attempts: 1 };
-  const ledger: IndexingLedger = {
-    claim: vi.fn().mockResolvedValue({ status: "CLAIMED", claim }),
-    complete: vi.fn().mockResolvedValue(undefined),
-    release: vi.fn().mockResolvedValue(undefined),
+  const claim = {
+    archiveId: "archive-1",
+    snapshotId: "snapshot-1",
+    token: "claim-1",
+    attempts: 1,
   };
-  const capturedPageReader: CapturedPageReader = {
-    read: vi.fn().mockResolvedValue({
+  const claimMock = vi.fn().mockResolvedValue({ status: "CLAIMED", claim });
+  const completeMock = vi.fn().mockResolvedValue(undefined);
+  const releaseMock = vi.fn().mockResolvedValue(undefined);
+  const readMock = vi.fn().mockResolvedValue({
       archiveId: "archive-1",
       snapshotId: "snapshot-1",
       url: "https://example.com/",
       capturedAt: "2026-11-22T10:00:00.000Z",
       contentType: "text/html",
       content: "<html><body>Indexed content</body></html>",
-    }),
+    });
+  const indexMock = vi.fn().mockResolvedValue(undefined);
+  const ledger: IndexingLedger = {
+    claim: claimMock,
+    complete: completeMock,
+    release: releaseMock,
   };
-  const documentWriter: SearchDocumentWriter = {
-    index: vi.fn().mockResolvedValue(undefined),
-  };
+  const capturedPageReader: CapturedPageReader = { read: readMock };
+  const documentWriter: SearchDocumentWriter = { index: indexMock };
 
   await expect(
     processPageCaptured(event, { ledger, capturedPageReader, documentWriter }),
   ).resolves.toEqual({ status: "COMPLETED", outcome: "INDEXED" });
 
-  expect(ledger.claim).toHaveBeenCalledWith("archive-1", "snapshot-1", "message-1", 120);
-  expect(documentWriter.index).toHaveBeenCalledOnce();
-  expect(ledger.complete).toHaveBeenCalledWith(claim, "INDEXED", undefined);
+  expect(claimMock).toHaveBeenCalledWith(
+    "archive-1",
+    "snapshot-1",
+    "message-1",
+    120,
+  );
+  expect(indexMock).toHaveBeenCalledOnce();
+  expect(completeMock).toHaveBeenCalledWith(claim, "INDEXED", undefined);
 });
 
 it("does not repeat work when the snapshot already has a terminal result", async () => {
+  const claimMock = vi
+    .fn()
+    .mockResolvedValue({ status: "TERMINAL", outcome: "INDEXED" });
+  const readMock = vi.fn();
+  const indexMock = vi.fn();
   const ledger: IndexingLedger = {
-    claim: vi.fn().mockResolvedValue({ status: "TERMINAL", outcome: "INDEXED" }),
+    claim: claimMock,
     complete: vi.fn(),
     release: vi.fn(),
   };
-  const capturedPageReader: CapturedPageReader = {
-    read: vi.fn(),
-  };
-  const documentWriter: SearchDocumentWriter = {
-    index: vi.fn(),
-  };
+  const capturedPageReader: CapturedPageReader = { read: readMock };
+  const documentWriter: SearchDocumentWriter = { index: indexMock };
 
   await expect(
     processPageCaptured(event, { ledger, capturedPageReader, documentWriter }),
   ).resolves.toEqual({ status: "DUPLICATE", outcome: "INDEXED" });
 
-  expect(capturedPageReader.read).not.toHaveBeenCalled();
-  expect(documentWriter.index).not.toHaveBeenCalled();
+  expect(readMock).not.toHaveBeenCalled();
+  expect(indexMock).not.toHaveBeenCalled();
 });
 
 it("leaves a snapshot with a live claim untouched", async () => {
+  const claimMock = vi
+    .fn()
+    .mockResolvedValue({ status: "BUSY", leaseUntil: 1795360920 });
+  const readMock = vi.fn();
+  const indexMock = vi.fn();
   const ledger: IndexingLedger = {
-    claim: vi.fn().mockResolvedValue({ status: "BUSY", leaseUntil: 1795360920 }),
+    claim: claimMock,
     complete: vi.fn(),
     release: vi.fn(),
   };
-  const capturedPageReader: CapturedPageReader = {
-    read: vi.fn(),
-  };
-  const documentWriter: SearchDocumentWriter = {
-    index: vi.fn(),
-  };
+  const capturedPageReader: CapturedPageReader = { read: readMock };
+  const documentWriter: SearchDocumentWriter = { index: indexMock };
 
   await expect(
     processPageCaptured(event, { ledger, capturedPageReader, documentWriter }),
   ).resolves.toEqual({ status: "BUSY" });
 
-  expect(capturedPageReader.read).not.toHaveBeenCalled();
-  expect(documentWriter.index).not.toHaveBeenCalled();
+  expect(readMock).not.toHaveBeenCalled();
+  expect(indexMock).not.toHaveBeenCalled();
 });
