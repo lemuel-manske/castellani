@@ -24,7 +24,8 @@ interface PublicationFacts {
   compensationDecision: CompensationDecision | null;
 }
 
-type IndexingOutcome = "PENDING" | "PROCESSING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
+type IndexingOutcome =
+  "PENDING" | "PROCESSING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
 
 interface ManifestSnapshot {
   snapshotId: string;
