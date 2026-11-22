@@ -1,49 +1,52 @@
-from typing import cast
+from uuid import uuid4
 
 import aio_pika
 import pytest
-from support.rabbitmq import FakeConnection
+from aio_pika.abc import AbstractRobustConnection
 
 from adapters.messaging.rabbitmq.publisher import (
     CAPTURE_ROUTING_KEY,
-    EXCHANGE_NAME,
     RabbitMQMessagePublisher,
 )
 
 
-async def test_publisher_declares_durable_exchange_and_publishes_persistent_message(
-    rabbitmq: FakeConnection,
+@pytest.mark.integration
+async def test_publisher_delivers_persistent_message_to_a_real_queue(
+    rabbitmq: AbstractRobustConnection,
 ) -> None:
-    publisher = RabbitMQMessagePublisher(rabbitmq)  # type: ignore[arg-type]
+    publisher = RabbitMQMessagePublisher(rabbitmq)
+    consumer_channel = await rabbitmq.channel()
+    queue = await consumer_channel.declare_queue(
+        f"capture-publisher-test-{uuid4()}",
+        exclusive=True,
+        auto_delete=True,
+    )
 
-    await publisher.start()
-    await publisher.publish("message-1", b'{"type":"CapturePage"}')
+    try:
+        await publisher.start()
+        await queue.bind(publisher.exchange, routing_key=CAPTURE_ROUTING_KEY)
 
-    assert rabbitmq.channel_options == {
-        "publisher_confirms": True,
-        "on_return_raises": True,
-    }
-    assert rabbitmq.channel_instance.declarations == [
-        (EXCHANGE_NAME, aio_pika.ExchangeType.DIRECT, True)
-    ]
+        body = b'{"type":"CapturePage"}'
+        await publisher.publish("message-1", body)
 
-    message, routing_key, mandatory = rabbitmq.channel_instance.exchange.publications[0]
-    published = cast(aio_pika.Message, message)
+        received = await queue.get(timeout=5, fail=True)
 
-    assert published.message_id == "message-1"
-    assert published.body == b'{"type":"CapturePage"}'
-    assert published.content_type == "application/json"
-    assert published.delivery_mode == aio_pika.DeliveryMode.PERSISTENT
-    assert routing_key == CAPTURE_ROUTING_KEY
-    assert mandatory
-
-    await publisher.close()
-
-    assert rabbitmq.channel_instance.is_closed
+        assert received.message_id == "message-1"
+        assert received.body == body
+        assert received.content_type == "application/json"
+        assert received.delivery_mode == aio_pika.DeliveryMode.PERSISTENT
+        await received.ack()
+    finally:
+        await publisher.close()
+        await queue.delete()
+        await consumer_channel.close()
 
 
-async def test_publisher_rejects_publication_before_startup() -> None:
-    publisher = RabbitMQMessagePublisher(FakeConnection())  # type: ignore[arg-type]
+@pytest.mark.integration
+async def test_publisher_rejects_publication_before_startup(
+    rabbitmq: AbstractRobustConnection,
+) -> None:
+    publisher = RabbitMQMessagePublisher(rabbitmq)
 
     with pytest.raises(RuntimeError, match="has not been started"):
         await publisher.publish("message-1", b"{}")
