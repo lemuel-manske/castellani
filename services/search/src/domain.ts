@@ -12,10 +12,16 @@ export interface PublicationIdentity {
   packageDigest: string;
 }
 
+export interface CompensationDecision {
+  archiveId: string;
+  decisionVersion: number;
+  reasonCode: string;
+}
+
 export interface PublicationFacts {
-  decision: PublicationIdentity | null;
-  replay: PublicationIdentity | null;
-  compensated: boolean;
+  publicationDecision: PublicationIdentity | null;
+  replayPublication: PublicationIdentity | null;
+  compensationDecision: CompensationDecision | null;
 }
 
 export type IndexingOutcome = "PENDING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
