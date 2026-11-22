@@ -4,12 +4,16 @@ WORKDIR /src
 
 COPY libs/httpx/go.mod ./libs/httpx/go.mod
 COPY services/gateway/go.mod services/gateway/go.sum ./services/gateway/
+
 WORKDIR /src/services/gateway
+
 RUN go mod download
 
 WORKDIR /src
+
 COPY libs/httpx ./libs/httpx
 COPY services/gateway ./services/gateway
+
 WORKDIR /src/services/gateway
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/gateway .

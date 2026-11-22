@@ -4,12 +4,16 @@ WORKDIR /src
 
 COPY libs/httpx/go.mod ./libs/httpx/go.mod
 COPY services/coordinator/go.mod services/coordinator/go.sum ./services/coordinator/
+
 WORKDIR /src/services/coordinator
+
 RUN go mod download
 
 WORKDIR /src
+
 COPY libs/httpx ./libs/httpx
 COPY services/coordinator ./services/coordinator
+
 WORKDIR /src/services/coordinator
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/coordinator .
