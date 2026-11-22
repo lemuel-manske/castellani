@@ -155,3 +155,36 @@ async def test_first_failure_is_terminal_when_retry_budget_is_one(
     assert run_item(dynamodb)["outstandingPages"] == {"N": "0"}
     assert run_item(dynamodb)["failedPages"] == {"N": "1"}
     assert outbox_items(dynamodb) == []
+
+
+
+@pytest.mark.integration
+async def test_non_retryable_failure_becomes_terminal_on_first_attempt(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    repository = new_repository(dynamodb, clock)
+
+    claim = await repository.claim("archive-1", "url-1")
+    assert claim is not None
+
+    await repository.fail(
+        claim,
+        "unsafe_request",
+        "navigation target is disallowed",
+        retryable=False,
+    )
+
+    task = frontier_item(dynamodb)
+    assert task["state"] == {"S": "FAILED"}
+    assert task["failureCount"] == {"N": "1"}
+    assert task["failureReason"] == {"S": "unsafe_request"}
+    assert "nextAttemptAt" not in task
+
+    run = run_item(dynamodb)
+    assert run["outstandingPages"] == {"N": "0"}
+    assert run["failedPages"] == {"N": "1"}
+    assert outbox_items(dynamodb) == []
