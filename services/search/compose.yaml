@@ -13,18 +13,21 @@ services:
       timeout: 3s
       retries: 20
 
-  minio:
-    image: quay.io/minio/minio:latest
-
-    command: server /data --console-address ":9001"
+  localstack:
+    image: localstack/localstack:2026.10.8
 
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio-secret
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
 
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "4566:4566"
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   opensearch:
     image: opensearchproject/opensearch:3.10.0
