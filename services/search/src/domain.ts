@@ -1,9 +1,7 @@
 /**
  * Search domain vocabulary.
  *
- * Keep domain concepts and contracts here; behavior lives in the focused
- * modules under ./domain. This file is the stable surface for comparing
- * Search's language with Capture and Coordinator.
+ * Keep domain concepts and contracts here.
  */
 
 interface PublicationIdentity {
@@ -26,6 +24,8 @@ interface PublicationFacts {
 
 type IndexingOutcome =
   "PENDING" | "PROCESSING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
+
+type TerminalIndexingOutcome = Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
 
 interface ManifestSnapshot {
   snapshotId: string;
@@ -52,4 +52,5 @@ export type {
   PublicationFacts,
   PublicationIdentity,
   SnapshotLedgerEntry,
+  TerminalIndexingOutcome,
 };

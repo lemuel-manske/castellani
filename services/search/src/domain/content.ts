@@ -3,24 +3,31 @@ import { parse } from "node-html-parser";
 interface CapturedPage {
   archiveId: string;
   snapshotId: string;
+
   url: string;
+
   finalUrl?: string;
+
   capturedAt: string;
-  contentType?: string;
+
   content: string;
 }
 
 interface SearchDocument {
   archiveId: string;
   snapshotId: string;
+
   url: string;
+
   finalUrl: string;
+
   capturedAt: string;
-  contentType: string;
+
   title: string;
   description: string;
-  language: string;
   text: string;
+
+  language: string;
 }
 
 type ContentExtraction =
@@ -35,8 +42,7 @@ interface ExtractionOptions {
 }
 
 const DEFAULT_MAX_TEXT_LENGTH = 1_000_000;
-const HTML_CONTENT_TYPES = new Set(["text/html", "application/xhtml+xml"]);
-const TEXT_CONTENT_TYPES = new Set(["text/plain"]);
+
 const NON_CONTENT_ELEMENTS = [
   "script",
   "style",
@@ -65,12 +71,6 @@ function normalizeText(value: string): string {
     .trim();
 }
 
-function contentTypeOf(value: string | undefined): string {
-  const mediaType = (value ?? "application/octet-stream").split(";", 1)[0];
-
-  return (mediaType ?? "application/octet-stream").trim().toLowerCase();
-}
-
 function metaContent(root: ReturnType<typeof parse>, name: string): string {
   const element = root.querySelectorAll("meta").find((candidate) => {
     const key =
@@ -89,9 +89,12 @@ function extractHtml(content: string): {
   text: string;
 } {
   const root = parse(content);
+
   const title = normalizeText(root.querySelector("title")?.textContent ?? "");
+
   const description =
     metaContent(root, "description") || metaContent(root, "og:description");
+
   const language = normalizeText(
     root.querySelector("html")?.getAttribute("lang") ?? "",
   );
@@ -101,6 +104,7 @@ function extractHtml(content: string): {
       element.remove();
     }
   }
+
   for (const element of root.querySelectorAll(
     "[hidden], [aria-hidden='true']",
   )) {
@@ -119,24 +123,10 @@ function extractSearchableContent(
   page: CapturedPage,
   options: ExtractionOptions = {},
 ): ContentExtraction {
-  const contentType = contentTypeOf(page.contentType);
   const maxTextLength = options.maxTextLength ?? DEFAULT_MAX_TEXT_LENGTH;
 
-  if (
-    !HTML_CONTENT_TYPES.has(contentType) &&
-    !TEXT_CONTENT_TYPES.has(contentType)
-  ) {
-    return { kind: "UNSUPPORTED", reasonCode: "UNSUPPORTED_CONTENT_TYPE" };
-  }
+  const extracted = extractHtml(page.content)
 
-  const extracted = HTML_CONTENT_TYPES.has(contentType)
-    ? extractHtml(page.content)
-    : {
-        title: "",
-        description: "",
-        language: "",
-        text: normalizeText(page.content),
-      };
   const text = extracted.text.slice(0, maxTextLength);
 
   if (!text) {
@@ -151,7 +141,6 @@ function extractSearchableContent(
       url: page.url,
       finalUrl: page.finalUrl ?? page.url,
       capturedAt: page.capturedAt,
-      contentType,
       title: extracted.title,
       description: extracted.description,
       language: extracted.language,

@@ -1,11 +1,19 @@
 import type {
   IndexingOutcome,
+  TerminalIndexingOutcome,
   ManifestReconciliation,
   ManifestSnapshot,
   PublicationFacts,
   SnapshotLedgerEntry,
 } from "../domain.js";
+
 import { isPublicationAuthorized } from "./publication.js";
+
+function isTerminalIndexingOutcome(
+  outcome: IndexingOutcome,
+): outcome is TerminalIndexingOutcome {
+  return outcome === "INDEXED" || outcome === "UNSUPPORTED" || outcome === "FAILED";
+}
 
 /** Reconciles the immutable Capture manifest against Search's snapshot ledger. */
 function reconcileManifest(
@@ -55,7 +63,7 @@ function reconcileManifest(
 
     if (outcome === undefined) {
       missingSnapshotIds.push(snapshotId);
-    } else if (outcome !== "PENDING" && outcome !== "PROCESSING") {
+    } else if (isTerminalIndexingOutcome(outcome)) {
       terminalCount += 1;
     }
   }
