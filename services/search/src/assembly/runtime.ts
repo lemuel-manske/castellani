@@ -14,6 +14,10 @@ import {
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import type { SearchSettings } from "./config.js";
 
+function isSignalAborted(signal: AbortSignal): boolean {
+  return signal.aborted;
+}
+
 function waitForConnectionOrShutdown(
   connection: amqp.ChannelModel,
   signal: AbortSignal,
@@ -115,11 +119,9 @@ class SearchRuntime {
         signal,
       );
     } finally {
-      await Promise.allSettled([
-        dynamodb.destroy(),
-        s3.destroy(),
-        opensearch.close(),
-      ]);
+      dynamodb.destroy();
+      s3.destroy();
+      await opensearch.close();
     }
   }
 
@@ -127,7 +129,7 @@ class SearchRuntime {
     dependencies: Parameters<typeof processPageCaptured>[1],
     signal: AbortSignal,
   ): Promise<void> {
-    while (!signal.aborted) {
+    while (!isSignalAborted(signal)) {
       let connection: amqp.ChannelModel | undefined;
       let channel: amqp.Channel | undefined;
 
