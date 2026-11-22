@@ -7,7 +7,10 @@ from domain import ArtifactReference, TaskClaim
 from worker import ArtifactStore
 
 
-def references(directory: Path, warc_files: tuple[Path, ...]) -> tuple[ArtifactReference, ...]:
+def references(
+    directory: Path,
+    warc_files: tuple[Path, ...],
+) -> tuple[ArtifactReference, ...]:
     if not warc_files:
         raise ValueError("a capture must produce at least one WARC file")
 
