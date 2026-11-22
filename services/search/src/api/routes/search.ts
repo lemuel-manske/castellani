@@ -50,11 +50,22 @@ const searchRoutes: FastifyPluginAsync<SearchRouteDependencies> = async (
           );
       }
 
-      const { q, ...filters } = query;
-
       try {
         return await searchPublishedDocuments(
-          { text: q, ...filters },
+          {
+            text: query.q,
+            ...(query.collectionId ? { collectionId: query.collectionId } : {}),
+            ...(query.archiveId ? { archiveId: query.archiveId } : {}),
+            ...(query.snapshotId ? { snapshotId: query.snapshotId } : {}),
+            ...(query.capturedFrom === undefined
+              ? {}
+              : { capturedFrom: query.capturedFrom }),
+            ...(query.capturedTo === undefined
+              ? {}
+              : { capturedTo: query.capturedTo }),
+            ...(query.limit === undefined ? {} : { limit: query.limit }),
+            ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+          },
           reader,
           publicationLedger,
           manifestLedger,
