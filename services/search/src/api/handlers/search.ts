@@ -6,11 +6,11 @@ import type { SearchDocumentReader } from "../../ports/search-reader.js";
 import { problem } from "../problem.js";
 import type { SearchQuery } from "../schemas/search.js";
 
-interface SearchHandlerDependencies {
+type SearchHandlerDependencies = {
   reader: SearchDocumentReader;
   publicationLedger: PublicationLedger;
   manifestLedger: ManifestLedger;
-}
+};
 
 async function handleSearch(
   request: FastifyRequest<{ Querystring: SearchQuery }>,
