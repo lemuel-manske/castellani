@@ -2,9 +2,16 @@ import { randomUUID } from "node:crypto";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { IndexingOutcome } from "../../../domain.js";
-import type { IndexingClaimResult, IndexingLedger, SnapshotClaim } from "../../../ports/indexing-ledger.js";
+import type {
+  IndexingClaimResult,
+  IndexingLedger,
+  SnapshotClaim,
+} from "../../../ports/indexing-ledger.js";
 
-type TerminalOutcome = Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
+type TerminalOutcome = Extract<
+  IndexingOutcome,
+  "INDEXED" | "UNSUPPORTED" | "FAILED"
+>;
 
 interface LedgerItem {
   archiveId?: string;
@@ -24,7 +31,9 @@ class IndexingClaimLostError extends Error {
 
 class IndexingIdentityConflictError extends Error {
   constructor(snapshotId: string) {
-    super(`snapshot identity conflicts with existing ledger entry: ${snapshotId}`);
+    super(
+      `snapshot identity conflicts with existing ledger entry: ${snapshotId}`,
+    );
     this.name = "IndexingIdentityConflictError";
   }
 }
@@ -102,7 +111,10 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         claim: { archiveId, snapshotId, token, attempts },
       };
     } catch (error) {
-      if (!(error instanceof Error) || error.name !== "ConditionalCheckFailedException") {
+      if (
+        !(error instanceof Error) ||
+        error.name !== "ConditionalCheckFailedException"
+      ) {
         throw error;
       }
 
@@ -122,7 +134,11 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         throw new IndexingIdentityConflictError(snapshotId);
       }
 
-      if (item.state === "INDEXED" || item.state === "UNSUPPORTED" || item.state === "FAILED") {
+      if (
+        item.state === "INDEXED" ||
+        item.state === "UNSUPPORTED" ||
+        item.state === "FAILED"
+      ) {
         return { status: "TERMINAL", outcome: item.state };
       }
 
@@ -139,71 +155,89 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     reasonCode?: string,
   ): Promise<void> {
     const now = this.clock() / 1000;
-    await this.client.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { snapshotId: claim.snapshotId },
-        UpdateExpression: reasonCode === undefined
-          ? "SET #state = :outcome, #updated = :now REMOVE #token, #lease"
-          : "SET #state = :outcome, #reason = :reason, #updated = :now REMOVE #token, #lease",
-        ConditionExpression: "#archive = :archive AND #state = :processing AND #token = :token",
-        ExpressionAttributeNames: {
-          "#archive": "archiveId",
-          "#state": "state",
-          "#token": "claimToken",
-          "#lease": "leaseUntil",
-          "#updated": "updatedAt",
-          ...(reasonCode === undefined ? {} : { "#reason": "reasonCode" }),
-        },
-        ExpressionAttributeValues: {
-          ":archive": claim.archiveId,
-          ":processing": "PROCESSING",
-          ":token": claim.token,
-          ":outcome": outcome,
-          ":now": now,
-          ...(reasonCode === undefined ? {} : { ":reason": reasonCode }),
-        },
-      }),
-    ).catch((error: unknown) => {
-      if (error instanceof Error && error.name === "ConditionalCheckFailedException") {
-        throw new IndexingClaimLostError(claim.snapshotId);
-      }
-      throw error;
-    });
+    await this.client
+      .send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { snapshotId: claim.snapshotId },
+          UpdateExpression:
+            reasonCode === undefined
+              ? "SET #state = :outcome, #updated = :now REMOVE #token, #lease"
+              : "SET #state = :outcome, #reason = :reason, #updated = :now REMOVE #token, #lease",
+          ConditionExpression:
+            "#archive = :archive AND #state = :processing AND #token = :token",
+          ExpressionAttributeNames: {
+            "#archive": "archiveId",
+            "#state": "state",
+            "#token": "claimToken",
+            "#lease": "leaseUntil",
+            "#updated": "updatedAt",
+            ...(reasonCode === undefined ? {} : { "#reason": "reasonCode" }),
+          },
+          ExpressionAttributeValues: {
+            ":archive": claim.archiveId,
+            ":processing": "PROCESSING",
+            ":token": claim.token,
+            ":outcome": outcome,
+            ":now": now,
+            ...(reasonCode === undefined ? {} : { ":reason": reasonCode }),
+          },
+        }),
+      )
+      .catch((error: unknown) => {
+        if (
+          error instanceof Error &&
+          error.name === "ConditionalCheckFailedException"
+        ) {
+          throw new IndexingClaimLostError(claim.snapshotId);
+        }
+        throw error;
+      });
   }
 
   async release(claim: SnapshotClaim, reason: string): Promise<void> {
     const now = this.clock() / 1000;
-    await this.client.send(
-      new UpdateCommand({
-        TableName: this.tableName,
-        Key: { snapshotId: claim.snapshotId },
-        UpdateExpression: "SET #state = :pending, #reason = :reason, #updated = :now REMOVE #token, #lease",
-        ConditionExpression: "#archive = :archive AND #state = :processing AND #token = :token",
-        ExpressionAttributeNames: {
-          "#archive": "archiveId",
-          "#state": "state",
-          "#token": "claimToken",
-          "#lease": "leaseUntil",
-          "#reason": "lastError",
-          "#updated": "updatedAt",
-        },
-        ExpressionAttributeValues: {
-          ":archive": claim.archiveId,
-          ":processing": "PROCESSING",
-          ":pending": "PENDING",
-          ":token": claim.token,
-          ":reason": reason.slice(0, 1000),
-          ":now": now,
-        },
-      }),
-    ).catch((error: unknown) => {
-      if (error instanceof Error && error.name === "ConditionalCheckFailedException") {
-        throw new IndexingClaimLostError(claim.snapshotId);
-      }
-      throw error;
-    });
+    await this.client
+      .send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { snapshotId: claim.snapshotId },
+          UpdateExpression:
+            "SET #state = :pending, #reason = :reason, #updated = :now REMOVE #token, #lease",
+          ConditionExpression:
+            "#archive = :archive AND #state = :processing AND #token = :token",
+          ExpressionAttributeNames: {
+            "#archive": "archiveId",
+            "#state": "state",
+            "#token": "claimToken",
+            "#lease": "leaseUntil",
+            "#reason": "lastError",
+            "#updated": "updatedAt",
+          },
+          ExpressionAttributeValues: {
+            ":archive": claim.archiveId,
+            ":processing": "PROCESSING",
+            ":pending": "PENDING",
+            ":token": claim.token,
+            ":reason": reason.slice(0, 1000),
+            ":now": now,
+          },
+        }),
+      )
+      .catch((error: unknown) => {
+        if (
+          error instanceof Error &&
+          error.name === "ConditionalCheckFailedException"
+        ) {
+          throw new IndexingClaimLostError(claim.snapshotId);
+        }
+        throw error;
+      });
   }
 }
 
-export { DynamoDBIndexingLedger, IndexingClaimLostError, IndexingIdentityConflictError };
+export {
+  DynamoDBIndexingLedger,
+  IndexingClaimLostError,
+  IndexingIdentityConflictError,
+};
