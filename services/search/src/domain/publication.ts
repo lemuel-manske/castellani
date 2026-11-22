@@ -32,14 +32,19 @@ function sameIdentity(left: PublicationIdentity, right: PublicationIdentity): bo
 }
 
 function validateIdentity(identity: PublicationIdentity): void {
-  if (!identity.archiveId || !identity.packageDigest || !Number.isSafeInteger(identity.decisionVersion) || identity.decisionVersion < 1) {
+  if (
+    !identity.archiveId ||
+    !identity.packageDigest ||
+    !Number.isSafeInteger(identity.decisionVersion) ||
+    identity.decisionVersion < 1
+  ) {
     throw new PublicationConflictError("invalid publication identity");
   }
 }
 
 /**
  * Records the Coordinator's irreversible publication decision.
- * Re-delivery of the same decision is idempotent; a conflicting decision is rejected.
+ * Re-delivery of the same decision is idempotent; a conflicting fact is rejected.
  */
 export function recordPublicationDecision(
   facts: PublicationFacts,
@@ -49,6 +54,10 @@ export function recordPublicationDecision(
 
   if (facts.compensated) {
     throw new PublicationConflictError("a compensated archive cannot be published");
+  }
+
+  if (facts.replay && !sameIdentity(facts.replay, identity)) {
+    throw new PublicationConflictError("publication decision conflicts with replay acknowledgement");
   }
 
   if (facts.decision) {
@@ -75,6 +84,10 @@ export function recordReplayPublished(
     throw new PublicationConflictError("a compensated archive cannot be replay-published");
   }
 
+  if (facts.decision && !sameIdentity(facts.decision, identity)) {
+    throw new PublicationConflictError("replay acknowledgement conflicts with publication decision");
+  }
+
   if (facts.replay) {
     if (!sameIdentity(facts.replay, identity)) {
       throw new PublicationConflictError("conflicting replay publication");
@@ -85,8 +98,11 @@ export function recordReplayPublished(
   return { ...facts, replay: { ...identity } };
 }
 
-/** Compensation is terminal for Search visibility and cannot be reversed. */
+/** Compensation and publication are mutually exclusive terminal decisions. */
 export function recordCompensation(facts: PublicationFacts): PublicationFacts {
+  if (facts.decision || facts.replay) {
+    throw new PublicationConflictError("a publication fact prevents compensation");
+  }
   return facts.compensated ? facts : { ...facts, compensated: true };
 }
 
