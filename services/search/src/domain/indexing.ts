@@ -8,7 +8,7 @@ import type {
 import { isPublicationAuthorized } from "./publication.js";
 
 /** Reconciles the immutable Capture manifest against Search's snapshot ledger. */
-export function reconcileManifest(
+function reconcileManifest(
   manifestSnapshots: readonly ManifestSnapshot[],
   ledgerEntries: readonly SnapshotLedgerEntry[],
 ): ManifestReconciliation {
@@ -60,7 +60,7 @@ export function reconcileManifest(
 }
 
 /** A snapshot is visible only after indexing and publication are both complete. */
-export function canExposeSnapshot(
+function canExposeSnapshot(
   snapshotId: string,
   manifestSnapshots: readonly ManifestSnapshot[],
   outcome: IndexingOutcome,
@@ -72,3 +72,5 @@ export function canExposeSnapshot(
 
   return manifestSnapshots.some((snapshot) => snapshot.snapshotId === snapshotId);
 }
+
+export { canExposeSnapshot, reconcileManifest };
