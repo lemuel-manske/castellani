@@ -219,3 +219,15 @@ resource "aws_dynamodb_table" "capture_browser_slots" {
     type = "S"
   }
 }
+
+resource "aws_dynamodb_table" "capture_snapshots" {
+  name         = "capture_snapshots"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "snapshotId"
+
+  attribute {
+    name = "snapshotId"
+    type = "S"
+  }
+}
