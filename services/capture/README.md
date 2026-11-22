@@ -30,6 +30,7 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. The runti
 | `AWS_SECRET_ACCESS_KEY` | `test` | AWS SDK secret key |
 | `AWS_EC2_METADATA_DISABLED` | `true` | Disable EC2 metadata service |
 | `DYNAMODB_ENDPOINT_URL` | `http://localhost:4566` | Optional DynamoDB-compatible endpoint |
-| `S3_ENDPOINT_URL` | unset | Optional S3-compatible endpoint |
+| `S3_ENDPOINT_URL` | unset | Optional S3-compatible endpoint; use `http://localhost:4566` with MiniStack |
+| `CAPTURE_SNAPSHOTS_TABLE` | `capture_snapshots` | Immutable successful page-capture metadata table |
 | `CAPTURE_ARTIFACT_BUCKET` | `castellani-archive-artifacts` | Private bucket for immutable WARC artifacts |
 | `RABBITMQ_URL` | `amqp://castellani:local-development-only@localhost:5672/` | Message broker connection |
