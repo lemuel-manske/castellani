@@ -119,9 +119,61 @@ class S3ArtifactStore(ArtifactStore):
         return tuple(references)
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
-        del claim
+        prefix = "/".join(
+            (
+                "capture-staging",
+                quote(claim.task.archive_id, safe=""),
+                quote(claim.task.url_key, safe=""),
+                quote(claim.attempt_id, safe=""),
+            )
+        ) + "/"
 
+        await asyncio.to_thread(self._discard_attempt_objects, prefix)
         await asyncio.to_thread(shutil.rmtree, directory, True)
+
+    def _discard_attempt_objects(self, prefix: str) -> None:
+        key_marker: str | None = None
+        version_marker: str | None = None
+
+        while True:
+            request: dict[str, Any] = {
+                "Bucket": self.bucket,
+                "Prefix": prefix,
+            }
+
+            if key_marker is not None:
+                request["KeyMarker"] = key_marker
+
+            if version_marker is not None:
+                request["VersionIdMarker"] = version_marker
+
+            page = self.client.list_object_versions(**request)
+            versions = page.get("Versions", [])
+            delete_markers = page.get("DeleteMarkers", [])
+            objects = [
+                {"Key": item["Key"], "VersionId": item["VersionId"]}
+                for item in (*versions, *delete_markers)
+            ]
+
+            for offset in range(0, len(objects), 1000):
+                response = self.client.delete_objects(
+                    Bucket=self.bucket,
+                    Delete={"Objects": objects[offset : offset + 1000], "Quiet": True},
+                )
+
+                if response.get("Errors"):
+                    raise RuntimeError(
+                        f"failed to delete staged S3 artifacts under {prefix}"
+                    )
+
+            if not page.get("IsTruncated"):
+                return
+
+            key_marker = page.get("NextKeyMarker")
+            version_marker = page.get("NextVersionIdMarker")
+
+            if key_marker is None:
+                raise RuntimeError("S3 returned a truncated version listing without a key marker")
 
     async def commit_attempt(self, claim: TaskClaim, directory: Path) -> None:
         del claim
