@@ -326,6 +326,23 @@ class DynamoDBTaskRepository(TaskRepository):
         )
         artifacts = [self._artifact_attribute(item) for item in outcome.warc_artifacts]
         depth = self._task_depth(outcome.archive_id, outcome.url_key)
+        snapshot_item: dict[str, Any] = {
+            "snapshotId": {"S": outcome.snapshot_id},
+            "archiveId": {"S": outcome.archive_id},
+            "urlKey": {"S": outcome.url_key},
+            "url": {"S": outcome.capture.requested_url},
+            "finalUrl": {"S": outcome.capture.final_url},
+            "capturedAt": {"S": captured_at_text},
+            "minDepth": {"N": str(depth)},
+            "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
+            "warcArtifacts": {"L": artifacts},
+        }
+        if outcome.capture.content_type is not None:
+            snapshot_item["contentType"] = {"S": outcome.capture.content_type}
+        if outcome.capture.title:
+            snapshot_item["title"] = {"S": outcome.capture.title}
+        if outcome.capture.status_code is not None:
+            snapshot_item["statusCode"] = {"N": str(outcome.capture.status_code)}
         payload: dict[str, Any] = {
             "archiveId": {"S": outcome.archive_id},
             "snapshotId": {"S": outcome.snapshot_id},
@@ -410,21 +427,7 @@ class DynamoDBTaskRepository(TaskRepository):
             {
                 "Put": {
                     "TableName": self.snapshots_table_name,
-                    "Item": {
-                        "snapshotId": {"S": outcome.snapshot_id},
-                        "archiveId": {"S": outcome.archive_id},
-                        "urlKey": {"S": outcome.url_key},
-                        "url": {"S": outcome.capture.requested_url},
-                        "finalUrl": {"S": outcome.capture.final_url},
-                        "capturedAt": {"S": captured_at_text},
-                        **({"contentType": {"S": outcome.capture.content_type}} if outcome.capture.content_type is not None else {}),
-                        **({"title": {"S": outcome.capture.title}} if outcome.capture.title else {}),
-                        **({"statusCode": {"N": str(outcome.capture.status_code)}} if outcome.capture.status_code is not None else {}),
-                        **({"contentType": {"S": outcome.capture.content_type}} if outcome.capture.content_type is not None else {}),
-                        "minDepth": {"N": str(depth)},
-                        "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
-                        "warcArtifacts": {"L": artifacts},
-                    },
+                    "Item": snapshot_item,
                     "ConditionExpression": "attribute_not_exists(#snapshot_id)",
                     "ExpressionAttributeNames": {"#snapshot_id": "snapshotId"},
                 }
