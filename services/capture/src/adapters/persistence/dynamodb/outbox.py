@@ -10,17 +10,17 @@ from botocore.exceptions import ClientError
 
 from domain import OutboxMessage, OutboxRepository
 
-from .values import (
-    deserialize_attribute,
-    number_from_item,
-    string_from_item,
+from .queries.outbox import (
+    claim_message,
+    confirm_message,
+    message_from_item,
+    query_due_messages,
+    reschedule_message,
 )
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
 OUTBOX_PUBLISHED = "PUBLISHED"
-OUTBOX_INDEX = "status-nextAttemptAt-index"
-OUTBOX_CLAIM_LIMIT = 50
 
 
 class OutboxLeaseLostError(RuntimeError):
@@ -67,25 +67,13 @@ class DynamoDBOutbox(OutboxRepository):
             cursor: dict[str, Any] | None = None
 
             while True:
-                request: dict[str, Any] = {
-                    "TableName": self.table_name,
-                    "IndexName": OUTBOX_INDEX,
-                    "KeyConditionExpression": "#status = :status AND #next_attempt <= :now",
-                    "ExpressionAttributeNames": {
-                        "#status": "status",
-                        "#next_attempt": "nextAttemptAt",
-                    },
-                    "ExpressionAttributeValues": {
-                        ":status": {"S": status},
-                        ":now": {"N": str(now)},
-                    },
-                    "Limit": OUTBOX_CLAIM_LIMIT,
-                }
-
-                if cursor is not None:
-                    request["ExclusiveStartKey"] = cursor
-
-                page = self.client.query(**request)
+                page = query_due_messages(
+                    self.client,
+                    self.table_name,
+                    status,
+                    now,
+                    cursor,
+                )
 
                 for item in page.get("Items", []):
                     message = self._try_claim(item, status, now, lease_duration)
@@ -117,29 +105,15 @@ class DynamoDBOutbox(OutboxRepository):
         lease_until = now + lease_duration
 
         try:
-            updated = self.client.update_item(
-                TableName=self.table_name,
-                Key={"messageId": {"S": message_id}},
-                ConditionExpression="#status = :status AND #next_attempt = :due_at",
-                UpdateExpression=(
-                    "SET #status = :claimed, #lease_token = :lease_token, "
-                    "#next_attempt = :lease_until ADD #attempts :one"
-                ),
-                ExpressionAttributeNames={
-                    "#status": "status",
-                    "#next_attempt": "nextAttemptAt",
-                    "#lease_token": "leaseToken",
-                    "#attempts": "attempts",
-                },
-                ExpressionAttributeValues={
-                    ":status": {"S": status},
-                    ":due_at": {"N": due_at},
-                    ":claimed": {"S": OUTBOX_CLAIMED},
-                    ":lease_token": {"S": lease_token},
-                    ":lease_until": {"N": str(lease_until)},
-                    ":one": {"N": "1"},
-                },
-                ReturnValues="ALL_NEW",
+            updated = claim_message(
+                self.client,
+                self.table_name,
+                message_id,
+                status,
+                OUTBOX_CLAIMED,
+                due_at,
+                lease_token,
+                lease_until,
             )
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
@@ -152,7 +126,7 @@ class DynamoDBOutbox(OutboxRepository):
         if not isinstance(claimed, dict):
             raise RuntimeError("DynamoDB did not return the claimed outbox record")
 
-        envelope = self._envelope(cast(dict[str, Any], claimed))
+        envelope = message_from_item(cast(dict[str, Any], claimed))
 
         return OutboxMessage(
             message_id=message_id,
@@ -161,32 +135,18 @@ class DynamoDBOutbox(OutboxRepository):
         )
 
     def _confirm(self, message: OutboxMessage) -> None:
-        now = datetime.fromtimestamp(self.clock(), UTC).isoformat().replace("+00:00", "Z")
+        published_at = datetime.fromtimestamp(self.clock(), UTC).isoformat().replace("+00:00", "Z")
 
         try:
-            self.client.update_item(
-                TableName=self.table_name,
-                Key={"messageId": {"S": message.message_id}},
-                ConditionExpression=(
-                    "#status = :claimed AND #lease_token = :lease_token "
-                    "AND #next_attempt > :lease_now"
-                ),
-                UpdateExpression=(
-                    "SET #status = :published, #published_at = :now REMOVE #lease_token"
-                ),
-                ExpressionAttributeNames={
-                    "#status": "status",
-                    "#lease_token": "leaseToken",
-                    "#published_at": "publishedAt",
-                    "#next_attempt": "nextAttemptAt",
-                },
-                ExpressionAttributeValues={
-                    ":claimed": {"S": OUTBOX_CLAIMED},
-                    ":lease_token": {"S": message.lease_token},
-                    ":published": {"S": OUTBOX_PUBLISHED},
-                    ":now": {"S": now},
-                    ":lease_now": {"N": str(self.clock())},
-                },
+            confirm_message(
+                self.client,
+                self.table_name,
+                message.message_id,
+                message.lease_token,
+                OUTBOX_CLAIMED,
+                OUTBOX_PUBLISHED,
+                published_at,
+                self.clock(),
             )
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
@@ -198,41 +158,18 @@ class DynamoDBOutbox(OutboxRepository):
         next_attempt_at = self.clock() + delay
 
         try:
-            self.client.update_item(
-                TableName=self.table_name,
-                Key={"messageId": {"S": message.message_id}},
-                ConditionExpression=(
-                    "#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :now"
-                ),
-                UpdateExpression=(
-                    "SET #status = :pending, #next_attempt = :next_attempt REMOVE #lease_token"
-                ),
-                ExpressionAttributeNames={
-                    "#status": "status",
-                    "#lease_token": "leaseToken",
-                    "#next_attempt": "nextAttemptAt",
-                },
-                ExpressionAttributeValues={
-                    ":claimed": {"S": OUTBOX_CLAIMED},
-                    ":lease_token": {"S": message.lease_token},
-                    ":pending": {"S": OUTBOX_PENDING},
-                    ":next_attempt": {"N": str(next_attempt_at)},
-                    ":now": {"N": str(self.clock())},
-                },
+            reschedule_message(
+                self.client,
+                self.table_name,
+                message.message_id,
+                message.lease_token,
+                OUTBOX_CLAIMED,
+                OUTBOX_PENDING,
+                next_attempt_at,
+                self.clock(),
             )
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
                 raise OutboxLeaseLostError("outbox message lease is no longer owned") from error
 
             raise
-
-    @staticmethod
-    def _envelope(item: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "messageId": string_from_item(item, "messageId", "outbox record"),
-            "correlationId": string_from_item(item, "correlationId", "outbox record"),
-            "type": string_from_item(item, "type", "outbox record"),
-            "version": number_from_item(item, "version", "outbox record"),
-            "occurredAt": string_from_item(item, "occurredAt", "outbox record"),
-            "payload": deserialize_attribute(item.get("payload", {})),
-        }

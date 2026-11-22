@@ -8,28 +8,14 @@ from botocore.exceptions import ClientError
 from domain import CaptureAllocator, CaptureReservation, new_reservation_id
 
 from .error_handling import is_conditional_failure
+from .queries.alloc import (
+    read_slot,
+    release_slot,
+    renew_slot,
+    reservation_from_item,
+    reserve_slot,
+)
 from .values import number_from_item
-
-
-def reservation_from_item(
-    slot_id: str,
-    item: dict[str, Any],
-) -> CaptureReservation:
-    try:
-        attempt_id = item["ownerAttemptId"]["S"]
-        reservation_id = item["reservationId"]["S"]
-        fence = int(number_from_item(item, "fence", "browser slot"))
-        lease_until = number_from_item(item, "leaseUntil", "browser slot")
-    except (KeyError, TypeError, ValueError) as error:
-        raise RuntimeError("DynamoDB returned an invalid browser slot") from error
-
-    return CaptureReservation(
-        attempt_id=attempt_id,
-        reservation_id=reservation_id,
-        slot_id=slot_id,
-        fence=fence,
-        lease_until=lease_until,
-    )
 
 
 class CaptureReservationLostError(RuntimeError):
@@ -97,35 +83,20 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
             lease_until = now + self.lease_duration
 
             try:
-                response = self.client.update_item(
-                    TableName=self.table_name,
-                    Key={"slotId": {"S": slot_id}},
-                    UpdateExpression=(
-                        "SET #owner = :attempt, #reservation = :reservation, "
-                        "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one"
-                    ),
-                    ConditionExpression=("attribute_not_exists(#owner) OR #lease <= :now"),
-                    ExpressionAttributeNames={
-                        "#owner": "ownerAttemptId",
-                        "#reservation": "reservationId",
-                        "#lease": "leaseUntil",
-                        "#fence": "fence",
-                    },
-                    ExpressionAttributeValues={
-                        ":attempt": {"S": attempt_id},
-                        ":reservation": {"S": reservation_id},
-                        ":lease": {"N": str(lease_until)},
-                        ":now": {"N": str(now)},
-                        ":zero": {"N": "0"},
-                        ":one": {"N": "1"},
-                    },
-                    ReturnValues="ALL_NEW",
+                response = reserve_slot(
+                    self.client,
+                    self.table_name,
+                    slot_id,
+                    attempt_id,
+                    reservation_id,
+                    lease_until,
+                    now,
                 )
             except ClientError as error:
                 if not is_conditional_failure(error):
                     raise
 
-                existing = self._read_slot(slot_id)
+                existing = read_slot(self.client, self.table_name, slot_id)
 
                 if (
                     existing is not None
@@ -146,28 +117,15 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         lease_until = now + self.lease_duration
 
         try:
-            response = self.client.update_item(
-                TableName=self.table_name,
-                Key={"slotId": {"S": reservation.slot_id}},
-                UpdateExpression="SET #lease = :lease",
-                ConditionExpression=(
-                    "#owner = :attempt AND #reservation = :reservation "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
-                ExpressionAttributeNames={
-                    "#owner": "ownerAttemptId",
-                    "#reservation": "reservationId",
-                    "#fence": "fence",
-                    "#lease": "leaseUntil",
-                },
-                ExpressionAttributeValues={
-                    ":attempt": {"S": reservation.attempt_id},
-                    ":reservation": {"S": reservation.reservation_id},
-                    ":fence": {"N": str(reservation.fence)},
-                    ":lease": {"N": str(lease_until)},
-                    ":now": {"N": str(now)},
-                },
-                ReturnValues="ALL_NEW",
+            response = renew_slot(
+                self.client,
+                self.table_name,
+                reservation.slot_id,
+                reservation.attempt_id,
+                reservation.reservation_id,
+                reservation.fence,
+                lease_until,
+                now,
             )
         except ClientError as error:
             if is_conditional_failure(error):
@@ -177,30 +135,17 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
             raise
 
-        renewed = reservation_from_item(reservation.slot_id, response["Attributes"])
-
-        return renewed
+        return reservation_from_item(reservation.slot_id, response["Attributes"])
 
     def _release(self, reservation: CaptureReservation) -> None:
         try:
-            self.client.update_item(
-                TableName=self.table_name,
-                Key={"slotId": {"S": reservation.slot_id}},
-                UpdateExpression="REMOVE #owner, #reservation, #lease",
-                ConditionExpression=(
-                    "#owner = :attempt AND #reservation = :reservation AND #fence = :fence"
-                ),
-                ExpressionAttributeNames={
-                    "#owner": "ownerAttemptId",
-                    "#reservation": "reservationId",
-                    "#lease": "leaseUntil",
-                    "#fence": "fence",
-                },
-                ExpressionAttributeValues={
-                    ":attempt": {"S": reservation.attempt_id},
-                    ":reservation": {"S": reservation.reservation_id},
-                    ":fence": {"N": str(reservation.fence)},
-                },
+            release_slot(
+                self.client,
+                self.table_name,
+                reservation.slot_id,
+                reservation.attempt_id,
+                reservation.reservation_id,
+                reservation.fence,
             )
         except ClientError as error:
             if not is_conditional_failure(error):
@@ -214,7 +159,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         for slot_number in range(self.slot_count):
             slot_id = str(slot_number)
 
-            item = self._read_slot(slot_id)
+            item = read_slot(self.client, self.table_name, slot_id)
 
             if (
                 item is not None
@@ -225,14 +170,3 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                 return reservation_from_item(slot_id, item)
 
         return None
-
-    def _read_slot(self, slot_id: str) -> dict[str, Any] | None:
-        response = self.client.get_item(
-            TableName=self.table_name,
-            Key={"slotId": {"S": slot_id}},
-            ConsistentRead=True,
-        )
-
-        item = response.get("Item")
-
-        return item if item else None
