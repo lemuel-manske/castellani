@@ -17,7 +17,7 @@ Install the matching Playwright browser with `uv run playwright install chromium
 - `make run`: start the Capture API and background worker runtime.
 - `make fmt`: format and lint the Python service.
 - `make test-unit`: run unit tests.
-- `make test-integration`: run integration tests requiring DynamoDB Local and RabbitMQ.
+- `make test-integration`: run integration tests requiring DynamoDB Local and RabbitMQ; start both first with `make db-up`.
 - `make check`: run static analysis.
 
 The local recording prototype uses pywb as an HTTP(S) recording proxy. The runtime uses a durable RabbitMQ command queue and a DynamoDB-backed transactional outbox; publisher confirms are required before an outbox record is marked as published.
