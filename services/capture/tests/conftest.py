@@ -1,5 +1,5 @@
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import aio_pika
 import pytest
@@ -49,7 +49,7 @@ def s3() -> FakeS3:
 
 
 @pytest.fixture
-async def rabbitmq() -> Iterator[AbstractRobustConnection]:
+async def rabbitmq() -> AsyncIterator[AbstractRobustConnection]:
     connection = await aio_pika.connect_robust(
         os.getenv(
             "RABBITMQ_URL",
