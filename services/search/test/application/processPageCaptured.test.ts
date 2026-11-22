@@ -114,3 +114,39 @@ it("leaves a snapshot with a live claim untouched", async () => {
   expect(readMock).not.toHaveBeenCalled();
   expect(indexMock).not.toHaveBeenCalled();
 });
+
+it("marks the snapshot terminal after the maximum indexing attempt fails", async () => {
+  const claim = {
+    archiveId: "archive-1",
+    snapshotId: "snapshot-1",
+    token: "claim-5",
+    attempts: 5,
+  };
+  const completeMock = vi.fn().mockResolvedValue(undefined);
+  const releaseMock = vi.fn().mockResolvedValue(undefined);
+  const ledger: IndexingLedger = {
+    claim: vi.fn().mockResolvedValue({ status: "CLAIMED", claim }),
+    complete: completeMock,
+    release: releaseMock,
+  };
+  const capturedPageReader: CapturedPageReader = {
+    read: vi.fn().mockRejectedValue(new Error("artifact unavailable")),
+  };
+  const documentWriter: SearchDocumentWriter = { index: vi.fn() };
+
+  await expect(
+    processPageCaptured(event, {
+      ledger,
+      capturedPageReader,
+      documentWriter,
+      maxAttempts: 5,
+    }),
+  ).resolves.toEqual({ status: "COMPLETED", outcome: "FAILED" });
+
+  expect(completeMock).toHaveBeenCalledWith(
+    claim,
+    "FAILED",
+    "INDEXING_ATTEMPTS_EXHAUSTED",
+  );
+  expect(releaseMock).not.toHaveBeenCalled();
+});
