@@ -1,0 +1,71 @@
+import { randomUUID } from "node:crypto";
+import * as amqp from "amqplib";
+import {
+  startPageCapturedConsumer,
+  type PageCapturedConsumerTopology,
+} from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
+import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
+
+const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
+
+function createRabbitMqTestSupport() {
+  const suffix = randomUUID().replaceAll("-", "");
+  const topology: PageCapturedConsumerTopology = {
+    eventsExchange: `search-integration-events-${suffix}`,
+    routingKey: "PageCaptured",
+    queue: `search-integration-queue-${suffix}`,
+    deadLetterExchange: `search-integration-dead-${suffix}`,
+    deadLetterQueue: `search-integration-dead-queue-${suffix}`,
+  };
+
+  let connection: amqp.ChannelModel | undefined;
+  let consumerChannel: amqp.Channel | undefined;
+  let publisherChannel: amqp.ConfirmChannel | undefined;
+
+  return {
+    async setup(
+      handle: (event: PageCapturedEvent) => Promise<unknown>,
+    ): Promise<void> {
+      connection = await amqp.connect(
+        SEARCH_RABBITMQ_URL ?? "amqp://localhost",
+      );
+      consumerChannel = await connection.createChannel();
+      publisherChannel = await connection.createConfirmChannel();
+      await startPageCapturedConsumer(consumerChannel, handle, topology);
+    },
+
+    async publish(event: unknown): Promise<void> {
+      if (publisherChannel === undefined) {
+        throw new Error("RabbitMQ test support has not been initialized");
+      }
+
+      publisherChannel.publish(
+        topology.eventsExchange,
+        topology.routingKey,
+        Buffer.from(JSON.stringify(event)),
+        {
+          contentType: "application/json",
+          persistent: true,
+        },
+      );
+      await publisherChannel.waitForConfirms();
+    },
+
+    async teardown(): Promise<void> {
+      await publisherChannel?.close().catch(() => undefined);
+      await consumerChannel?.close().catch(() => undefined);
+
+      if (connection !== undefined) {
+        const cleanup = await connection.createChannel();
+        await cleanup.deleteQueue(topology.queue);
+        await cleanup.deleteQueue(topology.deadLetterQueue);
+        await cleanup.deleteExchange(topology.eventsExchange);
+        await cleanup.deleteExchange(topology.deadLetterExchange);
+        await cleanup.close();
+        await connection.close();
+      }
+    },
+  };
+}
+
+export { SEARCH_RABBITMQ_URL, createRabbitMqTestSupport };
