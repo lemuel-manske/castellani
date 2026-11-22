@@ -43,6 +43,7 @@ async def test_release_requeues_and_records_capture_page(
 
     assert task["state"] == {"S": "PENDING"}
     assert task["fence"] == {"N": "1"}
+    assert task["attemptCount"] == {"N": "0"}
 
     assert len(outbox_items(dynamodb)) == 1
 
