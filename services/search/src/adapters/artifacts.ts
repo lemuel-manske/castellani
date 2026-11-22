@@ -24,6 +24,12 @@ interface ArtifactObjectReader {
   getObject(reference: ArtifactReference): Promise<AsyncIterable<Uint8Array>>;
 }
 
+interface CapturedWarcResponse {
+  targetUrl: string;
+  content: string;
+  contentType: string;
+}
+
 class ArtifactIntegrityError extends Error {
   constructor(message: string) {
     super(message);
@@ -68,24 +74,27 @@ async function readWarcArtifact(
   reference: ArtifactReference,
   page: CapturedPageReference,
   reader: ArtifactObjectReader,
-): Promise<{ content: string; contentType: string } | null> {
+): Promise<CapturedWarcResponse | null> {
   const body = await reader.getObject(reference);
   const parser = new WARCParser(verifiedChunks(body, reference));
-  let requestedUrlResponse: { content: string; contentType: string } | null = null;
+  const finalUrl = page.finalUrl ?? page.url;
+  let requestedUrlResponse: CapturedWarcResponse | null = null;
+  let finalUrlResponse: CapturedWarcResponse | null = null;
 
   for await (const record of parser) {
     if (record.warcType !== "response") {
       continue;
     }
 
-    const target = record.warcTargetURI;
+    const targetUrl = record.warcTargetURI;
 
-    if (target !== page.url && target !== (page.finalUrl ?? page.url)) {
+    if (targetUrl !== page.url && targetUrl !== finalUrl) {
       continue;
     }
 
     const response = record.getResponseInfo();
     const candidate = {
+      targetUrl,
       content: await record.contentText(),
       contentType:
         response.headers.get("content-type") ??
@@ -93,14 +102,15 @@ async function readWarcArtifact(
         "application/octet-stream",
     };
 
-    if (target === (page.finalUrl ?? page.url)) {
-      return candidate;
+    if (targetUrl === finalUrl) {
+      finalUrlResponse = candidate;
+      continue;
     }
 
     requestedUrlResponse = candidate;
   }
 
-  return requestedUrlResponse;
+  return finalUrlResponse ?? requestedUrlResponse;
 }
 
 async function readCapturedPage(
@@ -114,7 +124,8 @@ async function readCapturedPage(
     );
   }
 
-  let requestedUrlResponse: { content: string; contentType: string } | null = null;
+  const finalUrl = page.finalUrl ?? page.url;
+  let requestedUrlResponse: CapturedWarcResponse | null = null;
 
   for (const artifact of artifacts) {
     const response = await readWarcArtifact(artifact, page, reader);
@@ -123,12 +134,12 @@ async function readCapturedPage(
       continue;
     }
 
-    if (response.contentType && page.finalUrl && page.finalUrl !== page.url) {
+    if (response.targetUrl === finalUrl) {
       return {
         archiveId: page.archiveId,
         snapshotId: page.snapshotId,
         url: page.url,
-        finalUrl: page.finalUrl,
+        finalUrl,
         capturedAt: page.capturedAt,
         contentType: response.contentType,
         content: response.content,
@@ -148,7 +159,7 @@ async function readCapturedPage(
     archiveId: page.archiveId,
     snapshotId: page.snapshotId,
     url: page.url,
-    finalUrl: page.finalUrl ?? page.url,
+    finalUrl,
     capturedAt: page.capturedAt,
     contentType: response.contentType,
     content: response.content,
