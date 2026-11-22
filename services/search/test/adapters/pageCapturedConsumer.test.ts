@@ -39,10 +39,12 @@ it("parses a valid PageCaptured event envelope", () => {
 it("rejects an event whose correlation identity differs from its archive", () => {
   expect(
     parsePageCaptured(
-      Buffer.from(JSON.stringify({
-        ...event,
-        correlationId: "another-archive",
-      })),
+      Buffer.from(
+        JSON.stringify({
+          ...event,
+          correlationId: "another-archive",
+        }),
+      ),
     ),
   ).toBeNull();
 });
@@ -50,21 +52,23 @@ it("rejects an event whose correlation identity differs from its archive", () =>
 it("rejects malformed artifact references", () => {
   expect(
     parsePageCaptured(
-      Buffer.from(JSON.stringify({
-        ...event,
-        payload: {
-          ...event.payload,
-          warcArtifacts: [{ bucket: "capture-artifacts", key: "missing-checksum" }],
-        },
-      })),
+      Buffer.from(
+        JSON.stringify({
+          ...event,
+          payload: {
+            ...event.payload,
+            warcArtifacts: [
+              { bucket: "capture-artifacts", key: "missing-checksum" },
+            ],
+          },
+        }),
+      ),
     ),
   ).toBeNull();
 });
 
 it("rejects unsupported event versions", () => {
   expect(
-    parsePageCaptured(
-      Buffer.from(JSON.stringify({ ...event, version: 2 })),
-    ),
+    parsePageCaptured(Buffer.from(JSON.stringify({ ...event, version: 2 }))),
   ).toBeNull();
 });
