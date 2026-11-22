@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { canExposeSnapshot, reconcileManifest } from "../../src/domain/indexing.js";
+import {
+  canExposeSnapshot,
+  reconcileManifest,
+} from "../../src/domain/indexing.js";
 import {
   emptyPublicationFacts,
   recordPublicationDecision,
@@ -8,7 +11,9 @@ import {
 
 const manifest = [{ snapshotId: "snapshot-1" }, { snapshotId: "snapshot-2" }];
 
-it("identifies work missing from the ledger when completion arrives first", () => {
+it(
+  "identifies work missing from the ledger when completion arrives first",
+  () => {
   const result = reconcileManifest(manifest, [
     { snapshotId: "snapshot-1", outcome: "INDEXED" },
   ]);
@@ -22,7 +27,9 @@ it("identifies work missing from the ledger when completion arrives first", () =
   });
 });
 
-it("counts each expected snapshot once and treats terminal failures as accounted", () => {
+it(
+  "counts each expected snapshot once and treats terminal failures as accounted",
+  () => {
   const result = reconcileManifest(manifest, [
     { snapshotId: "snapshot-1", outcome: "INDEXED" },
     { snapshotId: "snapshot-2", outcome: "FAILED" },
@@ -82,17 +89,27 @@ const published = recordReplayPublished(
 );
 
 it("exposes only indexed snapshots in the manifest after publication", () => {
-  expect(canExposeSnapshot("snapshot-1", manifest, "INDEXED", published)).toBe(true);
-  expect(canExposeSnapshot("snapshot-1", manifest, "PENDING", published)).toBe(false);
-  expect(canExposeSnapshot("snapshot-3", manifest, "INDEXED", published)).toBe(false);
+  expect(
+    canExposeSnapshot("snapshot-1", manifest, "INDEXED", published),
+  ).toBe(true);
+  expect(
+    canExposeSnapshot("snapshot-1", manifest, "PENDING", published),
+  ).toBe(false);
+  expect(
+    canExposeSnapshot("snapshot-3", manifest, "INDEXED", published),
+  ).toBe(false);
 });
 
-it("keeps indexed documents hidden before both publication facts arrive", () => {
+it(
+  "keeps indexed documents hidden before both publication facts arrive",
+  () => {
   const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), {
     archiveId: "archive-1",
     decisionVersion: 1,
     packageDigest: "digest",
   });
 
-  expect(canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly)).toBe(false);
+  expect(
+    canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
+  ).toBe(false);
 });
