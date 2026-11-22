@@ -20,6 +20,7 @@ class FakeS3:
 
     def head_object(self, Bucket: str, Key: str) -> dict[str, Any]:
         body, metadata = self.objects[(Bucket, Key)]
+
         return {
             "ContentLength": len(body),
             "Metadata": metadata,
@@ -34,14 +35,17 @@ class FakeS3:
         VersionIdMarker: str | None = None,
     ) -> dict[str, Any]:
         del KeyMarker, VersionIdMarker
+
         versions = [
             {"Key": key, "VersionId": "version-1"}
             for bucket, key in self.objects
             if bucket == Bucket and key.startswith(Prefix)
         ]
+
         return {"Versions": versions, "DeleteMarkers": [], "IsTruncated": False}
 
     def delete_objects(self, Bucket: str, Delete: dict[str, Any]) -> dict[str, Any]:
         for item in Delete["Objects"]:
             self.objects.pop((Bucket, item["Key"]), None)
+
         return {"Deleted": Delete["Objects"]}
