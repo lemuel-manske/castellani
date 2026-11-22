@@ -30,7 +30,6 @@ async def test_claim_sets_new_fence_for_pending_task(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")
@@ -56,7 +55,6 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
-        attempt_id_factory=lambda: next(attempt_ids),
     )
 
     first = await claims.claim("archive-1", "url-1")
@@ -85,7 +83,6 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: next(attempt_ids),
     )
 
     previous = await claims.claim("archive-1", "url-1")
@@ -114,7 +111,6 @@ async def test_claim_requires_an_open_archive_run(dynamodb: DynamoDBClient) -> N
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")
@@ -137,7 +133,6 @@ async def test_renewal_extends_lease_preserving_owner_and_fence(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")
@@ -166,7 +161,6 @@ async def test_renewal_is_rejected_after_the_archive_run_closes(
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")
@@ -193,7 +187,6 @@ async def test_concurrent_claims_have_exactly_one_winner_for_a_page(
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
-        attempt_id_factory=lambda: next(attempt_ids),
     )
 
     results = await asyncio.gather(*(claims.claim("archive-1", "url-1") for _ in range(20)))
