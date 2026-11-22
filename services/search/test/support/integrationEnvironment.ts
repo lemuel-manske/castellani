@@ -8,14 +8,8 @@ import {
   SEARCH_OPENSEARCH_URL,
   createOpenSearchTestSupport,
 } from "./openSearch.js";
-import {
-  SEARCH_RABBITMQ_URL,
-  createRabbitMqTestSupport,
-} from "./rabbitMq.js";
-import {
-  SEARCH_S3_ENDPOINT_URL,
-  createS3TestSupport,
-} from "./s3.js";
+import { SEARCH_RABBITMQ_URL, createRabbitMqTestSupport } from "./rabbitMq.js";
+import { SEARCH_S3_ENDPOINT_URL, createS3TestSupport } from "./s3.js";
 
 const clock = { now: 1_000_000 };
 const dynamodb = createDynamoDbTestSupport(() => clock.now);
@@ -95,7 +89,9 @@ function setupIntegrationEnvironment(
 
   afterAll(async () => {
     await Promise.allSettled(
-      [...selected].reverse().map((service) => integrations[service].teardown()),
+      [...selected]
+        .reverse()
+        .map((service) => integrations[service].teardown()),
     );
   });
 }

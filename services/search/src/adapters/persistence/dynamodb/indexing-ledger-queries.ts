@@ -1,7 +1,4 @@
-import {
-  GetCommand,
-  UpdateCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { IndexingOutcome } from "../../../domain.js";
 import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";

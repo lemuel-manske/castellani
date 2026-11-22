@@ -94,6 +94,7 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
   }
 
   const event = value;
+
   if (event.payload.archiveId !== event.correlationId) {
     return null;
   }
@@ -119,11 +120,13 @@ async function handlePageCapturedMessage(
 
   try {
     const result = await handle(event);
+
     if (isRecord(result) && result.status === "BUSY") {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       channel.nack(message, false, true);
       return;
     }
+
     channel.ack(message);
   } catch {
     await new Promise((resolve) => setTimeout(resolve, 1000));

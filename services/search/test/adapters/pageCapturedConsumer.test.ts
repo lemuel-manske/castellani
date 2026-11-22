@@ -58,7 +58,9 @@ it("parses the PageCaptured envelope emitted by Capture", () => {
 it("rejects an event whose correlation identity differs from its archive", () => {
   expect(
     parsePageCaptured(
-      Buffer.from(JSON.stringify({ ...event, correlationId: "another-archive" })),
+      Buffer.from(
+        JSON.stringify({ ...event, correlationId: "another-archive" }),
+      ),
     ),
   ).toBeNull();
 });
@@ -71,7 +73,9 @@ it("rejects malformed artifact references", () => {
           ...event,
           payload: {
             ...event.payload,
-            warcArtifacts: [{ bucket: "capture-artifacts", key: "missing-checksum" }],
+            warcArtifacts: [
+              { bucket: "capture-artifacts", key: "missing-checksum" },
+            ],
           },
         }),
       ),

@@ -68,7 +68,9 @@ function waitForReconnectDelay(
 class SearchRuntime {
   constructor(private readonly settings: SearchSettings) {}
 
-  async start(signal: AbortSignal = new AbortController().signal): Promise<void> {
+  async start(
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<void> {
     if (isSignalAborted(signal)) {
       return;
     }

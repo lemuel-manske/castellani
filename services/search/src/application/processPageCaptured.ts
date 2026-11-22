@@ -76,6 +76,7 @@ async function processPageCaptured(
   } catch (error) {
     const reason =
       error instanceof Error ? error.message : "unknown indexing error";
+
     if (claimResult.claim.attempts >= (dependencies.maxAttempts ?? 5)) {
       await dependencies.ledger.complete(
         claimResult.claim,

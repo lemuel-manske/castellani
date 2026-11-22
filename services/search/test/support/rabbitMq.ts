@@ -61,9 +61,15 @@ function createRabbitMqTestSupport() {
 
         try {
           await cleanup.deleteQueue(topology.queue).catch(() => undefined);
-          await cleanup.deleteQueue(topology.deadLetterQueue).catch(() => undefined);
-          await cleanup.deleteExchange(topology.eventsExchange).catch(() => undefined);
-          await cleanup.deleteExchange(topology.deadLetterExchange).catch(() => undefined);
+          await cleanup
+            .deleteQueue(topology.deadLetterQueue)
+            .catch(() => undefined);
+          await cleanup
+            .deleteExchange(topology.eventsExchange)
+            .catch(() => undefined);
+          await cleanup
+            .deleteExchange(topology.deadLetterExchange)
+            .catch(() => undefined);
         } finally {
           await cleanup.close().catch(() => undefined);
         }

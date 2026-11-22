@@ -31,7 +31,9 @@ it("allows only one concurrent claim for the same snapshot", async () => {
     dynamodb.ledger.claim("archive-2", "snapshot-2", "message-2b", 120),
   ]);
 
-  expect(results.filter((result) => result.status === "CLAIMED")).toHaveLength(1);
+  expect(results.filter((result) => result.status === "CLAIMED")).toHaveLength(
+    1,
+  );
   expect(results.filter((result) => result.status === "BUSY")).toHaveLength(1);
 });
 

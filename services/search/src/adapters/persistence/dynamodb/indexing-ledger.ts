@@ -27,7 +27,9 @@ class IndexingClaimLostError extends Error {
 
 class IndexingIdentityConflictError extends Error {
   constructor(snapshotId: string) {
-    super(`snapshot identity conflicts with existing ledger entry: ${snapshotId}`);
+    super(
+      `snapshot identity conflicts with existing ledger entry: ${snapshotId}`,
+    );
     this.name = "IndexingIdentityConflictError";
   }
 }
@@ -52,6 +54,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     if (!archiveId || !snapshotId || !messageId) {
       throw new Error("archiveId, snapshotId, and messageId must not be empty");
     }
+
     if (!Number.isFinite(leaseDurationSeconds) || leaseDurationSeconds <= 0) {
       throw new Error("lease duration must be positive");
     }
@@ -85,10 +88,16 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         throw error;
       }
 
-      const item = await getIndexingEntry(this.client, this.tableName, snapshotId);
+      const item = await getIndexingEntry(
+        this.client,
+        this.tableName,
+        snapshotId,
+      );
+
       if (item === undefined) {
         throw error;
       }
+
       if (item.archiveId !== archiveId) {
         throw new IndexingIdentityConflictError(snapshotId);
       }
@@ -124,6 +133,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       ) {
         throw new IndexingClaimLostError(claim.snapshotId);
       }
+
       throw error;
     }
   }
@@ -142,6 +152,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       ) {
         throw new IndexingClaimLostError(claim.snapshotId);
       }
+
       throw error;
     }
   }

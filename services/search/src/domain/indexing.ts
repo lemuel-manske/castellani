@@ -18,11 +18,13 @@ function reconcileManifest(
     if (!snapshot.snapshotId) {
       throw new Error("manifest contains an empty snapshotId");
     }
+
     if (expected.has(snapshot.snapshotId)) {
       throw new Error(
         "manifest contains duplicate snapshotId: " + snapshot.snapshotId,
       );
     }
+
     expected.add(snapshot.snapshotId);
   }
 
@@ -31,13 +33,16 @@ function reconcileManifest(
     if (!entry.snapshotId) {
       throw new Error("ledger contains an empty snapshotId");
     }
+
     const previous = ledger.get(entry.snapshotId);
+
     if (previous !== undefined && previous !== entry.outcome) {
       throw new Error(
         "ledger contains conflicting outcomes for snapshotId: " +
           entry.snapshotId,
       );
     }
+
     ledger.set(entry.snapshotId, entry.outcome);
   }
 
@@ -46,6 +51,7 @@ function reconcileManifest(
 
   for (const snapshotId of expected) {
     const outcome = ledger.get(snapshotId);
+
     if (outcome === undefined) {
       missingSnapshotIds.push(snapshotId);
     } else if (outcome !== "PENDING" && outcome !== "PROCESSING") {

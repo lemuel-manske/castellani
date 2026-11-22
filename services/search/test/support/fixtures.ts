@@ -24,8 +24,7 @@ function createCapturedPageFixture(
   const body =
     options.body ??
     "<html><head><title>Integrated content</title></head><body><h1>Integrated content</h1></body></html>";
-  const response =
-    `HTTP/1.1 200 OK\r\nContent-Type: ${contentType}\r\n\r\n${body}`;
+  const response = `HTTP/1.1 200 OK\r\nContent-Type: ${contentType}\r\n\r\n${body}`;
   const warc = [
     "WARC/1.1",
     "WARC-Type: response",

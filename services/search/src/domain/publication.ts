@@ -51,6 +51,7 @@ function recordPublicationDecision(
       "a compensated archive cannot be published",
     );
   }
+
   if (
     facts.replayPublication &&
     !sameIdentity(facts.replayPublication, identity)
@@ -59,10 +60,12 @@ function recordPublicationDecision(
       "publication decision conflicts with replay acknowledgement",
     );
   }
+
   if (facts.publicationDecision) {
     if (!sameIdentity(facts.publicationDecision, identity)) {
       throw new PublicationConflictError("conflicting publication decision");
     }
+
     return facts;
   }
 
@@ -81,6 +84,7 @@ function recordReplayPublished(
       "a compensated archive cannot be replay-published",
     );
   }
+
   if (
     facts.publicationDecision &&
     !sameIdentity(facts.publicationDecision, identity)
@@ -89,10 +93,12 @@ function recordReplayPublished(
       "replay acknowledgement conflicts with publication decision",
     );
   }
+
   if (facts.replayPublication) {
     if (!sameIdentity(facts.replayPublication, identity)) {
       throw new PublicationConflictError("conflicting replay publication");
     }
+
     return facts;
   }
 
@@ -112,13 +118,16 @@ function recordCompensationDecision(
   ) {
     throw new PublicationConflictError("invalid compensation decision");
   }
+
   if (facts.publicationDecision || facts.replayPublication) {
     throw new PublicationConflictError(
       "a publication fact prevents compensation",
     );
   }
+
   if (facts.compensationDecision) {
     const previous = facts.compensationDecision;
+
     if (
       previous.archiveId !== decision.archiveId ||
       previous.decisionVersion !== decision.decisionVersion ||
@@ -126,8 +135,10 @@ function recordCompensationDecision(
     ) {
       throw new PublicationConflictError("conflicting compensation decision");
     }
+
     return facts;
   }
+
   return { ...facts, compensationDecision: { ...decision } };
 }
 
