@@ -66,22 +66,23 @@ it("extracts the captured HTTP response from its WARC artifact", async () => {
     ),
   );
 
-  await expect(
-    readCapturedPage(page, [artifact.reference], artifact.reader),
-  ).resolves.toMatchObject({
+    await expect(
+      readCapturedPage(page, [artifact.reference], artifact.reader),
+    ).resolves.toMatchObject({
     archiveId: "archive-1",
     snapshotId: "snapshot-1",
     url: "https://example.com/start",
     finalUrl: "https://example.com/final",
     contentType: "text/html; charset=utf-8",
-    content: "<html><body>Archived page</body></html>",
-  });
-});
+      content: "<html><body>Archived page</body></html>",
+    });
+  },
+);
 
 it(
   "selects the final URL response when the WARC contains a redirect response",
   async () => {
-  const artifact = artifactFor(
+    const artifact = artifactFor(
     responseRecord(page.url, "<html><body>Redirect response</body></html>") +
       responseRecord(
         page.finalUrl ?? page.url,
@@ -92,15 +93,19 @@ it(
   await expect(
     readCapturedPage(page, [artifact.reference], artifact.reader),
   ).resolves.toMatchObject({
-    content: "<html><body>Final response</body></html>",
-  });
-});
+      content: "<html><body>Final response</body></html>",
+    });
+  },
+);
 
 it(
   "validates the complete artifact checksum before returning captured content",
   async () => {
   const artifact = artifactFor(
-    responseRecord(page.finalUrl ?? page.url, "<html><body>Archived page</body></html>"),
+    responseRecord(
+      page.finalUrl ?? page.url,
+      "<html><body>Archived page</body></html>",
+    ),
   );
 
   await expect(
@@ -109,8 +114,9 @@ it(
       [{ ...artifact.reference, sha256: "0".repeat(64) }],
       artifact.reader,
     ),
-  ).rejects.toBeInstanceOf(ArtifactIntegrityError);
-});
+    ).rejects.toBeInstanceOf(ArtifactIntegrityError);
+  },
+);
 
 it(
   "rejects artifacts whose declared size does not match the downloaded object",
@@ -140,5 +146,6 @@ it(
 
   await expect(
     readCapturedPage(page, [artifact.reference], artifact.reader),
-  ).rejects.toBeInstanceOf(CapturedResponseNotFoundError);
-});
+    ).rejects.toBeInstanceOf(CapturedResponseNotFoundError);
+  },
+);
