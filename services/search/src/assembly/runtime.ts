@@ -135,7 +135,7 @@ class SearchRuntime {
   ): Promise<void> {
     while (!isSignalAborted(signal)) {
       let connection: amqp.ChannelModel | undefined;
-      let channel: amqp.Channel | undefined;
+      let channel: amqp.ConfirmChannel | undefined;
 
       try {
         connection = await amqp.connect(this.settings.rabbitmqUrl);
@@ -145,7 +145,7 @@ class SearchRuntime {
           break;
         }
 
-        channel = await connection.createChannel();
+        channel = await connection.createConfirmChannel();
 
         if (isSignalAborted(signal)) {
           await channel.close();
