@@ -42,15 +42,15 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
   if (publicationLedgerReady && event.type === "CrawlCompleted") {
+    const artifactReader = createS3ArtifactReader(s3.client);
+
     await processCrawlCompleted(
       event.payload,
-      createS3ArtifactReader(s3.client),
+      artifactReader,
       dynamodb.manifestLedger,
       {
         ledger: dynamodb.ledger,
-        capturedPageReader: createWarcCapturedPageReader(
-          createS3ArtifactReader(s3.client),
-        ),
+        capturedPageReader: createWarcCapturedPageReader(artifactReader),
         documentWriter: createOpenSearchDocumentWriter(
           opensearch.client,
           opensearch.indexName,
