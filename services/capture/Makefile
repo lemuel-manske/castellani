@@ -15,7 +15,9 @@ test-unit:
 	uv run pytest -m "not integration"
 
 test-integration:
-	DYNAMODB_ENDPOINT_URL=http://localhost:8000 uv run pytest -m integration
+	DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
+		RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
+		uv run pytest -m integration
 
 test: test-unit test-integration
 
