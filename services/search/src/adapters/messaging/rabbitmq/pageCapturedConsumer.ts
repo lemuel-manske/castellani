@@ -8,6 +8,22 @@ const PAGE_CAPTURED_QUEUE = "castellani.search.page-captured";
 const DEAD_LETTER_EXCHANGE = "castellani.search.dead";
 const DEAD_LETTER_QUEUE = "castellani.search.page-captured.dead";
 
+interface PageCapturedConsumerTopology {
+  eventsExchange: string;
+  routingKey: string;
+  queue: string;
+  deadLetterExchange: string;
+  deadLetterQueue: string;
+}
+
+const DEFAULT_TOPOLOGY: PageCapturedConsumerTopology = {
+  eventsExchange: EVENTS_EXCHANGE,
+  routingKey: PAGE_CAPTURED_ROUTING_KEY,
+  queue: PAGE_CAPTURED_QUEUE,
+  deadLetterExchange: DEAD_LETTER_EXCHANGE,
+  deadLetterQueue: DEAD_LETTER_QUEUE,
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -143,24 +159,31 @@ async function handlePageCapturedMessage(
 async function startPageCapturedConsumer(
   channel: Channel,
   handle: (event: PageCapturedEvent) => Promise<unknown>,
+  topology: PageCapturedConsumerTopology = DEFAULT_TOPOLOGY,
 ): Promise<void> {
-  await channel.assertExchange(EVENTS_EXCHANGE, "topic", { durable: true });
-  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", {
+  await channel.assertExchange(topology.eventsExchange, "topic", {
     durable: true,
   });
-  await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
-  await channel.bindQueue(DEAD_LETTER_QUEUE, DEAD_LETTER_EXCHANGE, "");
-  await channel.assertQueue(PAGE_CAPTURED_QUEUE, {
+  await channel.assertExchange(topology.deadLetterExchange, "fanout", {
     durable: true,
-    arguments: { "x-dead-letter-exchange": DEAD_LETTER_EXCHANGE },
+  });
+  await channel.assertQueue(topology.deadLetterQueue, { durable: true });
+  await channel.bindQueue(
+    topology.deadLetterQueue,
+    topology.deadLetterExchange,
+    "",
+  );
+  await channel.assertQueue(topology.queue, {
+    durable: true,
+    arguments: { "x-dead-letter-exchange": topology.deadLetterExchange },
   });
   await channel.bindQueue(
-    PAGE_CAPTURED_QUEUE,
-    EVENTS_EXCHANGE,
-    PAGE_CAPTURED_ROUTING_KEY,
+    topology.queue,
+    topology.eventsExchange,
+    topology.routingKey,
   );
   await channel.prefetch(1);
-  await channel.consume(PAGE_CAPTURED_QUEUE, (message) => {
+  await channel.consume(topology.queue, (message) => {
     void handlePageCapturedMessage(channel, message, handle);
   });
 }
@@ -174,3 +197,4 @@ export {
   parsePageCaptured,
   startPageCapturedConsumer,
 };
+export type { PageCapturedConsumerTopology };
