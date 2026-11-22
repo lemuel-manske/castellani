@@ -9,10 +9,82 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     defaults:
       run:
         working-directory: services/search
+
+    env:
+      SEARCH_DYNAMODB_ENDPOINT_URL: http://localhost:8000
+      SEARCH_S3_ENDPOINT_URL: http://localhost:9000
+      SEARCH_OPENSEARCH_URL: http://localhost:9200
+      SEARCH_RABBITMQ_URL: amqp://castellani:castellani@localhost:5672/
+
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:3.3.2
+
+        ports:
+          - 8000:8000
+
+        options: >-
+          --health-cmd "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000'"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 20
+
+      minio:
+        image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio-secret
+
+        ports:
+          - 9000:9000
+
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 20
+
+        command: server /data
+
+      opensearch:
+        image: opensearchproject/opensearch:3.10.0
+
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+
+        ports:
+          - 9200:9200
+
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+      rabbitmq:
+        image: rabbitmq:4.1-management
+
+        env:
+          RABBITMQ_DEFAULT_USER: castellani
+          RABBITMQ_DEFAULT_PASS: castellani
+
+        ports:
+          - 5672:5672
+
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 20
+
     steps:
       - uses: actions/checkout@v4
 
@@ -26,10 +98,4 @@ jobs:
 
       - run: make check
 
-      - run: make test-infra-up
-
       - run: make test
-
-      - name: Stop integration infrastructure
-        if: always()
-        run: make test-infra-down
