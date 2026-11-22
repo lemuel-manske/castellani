@@ -1,0 +1,29 @@
+name: typescript @ Search
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/search
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+          cache-dependency-path: services/search/package-lock.json
+
+      - run: make install
+
+      - run: make check
+
+      - run: make test
