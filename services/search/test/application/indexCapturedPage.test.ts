@@ -8,9 +8,7 @@ import type {
   ArtifactReference,
   CapturedPageReference,
 } from "../../src/adapters/artifacts.js";
-import type {
-  SearchDocumentWriter,
-} from "../../src/application/indexCapturedPage.js";
+import type { SearchDocumentWriter } from "../../src/application/indexCapturedPage.js";
 
 const page: CapturedPageReference = {
   archiveId: "archive-1",
