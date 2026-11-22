@@ -23,7 +23,7 @@ const SEARCH_INDEX_BODY = {
       text: { type: "text" },
     },
   },
-};
+} as const;
 
 async function ensureSearchIndex(
   client: Client,
