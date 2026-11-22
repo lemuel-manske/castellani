@@ -12,8 +12,8 @@ Install the pinned Python toolchain and dependencies with `make install`.
 Install the matching Playwright browser with `uv run playwright install chromium`.
 
 - `make install`: download dependencies.
-- `make db-up`: start isolated DynamoDB Local and RabbitMQ.
-- `make db-down`: stop local dependencies.
+- `make test-infra-up`: start isolated DynamoDB Local and RabbitMQ.
+- `make test-infra-down`: stop local dependencies.
 - `make run`: start the Capture API and background worker runtime.
 - `make fmt`: format and lint the Python service.
 - `make test-unit`: run unit tests.
@@ -24,11 +24,11 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. The runti
 
 ## Configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `AWS_ACCESS_KEY_ID` | `test` | AWS SDK access key |
-| `AWS_SECRET_ACCESS_KEY` | `test` | AWS SDK secret key |
-| `AWS_EC2_METADATA_DISABLED` | `true` | Disable EC2 metadata service |
-| `DYNAMODB_ENDPOINT_URL` | `http://localhost:4566` | Optional DynamoDB-compatible endpoint |
-| `S3_ENDPOINT_URL` | `DYNAMODB_ENDPOINT_URL` when set | Optional S3-compatible endpoint; use `http://localhost:4566` with MiniStack |
-| `RABBITMQ_URL` | `amqp://castellani:local-development-only@localhost:5672/` | Message broker connection |
+| Variable | Description |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | AWS SDK access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS SDK secret key |
+| `AWS_EC2_METADATA_DISABLED` | Disable EC2 metadata service |
+| `DYNAMODB_ENDPOINT_URL` | Optional DynamoDB-compatible endpoint |
+| `S3_ENDPOINT_URL` | Optional S3-compatible endpoint; use `http://localhost:4566` with MiniStack |
+| `RABBITMQ_URL` | Message broker connection |

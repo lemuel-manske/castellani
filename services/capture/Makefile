@@ -1,13 +1,13 @@
-.PHONY: install run fmt test test-unit test-integration check db-up db-down
+.PHONY: install run fmt test test-unit test-integration check test-infra-up test-infra-down
 
 install:
 	uv sync --all-groups
 
 
-db-up:
+test-infra-up:
 	docker compose up -d --wait dynamodb rabbitmq
 
-db-down:
+test-infra-down:
 	docker compose down
 
 
