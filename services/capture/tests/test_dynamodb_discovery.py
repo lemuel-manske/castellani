@@ -1,12 +1,7 @@
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.domain import (
-    frontier_item,
-    outbox_items,
-    seed_frontier,
-    seed_run,
-)
 from support.clock import FakeClock
+from support.domain import outbox_items, seed_frontier, seed_run
 
 from adapters.persistence.dynamodb.task import (
     DynamoDBTaskRepository,
