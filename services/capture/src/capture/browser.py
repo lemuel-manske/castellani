@@ -89,7 +89,7 @@ class CaptureFailure(RuntimeError):
 
 
 class CaptureLimitExceeded(CaptureFailure):
-    pass
+    retryable = False
 
 
 class UnsafeCaptureRequest(CaptureFailure):
