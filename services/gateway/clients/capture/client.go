@@ -196,6 +196,7 @@ func (c *Client) session(
 	if raw != nil {
 		request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	}
+
 	data, err := c.execute(request, http.StatusOK)
 
 	if err != nil {
@@ -212,8 +213,15 @@ func (c *Client) session(
 func validateSession(data []byte, id, archiveID string) (Session, error) {
 	var v Session
 
-	if json.Unmarshal(data, &v) != nil || !httpx.ValidPathSegment(v.SessionID) || !httpx.ValidPathSegment(v.ArchiveID) ||
-		v.Status == "" || v.ExpiresAt == "" || (id != "" && v.SessionID != id) || (archiveID != "" && v.ArchiveID != archiveID) {
+	isValid := (json.Unmarshal(data, &v) == nil &&
+		httpx.ValidPathSegment(v.SessionID) &&
+		httpx.ValidPathSegment(v.ArchiveID) &&
+		v.Status != "" &&
+		v.ExpiresAt != "" &&
+		(id == "" || v.SessionID == id) &&
+		(archiveID == "" || v.ArchiveID == archiveID))
+
+	if !isValid {
 		return Session{}, ErrInvalidResponse
 	}
 
@@ -230,7 +238,9 @@ func (c *Client) GetWACZ(
 	if options.MetadataOnly {
 		method = http.MethodHead
 	}
+
 	path := common.ArchivePathPrefix + url.PathEscape(id) + common.WACZPathSuffix
+
 	request, err := c.request(
 		ctx,
 		method,
@@ -250,6 +260,7 @@ func (c *Client) GetWACZ(
 	if options.IfRange != "" {
 		request.Header.Set("If-Range", options.IfRange)
 	}
+
 	response, err := c.stream.Do(request)
 
 	if err != nil {
@@ -262,20 +273,24 @@ func (c *Client) GetWACZ(
 
 	if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusServiceUnavailable || response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
 		defer response.Body.Close()
+
 		data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 		if err != nil || len(data) > maxJSONBytes {
 			return WACZ{}, ErrInvalidResponse
 		}
+
 		failure, err := parseFailure(response.StatusCode, data)
 
 		if err != nil {
 			return WACZ{}, err
 		}
+
 		failure.ContentRange = response.Header.Get("Content-Range")
 
 		return WACZ{}, failure
 	}
+
 	success := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
 
 	if !success || response.Header.Get(httpx.HeaderContentType) != httpx.WACZMediaType {
@@ -306,6 +321,7 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 		)
 	}
 	defer response.Body.Close()
+
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 	if err != nil {
@@ -326,7 +342,13 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 			return nil, ErrInvalidResponse
 		}
 
-		return nil, failureError(response.StatusCode, data)
+		failure, err := parseFailure(response.StatusCode, data)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, failure
 	}
 
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
@@ -353,16 +375,6 @@ func (c *Client) request(
 		target.String(),
 		bytes.NewReader(body),
 	)
-}
-
-func failureError(status int, data []byte) error {
-	failure, err := parseFailure(status, data)
-
-	if err != nil {
-		return err
-	}
-
-	return failure
 }
 
 func parseFailure(status int, data []byte) (*Failure, error) {

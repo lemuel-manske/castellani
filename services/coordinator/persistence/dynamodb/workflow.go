@@ -224,6 +224,7 @@ func (r *DynamoRepository) CommitEvent(
 
 	return persistence.ErrRevisionConflict
 }
+
 func (r *DynamoRepository) ListStalled(
 	ctx context.Context,
 	before time.Time,

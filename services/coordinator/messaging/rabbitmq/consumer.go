@@ -158,7 +158,7 @@ func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
 		return fmt.Errorf("declare dead letter queue: %w", err)
 	}
 
-	if err := channel.QueueBind(
+	if err = channel.QueueBind(
 		DeadQueue,
 		"#",
 		DeadExchange,
