@@ -93,6 +93,8 @@ class CaptureLimitExceeded(CaptureFailure):
 
 
 class UnsafeCaptureRequest(CaptureFailure):
+    retryable = False
+
     def __init__(self, message: str) -> None:
         super().__init__(CaptureFailureCode.UNSAFE_REQUEST, message)
 
