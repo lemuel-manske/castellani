@@ -24,7 +24,6 @@ async def test_discovery_admission_is_atomic_and_idempotent(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
     claim = await repository.claim("archive-1", "url-1")
     assert claim is not None
@@ -81,7 +80,6 @@ async def test_discovery_admission_never_exceeds_max_pages(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
     claim = await repository.claim("archive-1", "url-1")
     assert claim is not None
@@ -116,7 +114,6 @@ async def test_discovery_admission_rejects_a_stale_parent_claim(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
     claim = await repository.claim("archive-1", "url-1")
     assert claim is not None
