@@ -1,13 +1,17 @@
+import { createHash } from "node:crypto";
 import { expect, it } from "vitest";
 import {
   dynamodb,
   nextPublicationEvent,
+  opensearch,
+  s3,
   rabbitmq,
   setupIntegrationEnvironment,
 } from "../support/integrationEnvironment.js";
 import { isPublicationAuthorized } from "../../src/domain/publication.js";
+import { createCapturedPageFixture } from "../support/fixtures.js";
 
-setupIntegrationEnvironment(["dynamodb", "rabbitmq"]);
+setupIntegrationEnvironment(["dynamodb", "rabbitmq", "s3", "opensearch"]);
 
 it("persists publication decisions and replay acknowledgements delivered through RabbitMQ", async () => {
   const identity = {
@@ -69,21 +73,54 @@ it("dead-letters malformed publication event envelopes", async () => {
   );
 });
 
-it("receives CrawlCompleted manifest references from the events exchange", async () => {
+it("recovers missing PageCaptured indexing from the immutable manifest", async () => {
+  const fixture = createCapturedPageFixture("recovered-manifest-snapshot", {
+    bucket: s3.bucketName,
+  });
+  await s3.putObject(fixture.bytes, fixture.artifact.key);
+
+  const manifest = {
+    schemaVersion: 1,
+    archiveId: fixture.page.archiveId,
+    collectionId: "manifest-recovery-collection",
+    normalizerVersion: "v1",
+    seedUrl: fixture.page.url,
+    createdAt: fixture.page.capturedAt,
+    snapshots: [
+      {
+        snapshotId: fixture.page.snapshotId,
+        urlKey: fixture.event.payload.urlKey,
+        url: fixture.page.url,
+        finalUrl: fixture.page.finalUrl,
+        redirectChain: fixture.event.payload.redirectChain,
+        capturedAt: fixture.page.capturedAt,
+        contentType: "text/html; charset=utf-8",
+        warcArtifacts: [fixture.artifact],
+      },
+    ],
+    failedPages: [],
+  };
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  const manifestDigest = createHash("sha256")
+    .update(manifestBytes)
+    .digest("hex");
+  const manifestKey = "archives/manifest-recovery-archive/manifest.json";
+  await s3.putObject(manifestBytes, manifestKey);
+
   const event = {
-    messageId: "crawl-completed-message",
-    correlationId: "crawl-completed-archive",
+    messageId: "crawl-completed-recovery-message",
+    correlationId: fixture.page.archiveId,
     type: "CrawlCompleted",
     version: 1,
-    occurredAt: "2026-11-22T12:00:00.000Z",
+    occurredAt: fixture.page.capturedAt,
     payload: {
-      archiveId: "crawl-completed-archive",
-      manifestDigest: "a".repeat(64),
+      archiveId: fixture.page.archiveId,
+      manifestDigest,
       manifest: {
-        bucket: "archive-manifests",
-        key: "archives/crawl-completed-archive/manifest.json",
-        sha256: "a".repeat(64),
-        sizeBytes: 128,
+        bucket: s3.bucketName,
+        key: manifestKey,
+        sha256: manifestDigest,
+        sizeBytes: manifestBytes.byteLength,
       },
     },
   };
@@ -94,9 +131,29 @@ it("receives CrawlCompleted manifest references from the events exchange", async
   await expect(delivered).resolves.toMatchObject({
     type: "CrawlCompleted",
     payload: {
-      archiveId: event.payload.archiveId,
-      manifestDigest: event.payload.manifestDigest,
-      manifest: event.payload.manifest,
+      archiveId: fixture.page.archiveId,
+      manifestDigest,
     },
+  });
+
+  await expect(
+    dynamodb.manifestLedger.contains(
+      fixture.page.archiveId,
+      fixture.page.snapshotId,
+      "manifest-recovery-collection",
+    ),
+  ).resolves.toBe(true);
+
+  await opensearch.client.indices.refresh({ index: opensearch.indexName });
+
+  const indexed = await opensearch.client.get({
+    index: opensearch.indexName,
+    id: fixture.page.snapshotId,
+  });
+
+  expect(indexed.body._source).toMatchObject({
+    archiveId: fixture.page.archiveId,
+    snapshotId: fixture.page.snapshotId,
+    text: "Integrated content",
   });
 });
