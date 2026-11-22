@@ -162,7 +162,10 @@ function publishDeadLetter(
       "",
       message.content,
       {
-        contentType: message.properties.contentType ?? "application/json",
+        contentType:
+          typeof message.properties.contentType === "string"
+            ? message.properties.contentType
+            : "application/json",
         messageId: message.properties.messageId as string | undefined,
         correlationId: message.properties.correlationId as string | undefined,
         headers: message.properties.headers as Record<string, unknown> | undefined,
