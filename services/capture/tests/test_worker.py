@@ -3,7 +3,14 @@ from pathlib import Path
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.domain import frontier_item, outbox_items, run_item, seed_frontier, seed_run, specific_snapshot_item
+from support.domain import (
+    frontier_item,
+    outbox_items,
+    run_item,
+    seed_frontier,
+    seed_run,
+    specific_snapshot_item,
+)
 
 from adapters.artifacts.local import LocalArtifactStore
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator

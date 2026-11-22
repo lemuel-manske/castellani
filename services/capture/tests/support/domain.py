@@ -89,7 +89,6 @@ def set_run_admission(client: DynamoDBClient, admission: str) -> None:
     )
 
 
-
 def make_claim() -> TaskClaim:
     return TaskClaim(
         task=PageTask("archive/one", "url-key", "https://example.org/", 0),

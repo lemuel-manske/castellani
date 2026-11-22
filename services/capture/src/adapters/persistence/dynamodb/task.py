@@ -137,11 +137,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
         maximum = number_from_item(run, "maxPages", "capture run")
         admitted = number_from_item(run, "admittedPages", "capture run")
-        outstanding = number_from_item(run, "outstandingPages", "capture run")
-        if maximum is None or admitted is None or outstanding is None:
-            raise RuntimeError(
-                "Capture run is missing maxPages, admittedPages, or outstandingPages"
-            )
+
         if admitted >= maximum:
             return
 
@@ -292,8 +288,6 @@ class DynamoDBTaskRepository(TaskRepository):
 
             maximum = number_from_item(run, "maxPages", "capture run")
             admitted = number_from_item(run, "admittedPages", "capture run", default=0)
-            if maximum is None or admitted is None:
-                raise RuntimeError("Capture run is missing page accounting fields") from error
 
             if admitted >= maximum:
                 return False
@@ -409,9 +403,7 @@ class DynamoDBTaskRepository(TaskRepository):
                     "TableName": self.runs_table_name,
                     "Key": {"archiveId": {"S": outcome.archive_id}},
                     "UpdateExpression": "ADD #outstanding :minus_one, #completed :one",
-                    "ConditionExpression": (
-                        "#admission = :open AND #outstanding >= :one"
-                    ),
+                    "ConditionExpression": ("#admission = :open AND #outstanding >= :one"),
                     "ExpressionAttributeNames": {
                         "#admission": "admission",
                         "#outstanding": "outstandingPages",

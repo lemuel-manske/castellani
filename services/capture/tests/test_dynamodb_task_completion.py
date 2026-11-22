@@ -3,7 +3,14 @@ from datetime import UTC, datetime
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.clock import FakeClock
-from support.domain import frontier_item, outbox_items, run_item, seed_frontier, seed_run, snapshot_item
+from support.domain import (
+    frontier_item,
+    outbox_items,
+    run_item,
+    seed_frontier,
+    seed_run,
+    snapshot_item,
+)
 
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from domain import ArtifactReference, CaptureOutcome, PageCapture

@@ -34,16 +34,13 @@ class CaptureSettings:
     def from_environment(cls) -> "CaptureSettings":
         return cls(
             aws_region=os.getenv("AWS_REGION", "us-east-1"),
-
             dynamodb_endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL"),
             rabbitmq_url=os.getenv(
                 "RABBITMQ_URL",
                 "amqp://castellani:local-development-only@localhost:5672/",
             ),
             s3_endpoint_url=os.getenv("S3_ENDPOINT_URL"),
-
             artifact_bucket=os.getenv("CAPTURE_ARTIFACT_BUCKET", "castellani-archive-artifacts"),
-
             browser_slots_table_name=os.getenv(
                 "CAPTURE_BROWSER_SLOTS_TABLE",
                 "capture_browser_slots",
@@ -52,17 +49,12 @@ class CaptureSettings:
             outbox_table_name=os.getenv("CAPTURE_OUTBOX_TABLE", "capture_outbox"),
             runs_table_name=os.getenv("CAPTURE_RUNS_TABLE", "capture_runs"),
             snapshots_table_name=os.getenv("CAPTURE_SNAPSHOTS_TABLE", "capture_snapshots"),
-
             browser_slot_count=positive_int("CAPTURE_BROWSER_SLOT_COUNT", 10),
-
             lease_duration=positive_float("CAPTURE_LEASE_DURATION_SECONDS", 60),
-
             outbox_lease_duration=positive_float("CAPTURE_OUTBOX_LEASE_SECONDS", 30),
             outbox_poll_interval=positive_float("CAPTURE_OUTBOX_POLL_SECONDS", 0.5),
             outbox_retry_delay=positive_float("CAPTURE_OUTBOX_RETRY_SECONDS", 5),
-
             artifact_directory=os.getenv(
-
                 "CAPTURE_ARTIFACT_DIRECTORY",
                 "/tmp/castellani/capture",
             ),

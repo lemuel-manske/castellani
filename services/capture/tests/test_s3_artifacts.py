@@ -1,10 +1,10 @@
 from pathlib import Path
 
 import pytest
-
-from adapters.artifacts.s3 import S3ArtifactStore
 from support.domain import make_claim
 from support.s3 import FakeS3
+
+from adapters.artifacts.s3 import S3ArtifactStore
 
 
 @pytest.mark.asyncio
