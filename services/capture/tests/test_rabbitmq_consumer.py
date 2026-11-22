@@ -49,24 +49,30 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
     rabbitmq: AbstractRobustConnection,
 ) -> None:
     processed = asyncio.Event()
+
     received: list[tuple[str, str]] = []
 
-    async def capture_page(archive_id: str, url_key: str) -> None:
+    async def capture_page(archive_id: str, url_key: str) -> bool:
         received.append((archive_id, url_key))
         processed.set()
+        return True
+
+    ready = asyncio.Event()
+
+    consumer = RabbitMQPageTaskConsumer(capture_page)
+
+    queue_name = f"{QUEUE_NAME}.test-{uuid4()}"
+    consumer_task = asyncio.create_task(consumer.run(rabbitmq, queue_name=queue_name, ready=ready))
+
+    publisher = RabbitMQMessagePublisher(rabbitmq)
 
     message_id = str(uuid4())
-    queue_name = f"{QUEUE_NAME}.test-{uuid4()}"
-    ready = asyncio.Event()
-    consumer = RabbitMQPageTaskConsumer(capture_page)
-    consumer_task = asyncio.create_task(
-        consumer.run(rabbitmq, queue_name=queue_name, ready=ready)
-    )
-    publisher = RabbitMQMessagePublisher(rabbitmq)
 
     try:
         await asyncio.wait_for(ready.wait(), timeout=5)
+
         await publisher.start()
+
         envelope = {
             "messageId": message_id,
             "correlationId": "archive-integration-test",
@@ -80,18 +86,23 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
         }
 
         await publisher.publish(message_id, json.dumps(envelope).encode())
+
         await asyncio.wait_for(processed.wait(), timeout=5)
 
         assert received == [("archive-integration-test", "url-integration-test")]
     finally:
         consumer_task.cancel()
+
         with pytest.raises(asyncio.CancelledError):
             await consumer_task
+
         await publisher.close()
 
         cleanup_channel = await rabbitmq.channel()
+
         try:
             queue = await cleanup_channel.declare_queue(queue_name, durable=True)
+
             await queue.delete()
         finally:
             await cleanup_channel.close()
