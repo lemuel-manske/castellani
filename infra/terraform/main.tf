@@ -230,4 +230,21 @@ resource "aws_dynamodb_table" "capture_snapshots" {
     name = "snapshotId"
     type = "S"
   }
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
+
+  attribute {
+    name = "capturedAt"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "archiveId-capturedAt-index"
+    hash_key        = "archiveId"
+    range_key       = "capturedAt"
+    projection_type = "ALL"
+  }
 }
