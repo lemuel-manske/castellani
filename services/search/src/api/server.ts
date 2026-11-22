@@ -26,7 +26,9 @@ function createSearchServer(
     return reply
       .code(500)
       .type("application/problem+json")
-      .send(problem(500, "Internal Server Error", "an unexpected error occurred"));
+      .send(
+        problem(500, "Internal Server Error", "an unexpected error occurred"),
+      );
   });
 
   server.register(searchRoutes, {
