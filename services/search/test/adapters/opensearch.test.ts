@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import type { Client } from "@opensearch-project/opensearch";
-import { createOpenSearchDocumentWriter } from "../../src/adapters/opensearch.js";
+import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 import type { SearchDocument } from "../../src/domain/content.js";
 
 const document: SearchDocument = {
