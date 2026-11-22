@@ -33,7 +33,7 @@ function artifactFor(contentType: string, content: string): {
     "WARC-Target-URI: https://example.com/",
     "WARC-Date: 2026-11-22T10:00:00Z",
     "Content-Type: application/http; msgtype=response",
-    "Content-Length: " + Buffer.byteLength(response),
+    "Content-Length: " + String(Buffer.byteLength(response)),
     "",
     response,
     "",
