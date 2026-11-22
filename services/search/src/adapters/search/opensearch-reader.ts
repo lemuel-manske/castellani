@@ -38,24 +38,29 @@ function decodeCursor(
       Buffer.from(cursor, "base64url").toString("utf8"),
     );
 
+    if (!Array.isArray(value) || value.length !== 3) {
+      throw new Error("invalid search cursor");
+    }
+
+    const sortValues: unknown[] = value;
+    const [score, capturedAt, snapshotId] = sortValues;
+
     if (
-      !Array.isArray(value) ||
-      value.length !== 3 ||
-      typeof value[0] !== "number" ||
-      (typeof value[1] !== "string" && typeof value[1] !== "number") ||
-      typeof value[2] !== "string"
+      typeof score !== "number" ||
+      (typeof capturedAt !== "string" && typeof capturedAt !== "number") ||
+      typeof snapshotId !== "string"
     ) {
       throw new Error("invalid search cursor");
     }
 
-    return [value[0] as number, value[1] as string | number, value[2] as string];
+    return [score, capturedAt, snapshotId];
   } catch {
     throw new Error("invalid search cursor");
   }
 }
 
 function encodeCursor(sort: SearchSortCursor | undefined): string {
-  if (!sort || sort.length !== 3) {
+  if (sort === undefined) {
     throw new Error("OpenSearch returned a hit without pagination sort values");
   }
 
