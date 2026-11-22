@@ -16,7 +16,11 @@ const claim: SnapshotClaim = {
 it("acquires a snapshot claim and increments its attempt count", async () => {
   const send = vi.fn().mockResolvedValue({ Attributes: { attempts: 1 } });
   const client = { send } as unknown as DynamoDBDocumentClient;
-  const ledger = new DynamoDBIndexingLedger(client, "search_indexing_ledger", () => 1_000_000);
+  const ledger = new DynamoDBIndexingLedger(
+    client,
+    "search_indexing_ledger",
+    () => 1_000_000,
+  );
 
   await expect(
     ledger.claim("archive-1", "snapshot-1", "message-1", 120),
