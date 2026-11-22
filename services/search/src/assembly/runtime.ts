@@ -209,6 +209,7 @@ class SearchRuntime {
                   event.payload,
                   dependencies.artifactReader,
                   dependencies.manifestLedger,
+                  dependencies,
                 )
               : processPublicationEvent(event, dependencies.publicationLedger),
         );
