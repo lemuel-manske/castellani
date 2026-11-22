@@ -21,10 +21,13 @@ function createCapturedPageFixture(
   options: CapturedPageFixtureOptions = {},
 ) {
   const contentType = options.contentType ?? "text/html; charset=utf-8";
+
   const body =
     options.body ??
     "<html><head><title>Integrated content</title></head><body><h1>Integrated content</h1></body></html>";
+
   const response = `HTTP/1.1 200 OK\r\nContent-Type: ${contentType}\r\n\r\n${body}`;
+
   const warc = [
     "WARC/1.1",
     "WARC-Type: response",
@@ -37,8 +40,11 @@ function createCapturedPageFixture(
     "",
     "",
   ].join("\r\n");
+
   const bytes = gzipSync(Buffer.from(warc));
+
   const checksum = createHash("sha256").update(bytes).digest("hex");
+
   const page: CapturedPageReference = {
     archiveId: "integration-archive",
     snapshotId,
@@ -46,12 +52,14 @@ function createCapturedPageFixture(
     finalUrl: "https://example.com/final",
     capturedAt: "2026-11-22T10:00:00.000Z",
   };
+
   const artifact: ArtifactReference = {
     bucket: options.bucket ?? "capture-artifacts",
     key: `integration-archive/${snapshotId}.warc.gz`,
     sha256: options.validChecksum === false ? "0".repeat(64) : checksum,
     sizeBytes: bytes.byteLength,
   };
+
   const event: PageCapturedEvent = {
     messageId: `message-${snapshotId}`,
     correlationId: page.archiveId,
@@ -68,6 +76,7 @@ function createCapturedPageFixture(
       warcArtifacts: [artifact],
     },
   };
+
   const artifactReader: ArtifactObjectReader = {
     getObject: () => Promise.resolve(Readable.from([bytes])),
   };
