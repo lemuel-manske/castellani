@@ -64,6 +64,15 @@ async function* verifiedChunks(
   }
 }
 
+async function drainRecord(record: AsyncIterable<Uint8Array>): Promise<void> {
+  const iterator = record[Symbol.asyncIterator]();
+  let result = await iterator.next();
+
+  while (!result.done) {
+    result = await iterator.next();
+  }
+}
+
 async function readWarcArtifact(
   reference: ArtifactReference,
   targetUrl: string,
@@ -76,9 +85,7 @@ async function readWarcArtifact(
 
   for await (const record of parser) {
     if (record.warcType !== "response" || record.warcTargetURI !== targetUrl) {
-      for await (const chunk of record) {
-        void chunk;
-      }
+      await drainRecord(record);
       continue;
     }
 
