@@ -128,8 +128,10 @@ class S3ArtifactStore(ArtifactStore):
             )
         ) + "/"
 
-        await asyncio.to_thread(self._discard_attempt_objects, prefix)
-        await asyncio.to_thread(shutil.rmtree, directory, True)
+        try:
+            await asyncio.to_thread(self._discard_attempt_objects, prefix)
+        finally:
+            await asyncio.to_thread(shutil.rmtree, directory, True)
 
     def _discard_attempt_objects(self, prefix: str) -> None:
         key_marker: str | None = None
