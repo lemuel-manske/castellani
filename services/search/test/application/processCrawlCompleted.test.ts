@@ -119,13 +119,16 @@ it("verifies the immutable manifest, records membership, and recovers every snap
   expect(index).toHaveBeenCalledTimes(2);
   expect(read).toHaveBeenNthCalledWith(
     1,
-    {
+    expect.objectContaining({
       archiveId: "manifest-archive",
       snapshotId: "snapshot-a",
       url: "https://example.com/a",
       finalUrl: "https://example.com/a",
       capturedAt: "2026-11-22T10:00:00.000Z",
-    },
+      urlKey: "url-a",
+      redirectChain: ["https://example.com/a", "https://example.com/a"],
+      warcArtifacts: [artifact],
+    }),
     [artifact],
   );
   expect(claim).toHaveBeenNthCalledWith(
