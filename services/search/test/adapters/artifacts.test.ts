@@ -31,7 +31,7 @@ function responseRecord(targetUrl: string, html: string): string {
     "WARC-Target-URI: " + targetUrl,
     "WARC-Date: 2026-11-22T10:00:00Z",
     "Content-Type: application/http; msgtype=response",
-    "Content-Length: " + Buffer.byteLength(response),
+    `Content-Length: ${Buffer.byteLength(response)}`,
     "",
     response,
     "",
@@ -53,7 +53,7 @@ function artifactFor(warc: string): {
       sizeBytes: bytes.byteLength,
     },
     reader: {
-      getObject: async () => Readable.from([bytes]),
+      getObject: () => Promise.resolve(Readable.from([bytes])),
     },
   };
 }
