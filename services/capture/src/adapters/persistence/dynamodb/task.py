@@ -642,8 +642,6 @@ class DynamoDBTaskRepository(TaskRepository):
                                 "M": {
                                     "archiveId": {"S": archive_id},
                                     "urlKey": {"S": url_key},
-                                    "retryOfAttemptId": {"S": claim.attempt_id},
-                                    "retryOfFence": {"N": str(claim.fence)},
                                 }
                             },
                             "status": {"S": "PENDING"},
@@ -714,8 +712,6 @@ class DynamoDBTaskRepository(TaskRepository):
             and item.get("type", {}).get("S") == "CapturePage"
             and payload.get("archiveId", {}).get("S") == claim.task.archive_id
             and payload.get("urlKey", {}).get("S") == claim.task.url_key
-            and payload.get("retryOfAttemptId", {}).get("S") == claim.attempt_id
-            and payload.get("retryOfFence", {}).get("N") == str(claim.fence)
         )
 
     def _release(self, claim: TaskClaim) -> None:
