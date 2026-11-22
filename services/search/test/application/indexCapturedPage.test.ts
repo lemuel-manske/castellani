@@ -59,9 +59,8 @@ it("extracts and indexes a captured page using its snapshot identity", async () 
     "text/html; charset=utf-8",
     "<html><body><h1>Indexed page</h1></body></html>",
   );
-  const documentWriter: SearchDocumentWriter = {
-    index: vi.fn().mockResolvedValue(undefined),
-  };
+  const index = vi.fn().mockResolvedValue(undefined);
+  const documentWriter: SearchDocumentWriter = { index };
 
   await expect(
     indexCapturedPage(
@@ -72,7 +71,7 @@ it("extracts and indexes a captured page using its snapshot identity", async () 
     ),
   ).resolves.toEqual({ outcome: "INDEXED", snapshotId: "snapshot-1" });
 
-  expect(documentWriter.index).toHaveBeenCalledWith(
+  expect(index).toHaveBeenCalledWith(
     expect.objectContaining({
       archiveId: "archive-1",
       snapshotId: "snapshot-1",
@@ -100,5 +99,5 @@ it("accounts for unsupported captured content without writing a document", async
     reasonCode: "UNSUPPORTED_CONTENT_TYPE",
   });
 
-  expect(documentWriter.index).not.toHaveBeenCalled();
+  expect(index).not.toHaveBeenCalled();
 });
