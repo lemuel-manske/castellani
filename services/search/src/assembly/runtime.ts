@@ -30,7 +30,7 @@ function waitForConnectionOrShutdown(
     connection.once("error", finish);
     signal.addEventListener("abort", finish, { once: true });
 
-    if (signal.aborted) {
+    if (isSignalAborted(signal)) {
       finish();
     }
   });
@@ -40,7 +40,7 @@ function waitForReconnectDelay(
   milliseconds: number,
   signal: AbortSignal,
 ): Promise<void> {
-  if (signal.aborted) {
+  if (isSignalAborted(signal)) {
     return Promise.resolve();
   }
 
@@ -54,7 +54,7 @@ function waitForReconnectDelay(
     const timeout = setTimeout(finish, milliseconds);
     signal.addEventListener("abort", finish, { once: true });
 
-    if (signal.aborted) {
+    if (isSignalAborted(signal)) {
       finish();
     }
   });
@@ -65,7 +65,7 @@ class SearchRuntime {
   constructor(private readonly settings: SearchSettings) {}
 
   async start(signal: AbortSignal = new AbortController().signal): Promise<void> {
-    if (signal.aborted) {
+    if (isSignalAborted(signal)) {
       return;
     }
 
@@ -134,14 +134,14 @@ class SearchRuntime {
       try {
         connection = await amqp.connect(this.settings.rabbitmqUrl);
 
-        if (signal.aborted) {
+        if (isSignalAborted(signal)) {
           await connection.close();
           break;
         }
 
         channel = await connection.createChannel();
 
-        if (signal.aborted) {
+        if (isSignalAborted(signal)) {
           await channel.close();
           await connection.close();
           break;
@@ -157,7 +157,7 @@ class SearchRuntime {
 
         await waitForConnectionOrShutdown(connection, signal);
       } catch (error) {
-        if (!signal.aborted) {
+        if (!isSignalAborted(signal)) {
           console.error("Search consumer connection failed", error);
         }
       } finally {
