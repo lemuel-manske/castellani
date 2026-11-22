@@ -103,18 +103,16 @@ function parseSearchRequest(query: unknown): SearchRequestResult {
     return value === undefined || value.length === 0 ? undefined : value;
   };
 
+  const collectionId = optional("collectionId");
+  const archiveId = optional("archiveId");
+  const snapshotId = optional("snapshotId");
+
   return {
     request: {
       text,
-      ...(optional("collectionId") === undefined
-        ? {}
-        : { collectionId: optional("collectionId") }),
-      ...(optional("archiveId") === undefined
-        ? {}
-        : { archiveId: optional("archiveId") }),
-      ...(optional("snapshotId") === undefined
-        ? {}
-        : { snapshotId: optional("snapshotId") }),
+      ...(collectionId === undefined ? {} : { collectionId }),
+      ...(archiveId === undefined ? {} : { archiveId }),
+      ...(snapshotId === undefined ? {} : { snapshotId }),
       ...(capturedFrom === undefined ? {} : { capturedFrom }),
       ...(capturedTo === undefined ? {} : { capturedTo }),
       ...(limit === undefined ? {} : { limit }),
