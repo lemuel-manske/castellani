@@ -161,5 +161,5 @@ export type {
   CapturedPage,
   ContentExtraction,
   ExtractionOptions,
-  SearchDocument,
+  SearchDocument
 };
