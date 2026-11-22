@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as amqp from "amqplib";
+import type { ConsumeMessage } from "amqplib";
 import {
   startPageCapturedConsumer,
   type PageCapturedConsumerTopology,
@@ -23,6 +24,8 @@ function createRabbitMqTestSupport() {
   let connection: amqp.ChannelModel | undefined;
   let consumerChannel: amqp.ConfirmChannel | undefined;
   let publisherChannel: amqp.ConfirmChannel | undefined;
+  const deadLetters: ConsumeMessage[] = [];
+  const deadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
 
   return {
     async setup(
@@ -34,6 +37,15 @@ function createRabbitMqTestSupport() {
       consumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
       await startPageCapturedConsumer(consumerChannel, handle, topology);
+      await consumerChannel.consume(topology.deadLetterQueue, (message) => {
+        if (message === null) {
+          return;
+        }
+
+        consumerChannel?.ack(message);
+        const waiter = deadLetterWaiters.shift();
+        waiter ? waiter(message) : deadLetters.push(message);
+      });
     },
 
     async publish(event: unknown): Promise<void> {
@@ -48,6 +60,14 @@ function createRabbitMqTestSupport() {
         { contentType: "application/json", persistent: true },
       );
       await publisherChannel.waitForConfirms();
+    },
+
+    nextDeadLetter(): Promise<ConsumeMessage> {
+      const message = deadLetters.shift();
+
+      return message === undefined
+        ? new Promise((resolve) => deadLetterWaiters.push(resolve))
+        : Promise.resolve(message);
     },
 
     async teardown(): Promise<void> {
@@ -69,9 +89,6 @@ function createRabbitMqTestSupport() {
             .catch(() => undefined);
           await cleanup
             .deleteExchange(topology.eventsExchange)
-            .catch(() => undefined);
-          await cleanup
-            .deleteExchange(topology.retryExchange)
             .catch(() => undefined);
           await cleanup
             .deleteExchange(topology.retryExchange)
