@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
 import {
   SEARCH_RABBITMQ_URL,
@@ -6,26 +6,33 @@ import {
 } from "../support/rabbitMq.js";
 import { createPageCapturedEvent } from "../support/pageCaptured.js";
 
-describe.skipIf(!SEARCH_RABBITMQ_URL)("RabbitMQ integration", () => {
-  const support = createRabbitMqTestSupport();
-  let delivered: Promise<PageCapturedEvent>;
-  let resolveDelivery!: (event: PageCapturedEvent) => void;
+const support = createRabbitMqTestSupport();
+let delivered: Promise<PageCapturedEvent>;
+let resolveDelivery!: (event: PageCapturedEvent) => void;
 
-  beforeAll(async () => {
-    delivered = new Promise((resolve) => {
-      resolveDelivery = resolve;
-    });
+beforeAll(async () => {
+  if (SEARCH_RABBITMQ_URL === undefined) {
+    return;
+  }
 
-    await support.setup(async (event) => {
-      resolveDelivery(event);
-    });
+  delivered = new Promise((resolve) => {
+    resolveDelivery = resolve;
   });
 
-  afterAll(async () => {
+  await support.setup(async (event) => {
+    resolveDelivery(event);
+  });
+});
+
+afterAll(async () => {
+  if (SEARCH_RABBITMQ_URL !== undefined) {
     await support.teardown();
-  });
+  }
+});
 
-  it("delivers a published PageCaptured event to the real consumer", async () => {
+it.skipIf(!SEARCH_RABBITMQ_URL)(
+  "delivers a published PageCaptured event to the real consumer",
+  async () => {
     const event = createPageCapturedEvent("integration-message");
 
     await support.publish(event);
@@ -38,5 +45,5 @@ describe.skipIf(!SEARCH_RABBITMQ_URL)("RabbitMQ integration", () => {
         snapshotId: "integration-snapshot",
       },
     });
-  });
-});
+  },
+);

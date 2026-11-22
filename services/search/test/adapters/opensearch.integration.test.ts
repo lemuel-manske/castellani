@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import type { SearchDocument } from "../../src/domain/content.js";
 import {
   SEARCH_OPENSEARCH_URL,
@@ -6,31 +6,36 @@ import {
 } from "../support/openSearch.js";
 import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 
-describe.skipIf(!SEARCH_OPENSEARCH_URL)("OpenSearch integration", () => {
-  const support = createOpenSearchTestSupport();
+const support = createOpenSearchTestSupport();
 
-  const document: SearchDocument = {
-    archiveId: "integration-archive",
-    snapshotId: "integration-snapshot",
-    url: "https://example.com/",
-    finalUrl: "https://example.com/final",
-    capturedAt: "2026-11-22T10:00:00.000Z",
-    contentType: "text/html",
-    title: "Integration document",
-    description: "Indexed against a real OpenSearch node",
-    language: "en",
-    text: "Search integration test content",
-  };
+const document: SearchDocument = {
+  archiveId: "integration-archive",
+  snapshotId: "integration-snapshot",
+  url: "https://example.com/",
+  finalUrl: "https://example.com/final",
+  capturedAt: "2026-11-22T10:00:00.000Z",
+  contentType: "text/html",
+  title: "Integration document",
+  description: "Indexed against a real OpenSearch node",
+  language: "en",
+  text: "Search integration test content",
+};
 
-  beforeAll(async () => {
+beforeAll(async () => {
+  if (SEARCH_OPENSEARCH_URL !== undefined) {
     await support.setup();
-  });
+  }
+});
 
-  afterAll(async () => {
+afterAll(async () => {
+  if (SEARCH_OPENSEARCH_URL !== undefined) {
     await support.teardown();
-  });
+  }
+});
 
-  it("creates the index and persists a searchable document", async () => {
+it.skipIf(!SEARCH_OPENSEARCH_URL)(
+  "creates the index and persists a searchable document",
+  async () => {
     const writer = createOpenSearchDocumentWriter(
       support.client,
       support.indexName,
@@ -45,5 +50,5 @@ describe.skipIf(!SEARCH_OPENSEARCH_URL)("OpenSearch integration", () => {
     });
 
     expect(response.body._source).toMatchObject(document);
-  });
-});
+  },
+);
