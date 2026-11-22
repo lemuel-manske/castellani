@@ -93,3 +93,24 @@ it("records terminal failure when the captured artifact fails integrity validati
     ),
   ).resolves.toEqual({ status: "TERMINAL", outcome: "FAILED" });
 });
+
+it("records unsupported content without indexing a document", async () => {
+  const fixture = createCapturedPageFixture("unsupported-snapshot", {
+    bucket: s3.bucketName,
+    contentType: "application/pdf",
+    body: "%PDF-1.7 not searchable text",
+  });
+  await s3.putObject(fixture.bytes, fixture.artifact.key);
+
+  await expect(
+    processPageCaptured(fixture.event, dependencies()),
+  ).resolves.toEqual({ status: "COMPLETED", outcome: "UNSUPPORTED" });
+
+  await opensearch.client.indices.refresh({ index: opensearch.indexName });
+  const indexed = await opensearch.client.exists({
+    index: opensearch.indexName,
+    id: fixture.page.snapshotId,
+  });
+
+  expect(indexed.body).toBe(false);
+});
