@@ -59,7 +59,10 @@ const NON_CONTENT_ELEMENTS = [
 ];
 
 function normalizeText(value: string): string {
-  return value.replace(/\u00a0/g, " ").replace(/[\t\r\n ]+/g, " ").trim();
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/[\t\r\n ]+/g, " ")
+    .trim();
 }
 
 function contentTypeOf(value: string | undefined): string {
