@@ -82,9 +82,8 @@ it("extracts and indexes a captured page using its snapshot identity", async () 
 
 it("accounts for unsupported captured content without writing a document", async () => {
   const artifact = artifactFor("application/pdf", "not searchable text");
-  const documentWriter: SearchDocumentWriter = {
-    index: vi.fn().mockResolvedValue(undefined),
-  };
+  const index = vi.fn().mockResolvedValue(undefined);
+  const documentWriter: SearchDocumentWriter = { index };
 
   await expect(
     indexCapturedPage(
