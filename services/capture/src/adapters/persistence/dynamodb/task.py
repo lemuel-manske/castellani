@@ -986,7 +986,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
         try:
             self._transact(transaction, None)
-        except ConditionalWriteRejected:
+        except ConditionalWriteRejected as error:
             current = self._read_frontier(archive_id, url_key)
             if (
                 current is not None
@@ -995,6 +995,17 @@ class DynamoDBTaskRepository(TaskRepository):
                 and current.get("lastFailureFence", {}).get("N") == str(fence)
             ):
                 return
+
+            if (
+                current is not None
+                and current.get("state", {}).get("S") == "CLAIMED"
+                and current.get("attemptId", {}).get("S") == attempt_id
+                and current.get("fence", {}).get("N") == str(fence)
+                and float(current.get("leaseUntil", {}).get("N", "0")) <= now
+            ):
+                raise RuntimeError(
+                    "could not account for an expired page-task after retry exhaustion"
+                ) from error
 
     def _renew(self, claim: TaskClaim) -> TaskClaim:
         now = self.clock()
