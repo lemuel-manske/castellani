@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBIndexingLedger } from "../../src/adapters/persistence/dynamodb/indexing-ledger.js";
+import { DynamoDBPublicationLedger } from "../../src/adapters/persistence/dynamodb/publication-ledger.js";
 
 const SEARCH_DYNAMODB_ENDPOINT_URL = process.env.SEARCH_DYNAMODB_ENDPOINT_URL;
 
@@ -20,10 +21,16 @@ function createDynamoDbTestSupport(clock: () => number) {
     marshallOptions: { removeUndefinedValues: true },
   });
   const tableName = `search-ledger-${randomUUID().replaceAll("-", "")}`;
+  const publicationTableName = `search-publication-${randomUUID().replaceAll("-", "")}`;
   const ledger = new DynamoDBIndexingLedger(documentClient, tableName, clock);
+  const publicationLedger = new DynamoDBPublicationLedger(
+    documentClient,
+    publicationTableName,
+  );
 
   return {
     ledger,
+    publicationLedger,
     async setup(): Promise<void> {
       await client.send(
         new CreateTableCommand({
@@ -50,10 +57,29 @@ function createDynamoDbTestSupport(clock: () => number) {
         { client, maxWaitTime: 20 },
         { TableName: tableName },
       );
+      await client.send(
+        new CreateTableCommand({
+          TableName: publicationTableName,
+          AttributeDefinitions: [
+            { AttributeName: "archiveId", AttributeType: "S" },
+          ],
+          KeySchema: [{ AttributeName: "archiveId", KeyType: "HASH" }],
+          BillingMode: "PAY_PER_REQUEST",
+        }),
+      );
+      await waitUntilTableExists(
+        { client, maxWaitTime: 20 },
+        { TableName: publicationTableName },
+      );
     },
     async teardown(): Promise<void> {
       try {
-        await client.send(new DeleteTableCommand({ TableName: tableName }));
+        await Promise.all([
+          client.send(new DeleteTableCommand({ TableName: tableName })),
+          client.send(
+            new DeleteTableCommand({ TableName: publicationTableName }),
+          ),
+        ]);
       } finally {
         client.destroy();
       }

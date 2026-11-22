@@ -272,3 +272,16 @@ resource "aws_dynamodb_table" "search_indexing_ledger" {
     projection_type = "ALL"
   }
 }
+
+
+resource "aws_dynamodb_table" "search_publication_ledger" {
+  name         = "search_publication_ledger"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "archiveId"
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
+}
