@@ -1,15 +1,10 @@
-import { readCapturedPage } from "../adapters/artifacts.js";
-import type {
-  ArtifactObjectReader,
-  ArtifactReference,
-  CapturedPageReference,
-} from "../adapters/artifacts.js";
 import { extractSearchableContent } from "../domain/content.js";
-import type { SearchDocument } from "../domain/content.js";
-
-interface SearchDocumentWriter {
-  index(document: SearchDocument): Promise<void>;
-}
+import type {
+  ArtifactReference,
+  CapturedPageReader,
+  CapturedPageReference,
+} from "../ports/artifacts.js";
+import type { SearchDocumentWriter } from "../ports/search-index.js";
 
 type SnapshotIndexingResult =
   | { outcome: "INDEXED"; snapshotId: string }
@@ -22,10 +17,10 @@ type SnapshotIndexingResult =
 async function indexCapturedPage(
   page: CapturedPageReference,
   artifacts: readonly ArtifactReference[],
-  artifactReader: ArtifactObjectReader,
+  capturedPageReader: CapturedPageReader,
   documentWriter: SearchDocumentWriter,
 ): Promise<SnapshotIndexingResult> {
-  const capturedPage = await readCapturedPage(page, artifacts, artifactReader);
+  const capturedPage = await capturedPageReader.read(page, artifacts);
   const extraction = extractSearchableContent(capturedPage);
 
   if (extraction.kind === "UNSUPPORTED") {
@@ -42,4 +37,4 @@ async function indexCapturedPage(
 }
 
 export { indexCapturedPage };
-export type { SearchDocumentWriter, SnapshotIndexingResult };
+export type { SnapshotIndexingResult };
