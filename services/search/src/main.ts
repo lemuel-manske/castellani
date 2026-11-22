@@ -7,7 +7,10 @@ import { createS3ArtifactReader } from "./adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "./adapters/artifacts/warc.js";
 import { startPageCapturedConsumer } from "./adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { DynamoDBIndexingLedger } from "./adapters/persistence/dynamodb/indexing-ledger.js";
-import { ensureSearchIndex } from "./adapters/search/opensearch.js";
+import {
+  createOpenSearchDocumentWriter,
+  ensureSearchIndex,
+} from "./adapters/search/opensearch.js";
 import { processPageCaptured } from "./application/processPageCaptured.js";
 
 const awsRegion = process.env.SEARCH_AWS_REGION ?? "us-east-1";
@@ -46,6 +49,10 @@ const s3 = new S3Client({
 const opensearch = new OpenSearchClient({ node: opensearchUrl });
 
 const ledger = new DynamoDBIndexingLedger(documentClient, ledgerTable);
+const documentWriter = createOpenSearchDocumentWriter(
+  opensearch,
+  process.env.SEARCH_INDEX_NAME ?? "archive-pages-v1",
+);
 const capturedPageReader = createWarcCapturedPageReader(
   createS3ArtifactReader(s3),
 );
@@ -55,7 +62,10 @@ async function delay(milliseconds: number): Promise<void> {
 }
 
 async function runConsumer(): Promise<void> {
-  await ensureSearchIndex(opensearch);
+  await ensureSearchIndex(
+    opensearch,
+    process.env.SEARCH_INDEX_NAME ?? "archive-pages-v1",
+  );
 
   while (true) {
     let connection: amqp.ChannelModel | undefined;
@@ -69,16 +79,7 @@ async function runConsumer(): Promise<void> {
         processPageCaptured(event, {
           ledger,
           capturedPageReader,
-          documentWriter: {
-            index: async (document) => {
-              await opensearch.index({
-                index: process.env.SEARCH_INDEX_NAME ?? "archive-pages-v1",
-                id: document.snapshotId,
-                body: document,
-                refresh: false,
-              });
-            },
-          },
+          documentWriter,
         }),
       );
 
