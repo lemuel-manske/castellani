@@ -130,7 +130,12 @@ it(
     await expect(
       readCapturedPage(
         page,
-        [{ ...artifact.reference, sizeBytes: artifact.reference.sizeBytes + 1 }],
+        [
+        {
+          ...artifact.reference,
+          sizeBytes: artifact.reference.sizeBytes + 1,
+        },
+      ],
         artifact.reader,
       ),
     ).rejects.toBeInstanceOf(ArtifactIntegrityError);
