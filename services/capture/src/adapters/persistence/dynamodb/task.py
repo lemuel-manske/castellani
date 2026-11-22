@@ -296,8 +296,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
             maximum = self._number_from_item(run, "maxPages")
             admitted = self._number_from_item(run, "admittedPages", default=0)
-            if maximum is None:
-                raise RuntimeError("Capture run is missing maxPages") from error
+            if maximum is None or admitted is None:
+                raise RuntimeError("Capture run is missing page accounting fields") from error
 
             if admitted >= maximum:
                 return False

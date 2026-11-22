@@ -46,18 +46,19 @@ async def test_discovery_admission_is_atomic_and_idempotent(
         },
         ConsistentRead=True,
     )
-    item = response["Item"]
+    item = response.get("Item") or {}
 
     assert item["navigationUrl"] == {"S": child.navigation_url}
     assert item["fetchUrl"] == {"S": child.fetch_url}
     assert item["depth"] == {"N": "1"}
     assert item["state"] == {"S": "PENDING"}
 
-    run = dynamodb.get_item(
+    run_response = dynamodb.get_item(
         TableName="capture_runs",
         Key={"archiveId": {"S": "archive-1"}},
         ConsistentRead=True,
-    )["Item"]
+    )
+    run = run_response.get("Item") or {}
     assert run["admittedPages"] == {"N": "3"}
     assert run["outstandingPages"] == {"N": "3"}
 
