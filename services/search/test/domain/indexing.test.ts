@@ -15,25 +15,26 @@ it(
   "identifies work missing from the ledger when completion arrives first",
   () => {
     const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-1", outcome: "INDEXED" },
-  ]);
+      { snapshotId: "snapshot-1", outcome: "INDEXED" },
+    ]);
 
-  expect(result).toEqual({
-    expectedCount: 2,
-    terminalCount: 1,
-    missingSnapshotIds: ["snapshot-2"],
-    unexpectedSnapshotIds: [],
-    complete: false,
-  });
-});
+    expect(result).toEqual({
+      expectedCount: 2,
+      terminalCount: 1,
+      missingSnapshotIds: ["snapshot-2"],
+      unexpectedSnapshotIds: [],
+      complete: false,
+    });
+  },
+);
 
 it(
   "counts each expected snapshot once and treats terminal failures as accounted",
   () => {
-  const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-1", outcome: "INDEXED" },
-    { snapshotId: "snapshot-2", outcome: "FAILED" },
-  ]);
+    const result = reconcileManifest(manifest, [
+      { snapshotId: "snapshot-1", outcome: "INDEXED" },
+      { snapshotId: "snapshot-2", outcome: "FAILED" },
+    ]);
 
     expect(result.complete).toBe(true);
     expect(result.terminalCount).toBe(2);
@@ -105,10 +106,10 @@ it(
   "keeps indexed documents hidden before both publication facts arrive",
   () => {
     const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), {
-    archiveId: "archive-1",
-    decisionVersion: 1,
-    packageDigest: "digest",
-  });
+      archiveId: "archive-1",
+      decisionVersion: 1,
+      packageDigest: "digest",
+    });
 
     expect(
       canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
