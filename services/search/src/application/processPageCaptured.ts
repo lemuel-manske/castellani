@@ -48,6 +48,7 @@ async function processPageCaptured(
     event.payload.snapshotId,
     event.messageId,
     dependencies.leaseDurationSeconds ?? 120,
+    dependencies.maxAttempts ?? 5,
   );
 
   if (claimResult.status === "BUSY") {
