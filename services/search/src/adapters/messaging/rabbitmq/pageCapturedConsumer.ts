@@ -57,18 +57,20 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     return null;
   }
 
-  const validArtifacts = artifacts.every((artifact: unknown) =>
-    isRecord(artifact) &&
-    typeof artifact.bucket === "string" &&
-    artifact.bucket.length > 0 &&
-    typeof artifact.key === "string" &&
-    artifact.key.length > 0 &&
-    typeof artifact.sha256 === "string" &&
-    /^[a-f0-9]{64}$/i.test(artifact.sha256) &&
-    (artifact.versionId === undefined || typeof artifact.versionId === "string") &&
-    typeof artifact.sizeBytes === "number" &&
-    Number.isSafeInteger(artifact.sizeBytes) &&
-    artifact.sizeBytes >= 0,
+  const validArtifacts = artifacts.every(
+    (artifact: unknown) =>
+      isRecord(artifact) &&
+      typeof artifact.bucket === "string" &&
+      artifact.bucket.length > 0 &&
+      typeof artifact.key === "string" &&
+      artifact.key.length > 0 &&
+      typeof artifact.sha256 === "string" &&
+      /^[a-f0-9]{64}$/i.test(artifact.sha256) &&
+      (artifact.versionId === undefined ||
+        typeof artifact.versionId === "string") &&
+      typeof artifact.sizeBytes === "number" &&
+      Number.isSafeInteger(artifact.sizeBytes) &&
+      artifact.sizeBytes >= 0,
   );
 
   if (!validArtifacts) {
@@ -84,12 +86,46 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
       snapshotId: payload.snapshotId,
       urlKey: payload.urlKey,
       url: payload.url,
-      ...(typeof payload.finalUrl === "string" ? { finalUrl: payload.finalUrl } : {}),
+      ...(typeof payload.finalUrl === "string"
+        ? { finalUrl: payload.finalUrl }
+        : {}),
       capturedAt: payload.capturedAt,
-      ...(typeof payload.contentType === "string" ? { contentType: payload.contentType } : {}),
+      ...(typeof payload.contentType === "string"
+        ? { contentType: payload.contentType }
+        : {}),
       warcArtifacts: artifacts as ArtifactReference[],
     },
   };
+}
+
+async function handlePageCapturedMessage(
+  channel: Channel,
+  message: ConsumeMessage | null,
+  handle: (event: PageCapturedEvent) => Promise<unknown>,
+): Promise<void> {
+  if (message === null) {
+    return;
+  }
+
+  const event = parsePageCaptured(message.content);
+
+  if (event === null) {
+    channel.nack(message, false, false);
+    return;
+  }
+
+  try {
+    const result = await handle(event);
+    if (isRecord(result) && result.status === "BUSY") {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      channel.nack(message, false, true);
+      return;
+    }
+    channel.ack(message);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    channel.nack(message, false, true);
+  }
 }
 
 async function startPageCapturedConsumer(
@@ -97,39 +133,23 @@ async function startPageCapturedConsumer(
   handle: (event: PageCapturedEvent) => Promise<unknown>,
 ): Promise<void> {
   await channel.assertExchange(EVENTS_EXCHANGE, "topic", { durable: true });
-  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", { durable: true });
+  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", {
+    durable: true,
+  });
   await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
   await channel.bindQueue(DEAD_LETTER_QUEUE, DEAD_LETTER_EXCHANGE, "");
   await channel.assertQueue(PAGE_CAPTURED_QUEUE, {
     durable: true,
     arguments: { "x-dead-letter-exchange": DEAD_LETTER_EXCHANGE },
   });
-  await channel.bindQueue(PAGE_CAPTURED_QUEUE, EVENTS_EXCHANGE, PAGE_CAPTURED_ROUTING_KEY);
+  await channel.bindQueue(
+    PAGE_CAPTURED_QUEUE,
+    EVENTS_EXCHANGE,
+    PAGE_CAPTURED_ROUTING_KEY,
+  );
   await channel.prefetch(1);
-  await channel.consume(PAGE_CAPTURED_QUEUE, async (message: ConsumeMessage | null) => {
-    if (message === null) {
-      return;
-    }
-
-    const event = parsePageCaptured(message.content);
-
-    if (event === null) {
-      channel.nack(message, false, false);
-      return;
-    }
-
-    try {
-      const result = await handle(event);
-      if (isRecord(result) && result.status === "BUSY") {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        channel.nack(message, false, true);
-        return;
-      }
-      channel.ack(message);
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      channel.nack(message, false, true);
-    }
+  await channel.consume(PAGE_CAPTURED_QUEUE, (message) => {
+    void handlePageCapturedMessage(channel, message, handle);
   });
 }
 
