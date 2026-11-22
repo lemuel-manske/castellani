@@ -7,7 +7,6 @@ from aio_pika.abc import AbstractRobustConnection
 
 from adapters.messaging.rabbitmq.publisher import (
     CAPTURE_ROUTING_KEY,
-    EXCHANGE_NAME,
     RabbitMQMessagePublisher,
 )
 
