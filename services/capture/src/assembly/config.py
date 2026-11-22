@@ -28,7 +28,12 @@ class CaptureSettings:
         return cls(
             aws_region=os.getenv("AWS_REGION", "us-east-1"),
             dynamodb_endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL") or None,
-            s3_endpoint_url=os.getenv("S3_ENDPOINT_URL") or os.getenv("AWS_ENDPOINT_URL_S3") or None,
+            s3_endpoint_url=(
+                os.getenv("S3_ENDPOINT_URL")
+                or os.getenv("AWS_ENDPOINT_URL_S3")
+                or os.getenv("DYNAMODB_ENDPOINT_URL")
+                or None
+            ),
             artifact_bucket=os.getenv("CAPTURE_ARTIFACT_BUCKET", "castellani-archive-artifacts"),
             rabbitmq_url=os.getenv(
                 "RABBITMQ_URL",
