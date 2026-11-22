@@ -124,7 +124,6 @@ def new_worker(
             frontier_table_name="capture_frontier",
             runs_table_name="capture_runs",
             lease_duration=30,
-            attempt_id_factory=lambda: "attempt-1",
         ),
         capture_allocator=DynamoDBCaptureAllocator(
             client=dynamodb,
