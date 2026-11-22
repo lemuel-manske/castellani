@@ -13,7 +13,7 @@ const SEARCH_S3_ENDPOINT_URL = process.env.SEARCH_S3_ENDPOINT_URL;
 function createS3TestSupport() {
   const client = new S3Client({
     region: "us-east-1",
-    endpoint: SEARCH_S3_ENDPOINT_URL ?? "http://localhost:4566",
+    endpoint: SEARCH_S3_ENDPOINT_URL ?? "http://localhost:9000",
     forcePathStyle: true,
     credentials: { accessKeyId: "minio", secretAccessKey: "minio-secret" },
   });
