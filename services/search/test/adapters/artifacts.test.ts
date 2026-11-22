@@ -66,33 +66,32 @@ it("extracts the captured HTTP response from its WARC artifact", async () => {
     ),
   );
 
-    await expect(
-      readCapturedPage(page, [artifact.reference], artifact.reader),
-    ).resolves.toMatchObject({
+  await expect(
+    readCapturedPage(page, [artifact.reference], artifact.reader),
+  ).resolves.toMatchObject({
     archiveId: "archive-1",
     snapshotId: "snapshot-1",
     url: "https://example.com/start",
     finalUrl: "https://example.com/final",
     contentType: "text/html; charset=utf-8",
-      content: "<html><body>Archived page</body></html>",
-    });
-  },
-);
+    content: "<html><body>Archived page</body></html>",
+  });
+});
 
 it(
   "selects the final URL response when the WARC contains a redirect response",
   async () => {
     const artifact = artifactFor(
-    responseRecord(page.url, "<html><body>Redirect response</body></html>") +
-      responseRecord(
-        page.finalUrl ?? page.url,
-        "<html><body>Final response</body></html>",
-      ),
-  );
+      responseRecord(page.url, "<html><body>Redirect response</body></html>") +
+        responseRecord(
+          page.finalUrl ?? page.url,
+          "<html><body>Final response</body></html>",
+        ),
+    );
 
-  await expect(
-    readCapturedPage(page, [artifact.reference], artifact.reader),
-  ).resolves.toMatchObject({
+    await expect(
+      readCapturedPage(page, [artifact.reference], artifact.reader),
+    ).resolves.toMatchObject({
       content: "<html><body>Final response</body></html>",
     });
   },
@@ -101,19 +100,19 @@ it(
 it(
   "validates the complete artifact checksum before returning captured content",
   async () => {
-  const artifact = artifactFor(
-    responseRecord(
-      page.finalUrl ?? page.url,
-      "<html><body>Archived page</body></html>",
-    ),
-  );
+    const artifact = artifactFor(
+      responseRecord(
+        page.finalUrl ?? page.url,
+        "<html><body>Archived page</body></html>",
+      ),
+    );
 
-  await expect(
-    readCapturedPage(
-      page,
-      [{ ...artifact.reference, sha256: "0".repeat(64) }],
-      artifact.reader,
-    ),
+    await expect(
+      readCapturedPage(
+        page,
+        [{ ...artifact.reference, sha256: "0".repeat(64) }],
+        artifact.reader,
+      ),
     ).rejects.toBeInstanceOf(ArtifactIntegrityError);
   },
 );
@@ -121,31 +120,35 @@ it(
 it(
   "rejects artifacts whose declared size does not match the downloaded object",
   async () => {
-  const artifact = artifactFor(
-    responseRecord(page.finalUrl ?? page.url, "<html><body>Archived page</body></html>"),
-  );
+    const artifact = artifactFor(
+      responseRecord(
+        page.finalUrl ?? page.url,
+        "<html><body>Archived page</body></html>",
+      ),
+    );
 
-  await expect(
-    readCapturedPage(
-      page,
-      [{ ...artifact.reference, sizeBytes: artifact.reference.sizeBytes + 1 }],
-      artifact.reader,
-    ),
-  ).rejects.toBeInstanceOf(ArtifactIntegrityError);
-});
+    await expect(
+      readCapturedPage(
+        page,
+        [{ ...artifact.reference, sizeBytes: artifact.reference.sizeBytes + 1 }],
+        artifact.reader,
+      ),
+    ).rejects.toBeInstanceOf(ArtifactIntegrityError);
+  },
+);
 
 it(
   "rejects an artifact without a response for the captured page URL",
   async () => {
-  const artifact = artifactFor(
-    responseRecord(
-      "https://example.org/other",
-      "<html><body>Other page</body></html>",
-    ),
-  );
+    const artifact = artifactFor(
+      responseRecord(
+        "https://example.org/other",
+        "<html><body>Other page</body></html>",
+      ),
+    );
 
-  await expect(
-    readCapturedPage(page, [artifact.reference], artifact.reader),
+    await expect(
+      readCapturedPage(page, [artifact.reference], artifact.reader),
     ).rejects.toBeInstanceOf(CapturedResponseNotFoundError);
   },
 );
