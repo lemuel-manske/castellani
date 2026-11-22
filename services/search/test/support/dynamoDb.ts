@@ -28,12 +28,17 @@ function createDynamoDbTestSupport(clock: () => number) {
       await client.send(
         new CreateTableCommand({
           TableName: tableName,
-          AttributeDefinitions: [{ AttributeName: "snapshotId", AttributeType: "S" }],
+          AttributeDefinitions: [
+            { AttributeName: "snapshotId", AttributeType: "S" },
+          ],
           KeySchema: [{ AttributeName: "snapshotId", KeyType: "HASH" }],
           BillingMode: "PAY_PER_REQUEST",
         }),
       );
-      await waitUntilTableExists({ client, maxWaitTime: 20 }, { TableName: tableName });
+      await waitUntilTableExists(
+        { client, maxWaitTime: 20 },
+        { TableName: tableName },
+      );
     },
     async teardown(): Promise<void> {
       try {

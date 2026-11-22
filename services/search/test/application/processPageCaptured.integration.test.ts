@@ -16,7 +16,7 @@ import {
   createOpenSearchTestSupport,
 } from "../support/openSearch.js";
 
-let now = 1_000_000;
+const now = 1_000_000;
 const dynamodb = createDynamoDbTestSupport(() => now);
 const opensearch = createOpenSearchTestSupport();
 
@@ -50,12 +50,14 @@ function capturedFixture(snapshotId: string, validChecksum = true) {
       redirectChain: ["https://example.com/", "https://example.com/final"],
       capturedAt: "2026-11-22T10:00:00.000Z",
       contentType: "text/html",
-      warcArtifacts: [{
-        bucket: "capture-artifacts",
-        key: `integration-archive/${snapshotId}.warc`,
-        sha256: validChecksum ? checksum : "0".repeat(64),
-        sizeBytes: bytes.byteLength,
-      }],
+      warcArtifacts: [
+        {
+          bucket: "capture-artifacts",
+          key: `integration-archive/${snapshotId}.warc`,
+          sha256: validChecksum ? checksum : "0".repeat(64),
+          sizeBytes: bytes.byteLength,
+        },
+      ],
     },
   };
   const artifactReader: ArtifactObjectReader = {
@@ -70,11 +72,16 @@ function capturedFixture(snapshotId: string, validChecksum = true) {
 
 beforeAll(async () => {
   if (!SEARCH_DYNAMODB_ENDPOINT_URL?.trim()) {
-    throw new Error("SEARCH_DYNAMODB_ENDPOINT_URL is required for Search integration tests");
+    throw new Error(
+      "SEARCH_DYNAMODB_ENDPOINT_URL is required for Search integration tests",
+    );
   }
   if (!SEARCH_OPENSEARCH_URL?.trim()) {
-    throw new Error("SEARCH_OPENSEARCH_URL is required for Search integration tests");
+    throw new Error(
+      "SEARCH_OPENSEARCH_URL is required for Search integration tests",
+    );
   }
+
   await dynamodb.setup();
   await opensearch.setup();
 });
