@@ -14,10 +14,61 @@ import {
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import type { SearchSettings } from "./config.js";
 
+function waitForConnectionOrShutdown(
+  connection: amqp.ChannelModel,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const finish = () => {
+      signal.removeEventListener("abort", finish);
+      connection.removeListener("close", finish);
+      connection.removeListener("error", finish);
+      resolve();
+    };
+
+    connection.once("close", finish);
+    connection.once("error", finish);
+    signal.addEventListener("abort", finish, { once: true });
+
+    if (signal.aborted) {
+      finish();
+    }
+  });
+}
+
+function waitForReconnectDelay(
+  milliseconds: number,
+  signal: AbortSignal,
+): Promise<void> {
+  if (signal.aborted) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+
+    const timeout = setTimeout(finish, milliseconds);
+    signal.addEventListener("abort", finish, { once: true });
+
+    if (signal.aborted) {
+      finish();
+    }
+  });
+}
+
+/** Owns Search service infrastructure clients and the RabbitMQ consumer lifecycle. */
 class SearchRuntime {
   constructor(private readonly settings: SearchSettings) {}
 
-  async start(): Promise<void> {
+  async start(signal: AbortSignal = new AbortController().signal): Promise<void> {
+    if (signal.aborted) {
+      return;
+    }
+
     const localCredentials = { accessKeyId: "test", secretAccessKey: "test" };
     const dynamodb = new DynamoDBClient({
       region: this.settings.awsRegion,
@@ -59,27 +110,43 @@ class SearchRuntime {
 
     try {
       await ensureSearchIndex(opensearch, this.settings.searchIndexName);
-      await this.runConsumer({
-        ledger,
-        capturedPageReader,
-        documentWriter,
-      });
+      await this.runConsumer(
+        { ledger, capturedPageReader, documentWriter },
+        signal,
+      );
     } finally {
-      await Promise.allSettled([dynamodb.destroy(), s3.destroy()]);
-      await opensearch.close();
+      await Promise.allSettled([
+        dynamodb.destroy(),
+        s3.destroy(),
+        opensearch.close(),
+      ]);
     }
   }
 
   private async runConsumer(
     dependencies: Parameters<typeof processPageCaptured>[1],
+    signal: AbortSignal,
   ): Promise<void> {
-    while (true) {
+    while (!signal.aborted) {
       let connection: amqp.ChannelModel | undefined;
       let channel: amqp.Channel | undefined;
 
       try {
         connection = await amqp.connect(this.settings.rabbitmqUrl);
+
+        if (signal.aborted) {
+          await connection.close();
+          break;
+        }
+
         channel = await connection.createChannel();
+
+        if (signal.aborted) {
+          await channel.close();
+          await connection.close();
+          break;
+        }
+
         await startPageCapturedConsumer(channel, (event) =>
           processPageCaptured(event, {
             ...dependencies,
@@ -88,19 +155,19 @@ class SearchRuntime {
           }),
         );
 
-        await new Promise<void>((resolve) => {
-          connection?.once("close", resolve);
-          connection?.once("error", resolve);
-        });
+        await waitForConnectionOrShutdown(connection, signal);
       } catch (error) {
-        console.error("Search consumer connection failed", error);
+        if (!signal.aborted) {
+          console.error("Search consumer connection failed", error);
+        }
       } finally {
         await channel?.close().catch(() => undefined);
         await connection?.close().catch(() => undefined);
       }
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.settings.reconnectDelayMilliseconds),
+      await waitForReconnectDelay(
+        this.settings.reconnectDelayMilliseconds,
+        signal,
       );
     }
   }
