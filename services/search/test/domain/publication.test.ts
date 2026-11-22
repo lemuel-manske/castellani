@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import {
   emptyPublicationFacts,
   isPublicationAuthorized,
-  recordCompensation,
+  recordCompensationDecision,
   recordPublicationDecision,
   recordReplayPublished,
 } from "../../src/domain/publication.js";
@@ -57,7 +57,7 @@ it("rejects a decision that conflicts with an earlier replay acknowledgement", (
 });
 
 it("keeps compensated archives permanently ineligible", () => {
-  const facts = recordCompensation(emptyPublicationFacts());
+  const facts = recordCompensationDecision(emptyPublicationFacts(), { archiveId: identity.archiveId, decisionVersion: identity.decisionVersion, reasonCode: "crawl_failed" });
   expect(isPublicationAuthorized(facts)).toBe(false);
   expect(() => recordPublicationDecision(facts, identity)).toThrow(
     "a compensated archive cannot be published",
@@ -66,5 +66,5 @@ it("keeps compensated archives permanently ineligible", () => {
 
 it("rejects compensation after a publication fact has been recorded", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
-  expect(() => recordCompensation(facts)).toThrow("a publication fact prevents compensation");
+  expect(() => recordCompensationDecision(facts, { archiveId: identity.archiveId, decisionVersion: identity.decisionVersion, reasonCode: "crawl_failed" })).toThrow("a publication fact prevents compensation");
 });
