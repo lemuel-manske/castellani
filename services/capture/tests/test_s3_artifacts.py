@@ -58,3 +58,25 @@ async def test_s3_artifact_store_rejects_files_outside_attempt_directory(
 
     with pytest.raises(ValueError):
         await store.persist_attempt(claim, directory, "snapshot-1", (outside,))
+
+
+
+@pytest.mark.asyncio
+async def test_discard_attempt_removes_partial_s3_objects_and_local_staging(
+    tmp_path: Path,
+    s3: FakeS3,
+) -> None:
+    store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
+    claim = make_claim()
+    directory = await store.create_attempt_directory(claim)
+
+    warc = directory / "partial.warc.gz"
+    warc.write_bytes(b"partial")
+    await store.persist_attempt(claim, directory, "snapshot-partial", (warc,))
+
+    assert len(s3.objects) == 1
+
+    await store.discard_attempt(claim, directory)
+
+    assert s3.objects == {}
+    assert not directory.exists()
