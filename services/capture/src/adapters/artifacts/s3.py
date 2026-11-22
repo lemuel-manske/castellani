@@ -2,8 +2,8 @@ import asyncio
 import hashlib
 import shutil
 from pathlib import Path
-from urllib.parse import quote
 from typing import Any
+from urllib.parse import quote
 
 from domain import ArtifactReference, TaskClaim
 from worker import ArtifactStore
