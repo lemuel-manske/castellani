@@ -8,8 +8,6 @@ test-infra-up:
 	docker compose up -d --wait dynamodb-local opensearch rabbitmq
 	docker compose up -d localstack
 	timeout 120 sh -c 'until curl -fsS http://localhost:4566/_localstack/health >/dev/null; do sleep 2; done' || { docker compose logs localstack; exit 1; }
-		sleep 2; \
-	done
 
 test-infra-down:
 	docker compose down
