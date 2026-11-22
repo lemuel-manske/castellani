@@ -1,15 +1,6 @@
 import { expect, it } from "vitest";
 import { SearchSettings } from "../../src/assembly/config.js";
 
-it("loads service defaults", () => {
-  const settings = SearchSettings.fromEnvironment({});
-
-  expect(settings.awsRegion).toBe("us-east-1");
-  expect(settings.indexingLedgerTableName).toBe("search_indexing_ledger");
-  expect(settings.searchIndexName).toBe("archive-pages-v1");
-  expect(settings.indexingLeaseDurationSeconds).toBe(120);
-});
-
 it("loads service-specific environment settings", () => {
   const settings = SearchSettings.fromEnvironment({
     SEARCH_AWS_REGION: "sa-east-1",

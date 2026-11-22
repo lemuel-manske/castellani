@@ -30,6 +30,14 @@ function positiveInteger(
   return parsed;
 }
 
+function required(name: string, value: string | undefined): string {
+  if (!value?.trim()) {
+    throw new Error(`${name} must not be empty`);
+  }
+
+  return value;
+}
+
 /** Runtime configuration for one Search service process. */
 class SearchSettings {
   readonly awsRegion: string;
@@ -45,7 +53,7 @@ class SearchSettings {
   readonly reconnectDelayMilliseconds: number;
 
   constructor(options: SearchSettingsOptions) {
-    this.awsRegion = options.awsRegion ?? "us-east-1";
+    this.awsRegion = options.awsRegion;
 
     this.dynamodbEndpointUrl = options.dynamodbEndpointUrl;
     this.s3EndpointUrl = options.s3EndpointUrl;
@@ -91,18 +99,33 @@ class SearchSettings {
 
   static fromEnvironment(env: NodeJS.ProcessEnv = process.env): SearchSettings {
     return new SearchSettings({
-      awsRegion: env.SEARCH_AWS_REGION,
+      awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
 
-      dynamodbEndpointUrl: env.SEARCH_DYNAMODB_ENDPOINT_URL,
-      s3EndpointUrl: env.SEARCH_S3_ENDPOINT_URL,
-      rabbitmqUrl: env.SEARCH_RABBITMQ_URL,
-      opensearchUrl: env.SEARCH_OPENSEARCH_URL,
+      dynamodbEndpointUrl: required(
+        "SEARCH_DYNAMODB_ENDPOINT_URL",
+        env.SEARCH_DYNAMODB_ENDPOINT_URL,
+      ),
+      s3EndpointUrl: required(
+        "SEARCH_S3_ENDPOINT_URL",
+        env.SEARCH_S3_ENDPOINT_URL,
+      ),
+      rabbitmqUrl: required("SEARCH_RABBITMQ_URL", env.SEARCH_RABBITMQ_URL),
+      opensearchUrl: required(
+        "SEARCH_OPENSEARCH_URL",
+        env.SEARCH_OPENSEARCH_URL,
+      ),
 
-      artifactBucket: env.SEARCH_ARTIFACT_BUCKET,
+      artifactBucket: required(
+        "SEARCH_ARTIFACT_BUCKET",
+        env.SEARCH_ARTIFACT_BUCKET,
+      ),
 
-      indexingLedgerTableName: env.SEARCH_INDEXING_LEDGER_TABLE,
+      indexingLedgerTableName: required(
+        "SEARCH_INDEXING_LEDGER_TABLE",
+        env.SEARCH_INDEXING_LEDGER_TABLE,
+      ),
 
-      searchIndexName: env.SEARCH_INDEX_NAME,
+      searchIndexName: required("SEARCH_INDEX_NAME", env.SEARCH_INDEX_NAME),
 
       indexingLeaseDurationSeconds: positiveInteger(
         "SEARCH_INDEXING_LEASE_DURATION_SECONDS",
