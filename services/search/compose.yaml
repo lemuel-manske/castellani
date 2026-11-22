@@ -23,12 +23,6 @@ services:
     ports:
       - "4566:4566"
 
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
-
   opensearch:
     image: opensearchproject/opensearch:3.10.0
 
