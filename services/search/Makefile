@@ -29,7 +29,7 @@ test-unit:
 
 test-integration:
 	SEARCH_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
-		SEARCH_S3_ENDPOINT_URL=http://localhost:9000 \
+		SEARCH_S3_ENDPOINT_URL=http://localhost:4566 \
 		SEARCH_OPENSEARCH_URL=http://localhost:9200 \
 		SEARCH_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
 		npm run test:integration
