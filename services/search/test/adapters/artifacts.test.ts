@@ -99,7 +99,11 @@ it("validates the complete artifact checksum before returning captured content",
     responseRecord(
       page.finalUrl ?? page.url,
       "<html><body>Archived page</body></html>",
-    ),
+    ) +
+      responseRecord(
+        "https://example.org/trailing",
+        "<html><body>Trailing record</body></html>",
+      ),
   );
 
   await expect(
