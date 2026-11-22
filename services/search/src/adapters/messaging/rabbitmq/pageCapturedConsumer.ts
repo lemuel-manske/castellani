@@ -1,4 +1,4 @@
-import Ajv, { type AnySchema } from "ajv";
+import type { ArtifactReference } from "../../../ports/artifacts.js";
 import type { Channel, ConsumeMessage } from "amqplib";
 import type { PageCapturedEvent } from "../../../application/processPageCaptured.js";
 
@@ -26,69 +26,55 @@ const DEFAULT_TOPOLOGY: PageCapturedConsumerTopology = {
   deadLetterQueue: DEAD_LETTER_QUEUE,
 };
 
-const PAGE_CAPTURED_SCHEMA = {
-  type: "object",
-  required: [
-    "messageId",
-    "correlationId",
-    "type",
-    "version",
-    "occurredAt",
-    "payload",
-  ],
-  properties: {
-    messageId: { type: "string", minLength: 1 },
-    correlationId: { type: "string", minLength: 1 },
-    type: { const: "PageCaptured" },
-    version: { const: EXPECTED_VERSION },
-    occurredAt: { type: "string", minLength: 1 },
-    payload: {
-      type: "object",
-      required: [
-        "archiveId",
-        "snapshotId",
-        "urlKey",
-        "url",
-        "finalUrl",
-        "redirectChain",
-        "capturedAt",
-        "warcArtifacts",
-      ],
-      properties: {
-        archiveId: { type: "string", minLength: 1 },
-        snapshotId: { type: "string", minLength: 1 },
-        urlKey: { type: "string", minLength: 1 },
-        url: { type: "string", minLength: 1 },
-        finalUrl: { type: "string", minLength: 1 },
-        redirectChain: {
-          type: "array",
-          items: { type: "string", minLength: 1 },
-        },
-        capturedAt: { type: "string", minLength: 1 },
-        contentType: { type: "string" },
-        warcArtifacts: {
-          type: "array",
-          minItems: 1,
-          items: {
-            type: "object",
-            required: ["bucket", "key", "sha256", "sizeBytes"],
-            properties: {
-              bucket: { type: "string", minLength: 1 },
-              key: { type: "string", minLength: 1 },
-              sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
-              sizeBytes: { type: "integer", minimum: 0, maximum: 9007199254740991 },
-              versionId: { type: "string", minLength: 1 },
-            },
-          },
-        },
-      },
-    },
-  },
-} satisfies AnySchema;
+function isString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
 
-const validatePageCaptured = new Ajv({ allErrors: true }).compile<unknown>(
-  PAGE_CAPTURED_SCHEMA,
-);
+function isArtifactReference(value: unknown): value is ArtifactReference {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isString(value.bucket) &&
+    isString(value.key) &&
+    isString(value.sha256) &&
+    /^[a-f0-9]{64}$/.test(value.sha256) &&
+    typeof value.sizeBytes === "number" &&
+    Number.isSafeInteger(value.sizeBytes) &&
+    value.sizeBytes >= 0 &&
+    (value.versionId === undefined || isString(value.versionId))
+  );
+}
+
+function isPageCapturedEvent(value: unknown): value is PageCapturedEvent {
+  if (!isRecord(value) || !isRecord(value.payload)) {
+    return false;
+  }
+
+  const payload = value.payload;
+
+  return (
+    isString(value.messageId) &&
+    isString(value.correlationId) &&
+    value.type === "PageCaptured" &&
+    value.version === EXPECTED_VERSION &&
+    isString(value.occurredAt) &&
+    isString(payload.archiveId) &&
+    isString(payload.snapshotId) &&
+    isString(payload.urlKey) &&
+    isString(payload.url) &&
+    isString(payload.finalUrl) &&
+    Array.isArray(payload.redirectChain) &&
+    payload.redirectChain.every(isString) &&
+    isString(payload.capturedAt) &&
+    (payload.contentType === undefined ||
+      typeof payload.contentType === "string") &&
+    Array.isArray(payload.warcArtifacts) &&
+    payload.warcArtifacts.length > 0 &&
+    payload.warcArtifacts.every(isArtifactReference)
+  );
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -103,11 +89,11 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     return null;
   }
 
-  if (!validatePageCaptured(value)) {
+  if (!isPageCapturedEvent(value)) {
     return null;
   }
 
-  const event = value as PageCapturedEvent;
+  const event = value;
   if (event.payload.archiveId !== event.correlationId) {
     return null;
   }
