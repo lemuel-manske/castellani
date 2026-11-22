@@ -6,7 +6,7 @@ import pytest
 from aio_pika.abc import AbstractRobustConnection
 
 from adapters.messaging.rabbitmq.consumer import (
-    QUEUE_NAME,
+    CAPTURE_PAGE_QUEUE,
     RabbitMQPageTaskConsumer,
     parse_delivery,
 )
@@ -61,7 +61,7 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
 
     consumer = RabbitMQPageTaskConsumer(capture_page)
 
-    queue_name = f"{QUEUE_NAME}.test-{uuid4()}"
+    queue_name = f"{CAPTURE_PAGE_QUEUE}.test-{uuid4()}"
     consumer_task = asyncio.create_task(consumer.run(rabbitmq, queue_name=queue_name, ready=ready))
 
     publisher = RabbitMQMessagePublisher(rabbitmq)

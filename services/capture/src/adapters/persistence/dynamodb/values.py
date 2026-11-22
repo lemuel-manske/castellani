@@ -21,6 +21,7 @@ def number_from_item(
     except KeyError as error:
         if default is not None:
             return default
+
         raise RuntimeError(f"DynamoDB {resource} has an invalid {key}") from error
     except (TypeError, ValueError) as error:
         raise RuntimeError(f"DynamoDB {resource} has an invalid {key}") from error

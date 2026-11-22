@@ -35,6 +35,7 @@ class OutboxDispatcher:
 
         self.outbox = outbox
         self.publisher = publisher
+
         self.lease_duration = lease_duration
         self.retry_delay = retry_delay
         self.poll_interval = poll_interval

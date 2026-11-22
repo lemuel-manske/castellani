@@ -34,6 +34,7 @@ from .queries.task import (
     release_task_transaction,
     renew_task_transaction,
 )
+from .tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from .values import number_from_item
 
 
@@ -51,44 +52,19 @@ class DynamoDBTaskRepository(TaskRepository):
     def __init__(
         self,
         client: Any,
-        frontier_table_name: str,
-        runs_table_name: str,
         lease_duration: float,
         clock: Callable[[], float] = time.time,
-        outbox_table_name: str = "capture_outbox",
-        snapshots_table_name: str = "capture_snapshots",
     ) -> None:
-        if not frontier_table_name:
-            raise ValueError("frontier_table_name must not be empty")
-
-        if not runs_table_name:
-            raise ValueError("runs_table_name must not be empty")
-
-        if not snapshots_table_name:
-            raise ValueError("snapshots_table_name must not be empty")
-
-        if not outbox_table_name:
-            raise ValueError("outbox_table_name must not be empty")
-
         if lease_duration <= 0:
             raise ValueError("lease_duration must be positive")
 
         self.client = client
-        self.frontier_table_name = frontier_table_name
-        self.runs_table_name = runs_table_name
-        self.snapshots_table_name = snapshots_table_name
-        self.outbox_table_name = outbox_table_name
+
         self.lease_duration = lease_duration
 
         self.clock = clock
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
-        if not archive_id:
-            raise ValueError("archive_id must not be empty")
-
-        if not url_key:
-            raise ValueError("url_key must not be empty")
-
         attempt_id = new_attempt_id()
 
         return await asyncio.to_thread(self._claim, archive_id, url_key, attempt_id)
@@ -117,7 +93,7 @@ class DynamoDBTaskRepository(TaskRepository):
         if not pages:
             return
 
-        run = read_run(self.client, self.runs_table_name, claim.task.archive_id)
+        run = read_run(self.client, RUNS_TABLE, claim.task.archive_id)
 
         if run is None:
             raise RuntimeError("Capture run does not exist")
@@ -150,9 +126,9 @@ class DynamoDBTaskRepository(TaskRepository):
         url_key = page.identity.url_key
 
         transaction = admit_page_transaction(
-            self.frontier_table_name,
-            self.runs_table_name,
-            self.outbox_table_name,
+            FRONTIER_TABLE,
+            RUNS_TABLE,
+            OUTBOX_TABLE,
             claim,
             page,
             message_id,
@@ -165,7 +141,7 @@ class DynamoDBTaskRepository(TaskRepository):
         except ConditionalWriteRejected as error:
             existing = read_frontier(
                 self.client,
-                self.frontier_table_name,
+                FRONTIER_TABLE,
                 archive_id,
                 url_key,
             )
@@ -182,7 +158,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
             parent = read_frontier(
                 self.client,
-                self.frontier_table_name,
+                FRONTIER_TABLE,
                 archive_id,
                 claim.task.url_key,
             )
@@ -196,7 +172,7 @@ class DynamoDBTaskRepository(TaskRepository):
             ):
                 raise TaskClaimLostError("parent page-task claim is no longer owned") from error
 
-            run = read_run(self.client, self.runs_table_name, archive_id)
+            run = read_run(self.client, RUNS_TABLE, archive_id)
 
             if run is None:
                 raise RuntimeError("Capture run disappeared during discovery admission") from error
@@ -210,8 +186,6 @@ class DynamoDBTaskRepository(TaskRepository):
             if admitted >= maximum:
                 return False
 
-            # The failed condition was not a duplicate or a full run. Re-raise
-            # rather than silently dropping a discovery on an unexpected conflict.
             raise
 
     def _complete(self, outcome: CaptureOutcome) -> None:
@@ -225,10 +199,10 @@ class DynamoDBTaskRepository(TaskRepository):
         depth = self._task_depth(outcome.archive_id, outcome.url_key)
 
         transaction = complete_task_transaction(
-            self.frontier_table_name,
-            self.runs_table_name,
-            self.snapshots_table_name,
-            self.outbox_table_name,
+            FRONTIER_TABLE,
+            RUNS_TABLE,
+            SNAPSHOTS_TABLE,
+            OUTBOX_TABLE,
             outcome,
             depth,
             message_id,
@@ -240,7 +214,7 @@ class DynamoDBTaskRepository(TaskRepository):
         except ConditionalWriteRejected as error:
             existing = read_frontier(
                 self.client,
-                self.frontier_table_name,
+                FRONTIER_TABLE,
                 outcome.archive_id,
                 outcome.url_key,
             )
@@ -252,7 +226,7 @@ class DynamoDBTaskRepository(TaskRepository):
             ):
                 event = read_outbox(
                     self.client,
-                    self.outbox_table_name,
+                    OUTBOX_TABLE,
                     message_id,
                 )
 
@@ -266,7 +240,7 @@ class DynamoDBTaskRepository(TaskRepository):
     def _task_depth(self, archive_id: str, url_key: str) -> int:
         item = read_frontier(
             self.client,
-            self.frontier_table_name,
+            FRONTIER_TABLE,
             archive_id,
             url_key,
         )
@@ -300,7 +274,7 @@ class DynamoDBTaskRepository(TaskRepository):
         try:
             finish_task(
                 self.client,
-                self.frontier_table_name,
+                FRONTIER_TABLE,
                 archive_id,
                 url_key,
                 attempt_id,
@@ -329,21 +303,20 @@ class DynamoDBTaskRepository(TaskRepository):
         )
 
         transaction = release_task_transaction(
-            self.runs_table_name,
-            self.frontier_table_name,
-            self.outbox_table_name,
+            RUNS_TABLE,
+            FRONTIER_TABLE,
+            OUTBOX_TABLE,
             claim,
             message_id,
             now,
         )
 
         try:
-            # The conditional outbox Put is the idempotency guard for release retries.
             self._transact(transaction, None)
         except ConditionalWriteRejected as error:
             existing = read_outbox(
                 self.client,
-                self.outbox_table_name,
+                OUTBOX_TABLE,
                 message_id,
             )
 
@@ -358,8 +331,8 @@ class DynamoDBTaskRepository(TaskRepository):
         lease_until = now + self.lease_duration
 
         transaction = claim_task_transaction(
-            self.runs_table_name,
-            self.frontier_table_name,
+            RUNS_TABLE,
+            FRONTIER_TABLE,
             archive_id,
             url_key,
             attempt_id,
@@ -374,7 +347,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
         item = read_frontier(
             self.client,
-            self.frontier_table_name,
+            FRONTIER_TABLE,
             archive_id,
             url_key,
         )
@@ -390,8 +363,8 @@ class DynamoDBTaskRepository(TaskRepository):
         request_token = str(uuid4())
 
         transaction = renew_task_transaction(
-            self.runs_table_name,
-            self.frontier_table_name,
+            RUNS_TABLE,
+            FRONTIER_TABLE,
             claim.task.archive_id,
             claim.task.url_key,
             claim.attempt_id,
@@ -407,7 +380,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
         item = read_frontier(
             self.client,
-            self.frontier_table_name,
+            FRONTIER_TABLE,
             claim.task.archive_id,
             claim.task.url_key,
         )

@@ -12,13 +12,11 @@ from mypy_boto3_s3.client import S3Client
 
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
-from adapters.messaging.rabbitmq.consumer import (
-    QUEUE_NAME,
-    RabbitMQPageTaskConsumer,
-)
+from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
+from adapters.persistence.dynamodb.tables import CAPTURE_TABLES
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application import OutboxDispatcher
 from worker import new_worker
@@ -33,8 +31,10 @@ class CaptureRuntime:
 
     def __init__(self, settings: CaptureSettings) -> None:
         self.settings = settings
+
         self.dynamodb_client: DynamoDBClient | None = None
         self.s3_client: Any | None = None
+
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
 
@@ -88,13 +88,7 @@ class CaptureRuntime:
 
             self.s3_client = s3_client
 
-            for table_name in (
-                self.settings.frontier_table_name,
-                self.settings.runs_table_name,
-                self.settings.snapshots_table_name,
-                self.settings.outbox_table_name,
-                self.settings.browser_slots_table_name,
-            ):
+            for table_name in CAPTURE_TABLES:
                 await asyncio.to_thread(
                     dynamodb_client.describe_table,
                     TableName=table_name,
@@ -102,15 +96,10 @@ class CaptureRuntime:
 
             task_repository = DynamoDBTaskRepository(
                 client=dynamodb_client,
-                frontier_table_name=self.settings.frontier_table_name,
-                runs_table_name=self.settings.runs_table_name,
-                snapshots_table_name=self.settings.snapshots_table_name,
                 lease_duration=self.settings.lease_duration,
-                outbox_table_name=self.settings.outbox_table_name,
             )
             allocator = DynamoDBCaptureAllocator(
                 client=dynamodb_client,
-                table_name=self.settings.browser_slots_table_name,
                 slot_count=self.settings.browser_slot_count,
                 lease_duration=self.settings.lease_duration,
             )
@@ -120,7 +109,6 @@ class CaptureRuntime:
                 executor=BrowserPageExecutor(),
                 artifacts=S3ArtifactStore(
                     client=s3_client,
-                    bucket=self.settings.artifact_bucket,
                     staging_root=Path(self.settings.artifact_directory),
                 ),
             )
@@ -139,7 +127,7 @@ class CaptureRuntime:
             self.consumer = RabbitMQPageTaskConsumer(worker)
 
             self.consumer_task = asyncio.create_task(
-                self.consumer.run(self.connection, queue_name=QUEUE_NAME, ready=consumer_ready),
+                self.consumer.run(self.connection, ready=consumer_ready),
                 name="capture-rabbitmq-consumer",
             )
 
@@ -149,10 +137,7 @@ class CaptureRuntime:
             )
 
             dispatcher = OutboxDispatcher(
-                outbox=DynamoDBOutbox(
-                    client=dynamodb_client,
-                    table_name=self.settings.outbox_table_name,
-                ),
+                outbox=DynamoDBOutbox(client=dynamodb_client),
                 publisher=self.publisher,
                 lease_duration=self.settings.outbox_lease_duration,
                 retry_delay=self.settings.outbox_retry_delay,

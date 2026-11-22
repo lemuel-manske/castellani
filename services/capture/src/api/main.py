@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -11,7 +11,7 @@ HEALTH_CHECK_READINESS_PATH = f"{HEALTH_CHECK_PATH}/ready"
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     runtime = CaptureRuntime(CaptureSettings.from_environment())
     await runtime.start()
     app.state.runtime = runtime

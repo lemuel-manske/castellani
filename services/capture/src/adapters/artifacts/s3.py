@@ -8,16 +8,21 @@ from urllib.parse import quote
 from domain import ArtifactReference, TaskClaim
 from worker import ArtifactStore
 
+ARTIFACT_BUCKET = "castellani-archive-artifacts"
+
+DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
+
 
 class S3ArtifactStore(ArtifactStore):
     """Uploads attempt-scoped WARC artifacts to private, immutable S3 keys."""
 
-    def __init__(self, client: Any, bucket: str, staging_root: Path) -> None:
-        if not bucket:
-            raise ValueError("artifact bucket must not be empty")
-
+    def __init__(
+        self,
+        client: Any,
+        staging_root: Path = DEFAULT_STAGING_ROOT,
+    ) -> None:
         self.client = client
-        self.bucket = bucket
+
         self.staging_root = staging_root
 
     async def create_attempt_directory(self, claim: TaskClaim) -> Path:
@@ -71,20 +76,23 @@ class S3ArtifactStore(ArtifactStore):
                 seen_keys.add(key)
 
                 digest = hashlib.sha256()
+
                 with resolved.open("rb") as stream:
                     for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                         digest.update(chunk)
+
                 sha256 = digest.hexdigest()
+
                 size_bytes = resolved.stat().st_size
 
                 self.client.upload_file(
                     str(resolved),
-                    self.bucket,
+                    ARTIFACT_BUCKET,
                     key,
                     ExtraArgs={"Metadata": {"sha256": sha256}},
                 )
 
-                metadata = self.client.head_object(Bucket=self.bucket, Key=key)
+                metadata = self.client.head_object(Bucket=ARTIFACT_BUCKET, Key=key)
 
                 if metadata.get("Metadata", {}).get("sha256") != sha256:
                     raise RuntimeError(f"S3 artifact checksum metadata mismatch for {key}")
@@ -94,7 +102,7 @@ class S3ArtifactStore(ArtifactStore):
 
                 references.append(
                     ArtifactReference(
-                        bucket=self.bucket,
+                        bucket=ARTIFACT_BUCKET,
                         key=key,
                         sha256=sha256,
                         size_bytes=size_bytes,

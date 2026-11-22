@@ -1,32 +1,26 @@
-from typing import Any
-
 import aio_pika
-from aio_pika.abc import AbstractRobustConnection
+from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
 
-EXCHANGE_NAME = "castellani.capture"
-CAPTURE_ROUTING_KEY = "CapturePage"
+from .topology import CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT
 
 
 class RabbitMQMessagePublisher:
     """Publishes persistent Capture command envelopes with broker confirms."""
 
-    def __init__(
-        self,
-        connection: AbstractRobustConnection,
-        exchange_name: str = EXCHANGE_NAME,
-    ) -> None:
+    def __init__(self, connection: AbstractRobustConnection) -> None:
         self.connection = connection
-        self.exchange_name = exchange_name
-        self.channel: Any | None = None
-        self.exchange: Any | None = None
+
+        self.channel: AbstractChannel | None = None
+        self.exchange: AbstractExchange | None = None
 
     async def start(self) -> None:
         self.channel = await self.connection.channel(
             publisher_confirms=True,
             on_return_raises=True,
         )
+
         self.exchange = await self.channel.declare_exchange(
-            self.exchange_name,
+            CAPTURE_EXCHANGE_NAME,
             aio_pika.ExchangeType.DIRECT,
             durable=True,
         )
@@ -44,7 +38,7 @@ class RabbitMQMessagePublisher:
 
         await self.exchange.publish(
             message,
-            routing_key=CAPTURE_ROUTING_KEY,
+            routing_key=CAPTURE_PAGE_EVENT,
             mandatory=True,
         )
 

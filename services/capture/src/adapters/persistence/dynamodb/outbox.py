@@ -17,10 +17,15 @@ from .queries.outbox import (
     query_due_messages,
     reschedule_message,
 )
+from .tables import OUTBOX_TABLE
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
 OUTBOX_PUBLISHED = "PUBLISHED"
+
+
+def new_lease_token() -> str:
+    return str(uuid4())
 
 
 class OutboxLeaseLostError(RuntimeError):
@@ -33,17 +38,14 @@ class DynamoDBOutbox(OutboxRepository):
     def __init__(
         self,
         client: Any,
-        table_name: str,
         clock: Callable[[], float] = time.time,
-        lease_token_factory: Callable[[], str] | None = None,
+        lease_token_factory: Callable[[], str] = new_lease_token,
     ) -> None:
-        if not table_name:
-            raise ValueError("table_name must not be empty")
-
         self.client = client
-        self.table_name = table_name
+
         self.clock = clock
-        self.lease_token_factory = lease_token_factory or (lambda: str(uuid4()))
+
+        self.lease_token_factory = lease_token_factory
 
     async def claim(self, lease_duration: float) -> OutboxMessage | None:
         if lease_duration <= 0:
@@ -69,7 +71,7 @@ class DynamoDBOutbox(OutboxRepository):
             while True:
                 page = query_due_messages(
                     self.client,
-                    self.table_name,
+                    OUTBOX_TABLE,
                     status,
                     now,
                     cursor,
@@ -107,7 +109,7 @@ class DynamoDBOutbox(OutboxRepository):
         try:
             updated = claim_message(
                 self.client,
-                self.table_name,
+                OUTBOX_TABLE,
                 message_id,
                 status,
                 OUTBOX_CLAIMED,
@@ -140,7 +142,7 @@ class DynamoDBOutbox(OutboxRepository):
         try:
             confirm_message(
                 self.client,
-                self.table_name,
+                OUTBOX_TABLE,
                 message.message_id,
                 message.lease_token,
                 OUTBOX_CLAIMED,
@@ -160,7 +162,7 @@ class DynamoDBOutbox(OutboxRepository):
         try:
             reschedule_message(
                 self.client,
-                self.table_name,
+                OUTBOX_TABLE,
                 message.message_id,
                 message.lease_token,
                 OUTBOX_CLAIMED,

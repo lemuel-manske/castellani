@@ -7,12 +7,7 @@ from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
 
 from worker.api import CaptureRunner
 
-from .publisher import CAPTURE_ROUTING_KEY, EXCHANGE_NAME
-
-QUEUE_NAME = "castellani.capture.page"
-
-EXPECTED_MESSAGE_TYPE = "CapturePage"
-EXPECTED_MESSAGE_VERSION = 1
+from .topology import CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT, CAPTURE_PAGE_QUEUE, MESSAGE_VERSION
 
 
 def parse_delivery(body: bytes) -> tuple[str, str] | None:
@@ -36,10 +31,10 @@ def parse_delivery(body: bytes) -> tuple[str, str] | None:
         or not message_id
         or not isinstance(correlation_id, str)
         or not correlation_id
-        or envelope.get("type") != EXPECTED_MESSAGE_TYPE
+        or envelope.get("type") != CAPTURE_PAGE_EVENT
         or not isinstance(version, int)
         or isinstance(version, bool)
-        or version != EXPECTED_MESSAGE_VERSION
+        or version != MESSAGE_VERSION
         or not isinstance(occurred_at, str)
         or not occurred_at
     ):
@@ -85,9 +80,7 @@ class RabbitMQPageTaskConsumer:
     async def run(
         self,
         connection: AbstractRobustConnection,
-        exchange_name: str = EXCHANGE_NAME,
-        queue_name: str = QUEUE_NAME,
-        routing_key: str = CAPTURE_ROUTING_KEY,
+        queue_name: str = CAPTURE_PAGE_QUEUE,
         ready: asyncio.Event | None = None,
     ) -> None:
         channel: Any = await connection.channel()
@@ -98,7 +91,7 @@ class RabbitMQPageTaskConsumer:
             await channel.set_qos(prefetch_count=1)
 
             exchange = await channel.declare_exchange(
-                exchange_name,
+                CAPTURE_EXCHANGE_NAME,
                 aio_pika.ExchangeType.DIRECT,
                 durable=True,
             )
@@ -107,7 +100,7 @@ class RabbitMQPageTaskConsumer:
 
             assert queue is not None
 
-            await queue.bind(exchange, routing_key=routing_key)
+            await queue.bind(exchange, routing_key=CAPTURE_PAGE_EVENT)
 
             consumer_tag = await queue.consume(self.handle)
 

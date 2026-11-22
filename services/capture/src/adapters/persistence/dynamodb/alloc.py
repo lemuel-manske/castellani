@@ -15,7 +15,11 @@ from .queries.alloc import (
     reservation_from_item,
     reserve_slot,
 )
+from .tables import BROWSER_SLOTS_TABLE
 from .values import number_from_item
+
+DEFAULT_SLOT_COUNT = 10
+DEFAULT_LEASE_DURATION = 60
 
 
 class CaptureReservationLostError(RuntimeError):
@@ -28,14 +32,10 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
     def __init__(
         self,
         client: Any,
-        table_name: str,
-        slot_count: int,
-        lease_duration: float,
+        slot_count: int = DEFAULT_SLOT_COUNT,
+        lease_duration: float = DEFAULT_LEASE_DURATION,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        if not table_name:
-            raise ValueError("table_name must not be empty")
-
         if slot_count < 1:
             raise ValueError("slot_count must be positive")
 
@@ -43,10 +43,12 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
             raise ValueError("lease_duration must be positive")
 
         self.client = client
-        self.table_name = table_name
-        self.slot_count = slot_count
-        self.lease_duration = lease_duration
+
         self.clock = clock
+
+        self.slot_count = slot_count
+
+        self.lease_duration = lease_duration
 
     async def reserve(self, attempt_id: str) -> CaptureReservation | None:
         if not attempt_id:
@@ -85,7 +87,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
             try:
                 response = reserve_slot(
                     self.client,
-                    self.table_name,
+                    BROWSER_SLOTS_TABLE,
                     slot_id,
                     attempt_id,
                     reservation_id,
@@ -96,7 +98,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                 if not is_conditional_failure(error):
                     raise
 
-                existing = read_slot(self.client, self.table_name, slot_id)
+                existing = read_slot(self.client, BROWSER_SLOTS_TABLE, slot_id)
 
                 if (
                     existing is not None
@@ -119,7 +121,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         try:
             response = renew_slot(
                 self.client,
-                self.table_name,
+                BROWSER_SLOTS_TABLE,
                 reservation.slot_id,
                 reservation.attempt_id,
                 reservation.reservation_id,
@@ -141,7 +143,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         try:
             release_slot(
                 self.client,
-                self.table_name,
+                BROWSER_SLOTS_TABLE,
                 reservation.slot_id,
                 reservation.attempt_id,
                 reservation.reservation_id,
@@ -159,7 +161,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         for slot_number in range(self.slot_count):
             slot_id = str(slot_number)
 
-            item = read_slot(self.client, self.table_name, slot_id)
+            item = read_slot(self.client, BROWSER_SLOTS_TABLE, slot_id)
 
             if (
                 item is not None
