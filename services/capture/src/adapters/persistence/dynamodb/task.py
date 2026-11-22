@@ -1,6 +1,5 @@
 import asyncio
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +16,8 @@ from domain import (
     identify_discovered_pages,
     new_attempt_id,
 )
+
+from .values import number_from_item
 
 from .error_handling import (
     extract_cancellation_reasons,
@@ -66,7 +67,6 @@ class DynamoDBTaskRepository(TaskRepository):
         runs_table_name: str,
         lease_duration: float,
         clock: Callable[[], float] = time.time,
-        attempt_id_factory: Callable[[], str] = new_attempt_id,
         outbox_table_name: str = "capture_outbox",
     ) -> None:
         if not frontier_table_name:
@@ -88,7 +88,6 @@ class DynamoDBTaskRepository(TaskRepository):
         self.lease_duration = lease_duration
 
         self.clock = clock
-        self.attempt_id_factory = attempt_id_factory
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
         if not archive_id:
@@ -97,10 +96,7 @@ class DynamoDBTaskRepository(TaskRepository):
         if not url_key:
             raise ValueError("url_key must not be empty")
 
-        attempt_id = self.attempt_id_factory()
-
-        if not attempt_id:
-            raise ValueError("attempt_id_factory returned an empty value")
+        attempt_id = new_attempt_id()
 
         return await asyncio.to_thread(self._claim, archive_id, url_key, attempt_id)
 
@@ -139,9 +135,9 @@ class DynamoDBTaskRepository(TaskRepository):
         if run.get("admission", {}).get("S") != "OPEN":
             raise TaskClaimLostError("Capture run admission is closed")
 
-        maximum = self._number_from_item(run, "maxPages")
-        admitted = self._number_from_item(run, "admittedPages")
-        outstanding = self._number_from_item(run, "outstandingPages")
+        maximum = number_from_item(run, "maxPages", "capture run")
+        admitted = number_from_item(run, "admittedPages", "capture run")
+        outstanding = number_from_item(run, "outstandingPages", "capture run")
         if maximum is None or admitted is None or outstanding is None:
             raise RuntimeError(
                 "Capture run is missing maxPages, admittedPages, or outstandingPages"
@@ -295,7 +291,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 raise TaskClaimLostError("Capture run admission is closed") from error
 
             maximum = self._number_from_item(run, "maxPages")
-            admitted = self._number_from_item(run, "admittedPages", default=0)
+            admitted = number_from_item(run, "admittedPages", "capture run", default=0)
             if maximum is None or admitted is None:
                 raise RuntimeError("Capture run is missing page accounting fields") from error
 
@@ -314,15 +310,6 @@ class DynamoDBTaskRepository(TaskRepository):
         )
         item = response.get("Item")
         return item if item else None
-
-    @staticmethod
-    def _number_from_item(
-        item: dict[str, Any],
-        key: str,
-        default: int | None = None,
-    ) -> int | None:
-        value = item.get(key, {}).get("N")
-        return int(value) if value is not None else default
 
     def _complete(self, outcome: CaptureOutcome) -> None:
         self._finish(
