@@ -17,7 +17,10 @@ class PublicationConflictError extends Error {
   }
 }
 
-function sameIdentity(left: PublicationIdentity, right: PublicationIdentity): boolean {
+function sameIdentity(
+  left: PublicationIdentity,
+  right: PublicationIdentity,
+): boolean {
   return (
     left.archiveId === right.archiveId &&
     left.decisionVersion === right.decisionVersion &&
@@ -44,9 +47,14 @@ function recordPublicationDecision(
   validateIdentity(identity);
 
   if (facts.compensationDecision !== null) {
-    throw new PublicationConflictError("a compensated archive cannot be published");
+    throw new PublicationConflictError(
+      "a compensated archive cannot be published",
+    );
   }
-  if (facts.replayPublication && !sameIdentity(facts.replayPublication, identity)) {
+  if (
+    facts.replayPublication &&
+    !sameIdentity(facts.replayPublication, identity)
+  ) {
     throw new PublicationConflictError(
       "publication decision conflicts with replay acknowledgement",
     );
@@ -69,9 +77,14 @@ function recordReplayPublished(
   validateIdentity(identity);
 
   if (facts.compensationDecision !== null) {
-    throw new PublicationConflictError("a compensated archive cannot be replay-published");
+    throw new PublicationConflictError(
+      "a compensated archive cannot be replay-published",
+    );
   }
-  if (facts.publicationDecision && !sameIdentity(facts.publicationDecision, identity)) {
+  if (
+    facts.publicationDecision &&
+    !sameIdentity(facts.publicationDecision, identity)
+  ) {
     throw new PublicationConflictError(
       "replay acknowledgement conflicts with publication decision",
     );
@@ -100,7 +113,9 @@ function recordCompensationDecision(
     throw new PublicationConflictError("invalid compensation decision");
   }
   if (facts.publicationDecision || facts.replayPublication) {
-    throw new PublicationConflictError("a publication fact prevents compensation");
+    throw new PublicationConflictError(
+      "a publication fact prevents compensation",
+    );
   }
   if (facts.compensationDecision) {
     const previous = facts.compensationDecision;
