@@ -11,35 +11,29 @@ import {
 
 const manifest = [{ snapshotId: "snapshot-1" }, { snapshotId: "snapshot-2" }];
 
-it(
-  "identifies work missing from the ledger when completion arrives first",
-  () => {
-    const result = reconcileManifest(manifest, [
-      { snapshotId: "snapshot-1", outcome: "INDEXED" },
-    ]);
+it("identifies work missing from the ledger when completion arrives first", () => {
+  const result = reconcileManifest(manifest, [
+    { snapshotId: "snapshot-1", outcome: "INDEXED" },
+  ]);
 
-    expect(result).toEqual({
-      expectedCount: 2,
-      terminalCount: 1,
-      missingSnapshotIds: ["snapshot-2"],
-      unexpectedSnapshotIds: [],
-      complete: false,
-    });
-  },
-);
+  expect(result).toEqual({
+    expectedCount: 2,
+    terminalCount: 1,
+    missingSnapshotIds: ["snapshot-2"],
+    unexpectedSnapshotIds: [],
+    complete: false,
+  });
+});
 
-it(
-  "counts each expected snapshot once and treats terminal failures as accounted",
-  () => {
-    const result = reconcileManifest(manifest, [
-      { snapshotId: "snapshot-1", outcome: "INDEXED" },
-      { snapshotId: "snapshot-2", outcome: "FAILED" },
-    ]);
+it("counts each expected snapshot once and treats terminal failures as accounted", () => {
+  const result = reconcileManifest(manifest, [
+    { snapshotId: "snapshot-1", outcome: "INDEXED" },
+    { snapshotId: "snapshot-2", outcome: "FAILED" },
+  ]);
 
-    expect(result.complete).toBe(true);
-    expect(result.terminalCount).toBe(2);
-  },
-);
+  expect(result.complete).toBe(true);
+  expect(result.terminalCount).toBe(2);
+});
 
 it("does not consider pending entries terminal", () => {
   const result = reconcileManifest(manifest, [
@@ -91,28 +85,25 @@ const published = recordReplayPublished(
 );
 
 it("exposes only indexed snapshots in the manifest after publication", () => {
-  expect(
-    canExposeSnapshot("snapshot-1", manifest, "INDEXED", published),
-  ).toBe(true);
-  expect(
-    canExposeSnapshot("snapshot-1", manifest, "PENDING", published),
-  ).toBe(false);
-  expect(
-    canExposeSnapshot("snapshot-3", manifest, "INDEXED", published),
-  ).toBe(false);
+  expect(canExposeSnapshot("snapshot-1", manifest, "INDEXED", published)).toBe(
+    true,
+  );
+  expect(canExposeSnapshot("snapshot-1", manifest, "PENDING", published)).toBe(
+    false,
+  );
+  expect(canExposeSnapshot("snapshot-3", manifest, "INDEXED", published)).toBe(
+    false,
+  );
 });
 
-it(
-  "keeps indexed documents hidden before both publication facts arrive",
-  () => {
-    const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), {
-      archiveId: "archive-1",
-      decisionVersion: 1,
-      packageDigest: "digest",
-    });
+it("keeps indexed documents hidden before both publication facts arrive", () => {
+  const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), {
+    archiveId: "archive-1",
+    decisionVersion: 1,
+    packageDigest: "digest",
+  });
 
-    expect(
-      canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
-    ).toBe(false);
-  },
-);
+  expect(
+    canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
+  ).toBe(false);
+});
