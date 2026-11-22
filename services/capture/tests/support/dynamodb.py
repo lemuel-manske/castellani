@@ -6,6 +6,12 @@ from mypy_boto3_dynamodb.type_defs import CreateTableInputTypeDef
 
 TABLES: tuple[CreateTableInputTypeDef, ...] = (
     {
+        "TableName": "capture_snapshots",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [{"AttributeName": "snapshotId", "KeyType": "HASH"}],
+        "AttributeDefinitions": [{"AttributeName": "snapshotId", "AttributeType": "S"}],
+    },
+    {
         "TableName": "capture_browser_slots",
         "BillingMode": "PAY_PER_REQUEST",
         "KeySchema": [{"AttributeName": "slotId", "KeyType": "HASH"}],
