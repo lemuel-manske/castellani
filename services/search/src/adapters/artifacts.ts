@@ -80,6 +80,13 @@ async function readWarcArtifact(
     }
 
     const response = record.getResponseInfo();
+
+    if (response === null) {
+      throw new ArtifactIntegrityError(
+        "WARC response record has no HTTP response metadata for " + targetUrl,
+      );
+    }
+
     capturedResponse = {
       content: await record.contentText(),
       contentType:
