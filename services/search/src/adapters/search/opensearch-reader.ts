@@ -119,6 +119,7 @@ function createOpenSearchDocumentReader(
               },
             ]),
       ];
+      const searchAfter = decodeCursor(cursor);
       const response = (await client.search({
         index: indexName,
         body: {
@@ -142,9 +143,7 @@ function createOpenSearchDocumentReader(
             { capturedAt: "desc" },
             { snapshotId: "asc" },
           ],
-          ...(cursor === undefined
-            ? {}
-            : { search_after: decodeCursor(cursor) }),
+          ...(searchAfter === undefined ? {} : { search_after: searchAfter }),
           highlight: {
             fields: {
               title: { number_of_fragments: 1, fragment_size: 160 },
