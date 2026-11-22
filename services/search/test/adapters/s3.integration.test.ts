@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { expect, it, afterAll, beforeAll } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import {
   SEARCH_S3_ENDPOINT_URL,
   createS3TestSupport,
