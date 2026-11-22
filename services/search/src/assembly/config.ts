@@ -1,5 +1,7 @@
 interface SearchSettingsOptions {
   awsRegion: string;
+  httpHost: string;
+  httpPort: number;
   dynamodbEndpointUrl: string;
   s3EndpointUrl: string;
   rabbitmqUrl: string;
@@ -14,6 +16,8 @@ interface SearchSettingsOptions {
   reconnectDelayMilliseconds?: number;
 }
 
+const DEFAULT_HTTP_HOST = "0.0.0.0";
+const DEFAULT_HTTP_PORT = 8082;
 const DEFAULT_INDEXING_LEASE_DURATION_SECONDS = 120;
 const DEFAULT_INDEXING_MAX_ATTEMPTS = 5;
 const DEFAULT_RECONNECT_DELAY_MILLISECONDS = 1000;
@@ -43,6 +47,8 @@ function required(name: string, value: string | undefined): string {
 /** Runtime configuration for one Search service process. */
 class SearchSettings {
   readonly awsRegion: string;
+  readonly httpHost: string;
+  readonly httpPort: number;
   readonly dynamodbEndpointUrl: string | undefined;
   readonly s3EndpointUrl: string | undefined;
   readonly rabbitmqUrl: string;
@@ -58,6 +64,8 @@ class SearchSettings {
 
   constructor(options: SearchSettingsOptions) {
     this.awsRegion = options.awsRegion;
+    this.httpHost = options.httpHost;
+    this.httpPort = options.httpPort;
 
     this.dynamodbEndpointUrl = options.dynamodbEndpointUrl;
     this.s3EndpointUrl = options.s3EndpointUrl;
@@ -81,6 +89,10 @@ class SearchSettings {
 
     if (
       !this.awsRegion.trim() ||
+      !this.httpHost.trim() ||
+      !Number.isSafeInteger(this.httpPort) ||
+      this.httpPort < 1 ||
+      this.httpPort > 65535 ||
       !this.rabbitmqUrl.trim() ||
       !this.opensearchUrl.trim() ||
       !this.artifactBucket.trim() ||
@@ -106,6 +118,8 @@ class SearchSettings {
   static fromEnvironment(env: NodeJS.ProcessEnv = process.env): SearchSettings {
     return new SearchSettings({
       awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
+      httpHost: env.SEARCH_HTTP_HOST?.trim() || DEFAULT_HTTP_HOST,
+      httpPort: positiveInteger("SEARCH_HTTP_PORT", env.SEARCH_HTTP_PORT, DEFAULT_HTTP_PORT),
       dynamodbEndpointUrl: required(
         "SEARCH_DYNAMODB_ENDPOINT_URL",
         env.SEARCH_DYNAMODB_ENDPOINT_URL,

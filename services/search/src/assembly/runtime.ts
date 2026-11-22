@@ -6,6 +6,7 @@ import * as amqp from "amqplib";
 import { createS3ArtifactReader } from "../adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "../adapters/artifacts/warc.js";
 import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
+import { createOpenSearchDocumentReader } from "../adapters/search/opensearch-reader.js";
 import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
 import { DynamoDBIndexingLedger } from "../adapters/persistence/dynamodb/indexing-ledger.js";
 import { DynamoDBManifestLedger } from "../adapters/persistence/dynamodb/manifest-ledger.js";
@@ -14,6 +15,7 @@ import {
   createOpenSearchDocumentWriter,
   ensureSearchIndex,
 } from "../adapters/search/opensearch.js";
+import { createSearchServer } from "../api/server.js";
 import { processCrawlCompleted } from "../application/processCrawlCompleted.js";
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import { processPublicationEvent } from "../application/processPublicationEvent.js";
@@ -126,17 +128,25 @@ class SearchRuntime {
       opensearch,
       this.settings.searchIndexName,
     );
-    const capturedPageReader = createWarcCapturedPageReader(
-      artifactReader,
+    const capturedPageReader = createWarcCapturedPageReader(artifactReader);
+    const searchServer = createSearchServer(
+      createOpenSearchDocumentReader(opensearch, this.settings.searchIndexName),
+      publicationLedger,
+      manifestLedger,
     );
 
     try {
       await ensureSearchIndex(opensearch, this.settings.searchIndexName);
+      await searchServer.listen({
+        host: this.settings.httpHost,
+        port: this.settings.httpPort,
+      });
       await this.runConsumer(
         { ledger, capturedPageReader, documentWriter, publicationLedger, manifestLedger, artifactReader },
         signal,
       );
     } finally {
+      await searchServer.close().catch(() => undefined);
       dynamodb.destroy();
       s3.destroy();
       await opensearch.close();

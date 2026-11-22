@@ -21,6 +21,8 @@ it("loads service-specific environment settings", () => {
   });
 
   expect(settings.awsRegion).toBe("sa-east-1");
+  expect(settings.httpHost).toBe("0.0.0.0");
+  expect(settings.httpPort).toBe(8082);
   expect(settings.dynamodbEndpointUrl).toBe("http://localhost:8000");
   expect(settings.s3EndpointUrl).toBe("http://localhost:9000");
   expect(settings.indexingLedgerTableName).toBe("search-ledger-test");
