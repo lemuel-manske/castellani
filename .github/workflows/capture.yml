@@ -13,6 +13,7 @@ jobs:
 
     env:
       DYNAMODB_ENDPOINT_URL: http://localhost:8000
+      RABBITMQ_URL: amqp://castellani:castellani@localhost:5672/
 
     services:
       dynamodb:
@@ -23,6 +24,22 @@ jobs:
 
         options: >-
           --health-cmd "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000'"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 20
+
+      rabbitmq:
+        image: rabbitmq:4.1-management
+
+        env:
+          RABBITMQ_DEFAULT_USER: castellani
+          RABBITMQ_DEFAULT_PASS: castellani
+
+        ports:
+          - 5672:5672
+
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 5s
           --health-timeout 2s
           --health-retries 20
