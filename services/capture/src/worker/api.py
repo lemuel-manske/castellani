@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from domain import PageCapture, TaskClaim
+from domain import ArtifactReference, PageCapture, TaskClaim
 
 
 @dataclass(frozen=True)
@@ -39,4 +39,14 @@ class ArtifactStore(Protocol):
 
     async def create_attempt_directory(self, claim: TaskClaim) -> Path: ...
 
+    async def persist_attempt(
+        self,
+        claim: TaskClaim,
+        directory: Path,
+        snapshot_id: str,
+        warc_files: tuple[Path, ...],
+    ) -> tuple[ArtifactReference, ...]: ...
+
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None: ...
+
+    async def commit_attempt(self, claim: TaskClaim, directory: Path) -> None: ...
