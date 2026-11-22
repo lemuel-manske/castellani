@@ -10,7 +10,10 @@ interface SnapshotClaim {
 type IndexingClaimResult =
   | { status: "CLAIMED"; claim: SnapshotClaim }
   | { status: "BUSY"; leaseUntil: number }
-  | { status: "TERMINAL"; outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED"> };
+  | {
+      status: "TERMINAL";
+      outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
+    };
 
 interface IndexingLedger {
   claim(
