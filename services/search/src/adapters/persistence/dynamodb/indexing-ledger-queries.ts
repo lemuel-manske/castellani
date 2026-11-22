@@ -1,5 +1,5 @@
 import { GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import type { DynamoDBDocumentClient, ScanCommandInput } from "@aws-sdk/lib-dynamodb";
 import type { IndexingOutcome, SnapshotLedgerEntry } from "../../../domain.js";
 import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";
 
@@ -131,7 +131,7 @@ async function listIndexingEntriesByArchive(
   archiveId: string,
 ): Promise<SnapshotLedgerEntry[]> {
   const entries: SnapshotLedgerEntry[] = [];
-  let lastEvaluatedKey: Record<string, unknown> | undefined;
+  let lastEvaluatedKey: ScanCommandInput["ExclusiveStartKey"];
 
   do {
     const response = await client.send(
@@ -146,7 +146,7 @@ async function listIndexingEntriesByArchive(
           "#state": "state",
         },
         ExpressionAttributeValues: { ":archive": archiveId },
-        ...(lastEvaluatedKey === undefined ? {} : { ExclusiveStartKey: lastEvaluatedKey }),
+        ...(lastEvaluatedKey === undefined\n          ? {}\n          : { ExclusiveStartKey: lastEvaluatedKey }),
       }),
     );
 
