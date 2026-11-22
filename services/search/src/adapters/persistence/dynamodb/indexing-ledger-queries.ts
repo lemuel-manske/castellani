@@ -53,7 +53,7 @@ async function claimIndexingEntry(
       UpdateExpression:
         "SET #archive = :archive, #state = :processing, #token = :token, #lease = :lease, #attempts = if_not_exists(#attempts, :zero) + :one, #message = :message, #updated = :now",
       ConditionExpression:
-        "attribute_not_exists(#snapshot) OR #state = :pending OR (#state = :processing AND #lease <= :now)",
+        "attribute_not_exists(#snapshot) OR (#archive = :archive AND (#state = :pending OR (#state = :processing AND #lease <= :now)))",
       ExpressionAttributeNames: {
         "#snapshot": "snapshotId",
         "#archive": "archiveId",
