@@ -13,9 +13,10 @@ it("reads the referenced object from the real S3-compatible service", async () =
   });
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
-  const chunks = await Array.fromAsync(
-    await s3.reader.getObject(fixture.artifact),
-  );
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of await s3.reader.getObject(fixture.artifact)) {
+    chunks.push(chunk);
+  }
 
   expect(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))).toEqual(
     fixture.bytes,

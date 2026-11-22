@@ -26,7 +26,7 @@ const DEFAULT_TOPOLOGY: PageCapturedConsumerTopology = {
   deadLetterQueue: DEAD_LETTER_QUEUE,
 };
 
-const PAGE_CAPTURED_SCHEMA: AnySchema = {
+const PAGE_CAPTURED_SCHEMA = {
   type: "object",
   required: [
     "messageId",
@@ -84,9 +84,9 @@ const PAGE_CAPTURED_SCHEMA: AnySchema = {
       },
     },
   },
-};
+} satisfies AnySchema;
 
-const validatePageCaptured = new Ajv({ allErrors: true }).compile<PageCapturedEvent>(
+const validatePageCaptured = new Ajv({ allErrors: true }).compile<unknown>(
   PAGE_CAPTURED_SCHEMA,
 );
 
@@ -107,11 +107,12 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     return null;
   }
 
-  if (value.payload.archiveId !== value.correlationId) {
+  const event = value as PageCapturedEvent;
+  if (event.payload.archiveId !== event.correlationId) {
     return null;
   }
 
-  return value;
+  return event;
 }
 
 async function handlePageCapturedMessage(
