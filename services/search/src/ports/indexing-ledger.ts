@@ -21,6 +21,7 @@ interface IndexingLedger {
     snapshotId: string,
     messageId: string,
     leaseDurationSeconds: number,
+    maxAttempts?: number,
   ): Promise<IndexingClaimResult>;
   complete(
     claim: SnapshotClaim,
