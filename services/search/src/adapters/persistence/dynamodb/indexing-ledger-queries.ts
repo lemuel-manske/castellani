@@ -31,6 +31,7 @@ interface ExhaustIndexingEntryInput {
   snapshotId: string;
   now: number;
   attempts: number;
+  maxAttempts: number;
 }
 
 interface CompleteIndexingEntryInput {
@@ -113,7 +114,7 @@ async function exhaustIndexingEntry(
       ExpressionAttributeValues: {
         ":archive": input.archiveId,
         ":attempts": input.attempts,
-        ":maxAttempts": input.attempts,
+        ":maxAttempts": input.maxAttempts,
         ":pending": "PENDING",
         ":processing": "PROCESSING",
         ":failed": "FAILED",
