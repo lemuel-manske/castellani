@@ -9,6 +9,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from botocore.exceptions import ClientError
 
 from domain import (
+    ArtifactReference,
     CaptureOutcome,
     DiscoveredPage,
     PageTask,
@@ -103,12 +104,7 @@ class DynamoDBTaskRepository(TaskRepository):
     async def renew(self, claim: TaskClaim) -> TaskClaim:
         return await asyncio.to_thread(self._renew, claim)
 
-    async def complete(
-        self,
-        outcome: CaptureOutcome,
-        warc_files: tuple[Path, ...],
-    ) -> None:
-        del warc_files
+    async def complete(self, outcome: CaptureOutcome) -> None:
         await asyncio.to_thread(self._complete, outcome)
 
     async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
@@ -312,13 +308,167 @@ class DynamoDBTaskRepository(TaskRepository):
         return item if item else None
 
     def _complete(self, outcome: CaptureOutcome) -> None:
-        self._finish(
-            archive_id=outcome.archive_id,
-            url_key=outcome.url_key,
-            attempt_id=outcome.attempt_id,
-            fence=outcome.fence,
-            state="COMPLETED",
+        now = self.clock()
+        occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
+        captured_at = outcome.capture.captured_at
+        if captured_at.tzinfo is None:
+            captured_at = captured_at.replace(tzinfo=UTC)
+        captured_at_text = captured_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        message_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                f"page-captured:{outcome.archive_id}:{outcome.snapshot_id}",
+            )
         )
+        artifacts = [self._artifact_attribute(item) for item in outcome.warc_artifacts]
+        payload: dict[str, Any] = {
+            "archiveId": {"S": outcome.archive_id},
+            "snapshotId": {"S": outcome.snapshot_id},
+            "urlKey": {"S": outcome.url_key},
+            "url": {"S": outcome.capture.requested_url},
+            "finalUrl": {"S": outcome.capture.final_url},
+            "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
+            "capturedAt": {"S": captured_at_text},
+            "warcArtifacts": {"L": artifacts},
+        }
+        if outcome.capture.content_type is not None:
+            payload["contentType"] = {"S": outcome.capture.content_type}
+
+        transaction = [
+            {
+                "Update": {
+                    "TableName": self.frontier_table_name,
+                    "Key": {
+                        "archiveId": {"S": outcome.archive_id},
+                        "urlKey": {"S": outcome.url_key},
+                    },
+                    "UpdateExpression": (
+                        "SET #state = :completed, #snapshot = :snapshot, "
+                        "#capture_url = :capture_url, #final_url = :final_url, "
+                        "#captured_at = :captured_at, #redirects = :redirects, "
+                        "#artifacts = :artifacts, #min_depth = :min_depth "
+                        "REMOVE #attempt, #lease"
+                    ),
+                    "ConditionExpression": (
+                        "#state = :claimed AND #attempt = :attempt "
+                        "AND #fence = :fence AND #lease > :now"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#state": "state",
+                        "#attempt": "attemptId",
+                        "#fence": "fence",
+                        "#lease": "leaseUntil",
+                        "#snapshot": "snapshotId",
+                        "#capture_url": "capturedUrl",
+                        "#final_url": "finalUrl",
+                        "#captured_at": "capturedAt",
+                        "#redirects": "redirectChain",
+                        "#artifacts": "warcArtifacts",
+                        "#min_depth": "minDepth",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":claimed": {"S": "CLAIMED"},
+                        ":completed": {"S": "COMPLETED"},
+                        ":attempt": {"S": outcome.attempt_id},
+                        ":fence": {"N": str(outcome.fence)},
+                        ":now": {"N": str(now)},
+                        ":snapshot": {"S": outcome.snapshot_id},
+                        ":capture_url": {"S": outcome.capture.requested_url},
+                        ":final_url": {"S": outcome.capture.final_url},
+                        ":captured_at": {"S": captured_at_text},
+                        ":redirects": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
+                        ":artifacts": {"L": artifacts},
+                        ":min_depth": {"N": str(self._task_depth(outcome.archive_id, outcome.url_key))},
+                    },
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self.runs_table_name,
+                    "Key": {"archiveId": {"S": outcome.archive_id}},
+                    "UpdateExpression": "ADD #outstanding :minus_one, #completed :one",
+                    "ConditionExpression": (
+                        "#admission = :open AND #outstanding >= :one"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#admission": "admission",
+                        "#outstanding": "outstandingPages",
+                        "#completed": "completedPages",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":open": {"S": "OPEN"},
+                        ":minus_one": {"N": "-1"},
+                        ":one": {"N": "1"},
+                    },
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self.outbox_table_name,
+                    "Item": {
+                        "messageId": {"S": message_id},
+                        "correlationId": {"S": outcome.archive_id},
+                        "type": {"S": "PageCaptured"},
+                        "version": {"N": "1"},
+                        "occurredAt": {"S": occurred_at},
+                        "payload": {"M": payload},
+                        "status": {"S": "PENDING"},
+                        "attempts": {"N": "0"},
+                        "nextAttemptAt": {"N": str(now)},
+                    },
+                    "ConditionExpression": "attribute_not_exists(#message_id)",
+                    "ExpressionAttributeNames": {"#message_id": "messageId"},
+                }
+            },
+        ]
+
+        try:
+            self._transact(transaction, None)
+        except ConditionalWriteRejected as error:
+            existing = self._read_frontier(outcome.archive_id, outcome.url_key)
+            if (
+                existing is not None
+                and existing.get("state", {}).get("S") == "COMPLETED"
+                and existing.get("snapshotId", {}).get("S") == outcome.snapshot_id
+            ):
+                event = self._read_outbox(message_id)
+                if event is not None and self._is_page_captured_message(
+                    event, outcome.archive_id, outcome.snapshot_id
+                ):
+                    return
+            raise TaskClaimLostError("page-task claim is no longer completable") from error
+
+    @staticmethod
+    def _artifact_attribute(artifact: ArtifactReference) -> dict[str, Any]:
+        values: dict[str, Any] = {
+            "bucket": {"S": artifact.bucket},
+            "key": {"S": artifact.key},
+            "sha256": {"S": artifact.sha256},
+            "sizeBytes": {"N": str(artifact.size_bytes)},
+        }
+        if artifact.version_id is not None:
+            values["versionId"] = {"S": artifact.version_id}
+        return {"M": values}
+
+    @staticmethod
+    def _is_page_captured_message(
+        item: dict[str, Any],
+        archive_id: str,
+        snapshot_id: str,
+    ) -> bool:
+        payload = item.get("payload", {}).get("M", {})
+        return (
+            item.get("type", {}).get("S") == "PageCaptured"
+            and item.get("correlationId", {}).get("S") == archive_id
+            and payload.get("archiveId", {}).get("S") == archive_id
+            and payload.get("snapshotId", {}).get("S") == snapshot_id
+        )
+
+    def _task_depth(self, archive_id: str, url_key: str) -> int:
+        item = self._read_frontier(archive_id, url_key)
+        if item is None:
+            raise RuntimeError("page-task disappeared before completion")
+        return int(item.get("depth", {}).get("N", "0"))
 
     def _fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
         self._finish(
