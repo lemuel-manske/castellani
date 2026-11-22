@@ -1,9 +1,9 @@
 import { defineConfig } from "vitest/config";
 
-/** Integration tests against the running Compose stack (see test/support/stack.ts). */
 export default defineConfig({
   test: {
-    include: ["test/integration/**/*.integration.test.ts"],
+    include: ["test/**/*.integration.test.ts"],
+    exclude: ["node_modules/**"],
     environment: "node",
     testTimeout: 60_000,
     hookTimeout: 30_000,
