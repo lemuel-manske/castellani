@@ -56,6 +56,30 @@ def outbox_items(client: DynamoDBClient) -> list[dict[str, Any]]:
     return client.scan(TableName="capture_outbox", ConsistentRead=True)["Items"]
 
 
+def snapshot_item(client: DynamoDBClient) -> dict[str, Any]:
+    return client.get_item(
+        TableName="capture_snapshots",
+        Key={"snapshotId": {"S": "snapshot-1"}},
+        ConsistentRead=True,
+    ).get("Item", {})
+
+
+def specific_snapshot_item(client: DynamoDBClient, snapshot_id: str) -> dict[str, Any]:
+    return client.get_item(
+        TableName="capture_snapshots",
+        Key={"snapshotId": {"S": snapshot_id}},
+        ConsistentRead=True,
+    ).get("Item", {})
+
+
+def run_item(client: DynamoDBClient) -> dict[str, Any]:
+    return client.get_item(
+        TableName="capture_runs",
+        Key={"archiveId": {"S": "archive-1"}},
+        ConsistentRead=True,
+    ).get("Item", {})
+
+
 def set_run_admission(client: DynamoDBClient, admission: str) -> None:
     client.update_item(
         TableName="capture_runs",

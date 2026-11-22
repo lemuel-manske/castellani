@@ -13,8 +13,11 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     s3: FakeS3,
 ) -> None:
     store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
+
     claim = make_claim()
+
     directory = await store.create_attempt_directory(claim)
+
     warc = directory / "records" / "capture.warc.gz"
     warc.parent.mkdir()
     warc.write_bytes(b"warc-content")
@@ -27,7 +30,9 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     )
 
     assert len(references) == 1
+
     reference = references[0]
+
     assert reference.bucket == "private-artifacts"
     assert reference.key.startswith("capture-staging/archive%2Fone/url-key/attempt-1/")
     assert reference.key.endswith("records/capture.warc.gz")
@@ -43,8 +48,11 @@ async def test_s3_artifact_store_rejects_files_outside_attempt_directory(
     s3: FakeS3,
 ) -> None:
     store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
+
     claim = make_claim()
+
     directory = await store.create_attempt_directory(claim)
+
     outside = tmp_path / "outside.warc.gz"
     outside.write_bytes(b"not attempt-owned")
 

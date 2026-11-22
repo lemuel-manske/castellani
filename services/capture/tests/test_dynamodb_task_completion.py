@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.clock import FakeClock
-from support.domain import outbox_items, seed_frontier, seed_run
+from support.domain import frontier_item, outbox_items, run_item, seed_frontier, seed_run, snapshot_item
 
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from domain import ArtifactReference, CaptureOutcome, PageCapture
@@ -16,6 +16,7 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb)
+
     repository = DynamoDBTaskRepository(
         client=dynamodb,
         frontier_table_name="capture_frontier",
@@ -23,7 +24,9 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
         lease_duration=30,
         clock=clock,
     )
+
     claim = await repository.claim("archive-1", "url-1")
+
     assert claim is not None
 
     outcome = CaptureOutcome(
@@ -56,29 +59,21 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
     await repository.complete(outcome)
     await repository.complete(outcome)
 
-    frontier = dynamodb.get_item(
-        TableName="capture_frontier",
-        Key={"archiveId": {"S": "archive-1"}, "urlKey": {"S": "url-1"}},
-        ConsistentRead=True,
-    )["Item"]
-    snapshot = dynamodb.get_item(
-        TableName="capture_snapshots",
-        Key={"snapshotId": {"S": "snapshot-1"}},
-        ConsistentRead=True,
-    )["Item"]
-    run = dynamodb.get_item(
-        TableName="capture_runs",
-        Key={"archiveId": {"S": "archive-1"}},
-        ConsistentRead=True,
-    )["Item"]
+    frontier = frontier_item(dynamodb)
+    snapshot = snapshot_item(dynamodb)
+    run = run_item(dynamodb)
 
     assert frontier["state"] == {"S": "COMPLETED"}
     assert frontier["snapshotId"] == {"S": "snapshot-1"}
     assert snapshot["archiveId"] == {"S": "archive-1"}
+
     assert snapshot["warcArtifacts"]["L"][0]["M"]["versionId"] == {"S": "version-1"}
+
     assert run["outstandingPages"] == {"N": "0"}
     assert run["completedPages"] == {"N": "1"}
+
     events = outbox_items(dynamodb)
+
     assert len(events) == 1
     assert events[0]["type"] == {"S": "PageCaptured"}
     assert events[0]["payload"]["M"]["snapshotId"] == {"S": "snapshot-1"}

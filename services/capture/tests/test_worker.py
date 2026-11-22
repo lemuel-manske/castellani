@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.domain import frontier_item, outbox_items, seed_frontier, seed_run
+from support.domain import frontier_item, outbox_items, run_item, seed_frontier, seed_run, specific_snapshot_item
 
 from adapters.artifacts.local import LocalArtifactStore
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
@@ -33,6 +33,7 @@ async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
     assert task["state"] == {"S": "FAILED"}
     assert task["failureReason"] == {"S": "capture_failed"}
     assert task["failureMessage"] == {"S": "browser capture failed"}
+
     assert not (tmp_path / "attempt-1").exists()
 
 
@@ -51,33 +52,34 @@ async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
     assert await worker("archive-1", "url-1")
 
     completed = frontier_item(dynamodb)
+
     assert completed["state"] == {"S": "COMPLETED"}
     assert completed["snapshotId"]["S"]
     assert completed["warcArtifacts"]["L"][0]["M"]["bucket"] == {"S": "local"}
-    snapshot = dynamodb.get_item(
-        TableName="capture_snapshots",
-        Key={"snapshotId": completed["snapshotId"]},
-        ConsistentRead=True,
-    )["Item"]
-    assert snapshot["archiveId"] == {"S": "archive-1"}
+
+    snapshot = specific_snapshot_item(dynamodb, completed["snapshotId"]["S"])
+
     assert snapshot["urlKey"] == {"S": "url-1"}
     assert snapshot["minDepth"] == {"N": "0"}
     assert (tmp_path / "attempt-1" / "capture.warc.gz").read_bytes() == b"capture"
 
     events = outbox_items(dynamodb)
+
     assert len(events) == 1
+
     event = events[0]
+
     assert event["type"] == {"S": "PageCaptured"}
+
     payload = event["payload"]["M"]
+
     assert payload["archiveId"] == {"S": "archive-1"}
     assert payload["snapshotId"] == completed["snapshotId"]
     assert payload["url"] == {"S": "https://example.org/"}
     assert payload["warcArtifacts"]["L"][0]["M"]["sha256"]["S"]
-    run = dynamodb.get_item(
-        TableName="capture_runs",
-        Key={"archiveId": {"S": "archive-1"}},
-        ConsistentRead=True,
-    )["Item"]
+
+    run = run_item(dynamodb)
+
     assert run["outstandingPages"] == {"N": "0"}
     assert run["completedPages"] == {"N": "1"}
 

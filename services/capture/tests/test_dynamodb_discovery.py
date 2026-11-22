@@ -1,7 +1,7 @@
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.clock import FakeClock
-from support.domain import outbox_items, seed_frontier, seed_run
+from support.domain import frontier_item, outbox_items, run_item, seed_frontier, seed_run
 
 from adapters.persistence.dynamodb.task import (
     DynamoDBTaskRepository,
@@ -25,6 +25,7 @@ async def test_discovery_admission_is_atomic_and_idempotent(
         lease_duration=30,
         clock=clock,
     )
+
     claim = await repository.claim("archive-1", "url-1")
     assert claim is not None
 
@@ -33,35 +34,26 @@ async def test_discovery_admission_is_atomic_and_idempotent(
         "https://example.org/child",
         "https://example.org/child#section",
     )
+
     await repository.admit_discovered(claim, urls)
     await repository.admit_discovered(claim, urls)
 
     child = identify_url(urls[0])
-    response = dynamodb.get_item(
-        TableName="capture_frontier",
-        Key={
-            "archiveId": {"S": "archive-1"},
-            "urlKey": {"S": child.url_key},
-        },
-        ConsistentRead=True,
-    )
-    item = response.get("Item") or {}
+
+    item = frontier_item(dynamodb)
 
     assert item["navigationUrl"] == {"S": child.navigation_url}
     assert item["fetchUrl"] == {"S": child.fetch_url}
     assert item["depth"] == {"N": "1"}
     assert item["state"] == {"S": "PENDING"}
 
-    run_response = dynamodb.get_item(
-        TableName="capture_runs",
-        Key={"archiveId": {"S": "archive-1"}},
-        ConsistentRead=True,
-    )
-    run = run_response.get("Item") or {}
+    run = run_item(dynamodb)
+
     assert run["admittedPages"] == {"N": "3"}
     assert run["outstandingPages"] == {"N": "3"}
 
     messages = outbox_items(dynamodb)
+
     assert len(messages) == 1
     assert messages[0]["payload"]["M"]["urlKey"] == {"S": child.url_key}
 
@@ -81,6 +73,7 @@ async def test_discovery_admission_never_exceeds_max_pages(
         lease_duration=30,
         clock=clock,
     )
+
     claim = await repository.claim("archive-1", "url-1")
     assert claim is not None
 
@@ -89,14 +82,11 @@ async def test_discovery_admission_never_exceeds_max_pages(
         ("https://example.org/one", "https://example.org/two"),
     )
 
-    run_response = dynamodb.get_item(
-        TableName="capture_runs",
-        Key={"archiveId": {"S": "archive-1"}},
-        ConsistentRead=True,
-    )
-    run = run_response.get("Item") or {}
+    run = run_item(dynamodb)
+
     assert run["admittedPages"] == {"N": "1"}
     assert run["outstandingPages"] == {"N": "1"}
+
     assert outbox_items(dynamodb) == []
 
 
@@ -115,6 +105,7 @@ async def test_discovery_admission_rejects_a_stale_parent_claim(
         lease_duration=30,
         clock=clock,
     )
+
     claim = await repository.claim("archive-1", "url-1")
     assert claim is not None
 
