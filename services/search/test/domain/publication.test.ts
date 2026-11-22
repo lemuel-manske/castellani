@@ -57,7 +57,11 @@ it("rejects a decision that conflicts with an earlier replay acknowledgement", (
 });
 
 it("keeps compensated archives permanently ineligible", () => {
-  const facts = recordCompensationDecision(emptyPublicationFacts(), { archiveId: identity.archiveId, decisionVersion: identity.decisionVersion, reasonCode: "crawl_failed" });
+  const facts = recordCompensationDecision(emptyPublicationFacts(), {
+    archiveId: identity.archiveId,
+    decisionVersion: identity.decisionVersion,
+    reasonCode: "crawl_failed",
+  });
   expect(isPublicationAuthorized(facts)).toBe(false);
   expect(() => recordPublicationDecision(facts, identity)).toThrow(
     "a compensated archive cannot be published",
@@ -66,5 +70,11 @@ it("keeps compensated archives permanently ineligible", () => {
 
 it("rejects compensation after a publication fact has been recorded", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
-  expect(() => recordCompensationDecision(facts, { archiveId: identity.archiveId, decisionVersion: identity.decisionVersion, reasonCode: "crawl_failed" })).toThrow("a publication fact prevents compensation");
+  expect(() =>
+    recordCompensationDecision(facts, {
+      archiveId: identity.archiveId,
+      decisionVersion: identity.decisionVersion,
+      reasonCode: "crawl_failed",
+    }),
+  ).toThrow("a publication fact prevents compensation");
 });
