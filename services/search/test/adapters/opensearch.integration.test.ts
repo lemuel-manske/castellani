@@ -22,33 +22,34 @@ const document: SearchDocument = {
 };
 
 beforeAll(async () => {
-  if (SEARCH_OPENSEARCH_URL !== undefined) {
-    await support.setup();
+  if (!SEARCH_OPENSEARCH_URL?.trim()) {
+    throw new Error(
+      "SEARCH_OPENSEARCH_URL is required; start the Search Compose dependencies and configure the integration-test environment",
+    );
   }
+
+  await support.setup();
 });
 
 afterAll(async () => {
-  if (SEARCH_OPENSEARCH_URL !== undefined) {
+  if (SEARCH_OPENSEARCH_URL?.trim()) {
     await support.teardown();
   }
 });
 
-it.skipIf(!SEARCH_OPENSEARCH_URL)(
-  "creates the index and persists a searchable document",
-  async () => {
-    const writer = createOpenSearchDocumentWriter(
-      support.client,
-      support.indexName,
-    );
+it("creates the index and persists a searchable document", async () => {
+  const writer = createOpenSearchDocumentWriter(
+    support.client,
+    support.indexName,
+  );
 
-    await writer.index(document);
-    await support.client.indices.refresh({ index: support.indexName });
+  await writer.index(document);
+  await support.client.indices.refresh({ index: support.indexName });
 
-    const response = await support.client.get({
-      index: support.indexName,
-      id: document.snapshotId,
-    });
+  const response = await support.client.get({
+    index: support.indexName,
+    id: document.snapshotId,
+  });
 
-    expect(response.body._source).toMatchObject(document);
-  },
-);
+  expect(response.body._source).toMatchObject(document);
+});

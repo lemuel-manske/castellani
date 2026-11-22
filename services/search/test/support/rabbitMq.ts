@@ -52,17 +52,32 @@ function createRabbitMqTestSupport() {
     },
 
     async teardown(): Promise<void> {
+      if (connection === undefined) {
+        return;
+      }
+
       await publisherChannel?.close().catch(() => undefined);
       await consumerChannel?.close().catch(() => undefined);
 
-      if (connection !== undefined) {
+      try {
         const cleanup = await connection.createChannel();
-        await cleanup.deleteQueue(topology.queue);
-        await cleanup.deleteQueue(topology.deadLetterQueue);
-        await cleanup.deleteExchange(topology.eventsExchange);
-        await cleanup.deleteExchange(topology.deadLetterExchange);
-        await cleanup.close();
-        await connection.close();
+
+        try {
+          await cleanup.deleteQueue(topology.queue).catch(() => undefined);
+          await cleanup
+            .deleteQueue(topology.deadLetterQueue)
+            .catch(() => undefined);
+          await cleanup
+            .deleteExchange(topology.eventsExchange)
+            .catch(() => undefined);
+          await cleanup
+            .deleteExchange(topology.deadLetterExchange)
+            .catch(() => undefined);
+        } finally {
+          await cleanup.close().catch(() => undefined);
+        }
+      } finally {
+        await connection.close().catch(() => undefined);
       }
     },
   };

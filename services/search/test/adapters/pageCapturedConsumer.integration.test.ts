@@ -11,8 +11,10 @@ let delivered: Promise<PageCapturedEvent>;
 let resolveDelivery!: (event: PageCapturedEvent) => void;
 
 beforeAll(async () => {
-  if (SEARCH_RABBITMQ_URL === undefined) {
-    return;
+  if (!SEARCH_RABBITMQ_URL?.trim()) {
+    throw new Error(
+      "SEARCH_RABBITMQ_URL is required; start the Search Compose dependencies and configure the integration-test environment",
+    );
   }
 
   delivered = new Promise((resolve) => {
@@ -25,25 +27,22 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (SEARCH_RABBITMQ_URL !== undefined) {
+  if (SEARCH_RABBITMQ_URL?.trim()) {
     await support.teardown();
   }
 });
 
-it.skipIf(!SEARCH_RABBITMQ_URL)(
-  "delivers a published PageCaptured event to the real consumer",
-  async () => {
-    const event = createPageCapturedEvent("integration-message");
+it("delivers a published PageCaptured event to the real consumer", async () => {
+  const event = createPageCapturedEvent("integration-message");
 
-    await support.publish(event);
+  await support.publish(event);
 
-    await expect(delivered).resolves.toMatchObject({
-      messageId: "integration-message",
-      correlationId: "integration-archive",
-      payload: {
-        archiveId: "integration-archive",
-        snapshotId: "integration-snapshot",
-      },
-    });
-  },
-);
+  await expect(delivered).resolves.toMatchObject({
+    messageId: "integration-message",
+    correlationId: "integration-archive",
+    payload: {
+      archiveId: "integration-archive",
+      snapshotId: "integration-snapshot",
+    },
+  });
+});
