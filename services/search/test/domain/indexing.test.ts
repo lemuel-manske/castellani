@@ -108,7 +108,6 @@ it("keeps indexed documents hidden before both publication facts arrive", () => 
   ).toBe(false);
 });
 
-
 it("does not count an active processing claim as terminal", () => {
   const result = reconcileManifest(manifest, [
     { snapshotId: "snapshot-1", outcome: "PROCESSING" },
