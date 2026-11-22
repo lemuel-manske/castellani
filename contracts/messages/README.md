@@ -5,7 +5,7 @@ All broker messages validate against `envelope.v1.schema.json` and their more sp
 | Type | Producer | Consumers | Meaning and deduplication identity |
 |---|---|---|---|
 | `StartCrawl` | Coordinator | Capture | Start admitted run; dedup on `archiveId` |
-| `CapturePage` | Capture frontier | Competing Capture workers | Notify work available; dedup `archiveId + urlKey`, acquire lease/fence in DynamoDB before work |
+| `CapturePage` | Capture frontier | Competing Capture workers | Notify work for task identity `archiveId + urlKey`; every distinct logical delivery must reach the DynamoDB lease/fence claim, which arbitrates duplicates, retries, and lease rechecks |
 | `PageCaptured` | Capture | Search & Index | One immutable `snapshotId`; reconcile external indexing by snapshot ID |
 | `CrawlCompleted` | Capture | Coordinator, Search & Index | Immutable manifest reference+digest; arrival does not imply Indexer has finished |
 | `ArchivePrepared` | Capture | Coordinator | Validated private WACZ package reference+digest; not authorization to replay |
