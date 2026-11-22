@@ -36,10 +36,13 @@ def seed_frontier(client: DynamoDBClient, depth: int = 0) -> None:
     )
 
 
-def frontier_item(client: DynamoDBClient) -> dict[str, Any]:
+def frontier_item(
+    client: DynamoDBClient,
+    url_key: str = "url-1",
+) -> dict[str, Any]:
     return client.get_item(
         TableName="capture_frontier",
-        Key={"archiveId": {"S": "archive-1"}, "urlKey": {"S": "url-1"}},
+        Key={"archiveId": {"S": "archive-1"}, "urlKey": {"S": url_key}},
         ConsistentRead=True,
     ).get("Item", {})
 
