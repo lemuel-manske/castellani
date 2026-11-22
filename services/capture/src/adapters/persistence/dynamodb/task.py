@@ -508,7 +508,13 @@ class DynamoDBTaskRepository(TaskRepository):
             raise RuntimeError("page-task disappeared before completion")
         return int(item.get("depth", {}).get("N", "0"))
 
-    def _fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
+    def _fail(
+        self,
+        claim: TaskClaim,
+        reason_code: str,
+        message: str,
+        retryable: bool,
+    ) -> None:
         now = self.clock()
         archive_id = claim.task.archive_id
         url_key = claim.task.url_key
