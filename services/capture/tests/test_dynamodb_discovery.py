@@ -91,11 +91,12 @@ async def test_discovery_admission_never_exceeds_max_pages(
         ("https://example.org/one", "https://example.org/two"),
     )
 
-    run = dynamodb.get_item(
+    run_response = dynamodb.get_item(
         TableName="capture_runs",
         Key={"archiveId": {"S": "archive-1"}},
         ConsistentRead=True,
-    )["Item"]
+    )
+    run = run_response.get("Item") or {}
     assert run["admittedPages"] == {"N": "1"}
     assert run["outstandingPages"] == {"N": "1"}
     assert outbox_items(dynamodb) == []
