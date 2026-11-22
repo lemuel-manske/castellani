@@ -55,6 +55,7 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
         received.append((archive_id, url_key))
         processed.set()
 
+    message_id = str(uuid4())
     queue_name = f"{QUEUE_NAME}.test-{uuid4()}"
     ready = asyncio.Event()
     consumer = RabbitMQPageTaskConsumer(capture_page)
@@ -67,7 +68,7 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
         await asyncio.wait_for(ready.wait(), timeout=5)
         await publisher.start()
         envelope = {
-            "messageId": str(uuid4()),
+            "messageId": message_id,
             "correlationId": "archive-integration-test",
             "type": "CapturePage",
             "version": 1,
@@ -78,7 +79,7 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
             },
         }
 
-        await publisher.publish(envelope["messageId"], json.dumps(envelope).encode())
+        await publisher.publish(message_id, json.dumps(envelope).encode())
         await asyncio.wait_for(processed.wait(), timeout=5)
 
         assert received == [("archive-integration-test", "url-integration-test")]
