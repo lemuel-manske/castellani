@@ -146,7 +146,9 @@ async function listIndexingEntriesByArchive(
           "#state": "state",
         },
         ExpressionAttributeValues: { ":archive": archiveId },
-        ...(lastEvaluatedKey === undefined\n          ? {}\n          : { ExclusiveStartKey: lastEvaluatedKey }),
+        ...(lastEvaluatedKey === undefined
+          ? {}
+          : { ExclusiveStartKey: lastEvaluatedKey }),
       }),
     );
 
@@ -249,6 +251,7 @@ export {
   claimIndexingEntry,
   completeIndexingEntry,
   exhaustIndexingEntry,
-  getIndexingEntry,\n  listIndexingEntriesByArchive,
+  getIndexingEntry,
+  listIndexingEntriesByArchive,
   releaseIndexingEntry,
 };
