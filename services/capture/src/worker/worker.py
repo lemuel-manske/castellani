@@ -97,6 +97,7 @@ class ConcreteCaptureWorker(CaptureRunner):
                             claim_state[0],
                             str(getattr(error, "reason_code", "capture_failed")),
                             str(error),
+                            bool(getattr(error, "retryable", True)),
                         )
 
                     await self.on_error(error)
