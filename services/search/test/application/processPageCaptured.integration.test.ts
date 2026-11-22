@@ -1,12 +1,11 @@
 import { createHash } from "node:crypto";
-import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
 import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
-import type { ArtifactObjectReader } from "../../src/ports/artifacts.js";
 import {
   SEARCH_DYNAMODB_ENDPOINT_URL,
   createDynamoDbTestSupport,
@@ -15,10 +14,15 @@ import {
   SEARCH_OPENSEARCH_URL,
   createOpenSearchTestSupport,
 } from "../support/openSearch.js";
+import {
+  SEARCH_S3_ENDPOINT_URL,
+  createS3TestSupport,
+} from "../support/s3.js";
 
 const now = 1_000_000;
 const dynamodb = createDynamoDbTestSupport(() => now);
 const opensearch = createOpenSearchTestSupport();
+const s3 = createS3TestSupport();
 
 function capturedFixture(snapshotId: string, validChecksum = true) {
   const response =
@@ -52,21 +56,28 @@ function capturedFixture(snapshotId: string, validChecksum = true) {
       contentType: "text/html",
       warcArtifacts: [
         {
-          bucket: "capture-artifacts",
-          key: `integration-archive/${snapshotId}.warc`,
+          bucket: s3.bucketName,
+          key: s3.artifactKey,
           sha256: validChecksum ? checksum : "0".repeat(64),
           sizeBytes: bytes.byteLength,
         },
       ],
     },
   };
-  const artifactReader: ArtifactObjectReader = {
-    getObject: () => Promise.resolve(Readable.from([bytes])),
-  };
 
+  return { event, bytes };
+}
+
+function dependencies() {
   return {
-    event,
-    capturedPageReader: createWarcCapturedPageReader(artifactReader),
+    ledger: dynamodb.ledger,
+    capturedPageReader: createWarcCapturedPageReader(
+      createS3ArtifactReader(s3.client),
+    ),
+    documentWriter: createOpenSearchDocumentWriter(
+      opensearch.client,
+      opensearch.indexName,
+    ),
   };
 }
 
@@ -81,12 +92,21 @@ beforeAll(async () => {
       "SEARCH_OPENSEARCH_URL is required for Search integration tests",
     );
   }
+  if (!SEARCH_S3_ENDPOINT_URL?.trim()) {
+    throw new Error(
+      "SEARCH_S3_ENDPOINT_URL is required for Search integration tests",
+    );
+  }
 
   await dynamodb.setup();
   await opensearch.setup();
+  await s3.setup();
 });
 
 afterAll(async () => {
+  if (SEARCH_S3_ENDPOINT_URL?.trim()) {
+    await s3.teardown();
+  }
   if (SEARCH_OPENSEARCH_URL?.trim()) {
     await opensearch.teardown();
   }
@@ -95,16 +115,11 @@ afterAll(async () => {
   }
 });
 
-it("processes a captured page through DynamoDB, WARC extraction, and OpenSearch", async () => {
+it("processes a captured page through DynamoDB, S3, WARC extraction, and OpenSearch", async () => {
   const fixture = capturedFixture("integrated-snapshot");
-  const result = await processPageCaptured(fixture.event, {
-    ledger: dynamodb.ledger,
-    capturedPageReader: fixture.capturedPageReader,
-    documentWriter: createOpenSearchDocumentWriter(
-      opensearch.client,
-      opensearch.indexName,
-    ),
-  });
+  await s3.putObject(fixture.bytes);
+
+  const result = await processPageCaptured(fixture.event, dependencies());
 
   expect(result).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
   await opensearch.client.indices.refresh({ index: opensearch.indexName });
@@ -120,14 +135,7 @@ it("processes a captured page through DynamoDB, WARC extraction, and OpenSearch"
   });
 
   await expect(
-    processPageCaptured(fixture.event, {
-      ledger: dynamodb.ledger,
-      capturedPageReader: fixture.capturedPageReader,
-      documentWriter: createOpenSearchDocumentWriter(
-        opensearch.client,
-        opensearch.indexName,
-      ),
-    }),
+    processPageCaptured(fixture.event, dependencies()),
   ).resolves.toEqual({ status: "DUPLICATE", outcome: "INDEXED" });
 });
 
@@ -139,30 +147,20 @@ it("does not process a snapshot while another worker holds its DynamoDB lease", 
     120,
   );
   const fixture = capturedFixture("busy-snapshot");
+  await s3.putObject(fixture.bytes);
 
   await expect(
-    processPageCaptured(fixture.event, {
-      ledger: dynamodb.ledger,
-      capturedPageReader: fixture.capturedPageReader,
-      documentWriter: createOpenSearchDocumentWriter(
-        opensearch.client,
-        opensearch.indexName,
-      ),
-    }),
+    processPageCaptured(fixture.event, dependencies()),
   ).resolves.toEqual({ status: "BUSY" });
 });
 
 it("records terminal failure when the captured artifact fails integrity validation", async () => {
   const fixture = capturedFixture("invalid-artifact-snapshot", false);
+  await s3.putObject(fixture.bytes);
 
   await expect(
     processPageCaptured(fixture.event, {
-      ledger: dynamodb.ledger,
-      capturedPageReader: fixture.capturedPageReader,
-      documentWriter: createOpenSearchDocumentWriter(
-        opensearch.client,
-        opensearch.indexName,
-      ),
+      ...dependencies(),
       maxAttempts: 1,
     }),
   ).resolves.toEqual({ status: "COMPLETED", outcome: "FAILED" });
