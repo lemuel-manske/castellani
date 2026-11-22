@@ -157,8 +157,10 @@ async function processCrawlCompleted(
           urlKey: snapshot.urlKey,
           url: snapshot.url,
           finalUrl: snapshot.finalUrl,
-          redirectChain:
-            snapshot.redirectChain ?? [snapshot.url, snapshot.finalUrl],
+          redirectChain: snapshot.redirectChain ?? [
+            snapshot.url,
+            snapshot.finalUrl,
+          ],
           capturedAt: snapshot.capturedAt,
           ...(snapshot.contentType === undefined
             ? {}
