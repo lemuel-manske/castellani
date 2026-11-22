@@ -96,6 +96,27 @@ jobs:
 
       - run: make install
 
+      - run: |
+          npx prettier --write \
+            src/adapters/messaging/rabbitmq/pageCapturedConsumer.ts \
+            src/adapters/persistence/dynamodb/indexing-ledger.ts \
+            src/application/processPageCaptured.ts \
+            src/domain.ts \
+            src/ports/indexing-ledger.ts \
+            test/adapters/indexingLedger.test.ts \
+            test/adapters/pageCapturedConsumer.test.ts \
+            test/application/processPageCaptured.test.ts \
+            test/domain/indexing.test.ts
+          cat src/adapters/messaging/rabbitmq/pageCapturedConsumer.ts
+          cat src/adapters/persistence/dynamodb/indexing-ledger.ts
+          cat src/application/processPageCaptured.ts
+          cat src/domain.ts
+          cat src/ports/indexing-ledger.ts
+          cat test/adapters/indexingLedger.test.ts
+          cat test/adapters/pageCapturedConsumer.test.ts
+          cat test/application/processPageCaptured.test.ts
+          cat test/domain/indexing.test.ts
+
       - run: make check
 
       - run: make test
