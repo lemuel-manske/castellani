@@ -1,116 +1,61 @@
-import { createHash } from "node:crypto";
-import { Readable } from "node:stream";
-import { gzipSync } from "node:zlib";
 import { expect, it } from "vitest";
 import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
 import { indexCapturedPage } from "../../src/application/indexCapturedPage.js";
 import type { SearchDocument } from "../../src/domain/content.js";
-import type {
-  ArtifactObjectReader,
-  ArtifactReference,
-  CapturedPageReference,
-} from "../../src/ports/artifacts.js";
 import type { SearchDocumentWriter } from "../../src/ports/search-index.js";
+import { createCapturedPageFixture } from "../support/fixtures.js";
 
-const page: CapturedPageReference = {
-  archiveId: "archive-1",
-  snapshotId: "snapshot-1",
-  url: "https://example.com/",
-  finalUrl: "https://example.com/",
-  capturedAt: "2026-11-22T10:00:00.000Z",
-};
-
-function artifactFor(
-  contentType: string,
-  content: string,
-): {
-  reference: ArtifactReference;
-  reader: ArtifactObjectReader;
-} {
-  const response =
-    "HTTP/1.1 200 OK\\r\\nContent-Type: " +
-    contentType +
-    "\\r\\n\\r\\n" +
-    content;
-  const warc = [
-    "WARC/1.1",
-    "WARC-Type: response",
-    "WARC-Target-URI: https://example.com/",
-    "WARC-Date: 2026-11-22T10:00:00Z",
-    "Content-Type: application/http; msgtype=response",
-    "Content-Length: " + String(Buffer.byteLength(response)),
-    "",
-    response,
-    "",
-    "",
-  ].join("\\r\\n");
-  const bytes = gzipSync(Buffer.from(warc));
-
-  return {
-    reference: {
-      bucket: "capture-artifacts",
-      key: "archive-1/snapshot-1.warc",
-      sha256: createHash("sha256").update(bytes).digest("hex"),
-      sizeBytes: bytes.byteLength,
-    },
-    reader: {
-      getObject: () => Promise.resolve(Readable.from([bytes])),
+function collectingDocumentWriter() {
+  const documents: SearchDocument[] = [];
+  const writer: SearchDocumentWriter = {
+    async index(document) {
+      documents.push(document);
     },
   };
+
+  return { documents, writer };
 }
 
 it("extracts and indexes a captured page using its snapshot identity", async () => {
-  const artifact = artifactFor(
-    "text/html; charset=utf-8",
-    "<html><body><h1>Indexed page</h1></body></html>",
-  );
-  const indexedDocuments: SearchDocument[] = [];
-  const documentWriter: SearchDocumentWriter = {
-    async index(document) {
-      indexedDocuments.push(document);
-    },
-  };
-  const capturedPageReader = createWarcCapturedPageReader(artifact.reader);
+  const fixture = createCapturedPageFixture("snapshot-1");
+  const { documents, writer } = collectingDocumentWriter();
 
   await expect(
     indexCapturedPage(
-      page,
-      [artifact.reference],
-      capturedPageReader,
-      documentWriter,
+      fixture.page,
+      [fixture.artifact],
+      createWarcCapturedPageReader(fixture.artifactReader),
+      writer,
     ),
   ).resolves.toEqual({ outcome: "INDEXED", snapshotId: "snapshot-1" });
 
-  expect(indexedDocuments).toHaveLength(1);
-  expect(indexedDocuments[0]).toMatchObject({
-    archiveId: "archive-1",
+  expect(documents).toHaveLength(1);
+  expect(documents[0]).toMatchObject({
+    archiveId: "integration-archive",
     snapshotId: "snapshot-1",
-    text: "Indexed page",
+    text: "Integrated content",
   });
 });
 
 it("accounts for unsupported captured content without writing a document", async () => {
-  const artifact = artifactFor("application/pdf", "not searchable text");
-  const indexedDocuments: SearchDocument[] = [];
-  const documentWriter: SearchDocumentWriter = {
-    async index(document) {
-      indexedDocuments.push(document);
-    },
-  };
-  const capturedPageReader = createWarcCapturedPageReader(artifact.reader);
+  const fixture = createCapturedPageFixture("unsupported-snapshot", {
+    contentType: "application/pdf",
+    body: "%PDF-1.7 not searchable text",
+  });
+  const { documents, writer } = collectingDocumentWriter();
 
   await expect(
     indexCapturedPage(
-      page,
-      [artifact.reference],
-      capturedPageReader,
-      documentWriter,
+      fixture.page,
+      [fixture.artifact],
+      createWarcCapturedPageReader(fixture.artifactReader),
+      writer,
     ),
   ).resolves.toEqual({
     outcome: "UNSUPPORTED",
-    snapshotId: "snapshot-1",
+    snapshotId: "unsupported-snapshot",
     reasonCode: "UNSUPPORTED_CONTENT_TYPE",
   });
 
-  expect(indexedDocuments).toHaveLength(0);
+  expect(documents).toHaveLength(0);
 });

@@ -36,17 +36,14 @@ function createRabbitMqTestSupport() {
 
     async publish(event: unknown): Promise<void> {
       if (publisherChannel === undefined) {
-        throw new Error("RabbitMQ test support has not been initialized");
+        throw new Error("RabbitMQ integration environment is not initialized");
       }
 
       publisherChannel.publish(
         topology.eventsExchange,
         topology.routingKey,
         Buffer.from(JSON.stringify(event)),
-        {
-          contentType: "application/json",
-          persistent: true,
-        },
+        { contentType: "application/json", persistent: true },
       );
       await publisherChannel.waitForConfirms();
     },
@@ -64,15 +61,9 @@ function createRabbitMqTestSupport() {
 
         try {
           await cleanup.deleteQueue(topology.queue).catch(() => undefined);
-          await cleanup
-            .deleteQueue(topology.deadLetterQueue)
-            .catch(() => undefined);
-          await cleanup
-            .deleteExchange(topology.eventsExchange)
-            .catch(() => undefined);
-          await cleanup
-            .deleteExchange(topology.deadLetterExchange)
-            .catch(() => undefined);
+          await cleanup.deleteQueue(topology.deadLetterQueue).catch(() => undefined);
+          await cleanup.deleteExchange(topology.eventsExchange).catch(() => undefined);
+          await cleanup.deleteExchange(topology.deadLetterExchange).catch(() => undefined);
         } finally {
           await cleanup.close().catch(() => undefined);
         }

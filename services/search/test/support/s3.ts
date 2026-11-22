@@ -9,7 +9,6 @@ import {
 import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
 
 const SEARCH_S3_ENDPOINT_URL = process.env.SEARCH_S3_ENDPOINT_URL;
-const ARTIFACT_KEY = "integration-artifact.warc.gz";
 
 function createS3TestSupport() {
   const client = new S3Client({
@@ -19,31 +18,29 @@ function createS3TestSupport() {
     credentials: { accessKeyId: "minio", secretAccessKey: "minio-secret" },
   });
   const bucketName = `search-integration-${randomUUID().replaceAll("-", "")}`;
+  const objectKeys = new Set<string>();
 
   return {
     client,
     bucketName,
-    artifactKey: ARTIFACT_KEY,
     reader: createS3ArtifactReader(client),
     async setup(): Promise<void> {
       await client.send(new CreateBucketCommand({ Bucket: bucketName }));
     },
-    async putObject(body: Uint8Array): Promise<void> {
+    async putObject(body: Uint8Array, key: string): Promise<void> {
       await client.send(
-        new PutObjectCommand({
-          Bucket: bucketName,
-          Key: ARTIFACT_KEY,
-          Body: body,
-        }),
+        new PutObjectCommand({ Bucket: bucketName, Key: key, Body: body }),
       );
+      objectKeys.add(key);
     },
     async teardown(): Promise<void> {
       try {
-        await client.send(
-          new DeleteObjectCommand({
-            Bucket: bucketName,
-            Key: ARTIFACT_KEY,
-          }),
+        await Promise.all(
+          [...objectKeys].map((key) =>
+            client.send(
+              new DeleteObjectCommand({ Bucket: bucketName, Key: key }),
+            ),
+          ),
         );
         await client.send(new DeleteBucketCommand({ Bucket: bucketName }));
       } finally {
