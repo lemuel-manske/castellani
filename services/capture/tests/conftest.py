@@ -1,10 +1,12 @@
+import os
 from collections.abc import Iterator
 
+import aio_pika
 import pytest
+from aio_pika.abc import AbstractRobustConnection
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.clock import FakeClock
 from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamodb
-from support.rabbitmq import FakeConnection
 from support.recording import LocalSite, start_local_site
 from support.s3 import FakeS3
 
@@ -47,13 +49,18 @@ def s3() -> FakeS3:
 
 
 @pytest.fixture
-def rabbitmq() -> Iterator[FakeConnection]:
-    connection = FakeConnection()
+async def rabbitmq() -> Iterator[AbstractRobustConnection]:
+    connection = await aio_pika.connect_robust(
+        os.getenv(
+            "RABBITMQ_URL",
+            "amqp://castellani:castellani@localhost:5672/",
+        )
+    )
 
     try:
         yield connection
     finally:
-        pass
+        await connection.close()
 
 
 @pytest.fixture(autouse=True)
