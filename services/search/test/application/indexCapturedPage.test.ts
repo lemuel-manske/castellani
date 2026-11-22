@@ -8,7 +8,9 @@ import type {
   ArtifactReference,
   CapturedPageReference,
 } from "../../src/adapters/artifacts.js";
-import type { SearchDocumentWriter } from "../../src/application/indexCapturedPage.js";
+import type {
+  SearchDocumentWriter,
+} from "../../src/application/indexCapturedPage.js";
 
 const page: CapturedPageReference = {
   archiveId: "archive-1",
@@ -88,7 +90,12 @@ it("accounts for unsupported captured content without writing a document", async
   };
 
   await expect(
-    indexCapturedPage(page, [artifact.reference], artifact.reader, documentWriter),
+    indexCapturedPage(
+      page,
+      [artifact.reference],
+      artifact.reader,
+      documentWriter,
+    ),
   ).resolves.toEqual({
     outcome: "UNSUPPORTED",
     snapshotId: "snapshot-1",
