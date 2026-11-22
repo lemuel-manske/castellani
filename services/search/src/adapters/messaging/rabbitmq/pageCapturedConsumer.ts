@@ -119,9 +119,15 @@ async function startPageCapturedConsumer(
     }
 
     try {
-      await handle(event);
+      const result = await handle(event);
+      if (isRecord(result) && result.status === "BUSY") {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        channel.nack(message, false, true);
+        return;
+      }
       channel.ack(message);
     } catch {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       channel.nack(message, false, true);
     }
   });
