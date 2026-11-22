@@ -15,13 +15,16 @@ class S3ArtifactStore(ArtifactStore):
     def __init__(self, client: Any, bucket: str, staging_root: Path) -> None:
         if not bucket:
             raise ValueError("artifact bucket must not be empty")
+
         self.client = client
         self.bucket = bucket
         self.staging_root = staging_root
 
     async def create_attempt_directory(self, claim: TaskClaim) -> Path:
         directory = self.staging_root / quote(claim.attempt_id, safe="")
+
         await asyncio.to_thread(directory.mkdir, parents=True, exist_ok=True)
+
         return directory
 
     async def persist_attempt(
@@ -50,14 +53,18 @@ class S3ArtifactStore(ArtifactStore):
             raise ValueError("a capture must produce at least one WARC file")
 
         root = directory.resolve(strict=True)
+
         references: list[ArtifactReference] = []
         seen_keys: set[str] = set()
 
         for path in warc_files:
             resolved = path.resolve(strict=True)
+
             if not resolved.is_file():
                 raise ValueError(f"capture artifact is not a regular file: {path}")
+
             relative = resolved.relative_to(root)
+
             if relative in (Path("."), Path("")):
                 raise ValueError("capture artifact must have a relative file name")
 
@@ -71,8 +78,10 @@ class S3ArtifactStore(ArtifactStore):
                     *(quote(part, safe="") for part in relative.parts),
                 )
             )
+
             if key in seen_keys:
                 raise ValueError(f"duplicate artifact key: {key}")
+
             seen_keys.add(key)
 
             digest = hashlib.sha256()
@@ -88,9 +97,12 @@ class S3ArtifactStore(ArtifactStore):
                 key,
                 ExtraArgs={"Metadata": {"sha256": sha256}},
             )
+
             metadata = self.client.head_object(Bucket=self.bucket, Key=key)
+
             if metadata.get("Metadata", {}).get("sha256") != sha256:
                 raise RuntimeError(f"S3 artifact checksum metadata mismatch for {key}")
+
             if metadata.get("ContentLength") != size_bytes:
                 raise RuntimeError(f"S3 artifact size mismatch for {key}")
 
@@ -108,8 +120,10 @@ class S3ArtifactStore(ArtifactStore):
 
     async def discard_attempt(self, claim: TaskClaim, directory: Path) -> None:
         del claim
+
         await asyncio.to_thread(shutil.rmtree, directory, True)
 
     async def commit_attempt(self, claim: TaskClaim, directory: Path) -> None:
         del claim
+
         await asyncio.to_thread(shutil.rmtree, directory, True)
