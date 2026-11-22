@@ -76,6 +76,9 @@ async function readWarcArtifact(
 
   for await (const record of parser) {
     if (record.warcType !== "response" || record.warcTargetURI !== targetUrl) {
+      for await (const chunk of record) {
+        void chunk;
+      }
       continue;
     }
 
