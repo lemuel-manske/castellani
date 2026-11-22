@@ -121,8 +121,14 @@ class DynamoDBTaskRepository(TaskRepository):
     async def complete(self, outcome: CaptureOutcome) -> None:
         await asyncio.to_thread(self._complete, outcome)
 
-    async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
-        await asyncio.to_thread(self._fail, claim, reason_code, message)
+    async def fail(
+        self,
+        claim: TaskClaim,
+        reason_code: str,
+        message: str,
+        retryable: bool = True,
+    ) -> None:
+        await asyncio.to_thread(self._fail, claim, reason_code, message, retryable)
 
     async def admit_discovered(
         self,
