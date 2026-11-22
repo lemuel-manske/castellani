@@ -922,7 +922,8 @@ class DynamoDBTaskRepository(TaskRepository):
         message_id = str(
             uuid5(
                 NAMESPACE_URL,
-                f"capture-page-lease-recheck:{archive_id}:{url_key}:{attempt_id}:{fence}:{lease_until}",
+                f"capture-page-lease-recheck:{archive_id}:{url_key}:"
+                f"{attempt_id}:{fence}:{lease_until}",
             )
         )
         occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
