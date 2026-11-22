@@ -2,7 +2,10 @@ import type { IndexingOutcome } from "../domain.js";
 import type { ArtifactReference } from "../ports/artifacts.js";
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
-import type { CapturedPageReader, CapturedPageReference } from "../ports/artifacts.js";
+import type {
+  CapturedPageReader,
+  CapturedPageReference,
+} from "../ports/artifacts.js";
 import { indexCapturedPage } from "./indexCapturedPage.js";
 
 interface PageCapturedEvent {
@@ -16,9 +19,15 @@ interface PageCapturedEvent {
 }
 
 type PageCapturedResult =
-  | { status: "COMPLETED"; outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED"> }
+  | {
+      status: "COMPLETED";
+      outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
+    }
   | { status: "BUSY" }
-  | { status: "DUPLICATE"; outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED"> };
+  | {
+      status: "DUPLICATE";
+      outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
+    };
 
 interface ProcessPageCapturedDependencies {
   ledger: IndexingLedger;
@@ -63,7 +72,8 @@ async function processPageCaptured(
 
     return { status: "COMPLETED", outcome: result.outcome };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "unknown indexing error";
+    const reason =
+      error instanceof Error ? error.message : "unknown indexing error";
     if (claimResult.claim.attempts >= (dependencies.maxAttempts ?? 5)) {
       await dependencies.ledger.complete(
         claimResult.claim,
@@ -79,4 +89,8 @@ async function processPageCaptured(
 }
 
 export { processPageCaptured };
-export type { PageCapturedEvent, PageCapturedResult, ProcessPageCapturedDependencies };
+export type {
+  PageCapturedEvent,
+  PageCapturedResult,
+  ProcessPageCapturedDependencies,
+};
