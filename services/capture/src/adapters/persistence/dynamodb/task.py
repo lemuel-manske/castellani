@@ -66,9 +66,9 @@ class DynamoDBTaskRepository(TaskRepository):
         frontier_table_name: str,
         runs_table_name: str,
         lease_duration: float,
-        snapshots_table_name: str = "capture_snapshots",
         clock: Callable[[], float] = time.time,
         outbox_table_name: str = "capture_outbox",
+        snapshots_table_name: str = "capture_snapshots",
     ) -> None:
         if not frontier_table_name:
             raise ValueError("frontier_table_name must not be empty")
@@ -417,6 +417,9 @@ class DynamoDBTaskRepository(TaskRepository):
                         "url": {"S": outcome.capture.requested_url},
                         "finalUrl": {"S": outcome.capture.final_url},
                         "capturedAt": {"S": captured_at_text},
+                        **({"contentType": {"S": outcome.capture.content_type}} if outcome.capture.content_type is not None else {}),
+                        **({"title": {"S": outcome.capture.title}} if outcome.capture.title else {}),
+                        **({"statusCode": {"N": str(outcome.capture.status_code)}} if outcome.capture.status_code is not None else {}),
                         **({"contentType": {"S": outcome.capture.content_type}} if outcome.capture.content_type is not None else {}),
                         "minDepth": {"N": str(depth)},
                         "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
