@@ -57,7 +57,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
       identity.archiveId,
       "publicationDecision",
       identity,
-      "attribute_not_exists(compensationDecision) AND (attribute_not_exists(replayPublication) OR replayPublication = :identity) AND (attribute_not_exists(publicationDecision) OR publicationDecision = :identity)",
+      "attribute_not_exists(#compensation) AND (attribute_not_exists(#replay) OR #replay = :identity) AND (attribute_not_exists(#publication) OR #publication = :identity)",
     );
   }
 
@@ -69,7 +69,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
       identity.archiveId,
       "replayPublication",
       identity,
-      "attribute_not_exists(compensationDecision) AND (attribute_not_exists(publicationDecision) OR publicationDecision = :identity) AND (attribute_not_exists(replayPublication) OR replayPublication = :identity)",
+      "attribute_not_exists(#compensation) AND (attribute_not_exists(#publication) OR #publication = :identity) AND (attribute_not_exists(#replay) OR #replay = :identity)",
     );
   }
 
@@ -83,7 +83,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
       decision.archiveId,
       "compensationDecision",
       decision,
-      "attribute_not_exists(publicationDecision) AND attribute_not_exists(replayPublication) AND (attribute_not_exists(compensationDecision) OR compensationDecision = :identity)",
+      "attribute_not_exists(#publication) AND attribute_not_exists(#replay) AND (attribute_not_exists(#compensation) OR #compensation = :identity)",
     );
   }
 
@@ -102,7 +102,12 @@ class DynamoDBPublicationLedger implements PublicationLedger {
           Key: { archiveId },
           UpdateExpression: "SET #fact = :identity",
           ConditionExpression: condition,
-          ExpressionAttributeNames: { "#fact": attribute },
+          ExpressionAttributeNames: {
+            "#fact": attribute,
+            "#publication": "publicationDecision",
+            "#replay": "replayPublication",
+            "#compensation": "compensationDecision",
+          },
           ExpressionAttributeValues: { ":identity": serialized },
         }),
       );
