@@ -8,7 +8,7 @@ import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
 
-from adapters.artifacts.local import LocalArtifactStore
+from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
 from adapters.messaging.rabbitmq.consumer import (
     QUEUE_NAME,
@@ -35,6 +35,7 @@ class CaptureRuntime:
     def __init__(self, settings: CaptureSettings) -> None:
         self.settings = settings
         self.dynamodb_client: DynamoDBClient | None = None
+        self.s3_client: Any | None = None
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
         self.consumer_task: asyncio.Task[None] | None = None
@@ -71,6 +72,12 @@ class CaptureRuntime:
                 )
 
             self.dynamodb_client = dynamodb_client
+            s3_client = session.client(
+                "s3",
+                region_name=self.settings.aws_region,
+                **({"endpoint_url": self.settings.s3_endpoint_url} if self.settings.s3_endpoint_url else {}),
+            )
+            self.s3_client = s3_client
 
             for table_name in (
                 self.settings.frontier_table_name,
@@ -106,7 +113,11 @@ class CaptureRuntime:
                 task_repository=task_repository,
                 capture_allocator=allocator,
                 executor=BrowserPageExecutor(),
-                artifacts=LocalArtifactStore(Path(self.settings.artifact_directory)),
+                artifacts=S3ArtifactStore(
+                    client=s3_client,
+                    bucket=self.settings.artifact_bucket,
+                    staging_root=Path(self.settings.artifact_directory),
+                ),
             )
 
             publisher = RabbitMQMessagePublisher(connection)
@@ -168,6 +179,11 @@ class CaptureRuntime:
                     await self.connection.close()
                     self.connection = None
             finally:
-                if self.dynamodb_client is not None:
-                    self.dynamodb_client.close()
-                    self.dynamodb_client = None
+                try:
+                    if self.s3_client is not None:
+                        self.s3_client.close()
+                        self.s3_client = None
+                finally:
+                    if self.dynamodb_client is not None:
+                        self.dynamodb_client.close()
+                        self.dynamodb_client = None
