@@ -61,7 +61,7 @@ function createDynamoDbTestSupport(clock: () => number) {
         }),
       );
       await waitUntilTableExists(
-        { client, maxWaitTime: 20 },
+        { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
         { TableName: tableName },
       );
       await client.send(
@@ -75,7 +75,7 @@ function createDynamoDbTestSupport(clock: () => number) {
         }),
       );
       await waitUntilTableExists(
-        { client, maxWaitTime: 20 },
+        { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
         { TableName: publicationTableName },
       );
       await client.send(
@@ -93,7 +93,7 @@ function createDynamoDbTestSupport(clock: () => number) {
         }),
       );
       await waitUntilTableExists(
-        { client, maxWaitTime: 20 },
+        { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
         { TableName: manifestTableName },
       );
     },
