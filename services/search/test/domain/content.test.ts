@@ -13,43 +13,40 @@ const page = (overrides: Partial<CapturedPage> = {}): CapturedPage => ({
 });
 
 it("extracts searchable text and page metadata from HTML", () => {
-  const result = extractSearchableContent(page());
-
-  expect(result.kind).toBe("INDEXABLE");
-  if (result.kind !== "INDEXABLE") return;
-
-  expect(result.document).toMatchObject({
-    archiveId: "archive-1",
-    snapshotId: "snapshot-1",
-    url: "https://example.com/",
-    finalUrl: "https://example.com/",
-    contentType: "text/html",
-    title: "Example",
-    description: "A page",
-    language: "en",
-    text: "Hello World",
+  expect(extractSearchableContent(page())).toMatchObject({
+    kind: "INDEXABLE",
+    document: {
+      archiveId: "archive-1",
+      snapshotId: "snapshot-1",
+      url: "https://example.com/",
+      finalUrl: "https://example.com/",
+      contentType: "text/html",
+      title: "Example",
+      description: "A page",
+      language: "en",
+      text: "Hello World",
+    },
   });
 });
 
 it("uses the final URL when supplied", () => {
-  const result = extractSearchableContent(page({ finalUrl: "https://example.com/final" }));
-
-  expect(result.kind).toBe("INDEXABLE");
-  if (result.kind !== "INDEXABLE") return;
-
-  expect(result.document.finalUrl).toBe("https://example.com/final");
+  expect(
+    extractSearchableContent(page({ finalUrl: "https://example.com/final" })),
+  ).toMatchObject({
+    kind: "INDEXABLE",
+    document: { finalUrl: "https://example.com/final" },
+  });
 });
 
 it("extracts plain text without HTML parsing", () => {
-  const result = extractSearchableContent(
-    page({ contentType: "text/plain", content: "  Hello\n\tworld  " }),
-  );
-
-  expect(result.kind).toBe("INDEXABLE");
-  if (result.kind !== "INDEXABLE") return;
-
-  expect(result.document.text).toBe("Hello world");
-  expect(result.document.title).toBe("");
+  expect(
+    extractSearchableContent(
+      page({ contentType: "text/plain", content: "  Hello\n\tworld  " }),
+    ),
+  ).toMatchObject({
+    kind: "INDEXABLE",
+    document: { text: "Hello world", title: "" },
+  });
 });
 
 it("returns an unsupported outcome for non-text content", () => {
@@ -65,13 +62,13 @@ it("returns an unsupported outcome when extracted text is empty", () => {
 });
 
 it("limits extracted text to the configured maximum", () => {
-  const result = extractSearchableContent(
-    page({ contentType: "text/plain", content: "abcdefghij" }),
-    { maxTextLength: 4 },
-  );
-
-  expect(result.kind).toBe("INDEXABLE");
-  if (result.kind !== "INDEXABLE") return;
-
-  expect(result.document.text).toBe("abcd");
+  expect(
+    extractSearchableContent(
+      page({ contentType: "text/plain", content: "abcdefghij" }),
+      { maxTextLength: 4 },
+    ),
+  ).toMatchObject({
+    kind: "INDEXABLE",
+    document: { text: "abcd" },
+  });
 });
