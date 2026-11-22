@@ -52,6 +52,7 @@ function isIdentity(value: unknown): value is PublicationIdentity {
   return (
     isRecord(value) &&
     nonEmpty(value.archiveId) &&
+    typeof value.decisionVersion === "number" &&
     Number.isSafeInteger(value.decisionVersion) &&
     value.decisionVersion >= 1 &&
     nonEmpty(value.packageDigest)
@@ -61,8 +62,9 @@ function isCompensation(value: unknown): value is CompensationDecision {
   return (
     isRecord(value) &&
     nonEmpty(value.archiveId) &&
+    typeof value.decisionVersion === "number" &&
     Number.isSafeInteger(value.decisionVersion) &&
-    Number(value.decisionVersion) >= 1 &&
+    value.decisionVersion >= 1 &&
     nonEmpty(value.reasonCode)
   );
 }
@@ -73,6 +75,7 @@ function isArtifact(value: unknown): value is ArtifactReference {
     nonEmpty(value.key) &&
     nonEmpty(value.sha256) &&
     /^[a-f0-9]{64}$/.test(value.sha256) &&
+    typeof value.sizeBytes === "number" &&
     Number.isSafeInteger(value.sizeBytes) &&
     value.sizeBytes >= 0 &&
     (value.versionId === undefined || nonEmpty(value.versionId))
