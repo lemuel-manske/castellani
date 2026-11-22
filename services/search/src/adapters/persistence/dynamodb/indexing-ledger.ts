@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import type { IndexingOutcome } from "../../../domain.js";
+import type { IndexingOutcome, SnapshotLedgerEntry } from "../../../domain.js";
 import type {
   IndexingClaimResult,
   IndexingLedger,
@@ -10,7 +10,7 @@ import {
   claimIndexingEntry,
   completeIndexingEntry,
   exhaustIndexingEntry,
-  getIndexingEntry,
+  getIndexingEntry,\n  listIndexingEntriesByArchive,
   releaseIndexingEntry,
 } from "./indexing-ledger-queries.js";
 
