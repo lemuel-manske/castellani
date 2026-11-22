@@ -18,13 +18,12 @@ from domain import (
     new_attempt_id,
 )
 
-from .values import number_from_item
-
 from .error_handling import (
     extract_cancellation_reasons,
     is_conditional_failure,
     is_transaction_canceled,
 )
+from .values import number_from_item
 
 
 def claim_from_item(
