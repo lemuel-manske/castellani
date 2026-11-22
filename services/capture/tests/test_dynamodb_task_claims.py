@@ -48,8 +48,6 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient
 
     seed_frontier(dynamodb, depth=2)
 
-    attempt_ids = iter(("attempt-1", "attempt-2"))
-
     claims = DynamoDBTaskRepository(
         client=dynamodb,
         frontier_table_name="capture_frontier",
@@ -74,8 +72,6 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(
     seed_run(dynamodb)
 
     seed_frontier(dynamodb, depth=2)
-
-    attempt_ids = iter(("attempt-1", "attempt-2"))
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
@@ -179,8 +175,6 @@ async def test_concurrent_claims_have_exactly_one_winner_for_a_page(
     seed_run(dynamodb)
 
     seed_frontier(dynamodb, depth=2)
-
-    attempt_ids = iter(f"attempt-{number}" for number in range(20))
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
