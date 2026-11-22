@@ -96,14 +96,6 @@ jobs:
 
       - run: make install
 
-      - run: npx prettier --write src/domain/content.ts test/adapters/artifacts.test.ts test/domain/indexing.test.ts test/domain/publication.test.ts
-
-      - run: |
-          cat src/domain/content.ts
-          cat test/adapters/artifacts.test.ts
-          cat test/domain/indexing.test.ts
-          cat test/domain/publication.test.ts
-
       - run: make check
 
       - run: make test
