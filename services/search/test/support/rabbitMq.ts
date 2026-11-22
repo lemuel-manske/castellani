@@ -47,7 +47,8 @@ function createRabbitMqTestSupport() {
   const deadLetters: ConsumeMessage[] = [];
   const deadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
   const publicationDeadLetters: ConsumeMessage[] = [];
-  const publicationDeadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
+  const publicationDeadLetterWaiters: ((message: ConsumeMessage) => void)[] =
+    [];
 
   function receiveDeadLetter(
     message: ConsumeMessage,
@@ -56,7 +57,9 @@ function createRabbitMqTestSupport() {
     channel: amqp.ConfirmChannel | undefined,
   ): void {
     channel?.ack(message);
+
     const waiter = waiters.shift();
+
     waiter ? waiter(message) : messages.push(message);
   }
 
@@ -82,7 +85,12 @@ function createRabbitMqTestSupport() {
           return;
         }
 
-        receiveDeadLetter(message, deadLetters, deadLetterWaiters, consumerChannel);
+        receiveDeadLetter(
+          message,
+          deadLetters,
+          deadLetterWaiters,
+          consumerChannel,
+        );
       });
       await publicationConsumerChannel.consume(
         publicationTopology.deadLetterQueue,
@@ -115,7 +123,10 @@ function createRabbitMqTestSupport() {
       await publisherChannel.waitForConfirms();
     },
 
-    async publishPublication(event: unknown, routingKey: string): Promise<void> {
+    async publishPublication(
+      event: unknown,
+      routingKey: string,
+    ): Promise<void> {
       if (publisherChannel === undefined) {
         throw new Error("RabbitMQ integration environment is not initialized");
       }
@@ -141,9 +152,7 @@ function createRabbitMqTestSupport() {
       const message = publicationDeadLetters.shift();
 
       return message === undefined
-        ? new Promise((resolve) =>
-            publicationDeadLetterWaiters.push(resolve),
-          )
+        ? new Promise((resolve) => publicationDeadLetterWaiters.push(resolve))
         : Promise.resolve(message);
     },
 
@@ -160,24 +169,28 @@ function createRabbitMqTestSupport() {
         const cleanup = await connection.createChannel();
 
         try {
-          await Promise.all([
-            topology.queue,
-            topology.retryQueue,
-            topology.deadLetterQueue,
-            publicationTopology.queue,
-            publicationTopology.retryQueue,
-            publicationTopology.deadLetterQueue,
-          ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)));
-          await Promise.all([
-            topology.eventsExchange,
-            topology.retryExchange,
-            topology.deadLetterExchange,
-            publicationTopology.eventsExchange,
-            publicationTopology.retryExchange,
-            publicationTopology.deadLetterExchange,
-          ].map((exchange) =>
-            cleanup.deleteExchange(exchange).catch(() => undefined),
-          ));
+          await Promise.all(
+            [
+              topology.queue,
+              topology.retryQueue,
+              topology.deadLetterQueue,
+              publicationTopology.queue,
+              publicationTopology.retryQueue,
+              publicationTopology.deadLetterQueue,
+            ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)),
+          );
+          await Promise.all(
+            [
+              topology.eventsExchange,
+              topology.retryExchange,
+              topology.deadLetterExchange,
+              publicationTopology.eventsExchange,
+              publicationTopology.retryExchange,
+              publicationTopology.deadLetterExchange,
+            ].map((exchange) =>
+              cleanup.deleteExchange(exchange).catch(() => undefined),
+            ),
+          );
         } finally {
           await cleanup.close().catch(() => undefined);
         }

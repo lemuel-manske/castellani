@@ -70,13 +70,7 @@ it("marks a snapshot terminal when its final claim lease expires", async () => {
   clock.now += 121_000;
 
   await expect(
-    dynamodb.ledger.claim(
-      "archive-6",
-      "snapshot-6",
-      "message-6b",
-      120,
-      1,
-    ),
+    dynamodb.ledger.claim("archive-6", "snapshot-6", "message-6b", 120, 1),
   ).resolves.toEqual({ status: "TERMINAL", outcome: "FAILED" });
 });
 
@@ -99,6 +93,7 @@ it("reclaims an expired lease and increments the attempt count", async () => {
     "message-3a",
     120,
   );
+
   expect(first.status).toBe("CLAIMED");
 
   clock.now += 121_000;
@@ -131,6 +126,7 @@ it("rejects completion by a worker whose lease was reclaimed", async () => {
     "message-5a",
     120,
   );
+
   expect(first.status).toBe("CLAIMED");
 
   clock.now += 121_000;
@@ -141,10 +137,13 @@ it("rejects completion by a worker whose lease was reclaimed", async () => {
     "message-5b",
     120,
   );
+
   expect(second.status).toBe("CLAIMED");
 
-  const firstClaim = (first as Extract<typeof first, { status: "CLAIMED" }>).claim;
-  const secondClaim = (second as Extract<typeof second, { status: "CLAIMED" }>).claim;
+  const firstClaim = (first as Extract<typeof first, { status: "CLAIMED" }>)
+    .claim;
+  const secondClaim = (second as Extract<typeof second, { status: "CLAIMED" }>)
+    .claim;
 
   await expect(
     dynamodb.ledger.complete(firstClaim, "INDEXED"),

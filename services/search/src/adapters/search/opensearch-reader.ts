@@ -66,7 +66,10 @@ function snippetFromHit(hit: SearchHit, document: SearchDocument): string {
     document.description ||
     document.text.slice(0, 240);
 
-  return fragment.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  return fragment
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function createOpenSearchDocumentReader(

@@ -119,7 +119,11 @@ class SearchSettings {
     return new SearchSettings({
       awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
       httpHost: env.SEARCH_HTTP_HOST?.trim() || DEFAULT_HTTP_HOST,
-      httpPort: positiveInteger("SEARCH_HTTP_PORT", env.SEARCH_HTTP_PORT, DEFAULT_HTTP_PORT),
+      httpPort: positiveInteger(
+        "SEARCH_HTTP_PORT",
+        env.SEARCH_HTTP_PORT,
+        DEFAULT_HTTP_PORT,
+      ),
       dynamodbEndpointUrl: required(
         "SEARCH_DYNAMODB_ENDPOINT_URL",
         env.SEARCH_DYNAMODB_ENDPOINT_URL,

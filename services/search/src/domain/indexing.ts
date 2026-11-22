@@ -29,6 +29,7 @@ function reconcileManifest(
   }
 
   const ledger = new Map<string, IndexingOutcome>();
+
   for (const entry of ledgerEntries) {
     if (!entry.snapshotId) {
       throw new Error("ledger contains an empty snapshotId");

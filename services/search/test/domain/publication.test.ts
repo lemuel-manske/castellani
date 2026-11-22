@@ -19,22 +19,27 @@ it("does not authorize visibility until both independent facts match", () => {
     emptyPublicationFacts(),
     identity,
   );
+
   expect(isPublicationAuthorized(decisionOnly)).toBe(false);
 
   const both = recordReplayPublished(decisionOnly, identity);
+
   expect(isPublicationAuthorized(both)).toBe(true);
 });
 
 it("accepts replay acknowledgement before the decision", () => {
   const replayOnly = recordReplayPublished(emptyPublicationFacts(), identity);
+
   expect(isPublicationAuthorized(replayOnly)).toBe(false);
 
   const both = recordPublicationDecision(replayOnly, identity);
+
   expect(isPublicationAuthorized(both)).toBe(true);
 });
 
 it("treats duplicate deliveries as idempotent", () => {
   const first = recordPublicationDecision(emptyPublicationFacts(), identity);
+
   expect(recordPublicationDecision(first, identity)).toBe(first);
 });
 
@@ -74,6 +79,7 @@ it("keeps compensated archives permanently ineligible", () => {
     decisionVersion: identity.decisionVersion,
     reasonCode: "crawl_failed",
   });
+
   expect(isPublicationAuthorized(facts)).toBe(false);
   expect(() => recordPublicationDecision(facts, identity)).toThrow(
     "a compensated archive cannot be published",

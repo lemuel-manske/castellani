@@ -73,9 +73,7 @@ it("filters uncommitted documents and continues paging until the requested resul
   const publicationLedger: PublicationLedger = {
     get: vi.fn((archiveId: string) =>
       Promise.resolve(
-        archiveId === "published-archive"
-          ? authorizedFacts
-          : unpublishedFacts,
+        archiveId === "published-archive" ? authorizedFacts : unpublishedFacts,
       ),
     ),
     recordPublicationDecision: vi.fn(),
@@ -85,7 +83,12 @@ it("filters uncommitted documents and continues paging until the requested resul
 
   const manifestLedger: ManifestLedger = {
     record: vi.fn(),
-    contains: vi.fn((archiveId, snapshotId) => Promise.resolve(archiveId === "published-archive" && snapshotId === "published-snapshot")),
+    contains: vi.fn((archiveId, snapshotId) =>
+      Promise.resolve(
+        archiveId === "published-archive" &&
+          snapshotId === "published-snapshot",
+      ),
+    ),
   };
   const result = await searchPublishedDocuments(
     { text: "published", limit: 1 },
@@ -121,7 +124,10 @@ it("fails closed when publication authorization cannot be read", async () => {
     search: vi.fn().mockResolvedValue({
       candidates: [
         {
-          document: document("unavailable-ledger-archive", "candidate-snapshot"),
+          document: document(
+            "unavailable-ledger-archive",
+            "candidate-snapshot",
+          ),
           score: 1,
           snippet: "candidate content",
           cursor: "cursor",
@@ -139,6 +145,11 @@ it("fails closed when publication authorization cannot be read", async () => {
   const manifestLedger: ManifestLedger = { record: vi.fn(), contains: vi.fn() };
 
   await expect(
-    searchPublishedDocuments({ text: "candidate" }, reader, publicationLedger, manifestLedger),
+    searchPublishedDocuments(
+      { text: "candidate" },
+      reader,
+      publicationLedger,
+      manifestLedger,
+    ),
   ).rejects.toThrow("DynamoDB unavailable");
 });

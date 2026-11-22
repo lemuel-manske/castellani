@@ -65,6 +65,7 @@ function waitForReconnectDelay(
     };
 
     const timeout = setTimeout(finish, milliseconds);
+
     signal.addEventListener("abort", finish, { once: true });
 
     if (isSignalAborted(signal)) {
@@ -142,7 +143,14 @@ class SearchRuntime {
         port: this.settings.httpPort,
       });
       await this.runConsumer(
-        { ledger, capturedPageReader, documentWriter, publicationLedger, manifestLedger, artifactReader },
+        {
+          ledger,
+          capturedPageReader,
+          documentWriter,
+          publicationLedger,
+          manifestLedger,
+          artifactReader,
+        },
         signal,
       );
     } finally {

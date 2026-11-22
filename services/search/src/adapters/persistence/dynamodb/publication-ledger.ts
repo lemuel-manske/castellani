@@ -35,12 +35,19 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     return getPublicationFacts(this.client, this.tableName, archiveId);
   }
 
-  async recordPublicationDecision(identity: PublicationIdentity): Promise<void> {
+  async recordPublicationDecision(
+    identity: PublicationIdentity,
+  ): Promise<void> {
     const facts = await this.get(identity.archiveId);
+
     recordPublicationDecision(facts, identity);
 
     try {
-      await recordPublicationDecisionQuery(this.client, this.tableName, identity);
+      await recordPublicationDecisionQuery(
+        this.client,
+        this.tableName,
+        identity,
+      );
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;
@@ -60,6 +67,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
 
   async recordReplayPublished(identity: PublicationIdentity): Promise<void> {
     const facts = await this.get(identity.archiveId);
+
     recordReplayPublished(facts, identity);
 
     try {
@@ -85,10 +93,15 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     decision: CompensationDecision,
   ): Promise<void> {
     const facts = await this.get(decision.archiveId);
+
     recordCompensationDecision(facts, decision);
 
     try {
-      await recordCompensationDecisionQuery(this.client, this.tableName, decision);
+      await recordCompensationDecisionQuery(
+        this.client,
+        this.tableName,
+        decision,
+      );
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;
@@ -109,8 +122,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
 
 function isConditionalCheckFailure(error: unknown): boolean {
   return (
-    error instanceof Error &&
-    error.name === "ConditionalCheckFailedException"
+    error instanceof Error && error.name === "ConditionalCheckFailedException"
   );
 }
 

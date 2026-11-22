@@ -6,6 +6,10 @@ interface ArchiveManifest {
 }
 interface ManifestLedger {
   record(manifest: ArchiveManifest): Promise<void>;
-  contains(archiveId: string, snapshotId: string, collectionId?: string): Promise<boolean>;
+  contains(
+    archiveId: string,
+    snapshotId: string,
+    collectionId?: string,
+  ): Promise<boolean>;
 }
 export type { ArchiveManifest, ManifestLedger };

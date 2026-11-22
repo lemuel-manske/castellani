@@ -75,6 +75,7 @@ function metaContent(root: ReturnType<typeof parse>, name: string): string {
   const element = root.querySelectorAll("meta").find((candidate) => {
     const key =
       candidate.getAttribute("name") ?? candidate.getAttribute("property");
+
     return key?.toLowerCase() === name;
   });
 

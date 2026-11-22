@@ -1,5 +1,8 @@
 import { GetCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import type { DynamoDBDocumentClient, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
+import type {
+  DynamoDBDocumentClient,
+  QueryCommandInput,
+} from "@aws-sdk/lib-dynamodb";
 import type { IndexingOutcome, SnapshotLedgerEntry } from "../../../domain.js";
 import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";
 

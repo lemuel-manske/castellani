@@ -13,6 +13,7 @@ async function reconcileArchiveManifest(
   }
 
   const entries = await ledger.listByArchive(archiveId);
+
   return reconcileManifest(snapshots, entries);
 }
 

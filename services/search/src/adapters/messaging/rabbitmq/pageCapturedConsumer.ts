@@ -110,7 +110,10 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
   return event;
 }
 
-function deliveryRetryCount(message: ConsumeMessage, retryQueue: string): number {
+function deliveryRetryCount(
+  message: ConsumeMessage,
+  retryQueue: string,
+): number {
   const deaths = message.properties.headers?.["x-death"];
 
   if (!Array.isArray(deaths)) {
@@ -126,6 +129,7 @@ function deliveryRetryCount(message: ConsumeMessage, retryQueue: string): number
   }
 
   const count = retryDeath.count;
+
   return typeof count === "number" || typeof count === "bigint"
     ? Number(count)
     : 0;
@@ -148,7 +152,7 @@ function publishDeadLetter(
         headers: message.properties.headers,
         persistent: true,
       },
-      (error) => (error ? reject(error) : resolve()),
+      (error) => { error ? reject(error) : resolve(); },
     );
   });
 }

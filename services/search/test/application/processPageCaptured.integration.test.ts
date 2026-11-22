@@ -30,6 +30,7 @@ it("indexes a captured page across the real infrastructure adapters", async () =
   const fixture = createCapturedPageFixture("integrated-snapshot", {
     bucket: s3.bucketName,
   });
+
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
   await expect(
@@ -37,6 +38,7 @@ it("indexes a captured page across the real infrastructure adapters", async () =
   ).resolves.toEqual({ status: "COMPLETED", outcome: "INDEXED" });
 
   await opensearch.client.indices.refresh({ index: opensearch.indexName });
+
   const indexed = await opensearch.client.get({
     index: opensearch.indexName,
     id: fixture.page.snapshotId,
@@ -57,6 +59,7 @@ it("does not process a snapshot while another worker holds its lease", async () 
   const fixture = createCapturedPageFixture("busy-snapshot", {
     bucket: s3.bucketName,
   });
+
   await dynamodb.ledger.claim(
     fixture.page.archiveId,
     fixture.page.snapshotId,
@@ -75,6 +78,7 @@ it("records terminal failure when the captured artifact fails integrity validati
     bucket: s3.bucketName,
     validChecksum: false,
   });
+
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
   await expect(
@@ -100,6 +104,7 @@ it("records unsupported content without indexing a document", async () => {
     contentType: "application/pdf",
     body: "%PDF-1.7 not searchable text",
   });
+
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
   await expect(
@@ -107,6 +112,7 @@ it("records unsupported content without indexing a document", async () => {
   ).resolves.toEqual({ status: "COMPLETED", outcome: "UNSUPPORTED" });
 
   await opensearch.client.indices.refresh({ index: opensearch.indexName });
+
   const indexed = await opensearch.client.exists({
     index: opensearch.indexName,
     id: fixture.page.snapshotId,

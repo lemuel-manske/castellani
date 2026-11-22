@@ -91,6 +91,7 @@ it("rejects unsupported event versions", () => {
 
 it("rejects missing producer-required capture metadata", () => {
   const payload = { ...event.payload };
+
   delete (payload as Partial<typeof event.payload>).finalUrl;
 
   expect(

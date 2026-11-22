@@ -24,7 +24,6 @@ it("delivers a published PageCaptured event to the real consumer", async () => {
   });
 });
 
-
 it("dead-letters malformed PageCaptured envelopes", async () => {
   const deadLetter = rabbitmq.nextDeadLetter();
 

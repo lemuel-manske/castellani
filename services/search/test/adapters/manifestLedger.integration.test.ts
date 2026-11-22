@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { dynamodb, setupIntegrationEnvironment } from "../support/integrationEnvironment.js";
+import {
+  dynamodb,
+  setupIntegrationEnvironment,
+} from "../support/integrationEnvironment.js";
 
 setupIntegrationEnvironment("dynamodb");
 
@@ -11,15 +14,25 @@ it("exposes only snapshots in a completed immutable manifest", async () => {
     snapshotIds: ["manifest-snapshot-a", "manifest-snapshot-b"],
   });
 
-  await expect(dynamodb.manifestLedger.contains(
-    "manifest-membership-archive", "manifest-snapshot-a",
-  )).resolves.toBe(true);
-  await expect(dynamodb.manifestLedger.contains(
-    "manifest-membership-archive", "not-in-manifest",
-  )).resolves.toBe(false);
-  await expect(dynamodb.manifestLedger.contains(
-    "manifest-membership-archive", "manifest-snapshot-a", "collection-b",
-  )).resolves.toBe(false);
+  await expect(
+    dynamodb.manifestLedger.contains(
+      "manifest-membership-archive",
+      "manifest-snapshot-a",
+    ),
+  ).resolves.toBe(true);
+  await expect(
+    dynamodb.manifestLedger.contains(
+      "manifest-membership-archive",
+      "not-in-manifest",
+    ),
+  ).resolves.toBe(false);
+  await expect(
+    dynamodb.manifestLedger.contains(
+      "manifest-membership-archive",
+      "manifest-snapshot-a",
+      "collection-b",
+    ),
+  ).resolves.toBe(false);
 });
 
 it("rejects a different immutable manifest for an existing archive", async () => {
@@ -29,10 +42,13 @@ it("rejects a different immutable manifest for an existing archive", async () =>
     collectionId: "collection-b",
     snapshotIds: ["immutable-snapshot"],
   };
+
   await dynamodb.manifestLedger.record(manifest);
 
-  await expect(dynamodb.manifestLedger.record({
-    ...manifest,
-    manifestDigest: "c".repeat(64),
-  })).rejects.toThrow("archive manifest conflicts");
+  await expect(
+    dynamodb.manifestLedger.record({
+      ...manifest,
+      manifestDigest: "c".repeat(64),
+    }),
+  ).rejects.toThrow("archive manifest conflicts");
 });

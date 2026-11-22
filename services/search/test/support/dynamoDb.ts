@@ -29,7 +29,10 @@ function createDynamoDbTestSupport(clock: () => number) {
     documentClient,
     publicationTableName,
   );
-  const manifestLedger = new DynamoDBManifestLedger(documentClient, manifestTableName);
+  const manifestLedger = new DynamoDBManifestLedger(
+    documentClient,
+    manifestTableName,
+  );
 
   return {
     ledger,
@@ -75,19 +78,24 @@ function createDynamoDbTestSupport(clock: () => number) {
         { client, maxWaitTime: 20 },
         { TableName: publicationTableName },
       );
-      await client.send(new CreateTableCommand({
-        TableName: manifestTableName,
-        AttributeDefinitions: [
-          { AttributeName: "archiveId", AttributeType: "S" },
-          { AttributeName: "snapshotId", AttributeType: "S" },
-        ],
-        KeySchema: [
-          { AttributeName: "archiveId", KeyType: "HASH" },
-          { AttributeName: "snapshotId", KeyType: "RANGE" },
-        ],
-        BillingMode: "PAY_PER_REQUEST",
-      }));
-      await waitUntilTableExists({ client, maxWaitTime: 20 }, { TableName: manifestTableName });
+      await client.send(
+        new CreateTableCommand({
+          TableName: manifestTableName,
+          AttributeDefinitions: [
+            { AttributeName: "archiveId", AttributeType: "S" },
+            { AttributeName: "snapshotId", AttributeType: "S" },
+          ],
+          KeySchema: [
+            { AttributeName: "archiveId", KeyType: "HASH" },
+            { AttributeName: "snapshotId", KeyType: "RANGE" },
+          ],
+          BillingMode: "PAY_PER_REQUEST",
+        }),
+      );
+      await waitUntilTableExists(
+        { client, maxWaitTime: 20 },
+        { TableName: manifestTableName },
+      );
     },
     async teardown(): Promise<void> {
       try {

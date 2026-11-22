@@ -1,7 +1,10 @@
 import { expect, it } from "vitest";
 import { isPublicationAuthorized } from "../../src/domain/publication.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
-import { dynamodb, setupIntegrationEnvironment } from "../support/integrationEnvironment.js";
+import {
+  dynamodb,
+  setupIntegrationEnvironment,
+} from "../support/integrationEnvironment.js";
 
 setupIntegrationEnvironment("dynamodb");
 
