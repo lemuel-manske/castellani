@@ -47,27 +47,27 @@ it("filters uncommitted documents and continues paging until the requested resul
   const search = vi
     .fn()
     .mockResolvedValueOnce({
-        candidates: [
-          {
-            document: document("unpublished-archive", "staged-snapshot"),
-            score: 4,
-            snippet: "staged content",
-            cursor: "cursor-one",
-          },
-        ],
-        nextCursor: "cursor-one",
-      })
-      .mockResolvedValueOnce({
-        candidates: [
-          {
-            document: document("published-archive", "published-snapshot"),
-            score: 3,
-            snippet: "published content",
-            cursor: "cursor-two",
-          },
-        ],
-        nextCursor: null,
-      });
+      candidates: [
+        {
+          document: document("unpublished-archive", "staged-snapshot"),
+          score: 4,
+          snippet: "staged content",
+          cursor: "cursor-one",
+        },
+      ],
+      nextCursor: "cursor-one",
+    })
+    .mockResolvedValueOnce({
+      candidates: [
+        {
+          document: document("published-archive", "published-snapshot"),
+          score: 3,
+          snippet: "published content",
+          cursor: "cursor-two",
+        },
+      ],
+      nextCursor: null,
+    });
   const reader: SearchDocumentReader = { search };
   const publicationLedger: PublicationLedger = {
     get: vi.fn((archiveId: string) =>
@@ -121,16 +121,13 @@ it("filters uncommitted documents and continues paging until the requested resul
 it("fails closed when publication authorization cannot be read", async () => {
   const search = vi.fn().mockResolvedValue({
     candidates: [
-        {
-          document: document(
-            "unavailable-ledger-archive",
-            "candidate-snapshot",
-          ),
-          score: 1,
-          snippet: "candidate content",
-          cursor: "cursor",
-        },
-      ],
+      {
+        document: document("unavailable-ledger-archive", "candidate-snapshot"),
+        score: 1,
+        snippet: "candidate content",
+        cursor: "cursor",
+      },
+    ],
     nextCursor: null,
   });
   const reader: SearchDocumentReader = { search };

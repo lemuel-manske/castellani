@@ -13,8 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

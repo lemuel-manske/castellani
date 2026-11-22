@@ -168,7 +168,8 @@ function publishDeadLetter(
             : "application/json",
         messageId: message.properties.messageId as string | undefined,
         correlationId: message.properties.correlationId as string | undefined,
-        headers: message.properties.headers as Record<string, unknown> | undefined,
+        headers: message.properties.headers as
+          Record<string, unknown> | undefined,
         persistent: true,
       },
       (error) => {

@@ -16,12 +16,12 @@ run:
 
 
 fmt:
-	npm run format
+	npm run format:fix
 
 check:
-	npm run format:check
-	npm run typecheck
+	npm run format
 	npm run lint
+	npm run typecheck
 
 
 test-unit:
