@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError
 
 from domain import (
     CaptureOutcome,
+    DiscoveredPage,
     PageTask,
     TaskClaim,
     TaskRepository,
@@ -128,7 +129,7 @@ class DynamoDBTaskRepository(TaskRepository):
     async def release(self, claim: TaskClaim) -> None:
         await asyncio.to_thread(self._release, claim)
 
-    def _admit_discovered(self, claim: TaskClaim, pages: tuple[Any, ...]) -> None:
+    def _admit_discovered(self, claim: TaskClaim, pages: tuple[DiscoveredPage, ...]) -> None:
         for page in pages:
             if page.identity.url_key == claim.task.url_key:
                 continue
@@ -136,7 +137,7 @@ class DynamoDBTaskRepository(TaskRepository):
             if not self._admit_discovered_page(claim, page):
                 return
 
-    def _admit_discovered_page(self, claim: TaskClaim, page: Any) -> bool:
+    def _admit_discovered_page(self, claim: TaskClaim, page: DiscoveredPage) -> bool:
         now = self.clock()
         message_id = str(
             uuid5(
@@ -179,7 +180,8 @@ class DynamoDBTaskRepository(TaskRepository):
                     "TableName": self.runs_table_name,
                     "Key": {"archiveId": {"S": archive_id}},
                     "UpdateExpression": (
-                        "SET #admitted = if_not_exists(#admitted, :zero) + :one"
+                        "SET #admitted = if_not_exists(#admitted, :zero) + :one, "
+                        "#outstanding = if_not_exists(#outstanding, :zero) + :one"
                     ),
                     "ConditionExpression": (
                         "#admission = :open AND "
@@ -189,6 +191,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         "#admission": "admission",
                         "#admitted": "admittedPages",
                         "#maximum": "maxPages",
+                        "#outstanding": "outstandingPages",
                     },
                     "ExpressionAttributeValues": {
                         ":open": {"S": "OPEN"},
@@ -253,6 +256,16 @@ class DynamoDBTaskRepository(TaskRepository):
                         "URL identity hash collision: stored navigation identity differs"
                     ) from error
                 return True
+
+            parent = self._read_frontier(archive_id, claim.task.url_key)
+            if (
+                parent is None
+                or parent.get("state", {}).get("S") != "CLAIMED"
+                or parent.get("attemptId", {}).get("S") != claim.attempt_id
+                or parent.get("fence", {}).get("N") != str(claim.fence)
+                or float(parent.get("leaseUntil", {}).get("N", "0")) <= now
+            ):
+                raise TaskClaimLostError("parent page-task claim is no longer owned") from error
 
             run = self._read_run(archive_id)
             if run is None:

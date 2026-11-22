@@ -16,6 +16,7 @@ def seed_run(
             "admission": {"S": admission},
             "maxPages": {"N": str(max_pages)},
             "admittedPages": {"N": str(admitted_pages)},
+            "outstandingPages": {"N": str(admitted_pages)},
         },
     )
 
