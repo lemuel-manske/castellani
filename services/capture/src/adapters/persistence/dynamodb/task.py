@@ -870,7 +870,8 @@ class DynamoDBTaskRepository(TaskRepository):
                         "((#state = :pending AND "
                         "(attribute_not_exists(#next_attempt) OR #next_attempt <= :now)) "
                         "OR (#state = :claimed AND #lease <= :now)) "
-                        "AND (attribute_not_exists(#attempt_count) OR #attempt_count < :max_attempts)"
+                        "AND (attribute_not_exists(#attempt_count) "
+                        "OR #attempt_count < :max_attempts)"
                     ),
                     "ExpressionAttributeNames": {
                         "#state": "state",
@@ -950,7 +951,9 @@ class DynamoDBTaskRepository(TaskRepository):
                     "ExpressionAttributeValues": {
                         ":failed": {"S": "FAILED"},
                         ":reason": {"S": "attempt_lease_expired"},
-                        ":message": {"S": "execution lease expired after retry budget was exhausted"},
+                        ":message": {
+                            "S": "execution lease expired after retry budget was exhausted"
+                        },
                         ":zero": {"N": "0"},
                         ":one": {"N": "1"},
                         ":attempt": {"S": attempt_id},
