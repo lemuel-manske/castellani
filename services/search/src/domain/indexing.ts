@@ -1,28 +1,13 @@
-import { isPublicationAuthorized, type PublicationFacts } from "./publication.js";
+import type {
+  IndexingOutcome,
+  ManifestReconciliation,
+  ManifestSnapshot,
+  PublicationFacts,
+  SnapshotLedgerEntry,
+} from "../domain.js";
+import { isPublicationAuthorized } from "./publication.js";
 
-export type IndexingOutcome = "PENDING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
-
-export interface ManifestSnapshot {
-  snapshotId: string;
-}
-
-export interface SnapshotLedgerEntry {
-  snapshotId: string;
-  outcome: IndexingOutcome;
-}
-
-export interface ManifestReconciliation {
-  expectedCount: number;
-  terminalCount: number;
-  missingSnapshotIds: string[];
-  unexpectedSnapshotIds: string[];
-  complete: boolean;
-}
-
-/**
- * Compares the immutable Capture manifest with Search's local ledger.
- * Snapshot identity, not message identity or delivery count, is the unit of work.
- */
+/** Reconciles the immutable Capture manifest against Search's snapshot ledger. */
 export function reconcileManifest(
   manifestSnapshots: readonly ManifestSnapshot[],
   ledgerEntries: readonly SnapshotLedgerEntry[],
@@ -74,10 +59,7 @@ export function reconcileManifest(
   };
 }
 
-/**
- * Public visibility requires manifest membership, a successful index operation,
- * and both matching publication facts. An OpenSearch document alone is insufficient.
- */
+/** A snapshot is visible only after indexing and publication are both complete. */
 export function canExposeSnapshot(
   snapshotId: string,
   manifestSnapshots: readonly ManifestSnapshot[],
