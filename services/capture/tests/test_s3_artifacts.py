@@ -1,10 +1,9 @@
 from pathlib import Path
-from typing import Any
-
 import pytest
 
 from adapters.artifacts.s3 import S3ArtifactStore
-from domain import PageTask, TaskClaim
+from support.domain import make_claim
+from support.s3 import FakeS3
 
 
 @pytest.mark.asyncio
