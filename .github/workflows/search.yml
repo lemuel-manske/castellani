@@ -24,12 +24,6 @@ jobs:
 
       - run: make install
 
-      - name: Format and inspect manifest recovery files
-        run: |
-          npm run format:fix
-          cat src/application/processCrawlCompleted.ts
-          cat test/application/processCrawlCompleted.test.ts
-
       - run: make check
 
       - run: make test-infra-up
