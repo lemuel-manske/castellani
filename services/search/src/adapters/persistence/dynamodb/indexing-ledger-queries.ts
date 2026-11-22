@@ -23,6 +23,14 @@ interface ClaimIndexingEntryInput {
   token: string;
   now: number;
   leaseUntil: number;
+  maxAttempts: number;
+}
+
+interface ExhaustIndexingEntryInput {
+  archiveId: string;
+  snapshotId: string;
+  now: number;
+  attempts: number;
 }
 
 interface CompleteIndexingEntryInput {
@@ -50,7 +58,7 @@ async function claimIndexingEntry(
       UpdateExpression:
         "SET #archive = :archive, #state = :processing, #token = :token, #lease = :lease, #attempts = if_not_exists(#attempts, :zero) + :one, #message = :message, #updated = :now",
       ConditionExpression:
-        "attribute_not_exists(#snapshot) OR (#archive = :archive AND (#state = :pending OR (#state = :processing AND #lease <= :now)))",
+        "attribute_not_exists(#snapshot) OR (#archive = :archive AND #attempts < :maxAttempts AND (#state = :pending OR (#state = :processing AND #lease <= :now)))",
       ExpressionAttributeNames: {
         "#snapshot": "snapshotId",
         "#archive": "archiveId",
@@ -71,12 +79,49 @@ async function claimIndexingEntry(
         ":one": 1,
         ":message": input.messageId,
         ":now": input.now,
+        ":maxAttempts": input.maxAttempts,
       },
       ReturnValues: "ALL_NEW",
     }),
   );
 
   return (response.Attributes ?? {}) as LedgerItem;
+}
+
+async function exhaustIndexingEntry(
+  client: DynamoDBDocumentClient,
+  tableName: string,
+  input: ExhaustIndexingEntryInput,
+): Promise<void> {
+  await client.send(
+    new UpdateCommand({
+      TableName: tableName,
+      Key: { snapshotId: input.snapshotId },
+      UpdateExpression:
+        "SET #state = :failed, #reason = :reason, #updated = :now REMOVE #token, #lease",
+      ConditionExpression:
+        "#archive = :archive AND #attempts = :attempts AND #attempts >= :maxAttempts AND (#state = :pending OR (#state = :processing AND #lease <= :now))",
+      ExpressionAttributeNames: {
+        "#archive": "archiveId",
+        "#attempts": "attempts",
+        "#state": "state",
+        "#lease": "leaseUntil",
+        "#token": "claimToken",
+        "#reason": "reasonCode",
+        "#updated": "updatedAt",
+      },
+      ExpressionAttributeValues: {
+        ":archive": input.archiveId,
+        ":attempts": input.attempts,
+        ":maxAttempts": input.attempts,
+        ":pending": "PENDING",
+        ":processing": "PROCESSING",
+        ":failed": "FAILED",
+        ":reason": "INDEXING_ATTEMPTS_EXHAUSTED",
+        ":now": input.now,
+      },
+    }),
+  );
 }
 
 async function getIndexingEntry(
@@ -167,6 +212,7 @@ async function releaseIndexingEntry(
 export {
   claimIndexingEntry,
   completeIndexingEntry,
+  exhaustIndexingEntry,
   getIndexingEntry,
   releaseIndexingEntry,
 };
