@@ -156,6 +156,12 @@ async def test_first_failure_is_terminal_when_retry_budget_is_one(
     assert run_item(dynamodb)["failedPages"] == {"N": "1"}
     assert outbox_items(dynamodb) == []
 
+    # Repeating a terminal failure cannot decrement run accounting twice.
+    await repository.fail(claim, "invalid_capture", "capture cannot be retried")
+
+    run = run_item(dynamodb)
+    assert run["outstandingPages"] == {"N": "0"}
+    assert run["failedPages"] == {"N": "1"}
 
 
 @pytest.mark.integration
