@@ -604,9 +604,19 @@ class DynamoDBTaskRepository(TaskRepository):
             }
         }
 
-        transaction = [frontier_update]
-
         if retry:
+            transaction = [
+                {
+                    "ConditionCheck": {
+                        "TableName": self.runs_table_name,
+                        "Key": {"archiveId": {"S": archive_id}},
+                        "ConditionExpression": "#admission = :open",
+                        "ExpressionAttributeNames": {"#admission": "admission"},
+                        "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                    }
+                },
+                frontier_update,
+            ]
             occurred_at = datetime.fromtimestamp(now, UTC).isoformat().replace("+00:00", "Z")
             transaction.append(
                 {
@@ -636,6 +646,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 }
             )
         else:
+            transaction = [frontier_update]
             transaction.append(
                 {
                     "Update": {
