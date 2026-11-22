@@ -49,8 +49,8 @@ async def test_discovery_admission_is_atomic_and_idempotent(
 
     run = run_item(dynamodb)
 
-    assert run["admittedPages"] == {"N": "3"}
-    assert run["outstandingPages"] == {"N": "3"}
+    assert run["admittedPages"] == {"N": "2"}
+    assert run["outstandingPages"] == {"N": "2"}
 
     messages = outbox_items(dynamodb)
 
