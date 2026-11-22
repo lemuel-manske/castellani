@@ -24,7 +24,7 @@ describe.skipIf(url === undefined)("RabbitMQ PageCaptured integration", () => {
   let resolveReceived: (event: PageCapturedEvent) => void = () => {
     throw new Error("consumer was not initialized");
   };
-  let received: Promise<PageCapturedEvent> = new Promise(() => undefined);
+  let received: Promise<PageCapturedEvent> = new Promise<PageCapturedEvent>(() => undefined);
 
   beforeAll(async () => {
     connection = await amqp.connect(url ?? "amqp://localhost");
@@ -57,7 +57,7 @@ describe.skipIf(url === undefined)("RabbitMQ PageCaptured integration", () => {
     }
   });
 
-  it("receives and acknowledges the Capture-produced event envelope", async () => {
+  it("delivers the Capture-produced event envelope to the consumer", async () => {
     const event = {
       messageId: `page-captured-${suffix}`,
       correlationId: "integration-archive",
