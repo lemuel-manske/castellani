@@ -1,14 +1,4 @@
-export interface PublicationIdentity {
-  archiveId: string;
-  decisionVersion: number;
-  packageDigest: string;
-}
-
-export interface PublicationFacts {
-  decision: PublicationIdentity | null;
-  replay: PublicationIdentity | null;
-  compensated: boolean;
-}
+import type { PublicationFacts, PublicationIdentity } from "../domain.js";
 
 export const emptyPublicationFacts = (): PublicationFacts => ({
   decision: null,
@@ -42,10 +32,7 @@ function validateIdentity(identity: PublicationIdentity): void {
   }
 }
 
-/**
- * Records the Coordinator's irreversible publication decision.
- * Re-delivery of the same decision is idempotent; a conflicting fact is rejected.
- */
+/** Records the Coordinator's irreversible publication decision. */
 export function recordPublicationDecision(
   facts: PublicationFacts,
   identity: PublicationIdentity,
@@ -55,11 +42,9 @@ export function recordPublicationDecision(
   if (facts.compensated) {
     throw new PublicationConflictError("a compensated archive cannot be published");
   }
-
   if (facts.replay && !sameIdentity(facts.replay, identity)) {
     throw new PublicationConflictError("publication decision conflicts with replay acknowledgement");
   }
-
   if (facts.decision) {
     if (!sameIdentity(facts.decision, identity)) {
       throw new PublicationConflictError("conflicting publication decision");
@@ -70,10 +55,7 @@ export function recordPublicationDecision(
   return { ...facts, decision: { ...identity } };
 }
 
-/**
- * Records Capture's durable replay-publication acknowledgement.
- * This fact may arrive before the Coordinator's decision event.
- */
+/** Records Capture's durable replay-publication acknowledgement. */
 export function recordReplayPublished(
   facts: PublicationFacts,
   identity: PublicationIdentity,
@@ -83,11 +65,9 @@ export function recordReplayPublished(
   if (facts.compensated) {
     throw new PublicationConflictError("a compensated archive cannot be replay-published");
   }
-
   if (facts.decision && !sameIdentity(facts.decision, identity)) {
     throw new PublicationConflictError("replay acknowledgement conflicts with publication decision");
   }
-
   if (facts.replay) {
     if (!sameIdentity(facts.replay, identity)) {
       throw new PublicationConflictError("conflicting replay publication");
