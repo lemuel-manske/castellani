@@ -25,7 +25,10 @@ interface SearchDocument {
 
 type ContentExtraction =
   | { kind: "INDEXABLE"; document: SearchDocument }
-  | { kind: "UNSUPPORTED"; reasonCode: "UNSUPPORTED_CONTENT_TYPE" | "EMPTY_CONTENT" };
+  | {
+      kind: "UNSUPPORTED";
+      reasonCode: "UNSUPPORTED_CONTENT_TYPE" | "EMPTY_CONTENT";
+    };
 
 interface ExtractionOptions {
   maxTextLength?: number;
@@ -67,7 +70,8 @@ function contentTypeOf(value: string | undefined): string {
 
 function metaContent(root: ReturnType<typeof parse>, name: string): string {
   const element = root.querySelectorAll("meta").find((candidate) => {
-    const key = candidate.getAttribute("name") ?? candidate.getAttribute("property");
+    const key =
+      candidate.getAttribute("name") ?? candidate.getAttribute("property");
     return key?.toLowerCase() === name;
   });
 
@@ -82,15 +86,20 @@ function extractHtml(content: string): {
 } {
   const root = parse(content);
   const title = normalizeText(root.querySelector("title")?.textContent ?? "");
-  const description = metaContent(root, "description") || metaContent(root, "og:description");
-  const language = normalizeText(root.querySelector("html")?.getAttribute("lang") ?? "");
+  const description =
+    metaContent(root, "description") || metaContent(root, "og:description");
+  const language = normalizeText(
+    root.querySelector("html")?.getAttribute("lang") ?? "",
+  );
 
   for (const selector of NON_CONTENT_ELEMENTS) {
     for (const element of root.querySelectorAll(selector)) {
       element.remove();
     }
   }
-  for (const element of root.querySelectorAll("[hidden], [aria-hidden='true']")) {
+  for (const element of root.querySelectorAll(
+    "[hidden], [aria-hidden='true']",
+  )) {
     element.remove();
   }
 
@@ -109,13 +118,21 @@ function extractSearchableContent(
   const contentType = contentTypeOf(page.contentType);
   const maxTextLength = options.maxTextLength ?? DEFAULT_MAX_TEXT_LENGTH;
 
-  if (!HTML_CONTENT_TYPES.has(contentType) && !TEXT_CONTENT_TYPES.has(contentType)) {
+  if (
+    !HTML_CONTENT_TYPES.has(contentType) &&
+    !TEXT_CONTENT_TYPES.has(contentType)
+  ) {
     return { kind: "UNSUPPORTED", reasonCode: "UNSUPPORTED_CONTENT_TYPE" };
   }
 
   const extracted = HTML_CONTENT_TYPES.has(contentType)
     ? extractHtml(page.content)
-    : { title: "", description: "", language: "", text: normalizeText(page.content) };
+    : {
+        title: "",
+        description: "",
+        language: "",
+        text: normalizeText(page.content),
+      };
   const text = extracted.text.slice(0, maxTextLength);
 
   if (!text) {
@@ -140,4 +157,9 @@ function extractSearchableContent(
 }
 
 export { extractSearchableContent };
-export type { CapturedPage, ContentExtraction, ExtractionOptions, SearchDocument };
+export type {
+  CapturedPage,
+  ContentExtraction,
+  ExtractionOptions,
+  SearchDocument,
+};
