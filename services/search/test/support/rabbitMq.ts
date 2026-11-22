@@ -74,6 +74,9 @@ function createRabbitMqTestSupport() {
             .deleteExchange(topology.retryExchange)
             .catch(() => undefined);
           await cleanup
+            .deleteExchange(topology.retryExchange)
+            .catch(() => undefined);
+          await cleanup
             .deleteExchange(topology.deadLetterExchange)
             .catch(() => undefined);
         } finally {
