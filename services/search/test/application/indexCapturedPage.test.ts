@@ -27,7 +27,10 @@ function artifactFor(
   reader: ArtifactObjectReader;
 } {
   const response =
-    "HTTP/1.1 200 OK\\r\\nContent-Type: " + contentType + "\\r\\n\\r\\n" + content;
+    "HTTP/1.1 200 OK\\r\\nContent-Type: " +
+    contentType +
+    "\\r\\n\\r\\n" +
+    content;
   const warc = [
     "WARC/1.1",
     "WARC-Type: response",
