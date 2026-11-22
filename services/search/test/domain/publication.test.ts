@@ -42,37 +42,31 @@ it("rejects conflicting decision identities", () => {
   const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
-    recordPublicationDecision(
-      facts,
-      { ...identity, packageDigest: "sha256:other" },
-    ),
+    recordPublicationDecision(facts, {
+      ...identity,
+      packageDigest: "sha256:other",
+    }),
   ).toThrow("conflicting publication decision");
 });
 
-it(
-  "rejects a replay acknowledgement that conflicts with an earlier decision",
-  () => {
-    const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
+it("rejects a replay acknowledgement that conflicts with an earlier decision", () => {
+  const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
-    expect(() =>
-      recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
-    ).toThrow("replay acknowledgement conflicts");
-  },
-);
+  expect(() =>
+    recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
+  ).toThrow("replay acknowledgement conflicts");
+});
 
-it(
-  "rejects a decision that conflicts with an earlier replay acknowledgement",
-  () => {
-    const facts = recordReplayPublished(emptyPublicationFacts(), identity);
+it("rejects a decision that conflicts with an earlier replay acknowledgement", () => {
+  const facts = recordReplayPublished(emptyPublicationFacts(), identity);
 
-    expect(() =>
-      recordPublicationDecision(
-        facts,
-        { ...identity, packageDigest: "sha256:other" },
-      ),
-    ).toThrow("publication decision conflicts");
-  },
-);
+  expect(() =>
+    recordPublicationDecision(facts, {
+      ...identity,
+      packageDigest: "sha256:other",
+    }),
+  ).toThrow("publication decision conflicts");
+});
 
 it("keeps compensated archives permanently ineligible", () => {
   const facts = recordCompensationDecision(emptyPublicationFacts(), {
