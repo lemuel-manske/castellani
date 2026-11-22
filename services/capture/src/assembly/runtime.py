@@ -82,6 +82,7 @@ class CaptureRuntime:
             for table_name in (
                 self.settings.frontier_table_name,
                 self.settings.runs_table_name,
+                self.settings.snapshots_table_name,
                 self.settings.outbox_table_name,
                 self.settings.browser_slots_table_name,
             ):
@@ -100,6 +101,7 @@ class CaptureRuntime:
                 client=dynamodb_client,
                 frontier_table_name=self.settings.frontier_table_name,
                 runs_table_name=self.settings.runs_table_name,
+                snapshots_table_name=self.settings.snapshots_table_name,
                 lease_duration=self.settings.lease_duration,
                 outbox_table_name=self.settings.outbox_table_name,
             )
