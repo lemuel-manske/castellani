@@ -7,8 +7,9 @@ import type {
   ArtifactObjectReader,
   ArtifactReference,
   CapturedPageReference,
-} from "../../src/adapters/artifacts.js";
-import type { SearchDocumentWriter } from "../../src/application/indexCapturedPage.js";
+} from "../../src/ports/artifacts.js";
+import type { SearchDocumentWriter } from "../../src/ports/search-index.js";
+import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
 
 const page: CapturedPageReference = {
   archiveId: "archive-1",
@@ -26,7 +27,7 @@ function artifactFor(
   reader: ArtifactObjectReader;
 } {
   const response =
-    "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n\r\n" + content;
+    "HTTP/1.1 200 OK\\r\\nContent-Type: " + contentType + "\\r\\n\\r\\n" + content;
   const warc = [
     "WARC/1.1",
     "WARC-Type: response",
@@ -38,7 +39,7 @@ function artifactFor(
     response,
     "",
     "",
-  ].join("\r\n");
+  ].join("\\r\\n");
   const bytes = gzipSync(Buffer.from(warc));
 
   return {
@@ -61,12 +62,13 @@ it("extracts and indexes a captured page using its snapshot identity", async () 
   );
   const index = vi.fn().mockResolvedValue(undefined);
   const documentWriter: SearchDocumentWriter = { index };
+  const capturedPageReader = createWarcCapturedPageReader(artifact.reader);
 
   await expect(
     indexCapturedPage(
       page,
       [artifact.reference],
-      artifact.reader,
+      capturedPageReader,
       documentWriter,
     ),
   ).resolves.toEqual({ outcome: "INDEXED", snapshotId: "snapshot-1" });
@@ -84,12 +86,13 @@ it("accounts for unsupported captured content without writing a document", async
   const artifact = artifactFor("application/pdf", "not searchable text");
   const index = vi.fn().mockResolvedValue(undefined);
   const documentWriter: SearchDocumentWriter = { index };
+  const capturedPageReader = createWarcCapturedPageReader(artifact.reader);
 
   await expect(
     indexCapturedPage(
       page,
       [artifact.reference],
-      artifact.reader,
+      capturedPageReader,
       documentWriter,
     ),
   ).resolves.toEqual({
