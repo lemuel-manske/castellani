@@ -224,6 +224,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         ":open": {"S": "OPEN"},
                         ":zero": {"N": "0"},
                         ":one": {"N": "1"},
+                        ":max_attempts": {"N": str(self.max_attempts)},
                     },
                 }
             },
@@ -524,7 +525,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
         previous_failure_count = int(item.get("failureCount", {}).get("N", "0"))
         failure_count = previous_failure_count + 1
-        retry = retryable and failure_count < self.max_attempts
+        attempt_count = int(item.get("attemptCount", {}).get("N", "0"))
+        retry = retryable and attempt_count < self.max_attempts
         retry_at = now + self.retry_base_delay * (2 ** (failure_count - 1))
         message_id = str(
             uuid5(
@@ -744,16 +746,20 @@ class DynamoDBTaskRepository(TaskRepository):
                         "archiveId": {"S": claim.task.archive_id},
                         "urlKey": {"S": claim.task.url_key},
                     },
-                    "UpdateExpression": "SET #state = :pending REMOVE #attempt, #lease",
+                    "UpdateExpression": (
+                        "SET #state = :pending, #attempt_count = #attempt_count - :one "
+                        "REMOVE #attempt, #lease"
+                    ),
                     "ConditionExpression": (
                         "#state = :claimed AND #attempt = :attempt "
-                        "AND #fence = :fence AND #lease > :now"
+                        "AND #fence = :fence AND #lease > :now AND #attempt_count >= :one"
                     ),
                     "ExpressionAttributeNames": {
                         "#state": "state",
                         "#attempt": "attemptId",
                         "#fence": "fence",
                         "#lease": "leaseUntil",
+                        "#attempt_count": "attemptCount",
                     },
                     "ExpressionAttributeValues": {
                         ":pending": {"S": "PENDING"},
@@ -761,6 +767,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         ":attempt": {"S": claim.attempt_id},
                         ":fence": {"N": str(claim.fence)},
                         ":now": {"N": str(now)},
+                        ":one": {"N": "1"},
                     },
                 }
             },
@@ -827,6 +834,16 @@ class DynamoDBTaskRepository(TaskRepository):
         now = self.clock()
         lease_until = now + self.lease_duration
 
+        current = self._read_frontier(archive_id, url_key)
+        if (
+            current is not None
+            and current.get("state", {}).get("S") == "CLAIMED"
+            and float(current.get("leaseUntil", {}).get("N", "0")) <= now
+            and int(current.get("attemptCount", {}).get("N", "0")) >= self.max_attempts
+        ):
+            self._fail_expired_claim(archive_id, url_key, current, now)
+            return None
+
         transaction = [
             {
                 "ConditionCheck": {
@@ -846,13 +863,15 @@ class DynamoDBTaskRepository(TaskRepository):
                     },
                     "UpdateExpression": (
                         "SET #state = :claimed, #attempt = :attempt, "
-                        "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one "
+                        "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one, "
+                        "#attempt_count = if_not_exists(#attempt_count, :zero) + :one "
                         "REMOVE #next_attempt"
                     ),
                     "ConditionExpression": (
-                        "(#state = :pending AND "
+                        "((#state = :pending AND "
                         "(attribute_not_exists(#next_attempt) OR #next_attempt <= :now)) "
-                        "OR (#state = :claimed AND #lease <= :now)"
+                        "OR (#state = :claimed AND #lease <= :now)) "
+                        "AND (attribute_not_exists(#attempt_count) OR #attempt_count < :max_attempts)"
                     ),
                     "ExpressionAttributeNames": {
                         "#state": "state",
@@ -860,6 +879,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         "#lease": "leaseUntil",
                         "#fence": "fence",
                         "#next_attempt": "nextAttemptAt",
+                        "#attempt_count": "attemptCount",
                     },
                     "ExpressionAttributeValues": {
                         ":pending": {"S": "PENDING"},
@@ -885,6 +905,93 @@ class DynamoDBTaskRepository(TaskRepository):
             return None
 
         return claim_from_item(archive_id, url_key, item)
+
+    def _fail_expired_claim(
+        self,
+        archive_id: str,
+        url_key: str,
+        item: dict[str, Any],
+        now: float,
+    ) -> None:
+        attempt_id = item["attemptId"]["S"]
+        fence = int(item["fence"]["N"])
+
+        transaction = [
+            {
+                "Update": {
+                    "TableName": self.frontier_table_name,
+                    "Key": {
+                        "archiveId": {"S": archive_id},
+                        "urlKey": {"S": url_key},
+                    },
+                    "UpdateExpression": (
+                        "SET #state = :failed, #reason = :reason, #message = :message, "
+                        "#failure_count = if_not_exists(#failure_count, :zero) + :one, "
+                        "#last_attempt = :attempt, #last_fence = :fence "
+                        "REMOVE #attempt, #lease, #next_attempt"
+                    ),
+                    "ConditionExpression": (
+                        "#state = :claimed AND #attempt = :attempt AND #fence = :fence "
+                        "AND #lease <= :now AND #attempt_count >= :max_attempts"
+                    ),
+                    "ExpressionAttributeNames": {
+                        "#state": "state",
+                        "#reason": "failureReason",
+                        "#message": "failureMessage",
+                        "#failure_count": "failureCount",
+                        "#last_attempt": "lastFailureAttemptId",
+                        "#last_fence": "lastFailureFence",
+                        "#attempt": "attemptId",
+                        "#fence": "fence",
+                        "#lease": "leaseUntil",
+                        "#next_attempt": "nextAttemptAt",
+                        "#attempt_count": "attemptCount",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":failed": {"S": "FAILED"},
+                        ":reason": {"S": "attempt_lease_expired"},
+                        ":message": {"S": "execution lease expired after retry budget was exhausted"},
+                        ":zero": {"N": "0"},
+                        ":one": {"N": "1"},
+                        ":attempt": {"S": attempt_id},
+                        ":fence": {"N": str(fence)},
+                        ":now": {"N": str(now)},
+                        ":claimed": {"S": "CLAIMED"},
+                        ":max_attempts": {"N": str(self.max_attempts)},
+                    },
+                }
+            },
+            {
+                "Update": {
+                    "TableName": self.runs_table_name,
+                    "Key": {"archiveId": {"S": archive_id}},
+                    "UpdateExpression": "ADD #outstanding :minus_one, #failed :one",
+                    "ConditionExpression": "#admission = :open AND #outstanding >= :one",
+                    "ExpressionAttributeNames": {
+                        "#admission": "admission",
+                        "#outstanding": "outstandingPages",
+                        "#failed": "failedPages",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":open": {"S": "OPEN"},
+                        ":minus_one": {"N": "-1"},
+                        ":one": {"N": "1"},
+                    },
+                }
+            },
+        ]
+
+        try:
+            self._transact(transaction, None)
+        except ConditionalWriteRejected:
+            current = self._read_frontier(archive_id, url_key)
+            if (
+                current is not None
+                and current.get("state", {}).get("S") == "FAILED"
+                and current.get("lastFailureAttemptId", {}).get("S") == attempt_id
+                and current.get("lastFailureFence", {}).get("N") == str(fence)
+            ):
+                return
 
     def _renew(self, claim: TaskClaim) -> TaskClaim:
         now = self.clock()
