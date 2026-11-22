@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
@@ -76,7 +75,6 @@ class TaskRepository(Protocol):
     async def complete(
         self,
         outcome: CaptureOutcome,
-        warc_files: tuple[Path, ...],
     ) -> None: ...
 
     async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None: ...
