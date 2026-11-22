@@ -6,12 +6,12 @@ import {
   ArtifactIntegrityError,
   CapturedResponseNotFoundError,
   readCapturedPage,
-} from "../../src/adapters/artifacts.js";
+} from "../../src/adapters/artifacts/warc.js";
 import type {
   ArtifactObjectReader,
   ArtifactReference,
   CapturedPageReference,
-} from "../../src/adapters/artifacts.js";
+} from "../../src/ports/artifacts.js";
 
 const page: CapturedPageReference = {
   archiveId: "archive-1",
@@ -23,7 +23,7 @@ const page: CapturedPageReference = {
 
 function responseRecord(targetUrl: string, html: string): string {
   const response =
-    "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n" + html;
+    "HTTP/1.1 200 OK\\r\\nContent-Type: text/html; charset=utf-8\\r\\n\\r\\n" + html;
 
   return [
     "WARC/1.1",
@@ -36,7 +36,7 @@ function responseRecord(targetUrl: string, html: string): string {
     response,
     "",
     "",
-  ].join("\r\n");
+  ].join("\\r\\n");
 }
 
 function artifactFor(warc: string): {
