@@ -6,6 +6,7 @@ from support.clock import FakeClock
 from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamodb
 from support.rabbitmq import FakeConnection
 from support.recording import LocalSite, start_local_site
+from support.s3 import FakeS3
 
 
 @pytest.fixture
@@ -41,6 +42,11 @@ def dynamodb() -> Iterator[DynamoDBClient]:
 
 
 @pytest.fixture
+def s3() -> FakeS3:
+    return FakeS3()
+
+
+@pytest.fixture
 def rabbitmq() -> Iterator[FakeConnection]:
     connection = FakeConnection()
 
@@ -48,3 +54,13 @@ def rabbitmq() -> Iterator[FakeConnection]:
         yield connection
     finally:
         pass
+
+
+@pytest.fixture(autouse=True)
+def deterministic_attempt_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    from itertools import count
+
+    from adapters.persistence.dynamodb import task
+
+    identifiers = count(1)
+    monkeypatch.setattr(task, "new_attempt_id", lambda: f"attempt-{next(identifiers)}")

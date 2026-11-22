@@ -10,10 +10,19 @@ def string_from_item(item: dict[str, Any], key: str, resource: str) -> str:
     return value
 
 
-def number_from_item(item: dict[str, Any], key: str, resource: str) -> int | float:
+def number_from_item(
+    item: dict[str, Any],
+    key: str,
+    resource: str,
+    default: int | float | None = None,
+) -> int | float:
     try:
         number = float(item[key]["N"])
-    except (KeyError, TypeError, ValueError) as error:
+    except KeyError as error:
+        if default is not None:
+            return default
+        raise RuntimeError(f"DynamoDB {resource} has an invalid {key}") from error
+    except (TypeError, ValueError) as error:
         raise RuntimeError(f"DynamoDB {resource} has an invalid {key}") from error
 
     return int(number) if number.is_integer() else number

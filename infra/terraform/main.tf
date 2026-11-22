@@ -219,3 +219,32 @@ resource "aws_dynamodb_table" "capture_browser_slots" {
     type = "S"
   }
 }
+
+resource "aws_dynamodb_table" "capture_snapshots" {
+  name         = "capture_snapshots"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "snapshotId"
+
+  attribute {
+    name = "snapshotId"
+    type = "S"
+  }
+
+  attribute {
+    name = "archiveId"
+    type = "S"
+  }
+
+  attribute {
+    name = "capturedAt"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "archiveId-capturedAt-index"
+    hash_key        = "archiveId"
+    range_key       = "capturedAt"
+    projection_type = "ALL"
+  }
+}

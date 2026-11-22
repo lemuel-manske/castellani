@@ -29,7 +29,6 @@ async def test_release_requeues_and_records_capture_page(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")
@@ -76,7 +75,6 @@ async def test_releasing_the_same_claim_twice_is_idempotent(
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")
@@ -100,15 +98,12 @@ async def test_stale_claim_cannot_release_reclaimed_task(
     seed_run(dynamodb)
     seed_frontier(dynamodb, depth=0)
 
-    attempt_ids = iter(("attempt-1", "attempt-2"))
-
     claims = DynamoDBTaskRepository(
         client=dynamodb,
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
-        attempt_id_factory=lambda: next(attempt_ids),
     )
 
     stale = await claims.claim("archive-1", "url-1")
@@ -141,7 +136,6 @@ async def test_release_does_not_requeue_a_task_after_run_admission_closes(
         frontier_table_name="capture_frontier",
         runs_table_name="capture_runs",
         lease_duration=30,
-        attempt_id_factory=lambda: "attempt-1",
     )
 
     claim = await claims.claim("archive-1", "url-1")

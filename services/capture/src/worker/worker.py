@@ -9,6 +9,7 @@ from domain import (
     CaptureReservation,
     TaskClaim,
     TaskRepository,
+    new_snapshot_id,
 )
 from utils.fn import awaitable, noop
 
@@ -89,11 +90,12 @@ class ConcreteCaptureWorker(CaptureRunner):
                 try:
                     await operation
                 except Exception as error:
-                    await self.task_repository.fail(
-                        claim_state[0],
-                        str(getattr(error, "reason_code", "capture_failed")),
-                        str(error),
-                    )
+                    if not terminal_state[0]:
+                        await self.task_repository.fail(
+                            claim_state[0],
+                            str(getattr(error, "reason_code", "capture_failed")),
+                            str(error),
+                        )
 
                     await self.on_error(error)
 
@@ -189,17 +191,30 @@ class ConcreteCaptureWorker(CaptureRunner):
 
         claim = claim_state[0]
 
+        snapshot_id = new_snapshot_id()
+
+        warc_artifacts = await self.artifacts.persist_attempt(
+            claim,
+            directory,
+            snapshot_id,
+            artifact.warc_files,
+        )
+
         outcome = CaptureOutcome(
             archive_id=claim.task.archive_id,
             url_key=claim.task.url_key,
             attempt_id=claim.attempt_id,
             fence=claim.fence,
+            snapshot_id=snapshot_id,
             capture=artifact.capture,
+            warc_artifacts=warc_artifacts,
         )
 
-        await self.task_repository.complete(outcome, artifact.warc_files)
+        await self.task_repository.complete(outcome)
 
         terminal_state[0] = True
+
+        await self.artifacts.commit_attempt(claim, directory)
 
     async def _maintain_leases(
         self,
