@@ -5,6 +5,7 @@ from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.clock import FakeClock
 from support.domain import (
     frontier_item,
+    outbox_items,
     seed_frontier,
     seed_run,
     set_run_admission,
@@ -61,7 +62,18 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient
     second = await claims.claim("archive-1", "url-1")
     assert second is None
 
-    assert frontier_item(dynamodb)["attemptId"] == {"S": "attempt-1"}
+    task = frontier_item(dynamodb)
+    assert task["attemptId"] == {"S": "attempt-1"}
+
+    rechecks = outbox_items(dynamodb)
+    assert len(rechecks) == 1
+    assert rechecks[0]["nextAttemptAt"] == {"N": str(first.lease_until)}
+    assert rechecks[0]["payload"] == {
+        "M": {
+            "archiveId": {"S": "archive-1"},
+            "urlKey": {"S": "url-1"},
+        }
+    }
 
 
 @pytest.mark.integration
