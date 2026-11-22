@@ -72,10 +72,14 @@ class CaptureRuntime:
                 )
 
             self.dynamodb_client = dynamodb_client
+            s3_client_options: dict[str, str] = {}
+            if self.settings.s3_endpoint_url is not None:
+                s3_client_options["endpoint_url"] = self.settings.s3_endpoint_url
+
             s3_client = session.client(
                 "s3",
                 region_name=self.settings.aws_region,
-                **({"endpoint_url": self.settings.s3_endpoint_url} if self.settings.s3_endpoint_url else {}),
+                **s3_client_options,
             )
             self.s3_client = s3_client
 
