@@ -44,7 +44,6 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
   if (
     typeof payload.archiveId !== "string" ||
     !payload.archiveId ||
-    payload.correlationId === "" ||
     payload.archiveId !== value.correlationId ||
     typeof payload.snapshotId !== "string" ||
     !payload.snapshotId ||
@@ -66,6 +65,7 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
     artifact.key.length > 0 &&
     typeof artifact.sha256 === "string" &&
     /^[a-f0-9]{64}$/i.test(artifact.sha256) &&
+    (artifact.versionId === undefined || typeof artifact.versionId === "string") &&
     typeof artifact.sizeBytes === "number" &&
     Number.isSafeInteger(artifact.sizeBytes) &&
     artifact.sizeBytes >= 0,
