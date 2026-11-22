@@ -34,7 +34,8 @@ function reconcileManifest(
     const previous = ledger.get(entry.snapshotId);
     if (previous !== undefined && previous !== entry.outcome) {
       throw new Error(
-        "ledger contains conflicting outcomes for snapshotId: " + entry.snapshotId,
+        "ledger contains conflicting outcomes for snapshotId: " +
+          entry.snapshotId,
       );
     }
     ledger.set(entry.snapshotId, entry.outcome);
@@ -61,7 +62,8 @@ function reconcileManifest(
     terminalCount,
     missingSnapshotIds,
     unexpectedSnapshotIds,
-    complete: missingSnapshotIds.length === 0 && terminalCount === expected.size,
+    complete:
+      missingSnapshotIds.length === 0 && terminalCount === expected.size,
   };
 }
 
@@ -72,11 +74,17 @@ function canExposeSnapshot(
   outcome: IndexingOutcome,
   publication: PublicationFacts,
 ): boolean {
-  if (!snapshotId || outcome !== "INDEXED" || !isPublicationAuthorized(publication)) {
+  if (
+    !snapshotId ||
+    outcome !== "INDEXED" ||
+    !isPublicationAuthorized(publication)
+  ) {
     return false;
   }
 
-  return manifestSnapshots.some((snapshot) => snapshot.snapshotId === snapshotId);
+  return manifestSnapshots.some(
+    (snapshot) => snapshot.snapshotId === snapshotId,
+  );
 }
 
 export { canExposeSnapshot, reconcileManifest };
