@@ -152,10 +152,15 @@ function publishDeadLetter(
           typeof message.properties.contentType === "string"
             ? message.properties.contentType
             : "application/json",
-        messageId: message.properties.messageId as string | undefined,
-        correlationId: message.properties.correlationId as string | undefined,
-        headers: message.properties.headers as
-          Record<string, unknown> | undefined,
+        ...(typeof message.properties.messageId === "string"
+          ? { messageId: message.properties.messageId }
+          : {}),
+        ...(typeof message.properties.correlationId === "string"
+          ? { correlationId: message.properties.correlationId }
+          : {}),
+        ...(message.properties.headers === undefined
+          ? {}
+          : { headers: message.properties.headers }),
         persistent: true,
       },
       (error) => {
