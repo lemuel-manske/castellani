@@ -26,6 +26,12 @@ services:
       - "9000:9000"
       - "9001:9001"
 
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9000'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   opensearch:
     image: opensearchproject/opensearch:3.10.0
 
