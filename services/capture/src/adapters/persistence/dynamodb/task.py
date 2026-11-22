@@ -325,6 +325,7 @@ class DynamoDBTaskRepository(TaskRepository):
             )
         )
         artifacts = [self._artifact_attribute(item) for item in outcome.warc_artifacts]
+        depth = self._task_depth(outcome.archive_id, outcome.url_key)
         payload: dict[str, Any] = {
             "archiveId": {"S": outcome.archive_id},
             "snapshotId": {"S": outcome.snapshot_id},
@@ -382,7 +383,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         ":captured_at": {"S": captured_at_text},
                         ":redirects": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
                         ":artifacts": {"L": artifacts},
-                        ":min_depth": {"N": str(self._task_depth(outcome.archive_id, outcome.url_key))},
+                        ":min_depth": {"N": str(depth)},
                     },
                 }
             },
@@ -416,6 +417,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         "url": {"S": outcome.capture.requested_url},
                         "finalUrl": {"S": outcome.capture.final_url},
                         "capturedAt": {"S": captured_at_text},
+                        **({"contentType": {"S": outcome.capture.content_type}} if outcome.capture.content_type is not None else {}),
                         "minDepth": {"N": str(self._task_depth(outcome.archive_id, outcome.url_key))},
                         "redirectChain": {"L": [{"S": url} for url in outcome.capture.redirect_chain]},
                         "warcArtifacts": {"L": artifacts},
