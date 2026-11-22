@@ -52,12 +52,13 @@ it("rejects conflicting decision identities", () => {
 it(
   "rejects a replay acknowledgement that conflicts with an earlier decision",
   () => {
-  const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
+    const facts = recordPublicationDecision(emptyPublicationFacts(), identity);
 
   expect(() =>
     recordReplayPublished(facts, { ...identity, decisionVersion: 4 }),
-  ).toThrow("replay acknowledgement conflicts");
-});
+    ).toThrow("replay acknowledgement conflicts");
+  },
+);
 
 it(
   "rejects a decision that conflicts with an earlier replay acknowledgement",
@@ -65,9 +66,13 @@ it(
   const facts = recordReplayPublished(emptyPublicationFacts(), identity);
 
   expect(() =>
-    recordPublicationDecision(facts, { ...identity, packageDigest: "sha256:other" }),
-  ).toThrow("publication decision conflicts");
-});
+    recordPublicationDecision(
+      facts,
+      { ...identity, packageDigest: "sha256:other" },
+    ),
+    ).toThrow("publication decision conflicts");
+  },
+);
 
 it("keeps compensated archives permanently ineligible", () => {
   const facts = recordCompensationDecision(emptyPublicationFacts(), {
