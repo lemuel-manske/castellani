@@ -50,8 +50,28 @@ async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
 
     assert await worker("archive-1", "url-1")
 
-    assert frontier_item(dynamodb)["state"] == {"S": "COMPLETED"}
+    completed = frontier_item(dynamodb)
+    assert completed["state"] == {"S": "COMPLETED"}
+    assert completed["snapshotId"]["S"]
+    assert completed["warcArtifacts"]["L"][0]["M"]["bucket"] == {"S": "local"}
     assert (tmp_path / "attempt-1" / "capture.warc.gz").read_bytes() == b"capture"
+
+    events = outbox_items(dynamodb)
+    assert len(events) == 1
+    event = events[0]
+    assert event["type"] == {"S": "PageCaptured"}
+    payload = event["payload"]["M"]
+    assert payload["archiveId"] == {"S": "archive-1"}
+    assert payload["snapshotId"] == completed["snapshotId"]
+    assert payload["url"] == {"S": "https://example.org/"}
+    assert payload["warcArtifacts"]["L"][0]["M"]["sha256"]["S"]
+    run = dynamodb.get_item(
+        TableName="capture_runs",
+        Key={"archiveId": {"S": "archive-1"}},
+        ConsistentRead=True,
+    )["Item"]
+    assert run["outstandingPages"] == {"N": "0"}
+    assert run["completedPages"] == {"N": "1"}
 
 
 @pytest.mark.integration
