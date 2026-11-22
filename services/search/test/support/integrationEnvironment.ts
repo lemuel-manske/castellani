@@ -2,6 +2,10 @@ import { afterAll, beforeAll } from "vitest";
 import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
+import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
+import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
+import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
+import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 import {
   SEARCH_DYNAMODB_ENDPOINT_URL,
   createDynamoDbTestSupport,
@@ -37,6 +41,24 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
 }
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
+  if (publicationLedgerReady && event.type === "CrawlCompleted") {
+    await processCrawlCompleted(
+      event.payload,
+      createS3ArtifactReader(s3.client),
+      dynamodb.manifestLedger,
+      {
+        ledger: dynamodb.ledger,
+        capturedPageReader: createWarcCapturedPageReader(
+          createS3ArtifactReader(s3.client),
+        ),
+        documentWriter: createOpenSearchDocumentWriter(
+          opensearch.client,
+          opensearch.indexName,
+        ),
+      },
+    );
+  }
+
   if (publicationLedgerReady && event.type !== "CrawlCompleted") {
     await processPublicationEvent(event, dynamodb.publicationLedger);
   }
