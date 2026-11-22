@@ -60,7 +60,12 @@ function createRabbitMqTestSupport() {
 
     const waiter = waiters.shift();
 
-    waiter ? waiter(message) : messages.push(message);
+    if (waiter === undefined) {
+      messages.push(message);
+      return;
+    }
+
+    waiter(message);
   }
 
   return {

@@ -62,14 +62,11 @@ async function searchPublishedDocuments(
       ...new Set(page.candidates.map(({ document }) => document.archiveId)),
     ];
 
-    await Promise.all(
-      archiveIds.map((archiveId) => {
-        if (!authorization.has(archiveId))
-          authorization.set(archiveId, publicationLedger.get(archiveId));
-
-        return authorization.get(archiveId);
-      }),
-    );
+    archiveIds.forEach((archiveId) => {
+      if (!authorization.has(archiveId)) {
+        authorization.set(archiveId, publicationLedger.get(archiveId));
+      }
+    });
     for (const candidate of page.candidates) {
       const archiveId = candidate.document.archiveId;
       const facts = await authorization.get(archiveId);

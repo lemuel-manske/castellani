@@ -114,14 +114,14 @@ function deliveryRetryCount(
   message: ConsumeMessage,
   retryQueue: string,
 ): number {
-  const deaths = message.properties.headers?.["x-death"];
+  const deaths: unknown = message.properties.headers?.["x-death"];
 
   if (!Array.isArray(deaths)) {
     return 0;
   }
 
-  const retryDeath = deaths.find(
-    (death) => isRecord(death) && death.queue === retryQueue,
+  const retryDeath = (deaths as unknown[]).find(
+    (death: unknown) => isRecord(death) && death.queue === retryQueue,
   );
 
   if (!isRecord(retryDeath)) {
@@ -130,9 +130,11 @@ function deliveryRetryCount(
 
   const count = retryDeath.count;
 
-  return typeof count === "number" || typeof count === "bigint"
-    ? Number(count)
-    : 0;
+  return typeof count === "number"
+    ? count
+    : typeof count === "bigint"
+      ? Number(count)
+      : 0;
 }
 
 function publishDeadLetter(
@@ -152,7 +154,14 @@ function publishDeadLetter(
         headers: message.properties.headers,
         persistent: true,
       },
-      (error) => { error ? reject(error) : resolve(); },
+      (error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      },
     );
   });
 }

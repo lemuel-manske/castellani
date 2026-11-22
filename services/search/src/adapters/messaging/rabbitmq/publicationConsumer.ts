@@ -53,7 +53,7 @@ function isIdentity(value: unknown): value is PublicationIdentity {
     isRecord(value) &&
     nonEmpty(value.archiveId) &&
     Number.isSafeInteger(value.decisionVersion) &&
-    Number(value.decisionVersion) >= 1 &&
+    value.decisionVersion >= 1 &&
     nonEmpty(value.packageDigest)
   );
 }
@@ -74,7 +74,7 @@ function isArtifact(value: unknown): value is ArtifactReference {
     nonEmpty(value.sha256) &&
     /^[a-f0-9]{64}$/.test(value.sha256) &&
     Number.isSafeInteger(value.sizeBytes) &&
-    Number(value.sizeBytes) >= 0 &&
+    value.sizeBytes >= 0 &&
     (value.versionId === undefined || nonEmpty(value.versionId))
   );
 }
@@ -130,21 +130,23 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
   return null;
 }
 function retryCount(message: ConsumeMessage, queue: string): number {
-  const deaths = message.properties.headers?.["x-death"];
+  const deaths: unknown = message.properties.headers?.["x-death"];
 
   if (!Array.isArray(deaths)) return 0;
 
-  const death = deaths.find(
-    (entry) => isRecord(entry) && entry.queue === queue,
+  const death = (deaths as unknown[]).find(
+    (entry: unknown) => isRecord(entry) && entry.queue === queue,
   );
 
   if (!isRecord(death)) return 0;
 
   const count = death.count;
 
-  return typeof count === "number" || typeof count === "bigint"
-    ? Number(count)
-    : 0;
+  return typeof count === "number"
+    ? count
+    : typeof count === "bigint"
+      ? Number(count)
+      : 0;
 }
 function publishDeadLetter(
   channel: ConfirmChannel,
@@ -163,7 +165,14 @@ function publishDeadLetter(
         headers: message.properties.headers,
         persistent: true,
       },
-      (error) => { error ? reject(error) : resolve(); },
+      (error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      },
     ),
   );
 }

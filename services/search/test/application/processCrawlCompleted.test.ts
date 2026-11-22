@@ -22,7 +22,8 @@ it("verifies and records immutable manifest snapshot membership", async () => {
   const artifactReader: ArtifactObjectReader = {
     getObject: vi.fn().mockResolvedValue(Readable.from([data])),
   };
-  const manifestLedger: ManifestLedger = { record: vi.fn(), contains: vi.fn() };
+  const record = vi.fn();
+  const manifestLedger: ManifestLedger = { record, contains: vi.fn() };
 
   await processCrawlCompleted(
     {
@@ -39,7 +40,7 @@ it("verifies and records immutable manifest snapshot membership", async () => {
     manifestLedger,
   );
 
-  expect(manifestLedger.record).toHaveBeenCalledWith({
+  expect(record).toHaveBeenCalledWith({
     archiveId: "manifest-archive",
     manifestDigest: digest,
     collectionId: "collection-a",
@@ -70,5 +71,5 @@ it("rejects manifest bytes that do not match the immutable digest", async () => 
       manifestLedger,
     ),
   ).rejects.toThrow("archive manifest digest");
-  expect(manifestLedger.record).not.toHaveBeenCalled();
+  expect(record).not.toHaveBeenCalled();
 });

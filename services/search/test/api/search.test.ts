@@ -50,9 +50,10 @@ it("serves the Gateway search query contract and returns only authorized results
     recordReplayPublished: vi.fn(),
     recordCompensationDecision: vi.fn(),
   };
+  const contains = vi.fn().mockResolvedValue(true);
   const manifestLedger: ManifestLedger = {
     record: vi.fn(),
-    contains: vi.fn().mockResolvedValue(true),
+    contains,
   };
   const server = createSearchServer(reader, publicationLedger, manifestLedger);
   const response = await server.inject({
@@ -65,7 +66,7 @@ it("serves the Gateway search query contract and returns only authorized results
     results: [{ archiveId: "archive-a", snapshotId: "snapshot-a" }],
     nextCursor: null,
   });
-  expect(manifestLedger.contains).toHaveBeenCalledWith(
+  expect(contains).toHaveBeenCalledWith(
     "archive-a",
     "snapshot-a",
     "collection-a",

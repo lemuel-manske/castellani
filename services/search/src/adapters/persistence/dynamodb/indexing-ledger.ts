@@ -151,12 +151,12 @@ class DynamoDBIndexingLedger implements IndexingLedger {
             snapshotId,
           );
 
-          if (current?.archiveId !== archiveId) {
+          if (current.archiveId !== archiveId) {
             throw new IndexingIdentityConflictError(snapshotId);
           }
 
           if (
-            current?.state === "INDEXED" ||
+            current.state === "INDEXED" ||
             current?.state === "UNSUPPORTED" ||
             current?.state === "FAILED"
           ) {
@@ -165,7 +165,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
 
           return {
             status: "BUSY",
-            leaseUntil: current?.leaseUntil ?? now,
+            leaseUntil: current.leaseUntil ?? now,
           };
         }
       }

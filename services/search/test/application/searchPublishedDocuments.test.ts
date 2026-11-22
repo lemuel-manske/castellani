@@ -44,9 +44,8 @@ const unpublishedFacts: PublicationFacts = {
 };
 
 it("filters uncommitted documents and continues paging until the requested result count is reached", async () => {
-  const reader: SearchDocumentReader = {
-    search: vi
-      .fn()
+  const search = vi
+    .fn()
       .mockResolvedValueOnce({
         candidates: [
           {
@@ -68,8 +67,8 @@ it("filters uncommitted documents and continues paging until the requested resul
           },
         ],
         nextCursor: null,
-      }),
-  };
+      });
+  const reader: SearchDocumentReader = { search };
   const publicationLedger: PublicationLedger = {
     get: vi.fn((archiveId: string) =>
       Promise.resolve(
@@ -111,8 +110,8 @@ it("filters uncommitted documents and continues paging until the requested resul
     ],
     nextCursor: "cursor-two",
   });
-  expect(reader.search).toHaveBeenCalledTimes(2);
-  expect(reader.search).toHaveBeenLastCalledWith(
+  expect(search).toHaveBeenCalledTimes(2);
+  expect(search).toHaveBeenLastCalledWith(
     { text: "published" },
     1,
     "cursor-one",
@@ -120,8 +119,7 @@ it("filters uncommitted documents and continues paging until the requested resul
 });
 
 it("fails closed when publication authorization cannot be read", async () => {
-  const reader: SearchDocumentReader = {
-    search: vi.fn().mockResolvedValue({
+  const search = vi.fn().mockResolvedValue({
       candidates: [
         {
           document: document(
@@ -134,8 +132,8 @@ it("fails closed when publication authorization cannot be read", async () => {
         },
       ],
       nextCursor: null,
-    }),
-  };
+    });
+  const reader: SearchDocumentReader = { search };
   const publicationLedger: PublicationLedger = {
     get: vi.fn().mockRejectedValue(new Error("DynamoDB unavailable")),
     recordPublicationDecision: vi.fn(),

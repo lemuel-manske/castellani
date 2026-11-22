@@ -103,18 +103,18 @@ function factsFromItem(
   }
 
   return {
-    publicationDecision: parseFact<PublicationIdentity>(
+    publicationDecision: parseFact(
       item.publicationDecision,
       "publicationDecision",
-    ),
-    replayPublication: parseFact<PublicationIdentity>(
+    ) as PublicationIdentity | null,
+    replayPublication: parseFact(
       item.replayPublication,
       "replayPublication",
-    ),
-    compensationDecision: parseFact<CompensationDecision>(
+    ) as PublicationIdentity | null,
+    compensationDecision: parseFact(
       item.compensationDecision,
       "compensationDecision",
-    ),
+    ) as CompensationDecision | null,
   };
 }
 
@@ -134,13 +134,13 @@ function serializeFact(
       });
 }
 
-function parseFact<T>(value: string | undefined, name: string): T | null {
+function parseFact(value: string | undefined, name: string): unknown | null {
   if (value === undefined) {
     return null;
   }
 
   try {
-    return JSON.parse(value) as T;
+    return JSON.parse(value) as unknown;
   } catch {
     throw new Error(`corrupt publication ledger attribute: ${name}`);
   }

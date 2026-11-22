@@ -59,7 +59,7 @@ function parseManifest(
     !("snapshots" in manifest) ||
     !Array.isArray(manifest.snapshots) ||
     !manifest.snapshots.every(
-      (entry) =>
+      (entry: unknown) =>
         typeof entry === "object" &&
         entry !== null &&
         "snapshotId" in entry &&

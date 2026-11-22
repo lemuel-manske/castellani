@@ -44,7 +44,7 @@ function decodeCursor(cursor: string | undefined): unknown[] | undefined {
       throw new Error("invalid search cursor");
     }
 
-    return value;
+    return value as unknown[];
   } catch {
     throw new Error("invalid search cursor");
   }
