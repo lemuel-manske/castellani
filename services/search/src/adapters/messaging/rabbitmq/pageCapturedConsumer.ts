@@ -126,7 +126,9 @@ function deliveryRetryCount(message: ConsumeMessage, retryQueue: string): number
   }
 
   const count = retryDeath.count;
-  return typeof count === "number" || typeof count === "bigint"\n    ? Number(count)\n    : 0;
+  return typeof count === "number" || typeof count === "bigint"
+    ? Number(count)
+    : 0;
 }
 
 function publishDeadLetter(
@@ -164,7 +166,15 @@ async function handlePageCapturedMessage(
   const event = parsePageCaptured(message.content);
   const retries = deliveryRetryCount(message, topology.retryQueue);
 
-  if (event === null || retries >= MAX_DELIVERY_RETRIES) {\n    try {\n      await publishDeadLetter(channel, topology, message);\n      channel.ack(message);\n    } catch {\n      channel.nack(message, false, true);\n    }\n    return;\n  }
+  if (event === null || retries >= MAX_DELIVERY_RETRIES) {
+    try {
+      await publishDeadLetter(channel, topology, message);
+      channel.ack(message);
+    } catch {
+      channel.nack(message, false, true);
+    }
+    return;
+  }
 
   try {
     const result = await handle(event);
