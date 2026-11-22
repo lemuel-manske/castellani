@@ -40,7 +40,7 @@ async def test_discovery_admission_is_atomic_and_idempotent(
 
     child = identify_url(urls[0])
 
-    item = frontier_item(dynamodb)
+    item = frontier_item(dynamodb, child.url_key)
 
     assert item["navigationUrl"] == {"S": child.navigation_url}
     assert item["fetchUrl"] == {"S": child.fetch_url}
