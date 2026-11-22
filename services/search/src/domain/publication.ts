@@ -1,12 +1,12 @@
 import type { CompensationDecision, PublicationFacts, PublicationIdentity } from "../domain.js";
 
-export const emptyPublicationFacts = (): PublicationFacts => ({
+const emptyPublicationFacts = (): PublicationFacts => ({
   publicationDecision: null,
   replayPublication: null,
   compensationDecision: null,
 });
 
-export class PublicationConflictError extends Error {
+class PublicationConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PublicationConflictError";
@@ -33,7 +33,7 @@ function validateIdentity(identity: PublicationIdentity): void {
 }
 
 /** Records the Coordinator's irreversible publication decision. */
-export function recordPublicationDecision(
+function recordPublicationDecision(
   facts: PublicationFacts,
   identity: PublicationIdentity,
 ): PublicationFacts {
@@ -56,7 +56,7 @@ export function recordPublicationDecision(
 }
 
 /** Records Capture's durable replay-publication acknowledgement. */
-export function recordReplayPublished(
+function recordReplayPublished(
   facts: PublicationFacts,
   identity: PublicationIdentity,
 ): PublicationFacts {
@@ -79,7 +79,7 @@ export function recordReplayPublished(
 }
 
 /** Compensation and publication are mutually exclusive terminal decisions. */
-export function recordCompensationDecision(
+function recordCompensationDecision(
   facts: PublicationFacts,
   decision: CompensationDecision,
 ): PublicationFacts {
@@ -108,7 +108,7 @@ export function recordCompensationDecision(
   return { ...facts, compensationDecision: { ...decision } };
 }
 
-export function isPublicationAuthorized(facts: PublicationFacts): boolean {
+function isPublicationAuthorized(facts: PublicationFacts): boolean {
   return (
     facts.compensationDecision === null &&
     facts.publicationDecision !== null &&
@@ -116,3 +116,12 @@ export function isPublicationAuthorized(facts: PublicationFacts): boolean {
     sameIdentity(facts.publicationDecision, facts.replayPublication)
   );
 }
+
+export {
+  PublicationConflictError,
+  emptyPublicationFacts,
+  isPublicationAuthorized,
+  recordCompensationDecision,
+  recordPublicationDecision,
+  recordReplayPublished,
+};
