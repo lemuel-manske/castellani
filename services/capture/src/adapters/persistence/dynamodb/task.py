@@ -525,7 +525,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
         previous_failure_count = int(item.get("failureCount", {}).get("N", "0"))
         failure_count = previous_failure_count + 1
-        retry = failure_count < self.max_attempts
+        retry = retryable and failure_count < self.max_attempts
         retry_at = now + self.retry_base_delay * (2 ** (failure_count - 1))
         message_id = str(
             uuid5(
