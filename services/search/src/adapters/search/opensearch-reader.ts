@@ -7,10 +7,12 @@ import type {
   SearchQuery,
 } from "../../ports/search-reader.js";
 
+type SearchSortCursor = [number, string | number, string];
+
 interface SearchHit {
   _source?: SearchDocument;
   _score?: number | null;
-  sort?: unknown[];
+  sort?: SearchSortCursor;
   highlight?: {
     title?: string[];
     text?: string[];
@@ -24,7 +26,9 @@ interface SearchResponse {
   };
 }
 
-function decodeCursor(cursor: string | undefined): unknown[] | undefined {
+function decodeCursor(
+  cursor: string | undefined,
+): SearchSortCursor | undefined {
   if (cursor === undefined) {
     return undefined;
   }
@@ -44,13 +48,13 @@ function decodeCursor(cursor: string | undefined): unknown[] | undefined {
       throw new Error("invalid search cursor");
     }
 
-    return value as unknown[];
+    return [value[0] as number, value[1] as string | number, value[2] as string];
   } catch {
     throw new Error("invalid search cursor");
   }
 }
 
-function encodeCursor(sort: unknown[] | undefined): string {
+function encodeCursor(sort: SearchSortCursor | undefined): string {
   if (!sort || sort.length !== 3) {
     throw new Error("OpenSearch returned a hit without pagination sort values");
   }
