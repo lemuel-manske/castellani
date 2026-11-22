@@ -174,6 +174,14 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     }
   }
 
+  async listByArchive(archiveId: string): Promise<SnapshotLedgerEntry[]> {
+    if (!archiveId) {
+      throw new Error("archiveId must not be empty");
+    }
+
+    return listIndexingEntriesByArchive(this.client, this.tableName, archiveId);
+  }
+
   async complete(
     claim: SnapshotClaim,
     outcome: TerminalOutcome,
