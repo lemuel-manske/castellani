@@ -27,9 +27,9 @@ function artifactFor(
   reader: ArtifactObjectReader;
 } {
   const response =
-    "HTTP/1.1 200 OK\\r\\nContent-Type: " +
+    "HTTP/1.1 200 OK\r\nContent-Type: " +
     contentType +
-    "\\r\\n\\r\\n" +
+    "\r\n\r\n" +
     content;
   const warc = [
     "WARC/1.1",
@@ -42,7 +42,7 @@ function artifactFor(
     response,
     "",
     "",
-  ].join("\\r\\n");
+  ].join("\r\n");
   const bytes = gzipSync(Buffer.from(warc));
 
   return {
