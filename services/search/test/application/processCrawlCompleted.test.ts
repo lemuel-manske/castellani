@@ -53,7 +53,8 @@ it("rejects manifest bytes that do not match the immutable digest", async () => 
   const artifactReader: ArtifactObjectReader = {
     getObject: vi.fn().mockResolvedValue(Readable.from([data])),
   };
-  const manifestLedger: ManifestLedger = { record: vi.fn(), contains: vi.fn() };
+  const record = vi.fn();
+  const manifestLedger: ManifestLedger = { record, contains: vi.fn() };
 
   await expect(
     processCrawlCompleted(
