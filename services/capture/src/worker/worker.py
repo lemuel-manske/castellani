@@ -8,8 +8,8 @@ from domain import (
     CaptureOutcome,
     CaptureReservation,
     TaskClaim,
-    new_snapshot_id,
     TaskRepository,
+    new_snapshot_id,
 )
 from utils.fn import awaitable, noop
 
