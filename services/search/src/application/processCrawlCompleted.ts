@@ -66,7 +66,8 @@ function isManifestSnapshot(value: unknown): value is ManifestSnapshot {
     (value.redirectChain === undefined ||
       (Array.isArray(value.redirectChain) &&
         value.redirectChain.every(isNonEmptyString))) &&
-    (value.contentType === undefined || typeof value.contentType === "string") &&
+    (value.contentType === undefined ||
+      typeof value.contentType === "string") &&
     Array.isArray(value.warcArtifacts) &&
     value.warcArtifacts.length > 0 &&
     value.warcArtifacts.every(isArtifactReference)
@@ -167,9 +168,7 @@ async function processCrawlCompleted(
       },
       indexing,
     );
-
   }
-
 }
 
 export { processCrawlCompleted };
