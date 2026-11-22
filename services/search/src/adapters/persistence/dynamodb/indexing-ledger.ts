@@ -151,14 +151,18 @@ class DynamoDBIndexingLedger implements IndexingLedger {
             snapshotId,
           );
 
+          if (current === undefined) {
+            throw exhaustionError;
+          }
+
           if (current.archiveId !== archiveId) {
             throw new IndexingIdentityConflictError(snapshotId);
           }
 
           if (
             current.state === "INDEXED" ||
-            current?.state === "UNSUPPORTED" ||
-            current?.state === "FAILED"
+            current.state === "UNSUPPORTED" ||
+            current.state === "FAILED"
           ) {
             return { status: "TERMINAL", outcome: current.state };
           }
@@ -191,7 +195,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       await completeIndexingEntry(this.client, this.tableName, {
         claim,
         outcome,
-        reasonCode,
+        ...(reasonCode === undefined ? {} : { reasonCode }),
         now: this.clock() / 1000,
       });
     } catch (error) {
