@@ -93,7 +93,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     value: PublicationIdentity | CompensationDecision,
     condition: string,
   ): Promise<void> {
-    const serialized = JSON.stringify(value);
+    const serialized = serializeFact(value);
 
     try {
       await this.client.send(
@@ -152,6 +152,22 @@ function factsFromItem(
       "compensationDecision",
     ),
   };
+}
+
+function serializeFact(
+  value: PublicationIdentity | CompensationDecision,
+): string {
+  return "packageDigest" in value
+    ? JSON.stringify({
+        archiveId: value.archiveId,
+        decisionVersion: value.decisionVersion,
+        packageDigest: value.packageDigest,
+      })
+    : JSON.stringify({
+        archiveId: value.archiveId,
+        decisionVersion: value.decisionVersion,
+        reasonCode: value.reasonCode,
+      });
 }
 
 function parseFact<T>(value: string | undefined, name: string): T | null {
