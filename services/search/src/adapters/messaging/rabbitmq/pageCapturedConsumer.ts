@@ -1,6 +1,5 @@
 import Ajv, { type AnySchema } from "ajv";
 import type { Channel, ConsumeMessage } from "amqplib";
-import type { ArtifactReference } from "../../../ports/artifacts.js";
 import type { PageCapturedEvent } from "../../../application/processPageCaptured.js";
 
 const EXPECTED_VERSION = 1;
@@ -77,7 +76,7 @@ const PAGE_CAPTURED_SCHEMA: AnySchema = {
               bucket: { type: "string", minLength: 1 },
               key: { type: "string", minLength: 1 },
               sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
-              sizeBytes: { type: "integer", minimum: 0 },
+              sizeBytes: { type: "integer", minimum: 0, maximum: 9007199254740991 },
               versionId: { type: "string", minLength: 1 },
             },
           },
