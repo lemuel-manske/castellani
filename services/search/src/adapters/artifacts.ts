@@ -24,12 +24,6 @@ interface ArtifactObjectReader {
   getObject(reference: ArtifactReference): Promise<AsyncIterable<Uint8Array>>;
 }
 
-interface CapturedWarcResponse {
-  targetUrl: string;
-  content: string;
-  contentType: string;
-}
-
 class ArtifactIntegrityError extends Error {
   constructor(message: string) {
     super(message);
@@ -38,8 +32,8 @@ class ArtifactIntegrityError extends Error {
 }
 
 class CapturedResponseNotFoundError extends Error {
-  constructor(snapshotId: string) {
-    super(`no WARC response found for snapshot ${snapshotId}`);
+  constructor(snapshotId: string, targetUrl: string) {
+    super(`no WARC response found for snapshot ${snapshotId} at ${targetUrl}`);
     this.name = "CapturedResponseNotFoundError";
   }
 }
@@ -72,45 +66,30 @@ async function* verifiedChunks(
 
 async function readWarcArtifact(
   reference: ArtifactReference,
-  page: CapturedPageReference,
+  targetUrl: string,
+  contentType: string | undefined,
   reader: ArtifactObjectReader,
-): Promise<CapturedWarcResponse | null> {
+): Promise<{ content: string; contentType: string } | null> {
   const body = await reader.getObject(reference);
   const parser = new WARCParser(verifiedChunks(body, reference));
-  const finalUrl = page.finalUrl ?? page.url;
-  let requestedUrlResponse: CapturedWarcResponse | null = null;
-  let finalUrlResponse: CapturedWarcResponse | null = null;
+  let capturedResponse: { content: string; contentType: string } | null = null;
 
   for await (const record of parser) {
-    if (record.warcType !== "response") {
-      continue;
-    }
-
-    const targetUrl = record.warcTargetURI;
-
-    if (targetUrl !== page.url && targetUrl !== finalUrl) {
+    if (record.warcType !== "response" || record.warcTargetURI !== targetUrl) {
       continue;
     }
 
     const response = record.getResponseInfo();
-    const candidate = {
-      targetUrl,
+    capturedResponse = {
       content: await record.contentText(),
       contentType:
         response.headers.get("content-type") ??
-        page.contentType ??
+        contentType ??
         "application/octet-stream",
     };
-
-    if (targetUrl === finalUrl) {
-      finalUrlResponse = candidate;
-      continue;
-    }
-
-    requestedUrlResponse = candidate;
   }
 
-  return finalUrlResponse ?? requestedUrlResponse;
+  return capturedResponse;
 }
 
 async function readCapturedPage(
@@ -118,52 +97,38 @@ async function readCapturedPage(
   artifacts: readonly ArtifactReference[],
   reader: ArtifactObjectReader,
 ): Promise<CapturedPage> {
+  const finalUrl = page.finalUrl ?? page.url;
+
   if (artifacts.length === 0) {
     throw new ArtifactIntegrityError(
       `snapshot ${page.snapshotId} has no WARC artifact references`,
     );
   }
 
-  const finalUrl = page.finalUrl ?? page.url;
-  let requestedUrlResponse: CapturedWarcResponse | null = null;
-
   for (const artifact of artifacts) {
-    const response = await readWarcArtifact(artifact, page, reader);
+    const response = await readWarcArtifact(
+      artifact,
+      finalUrl,
+      page.contentType,
+      reader,
+    );
 
     if (response === null) {
       continue;
     }
 
-    if (response.targetUrl === finalUrl) {
-      return {
-        archiveId: page.archiveId,
-        snapshotId: page.snapshotId,
-        url: page.url,
-        finalUrl,
-        capturedAt: page.capturedAt,
-        contentType: response.contentType,
-        content: response.content,
-      };
-    }
-
-    requestedUrlResponse = response;
+    return {
+      archiveId: page.archiveId,
+      snapshotId: page.snapshotId,
+      url: page.url,
+      finalUrl,
+      capturedAt: page.capturedAt,
+      contentType: response.contentType,
+      content: response.content,
+    };
   }
 
-  const response = requestedUrlResponse;
-
-  if (response === null) {
-    throw new CapturedResponseNotFoundError(page.snapshotId);
-  }
-
-  return {
-    archiveId: page.archiveId,
-    snapshotId: page.snapshotId,
-    url: page.url,
-    finalUrl,
-    capturedAt: page.capturedAt,
-    contentType: response.contentType,
-    content: response.content,
-  };
+  throw new CapturedResponseNotFoundError(page.snapshotId, finalUrl);
 }
 
 function createS3ArtifactReader(client: S3Client): ArtifactObjectReader {
