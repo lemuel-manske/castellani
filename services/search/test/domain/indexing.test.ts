@@ -14,7 +14,7 @@ const manifest = [{ snapshotId: "snapshot-1" }, { snapshotId: "snapshot-2" }];
 it(
   "identifies work missing from the ledger when completion arrives first",
   () => {
-  const result = reconcileManifest(manifest, [
+    const result = reconcileManifest(manifest, [
     { snapshotId: "snapshot-1", outcome: "INDEXED" },
   ]);
 
@@ -35,9 +35,10 @@ it(
     { snapshotId: "snapshot-2", outcome: "FAILED" },
   ]);
 
-  expect(result.complete).toBe(true);
-  expect(result.terminalCount).toBe(2);
-});
+    expect(result.complete).toBe(true);
+    expect(result.terminalCount).toBe(2);
+  },
+);
 
 it("does not consider pending entries terminal", () => {
   const result = reconcileManifest(manifest, [
@@ -103,13 +104,14 @@ it("exposes only indexed snapshots in the manifest after publication", () => {
 it(
   "keeps indexed documents hidden before both publication facts arrive",
   () => {
-  const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), {
+    const decisionOnly = recordPublicationDecision(emptyPublicationFacts(), {
     archiveId: "archive-1",
     decisionVersion: 1,
     packageDigest: "digest",
   });
 
-  expect(
-    canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
-  ).toBe(false);
-});
+    expect(
+      canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
+    ).toBe(false);
+  },
+);
