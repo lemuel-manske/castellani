@@ -1,8 +1,6 @@
-import type { ArtifactReference } from "../../../ports/artifacts.js";
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
-import type { PageCapturedEvent } from "../../../application/processPageCaptured.js";
+import { isPageCapturedEvent, type PageCapturedEvent } from "../../../application/types.js";
 
-const EXPECTED_VERSION = 1;
 const MAX_DELIVERY_RETRIES = 5;
 const RETRY_DELAY_MILLISECONDS = 5_000;
 
@@ -13,76 +11,6 @@ const RETRY_EXCHANGE = "castellani.search.retry";
 const RETRY_QUEUE = "castellani.search.page-captured.retry.v2";
 const DEAD_LETTER_EXCHANGE = "castellani.search.dead";
 const DEAD_LETTER_QUEUE = "castellani.search.page-captured.dead";
-
-interface PageCapturedConsumerTopology {
-  eventsExchange: string;
-  routingKey: string;
-  queue: string;
-  retryExchange: string;
-  retryQueue: string;
-  deadLetterExchange: string;
-  deadLetterQueue: string;
-}
-
-const DEFAULT_TOPOLOGY: PageCapturedConsumerTopology = {
-  eventsExchange: EVENTS_EXCHANGE,
-  routingKey: PAGE_CAPTURED_ROUTING_KEY,
-  queue: PAGE_CAPTURED_QUEUE,
-  retryExchange: RETRY_EXCHANGE,
-  retryQueue: RETRY_QUEUE,
-  deadLetterExchange: DEAD_LETTER_EXCHANGE,
-  deadLetterQueue: DEAD_LETTER_QUEUE,
-};
-
-function isString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
-
-function isArtifactReference(value: unknown): value is ArtifactReference {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    isString(value.bucket) &&
-    isString(value.key) &&
-    isString(value.sha256) &&
-    /^[a-f0-9]{64}$/.test(value.sha256) &&
-    typeof value.sizeBytes === "number" &&
-    Number.isSafeInteger(value.sizeBytes) &&
-    value.sizeBytes >= 0 &&
-    (value.versionId === undefined || isString(value.versionId))
-  );
-}
-
-function isPageCapturedEvent(value: unknown): value is PageCapturedEvent {
-  if (!isRecord(value) || !isRecord(value.payload)) {
-    return false;
-  }
-
-  const payload = value.payload;
-
-  return (
-    isString(value.messageId) &&
-    isString(value.correlationId) &&
-    value.type === "PageCaptured" &&
-    value.version === EXPECTED_VERSION &&
-    isString(value.occurredAt) &&
-    isString(payload.archiveId) &&
-    isString(payload.snapshotId) &&
-    isString(payload.urlKey) &&
-    isString(payload.url) &&
-    isString(payload.finalUrl) &&
-    Array.isArray(payload.redirectChain) &&
-    payload.redirectChain.every(isString) &&
-    isString(payload.capturedAt) &&
-    (payload.contentType === undefined ||
-      typeof payload.contentType === "string") &&
-    Array.isArray(payload.warcArtifacts) &&
-    payload.warcArtifacts.length > 0 &&
-    payload.warcArtifacts.every(isArtifactReference)
-  );
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -112,7 +40,6 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
 
 function deliveryRetryCount(
   message: ConsumeMessage,
-  retryQueue: string,
 ): number {
   const deaths: unknown = message.properties.headers?.["x-death"];
 
@@ -121,7 +48,7 @@ function deliveryRetryCount(
   }
 
   const retryDeath = (deaths as unknown[]).find(
-    (death: unknown) => isRecord(death) && death.queue === retryQueue,
+    (death: unknown) => isRecord(death) && death.queue === RETRY_QUEUE,
   );
 
   if (!isRecord(retryDeath)) {
@@ -139,12 +66,11 @@ function deliveryRetryCount(
 
 function publishDeadLetter(
   channel: ConfirmChannel,
-  topology: PageCapturedConsumerTopology,
   message: ConsumeMessage,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     channel.publish(
-      topology.deadLetterExchange,
+      DEAD_LETTER_EXCHANGE,
       "",
       message.content,
       {
@@ -179,18 +105,17 @@ async function handlePageCapturedMessage(
   channel: ConfirmChannel,
   message: ConsumeMessage | null,
   handle: (event: PageCapturedEvent) => Promise<unknown>,
-  topology: PageCapturedConsumerTopology,
 ): Promise<void> {
   if (message === null) {
     return;
   }
 
   const event = parsePageCaptured(message.content);
-  const retries = deliveryRetryCount(message, topology.retryQueue);
+  const retries = deliveryRetryCount(message);
 
   if (event === null || retries >= MAX_DELIVERY_RETRIES) {
     try {
-      await publishDeadLetter(channel, topology, message);
+      await publishDeadLetter(channel, message);
       channel.ack(message);
     } catch {
       channel.nack(message, false, true);
@@ -215,61 +140,60 @@ async function handlePageCapturedMessage(
 async function startPageCapturedConsumer(
   channel: ConfirmChannel,
   handle: (event: PageCapturedEvent) => Promise<unknown>,
-  topology: PageCapturedConsumerTopology = DEFAULT_TOPOLOGY,
 ): Promise<void> {
-  await channel.assertExchange(topology.eventsExchange, "topic", {
+  await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
     durable: true,
   });
 
-  await channel.assertExchange(topology.retryExchange, "direct", {
+  await channel.assertExchange(RETRY_EXCHANGE, "direct", {
     durable: true,
   });
 
-  await channel.assertExchange(topology.deadLetterExchange, "fanout", {
+  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", {
     durable: true,
   });
 
-  await channel.assertQueue(topology.deadLetterQueue, { durable: true });
+  await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
 
   await channel.bindQueue(
-    topology.deadLetterQueue,
-    topology.deadLetterExchange,
+    DEAD_LETTER_QUEUE,
+    DEAD_LETTER_EXCHANGE,
     "",
   );
 
-  await channel.assertQueue(topology.retryQueue, {
+  await channel.assertQueue(RETRY_QUEUE, {
     durable: true,
     arguments: {
       "x-message-ttl": RETRY_DELAY_MILLISECONDS,
-      "x-dead-letter-exchange": topology.eventsExchange,
-      "x-dead-letter-routing-key": topology.routingKey,
+      "x-dead-letter-exchange": EVENTS_EXCHANGE,
+      "x-dead-letter-routing-key": PAGE_CAPTURED_ROUTING_KEY,
     },
   });
 
   await channel.bindQueue(
-    topology.retryQueue,
-    topology.retryExchange,
-    topology.routingKey,
+    RETRY_QUEUE,
+    RETRY_EXCHANGE,
+    PAGE_CAPTURED_ROUTING_KEY,
   );
 
-  await channel.assertQueue(topology.queue, {
+  await channel.assertQueue(PAGE_CAPTURED_QUEUE, {
     durable: true,
     arguments: {
-      "x-dead-letter-exchange": topology.retryExchange,
-      "x-dead-letter-routing-key": topology.routingKey,
+      "x-dead-letter-exchange": RETRY_EXCHANGE,
+      "x-dead-letter-routing-key": PAGE_CAPTURED_ROUTING_KEY,
     },
   });
 
   await channel.bindQueue(
-    topology.queue,
-    topology.eventsExchange,
-    topology.routingKey,
+    PAGE_CAPTURED_QUEUE,
+    EVENTS_EXCHANGE,
+    PAGE_CAPTURED_ROUTING_KEY,
   );
 
   await channel.prefetch(1);
 
-  await channel.consume(topology.queue, (message) => {
-    void handlePageCapturedMessage(channel, message, handle, topology);
+  await channel.consume(PAGE_CAPTURED_QUEUE, (message) => {
+    void handlePageCapturedMessage(channel, message, handle);
   });
 }
 
@@ -277,7 +201,6 @@ export {
   DEAD_LETTER_EXCHANGE,
   DEAD_LETTER_QUEUE,
   EVENTS_EXCHANGE,
-  EXPECTED_VERSION,
   MAX_DELIVERY_RETRIES,
   PAGE_CAPTURED_QUEUE,
   PAGE_CAPTURED_ROUTING_KEY,
@@ -287,4 +210,3 @@ export {
   startPageCapturedConsumer,
 };
 
-export type { PageCapturedConsumerTopology };
