@@ -1,0 +1,42 @@
+services:
+  ministack:
+    image: ministackorg/ministack:1.5.42
+    ports:
+      - "4566"
+    environment:
+      AWS_DEFAULT_REGION: us-east-1
+      PERSIST_STATE: "0"
+      S3_PERSIST: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.1.4-management-alpine
+    ports:
+      - "5672"
+      - "15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: castellani
+      RABBITMQ_DEFAULT_PASS: local-development-only
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  opensearch:
+    image: opensearchproject/opensearch:3.10.0
+    ports:
+      - "9200"
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
