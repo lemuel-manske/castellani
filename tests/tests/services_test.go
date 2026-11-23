@@ -28,8 +28,24 @@ func TestServices_AllReachable(t *testing.T) {
 	searchStatus, searchErr := services.Search.HealthStatus(ctx)
 	require.NoError(t, searchErr)
 
-	assert.Equal(t, http.StatusOK, gatewayStatus)
-	assert.Equal(t, http.StatusOK, coordinatorStatus)
-	assert.Equal(t, http.StatusOK, captureStatus)
-	assert.Equal(t, http.StatusOK, searchStatus)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		gatewayStatus,
+	)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		coordinatorStatus,
+	)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		captureStatus,
+	)
+	assert.Equal(
+		t,
+		http.StatusOK,
+		searchStatus,
+	)
 }

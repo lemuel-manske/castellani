@@ -27,21 +27,36 @@ const (
 	terraformLockFile = ".terraform.lock.hcl"
 )
 
-var httpClient = &http.Client{Timeout: requestTimeout}
+var httpClient = &http.Client{
+	Timeout: requestTimeout,
+}
 
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 
 	_, file, _, ok := runtime.Caller(0)
-	require.True(t, ok, "locate repository root")
+	require.True(
+		t,
+		ok,
+		"locate repository root",
+	)
 
-	return filepath.Join(filepath.Dir(file), "..", "..", "..")
+	return filepath.Join(
+		filepath.Dir(file),
+		"..",
+		"..",
+		"..",
+	)
 }
 
 func prepareTerraform(t *testing.T, root string) string {
 	t.Helper()
 
-	source := filepath.Join(root, "infra", "terraform")
+	source := filepath.Join(
+		root,
+		"infra",
+		"terraform",
+	)
 	target := t.TempDir()
 
 	entries, err := os.ReadDir(source)
@@ -63,7 +78,11 @@ func prepareTerraform(t *testing.T, root string) string {
 
 		require.NoError(
 			t,
-			os.WriteFile(filepath.Join(target, name), contents, 0o600),
+			os.WriteFile(
+				filepath.Join(target, name),
+				contents,
+				0o600,
+			),
 		)
 	}
 
@@ -149,21 +168,112 @@ func Start(t *testing.T) Dependencies {
 
 	require.NoError(t, stack.Up(ctx))
 
-	miniStack := newService(t, ctx, stack, "ministack", "4566", "/_ministack/health", "", "")
-	rabbitMQ := newService(t, ctx, stack, "rabbitmq", "15672", "/api/overview", rabbitMQUsername, rabbitMQPassword)
-	openSearch := newService(t, ctx, stack, "opensearch", "9200", "/_cluster/health", "", "")
-	gateway := newService(t, ctx, stack, "gateway", "8080", "/health/ready", "", "")
-	coordinator := newService(t, ctx, stack, "coordinator", "8081", "/health/ready", "", "")
-	capture := newService(t, ctx, stack, "capture", "8000", "/health/ready", "", "")
-	search := newService(t, ctx, stack, "search", "8082", "/health/ready", "", "")
+	miniStack := newService(
+		t,
+		ctx,
+		stack,
+		"ministack",
+		"4566",
+		"/_ministack/health",
+		"",
+		"",
+	)
+	rabbitMQ := newService(
+		t,
+		ctx,
+		stack,
+		"rabbitmq",
+		"15672",
+		"/api/overview",
+		rabbitMQUsername,
+		rabbitMQPassword,
+	)
+	openSearch := newService(
+		t,
+		ctx,
+		stack,
+		"opensearch",
+		"9200",
+		"/_cluster/health",
+		"",
+		"",
+	)
+	gateway := newService(
+		t,
+		ctx,
+		stack,
+		"gateway",
+		"8080",
+		"/health/ready",
+		"",
+		"",
+	)
+	coordinator := newService(
+		t,
+		ctx,
+		stack,
+		"coordinator",
+		"8081",
+		"/health/ready",
+		"",
+		"",
+	)
+	capture := newService(
+		t,
+		ctx,
+		stack,
+		"capture",
+		"8000",
+		"/health/ready",
+		"",
+		"",
+	)
+	search := newService(
+		t,
+		ctx,
+		stack,
+		"search",
+		"8082",
+		"/health/ready",
+		"",
+		"",
+	)
 
-	waitForHealthy(t, ctx, miniStack)
-	waitForHealthy(t, ctx, rabbitMQ)
-	waitForHealthy(t, ctx, openSearch)
-	waitForHealthy(t, ctx, gateway)
-	waitForHealthy(t, ctx, coordinator)
-	waitForHealthy(t, ctx, capture)
-	waitForHealthy(t, ctx, search)
+	waitForHealthy(
+		t,
+		ctx,
+		miniStack,
+	)
+	waitForHealthy(
+		t,
+		ctx,
+		rabbitMQ,
+	)
+	waitForHealthy(
+		t,
+		ctx,
+		openSearch,
+	)
+	waitForHealthy(
+		t,
+		ctx,
+		gateway,
+	)
+	waitForHealthy(
+		t,
+		ctx,
+		coordinator,
+	)
+	waitForHealthy(
+		t,
+		ctx,
+		capture,
+	)
+	waitForHealthy(
+		t,
+		ctx,
+		search,
+	)
 
 	return Dependencies{
 		MiniStack:   miniStack,
@@ -178,7 +288,13 @@ func Start(t *testing.T) Dependencies {
 
 // HealthStatus performs the service's health request and reports its result.
 func (s Service) HealthStatus(ctx context.Context) (int, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, s.healthURL, nil)
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		s.healthURL,
+		nil,
+	)
+
 	if err != nil {
 		return 0, err
 	}
@@ -188,6 +304,7 @@ func (s Service) HealthStatus(ctx context.Context) (int, error) {
 	}
 
 	response, err := httpClient.Do(request)
+
 	if err != nil {
 		return 0, err
 	}
@@ -221,7 +338,11 @@ func newService(
 	}
 }
 
-func waitForHealthy(t *testing.T, ctx context.Context, service Service) {
+func waitForHealthy(
+	t *testing.T,
+	ctx context.Context,
+	service Service,
+) {
 	t.Helper()
 
 	deadline := time.Now().Add(readinessTimeout)
@@ -230,13 +351,19 @@ func waitForHealthy(t *testing.T, ctx context.Context, service Service) {
 
 	for {
 		status, err := service.HealthStatus(ctx)
+
 		if err == nil && status == http.StatusOK {
 			return
 		}
 
 		if time.Now().After(deadline) {
 			require.NoError(t, err)
-			require.Equal(t, http.StatusOK, status)
+			require.Equal(
+				t,
+				http.StatusOK,
+				status,
+			)
+
 			return
 		}
 
