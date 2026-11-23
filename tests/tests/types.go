@@ -1,4 +1,4 @@
-package tests_test
+package tests
 
 type Problem struct {
 	Type     string `json:"type"`
