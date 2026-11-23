@@ -31,26 +31,15 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
     envelope.type === "ArchivePublicationDecided" ||
     envelope.type === "ArchivePublished"
   ) {
-    return isPublicationIdentity(payload)
-      ? { type: envelope.type, payload }
-      : null;
+    return isPublicationIdentity(payload) ? envelope : null;
   }
 
   if (envelope.type === "ArchiveCompensationDecided") {
-    return isCompensationDecision(payload)
-      ? { type: envelope.type, payload }
-      : null;
+    return isCompensationDecision(payload) ? envelope : null;
   }
 
   if (isCompletionCrawl(payload)) {
-    return {
-      type: "CrawlCompleted",
-      payload: {
-        archiveId: payload.archiveId,
-        manifestDigest: payload.manifestDigest,
-        manifest: payload.manifest,
-      },
-    };
+    return envelope;
   }
 
   return null;

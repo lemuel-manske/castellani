@@ -184,7 +184,16 @@ const PublicationEventSchema = {
   additionalProperties: false,
 } as const;
 
-const publicationEventValidator = createSchemaValidator<PublicationEvent>(
+interface PublicationEnvelope {
+  type: string;
+  version: 1;
+  messageId: string;
+  correlationId: string;
+  occurredAt: string;
+  payload: Record<string, unknown>;
+}
+
+const publicationEventValidator = createSchemaValidator<PublicationEnvelope>(
   PublicationEventSchema,
 );
 
