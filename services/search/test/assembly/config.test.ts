@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { SearchSettings } from "../../src/assembly/config.js";
 
 const requiredEnvironment = {
+  SEARCH_HTTP_PORT: "3000",
   SEARCH_AWS_REGION: "sa-east-1",
   SEARCH_AWS_ACCESS_KEY_ID: "test",
   SEARCH_AWS_SECRET_ACCESS_KEY: "test",
@@ -17,6 +18,7 @@ it("loads service-specific environment settings", () => {
     ...requiredEnvironment,
   });
 
+  expect(settings.httpPort).toBe("3000");
   expect(settings.awsRegion).toBe("sa-east-1");
   expect(settings.awsAccessKeyId).toBe("test");
   expect(settings.awsSecretAccessKey).toBe("test");
