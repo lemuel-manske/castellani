@@ -27,8 +27,9 @@ test-unit:
 	npm test
 
 test-integration:
-	SEARCH_ACCESS_KEY_ID=minio \
-		SEARCH_SECRET_ACCESS_KEY=minio-secret \
+	SEARCH_AWS_REGION=us-east-1 \
+		SEARCH_AWS_ACCESS_KEY_ID=minio \
+		SEARCH_AWS_SECRET_ACCESS_KEY=minio-secret \
 		SEARCH_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
 		SEARCH_S3_ENDPOINT_URL=http://localhost:9000 \
 		SEARCH_OPENSEARCH_URL=http://localhost:9200 \

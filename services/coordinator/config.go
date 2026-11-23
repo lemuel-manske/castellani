@@ -10,6 +10,9 @@ const (
 
 	regionEnvironment = "COORDINATOR_AWS_REGION"
 
+	accessKeyIDEnvironment     = "COORDINATOR_AWS_ACCESS_KEY_ID"
+	secretAccessKeyEnvironment = "COORDINATOR_AWS_SECRET_ACCESS_KEY"
+
 	shutdownEnvironment           = "COORDINATOR_SHUTDOWN_TIMEOUT"
 	reconcileIntervalEnvironment  = "COORDINATOR_RECONCILIATION_INTERVAL"
 	stalledWorkflowAgeEnvironment = "COORDINATOR_STALLED_WORKFLOW_AGE"
@@ -26,6 +29,8 @@ const (
 type Config struct {
 	port               string
 	region             string
+	awsAccessKeyID     string
+	awsSecretAccessKey string
 	shutdownTimeout    time.Duration
 	reconcileInterval  time.Duration
 	stalledWorkflowAge time.Duration
@@ -75,6 +80,16 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	}
 
 	config.region = getenv(regionEnvironment)
+	config.awsAccessKeyID = getenv(accessKeyIDEnvironment)
+	config.awsSecretAccessKey = getenv(secretAccessKeyEnvironment)
+
+	if config.awsAccessKeyID == "" {
+		return Config{}, fmt.Errorf("%s is required", accessKeyIDEnvironment)
+	}
+
+	if config.awsSecretAccessKey == "" {
+		return Config{}, fmt.Errorf("%s is required", secretAccessKeyEnvironment)
+	}
 
 	config.dynamoEndpoint = getenv(dynamoEndpointEnvironment)
 	config.rabbitURL = getenv(rabbitURLEnvironment)

@@ -58,7 +58,10 @@ class CaptureRuntime:
             raise RuntimeError("Capture runtime has already started")
 
         try:
-            session = boto3.Session()
+            session = boto3.Session(
+                aws_access_key_id=self.settings.aws_access_key_id,
+                aws_secret_access_key=self.settings.aws_secret_access_key,
+            )
 
             self.dynamodb_client = session.client(
                 "dynamodb",
