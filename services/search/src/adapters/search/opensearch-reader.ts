@@ -8,6 +8,8 @@ import type {
 } from "../../ports/search-reader.js";
 import { readJSON } from "../../utils.js";
 
+import { SEARCH_INDEX_NAME } from "./topology.js";
+
 type SearchSortCursor = [number, string | number, string];
 
 interface SearchHit {
@@ -83,12 +85,7 @@ function snippetFromHit(hit: SearchHit, document: SearchDocument): string {
 
 function createOpenSearchDocumentReader(
   client: Client,
-  indexName: string,
 ): SearchDocumentReader {
-  if (!indexName.trim()) {
-    throw new Error("OpenSearch index name must not be empty");
-  }
-
   return {
     async search(
       query: SearchQuery,
@@ -125,7 +122,7 @@ function createOpenSearchDocumentReader(
       const searchAfter = decodeCursor(cursor);
 
       const response = (await client.search({
-        index: indexName,
+        index: SEARCH_INDEX_NAME,
         body: {
           size: limit,
           query: {

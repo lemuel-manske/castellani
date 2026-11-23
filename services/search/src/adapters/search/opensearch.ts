@@ -2,7 +2,7 @@ import type { Client } from "@opensearch-project/opensearch";
 import type { SearchDocumentWriter } from "../../ports/search-index.js";
 import type { SearchDocument } from "../../domain/content.js";
 
-const DEFAULT_SEARCH_INDEX = "archive-pages-v1";
+import { SEARCH_INDEX_NAME } from "./topology.js";
 
 const SEARCH_INDEX_BODY = {
   settings: {
@@ -27,7 +27,7 @@ const SEARCH_INDEX_BODY = {
 
 async function ensureSearchIndex(
   client: Client,
-  indexName: string = DEFAULT_SEARCH_INDEX,
+  indexName: string = SEARCH_INDEX_NAME,
 ): Promise<void> {
   const existing = await client.indices.exists({ index: indexName });
 
@@ -50,16 +50,11 @@ async function ensureSearchIndex(
 
 function createOpenSearchDocumentWriter(
   client: Client,
-  indexName: string = DEFAULT_SEARCH_INDEX,
 ): SearchDocumentWriter {
-  if (!indexName.trim()) {
-    throw new Error("OpenSearch index name must not be empty");
-  }
-
   return {
     async index(document: SearchDocument) {
       await client.index({
-        index: indexName,
+        index: SEARCH_INDEX_NAME,
         id: document.snapshotId,
         body: document,
         refresh: false,
@@ -69,7 +64,7 @@ function createOpenSearchDocumentWriter(
 }
 
 export {
-  DEFAULT_SEARCH_INDEX,
+  SEARCH_INDEX_NAME,
   SEARCH_INDEX_BODY,
   createOpenSearchDocumentWriter,
   ensureSearchIndex,
