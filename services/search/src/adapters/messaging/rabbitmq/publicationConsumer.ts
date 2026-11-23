@@ -8,7 +8,7 @@ import { PublicationConflictError } from "../../../domain/publication.js";
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
 import { EVENTS_EXCHANGE, PUBLICATION_TOPOLOGY } from "./topology.js";
 import { readJSON } from "../../../utils.js";
-import { isPublicationEvent } from "../../../application/types.js";
+import { isEventEnvelope } from "../../../application/types.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
@@ -21,36 +21,32 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
     return null;
   }
 
-  if (!isPublicationEvent(envelope)) {
+  if (!isEventEnvelope(envelope)) {
     return null;
   }
 
   const payload = envelope.payload;
 
-  if (
-    envelope.type === "ArchivePublicationDecided" ||
-    envelope.type === "ArchivePublished"
-  ) {
+  if (envelope.type === "ArchivePublicationDecided") {
     return isPublicationIdentity(payload)
-      ? { type: envelope.type, payload }
+      ? { ...envelope, type: "ArchivePublicationDecided", payload }
+      : null;
+  }
+
+  if (envelope.type === "ArchivePublished") {
+    return isPublicationIdentity(payload)
+      ? { ...envelope, type: "ArchivePublished", payload }
       : null;
   }
 
   if (envelope.type === "ArchiveCompensationDecided") {
     return isCompensationDecision(payload)
-      ? { type: envelope.type, payload }
+      ? { ...envelope, type: "ArchiveCompensationDecided", payload }
       : null;
   }
 
-  if (isCompletionCrawl(payload)) {
-    return {
-      type: "CrawlCompleted",
-      payload: {
-        archiveId: payload.archiveId,
-        manifestDigest: payload.manifestDigest,
-        manifest: payload.manifest,
-      },
-    };
+  if (envelope.type === "CrawlCompleted" && isCompletionCrawl(payload)) {
+    return { ...envelope, type: "CrawlCompleted", payload };
   }
 
   return null;

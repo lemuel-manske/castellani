@@ -4,13 +4,10 @@ import type {
   ArtifactReference,
   CapturedPageReader,
 } from "../ports/artifacts.js";
+import type { CompletionCrawl } from "../domain.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import { processPageCaptured } from "./processPageCaptured.js";
-import {
-  CrawlCompletedEvent,
-  isManifestDocument,
-  ManifestDocument,
-} from "./types.js";
+import { isManifestDocument, ManifestDocument } from "./types.js";
 import { IndexingLedger } from "../ports/indexing-ledger.js";
 import { SearchDocumentWriter } from "../ports/search-index.js";
 
@@ -35,10 +32,7 @@ async function readArtifact(
   return data;
 }
 
-function parseManifest(
-  data: Buffer,
-  event: CrawlCompletedEvent,
-): ManifestDocument {
+function parseManifest(data: Buffer, event: CompletionCrawl): ManifestDocument {
   const digest = createHash("sha256").update(data).digest("hex");
 
   const expectedDigest = event.manifestDigest.replace(/^sha256:/, "");
@@ -63,7 +57,7 @@ function parseManifest(
 }
 
 async function processCrawlCompleted(
-  event: CrawlCompletedEvent,
+  event: CompletionCrawl,
   reader: ArtifactObjectReader,
   manifestLedger: ManifestLedger,
   ledger: IndexingLedger,
@@ -86,6 +80,8 @@ async function processCrawlCompleted(
   for (const snapshot of manifest.snapshots) {
     await processPageCaptured(
       {
+        type: "PageCaptured",
+        version: 1,
         messageId: `manifest:${event.manifestDigest}:${snapshot.snapshotId}`,
         correlationId: manifest.archiveId,
         occurredAt: manifest.createdAt,

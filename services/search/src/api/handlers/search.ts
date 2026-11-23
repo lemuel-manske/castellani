@@ -33,16 +33,12 @@ async function handleSearch(
     cursor: query.cursor,
   };
 
-  try {
-    return await searchPublishedDocuments(
-      queryParsed,
-      reader,
-      publicationLedger,
-      manifestLedger,
-    );
-  } catch (error) {
-    request.log.error({ err: error }, "Search request failed");
-  }
+  return searchPublishedDocuments(
+    queryParsed,
+    reader,
+    publicationLedger,
+    manifestLedger,
+  );
 }
 
 export { handleSearch };

@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type { SearchDocumentReader } from "../ports/search-reader.js";
-import { problem } from "./problem.js";
+import { mapError } from "./errors.js";
 import { searchRoutes } from "./routes/search.js";
 
 function createSearchServer(
@@ -14,22 +14,19 @@ function createSearchServer(
   const server = Fastify({ logger: false });
 
   server.setErrorHandler((error, _request, reply) => {
-    if (error.validation !== undefined) {
-      return reply
-        .code(400)
-        .type("application/problem+json")
-        .send(problem(400, "Invalid Search", "query parameters are invalid"));
+    const mapped = mapError(error);
+
+    if (mapped.status >= 500) {
+      reply.log.error({ err: error }, "Unhandled Search API error");
     }
 
-    reply.log.error({ err: error }, "Unhandled Search API error");
-
     return reply
-      .code(500)
+      .code(mapped.status)
       .type("application/problem+json")
-      .send(
-        problem(500, "Internal Server Error", "an unexpected error occurred"),
-      );
+      .send(mapped);
   });
+
+  server.get("/health/ready", () => ({ status: "ok" }));
 
   server.register(searchRoutes, {
     reader,

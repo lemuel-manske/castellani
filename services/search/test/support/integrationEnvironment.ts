@@ -1,12 +1,12 @@
 import { afterAll, beforeAll } from "vitest";
 
+import type { CompletionCrawl } from "../../src/domain.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
 import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 import type {
-  CrawlCompletedEvent,
   PageCapturedEvent,
   PageCapturedResult,
   SearchPublishedDocumentsInput,
@@ -56,7 +56,7 @@ const application = {
     );
   },
 
-  processCrawlCompleted(event: CrawlCompletedEvent): Promise<void> {
+  processCrawlCompleted(event: CompletionCrawl): Promise<void> {
     return processCrawlCompleted(
       event,
       artifactReader,

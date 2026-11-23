@@ -17,40 +17,32 @@ interface SearchPublishedDocumentsInput extends SearchQuery {
   cursor?: string;
 }
 
-type Event = {
+type Event<Type extends string, Payload> = {
+  type: Type;
   version: 1;
   messageId: string;
   correlationId: string;
   occurredAt: string;
+  payload: Payload;
 };
 
 type PublicationEvent =
-  | ({
-      type: "ArchivePublicationDecided";
-      payload: PublicationIdentity;
-    } & Event)
-  | ({ type: "ArchivePublished"; payload: PublicationIdentity } & Event)
-  | ({
-      type: "ArchiveCompensationDecided";
-      payload: CompensationDecision;
-    } & Event)
-  | ({ type: "CrawlCompleted"; payload: CompletionCrawl } & Event);
+  | Event<"ArchivePublicationDecided", PublicationIdentity>
+  | Event<"ArchivePublished", PublicationIdentity>
+  | Event<"ArchiveCompensationDecided", CompensationDecision>
+  | Event<"CrawlCompleted", CompletionCrawl>;
 
-type PageCapturedEvent = Event & {
-  type: "PageCaptured";
-  payload: CapturedPageReference & {
+type PageCapturedEvent = Event<
+  "PageCaptured",
+  CapturedPageReference & {
     finalUrl: string;
     redirectChain: string[];
     urlKey: string;
     warcArtifacts: ArtifactReference[];
-  };
-};
+  }
+>;
 
-interface CrawlCompletedEvent {
-  archiveId: string;
-  manifestDigest: string;
-  manifest: ArtifactReference;
-}
+type EventEnvelope = Event<string, object>;
 
 type PageCapturedResult =
   | {
@@ -184,12 +176,12 @@ const PublicationEventSchema = {
   additionalProperties: false,
 } as const;
 
-const publicationEventValidator = createSchemaValidator<PublicationEvent>(
+const eventEnvelopeValidator = createSchemaValidator<EventEnvelope>(
   PublicationEventSchema,
 );
 
-function isPublicationEvent(value: unknown): value is PublicationEvent {
-  return publicationEventValidator.validate(value);
+function isEventEnvelope(value: unknown): value is EventEnvelope {
+  return eventEnvelopeValidator.validate(value);
 }
 
 const ManifestSnapshotSchema = {
@@ -260,14 +252,14 @@ export {
   ManifestSnapshotSchema,
   PageCapturedEventSchema,
   PublicationEventSchema,
+  isEventEnvelope,
   isPageCapturedEvent,
   isManifestDocument,
   isManifestSnapshot,
-  isPublicationEvent,
 };
 
 export type {
-  CrawlCompletedEvent,
+  Event,
   ManifestDocument,
   ManifestSnapshot,
   PageCapturedEvent,
