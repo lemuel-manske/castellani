@@ -83,22 +83,26 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		r,
 		&input,
 	); err != nil {
-		kind := "invalid-json"
-		title := "Invalid Request"
-		detail := "Expected one valid archive JSON object."
-
 		if errors.Is(err, httpx.ErrContentType) {
-			kind = "content-type"
-			title = "Invalid Content Type"
-			detail = "Expected application/json."
+			problem := httpx.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"content-type",
+				"Invalid Content Type",
+				"Expected application/json.",
+			)
+
+			httpx.WriteProblem(w, problem)
+
+			return
 		}
 
 		problem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
-			kind,
-			title,
-			detail,
+			"invalid-json",
+			"Invalid Request",
+			"Expected one valid archive JSON object.",
 		)
 
 		httpx.WriteProblem(w, problem)
@@ -132,6 +136,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	statusURL := common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
+
 	w.Header().Set(httpx.LocationHeader, statusURL)
 
 	response := AcceptedResponse{

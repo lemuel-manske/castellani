@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"net/url"
 	"sort"
-	"strings"
 	"time"
+
+	"github.com/lemuel-manske/castellani/libs/httpx"
 )
 
 const (
@@ -117,7 +117,7 @@ type Archive struct {
 }
 
 func (s Submission) Validate() error {
-	if !validHTTPURL(s.SeedURL) {
+	if !httpx.ValidHTTPURL(s.SeedURL) {
 		return ValidationError{
 			Field:   "seedUrl",
 			Message: "must be an absolute HTTP(S) URL without credentials or fragment",
@@ -148,7 +148,7 @@ func (s Submission) Validate() error {
 	seen := make(map[string]struct{}, len(s.AllowedOrigins))
 
 	for _, origin := range s.AllowedOrigins {
-		if !validHTTPURL(origin) {
+		if !httpx.ValidHTTPURL(origin) {
 			return ValidationError{
 				Field:   "allowedOrigins",
 				Message: "entries must be absolute HTTP(S) URLs without credentials or fragment",
@@ -166,20 +166,4 @@ func (s Submission) Validate() error {
 	}
 
 	return nil
-}
-
-func validHTTPURL(raw string) bool {
-	target, err := url.Parse(raw)
-
-	if err != nil {
-		return false
-	}
-
-	httpScheme := strings.EqualFold(target.Scheme, "http") ||
-		strings.EqualFold(target.Scheme, "https")
-	hasHostname := target.Hostname() != ""
-	noCredentials := target.User == nil
-	noFragment := target.Fragment == "" && !strings.Contains(raw, "#")
-
-	return httpScheme && hasHostname && noCredentials && noFragment
 }
