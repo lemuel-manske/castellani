@@ -50,11 +50,12 @@ async function ensureSearchIndex(
 
 function createOpenSearchDocumentWriter(
   client: Client,
+  indexName: string = SEARCH_INDEX_NAME,
 ): SearchDocumentWriter {
   return {
     async index(document: SearchDocument) {
       await client.index({
-        index: SEARCH_INDEX_NAME,
+        index: indexName,
         id: document.snapshotId,
         body: document,
         refresh: false,
