@@ -23,6 +23,7 @@ export function createSchemaValidator<T>(
   schema: JSONSchemaType<T>,
 ): SchemaValidator<T> {
   const ajv = new Ajv();
+
   addFormats(ajv);
 
   const validate = ajv.compile(schema);
