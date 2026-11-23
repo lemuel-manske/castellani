@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 	"github.com/lemuel-manske/castellani/services/coordinator/common"
@@ -147,7 +148,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue(common.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
 		httpx.WriteProblem(w, httpx.NewProblem(
