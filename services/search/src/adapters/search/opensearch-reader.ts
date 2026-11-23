@@ -85,7 +85,6 @@ function snippetFromHit(hit: SearchHit, document: SearchDocument): string {
 
 function createOpenSearchDocumentReader(
   client: Client,
-  indexName: string = SEARCH_INDEX_NAME,
 ): SearchDocumentReader {
   return {
     async search(
@@ -123,7 +122,7 @@ function createOpenSearchDocumentReader(
       const searchAfter = decodeCursor(cursor);
 
       const response = (await client.search({
-        index: indexName,
+        index: SEARCH_INDEX_NAME,
         body: {
           size: limit,
           query: {
