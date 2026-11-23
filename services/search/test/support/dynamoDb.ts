@@ -4,7 +4,7 @@ import {
   DynamoDBClient,
   waitUntilTableExists,
 } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 import {
   MANIFEST_LEDGER,
@@ -43,6 +43,17 @@ function createDynamoDbTestSupport() {
 
   return {
     ledger,
+    async getIndexingEntry(snapshotId: string): Promise<Record<string, unknown> | undefined> {
+      const response = await documentClient.send(
+        new GetCommand({
+          TableName: INDEXING_LEDGER,
+          Key: { snapshotId },
+          ConsistentRead: true,
+        }),
+      );
+
+      return response.Item;
+    },
     publicationLedger,
     manifestLedger,
     async setup(): Promise<void> {
