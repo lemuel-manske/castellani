@@ -10,14 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Problem struct {
-	Type     string `json:"type"`
-	Title    string `json:"title"`
-	Status   int    `json:"status"`
-	Detail   string `json:"detail"`
-	Instance string `json:"instance"`
-}
-
 func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 	services := infra.Start(t)
 
@@ -28,13 +20,16 @@ func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+
 	request.Header.Set("Content-Type", "application/json")
 
 	response, err := http.DefaultClient.Do(request)
 	require.NoError(t, err)
+
 	defer response.Body.Close()
 
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+
 	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 
 	var problem Problem
@@ -62,14 +57,17 @@ func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Idempotency-Key", "short")
 
 	response, err := http.DefaultClient.Do(request)
 	require.NoError(t, err)
+
 	defer response.Body.Close()
 
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+
 	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 
 	var problem Problem
@@ -101,24 +99,30 @@ func TestGateway_CreateArchiveAcceptsValidSubmission(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Idempotency-Key", "archive-test-0001")
 
 	response, err := http.DefaultClient.Do(request)
 	require.NoError(t, err)
+
 	defer response.Body.Close()
 
 	require.Equal(t, http.StatusAccepted, response.StatusCode)
+
 	require.Equal(t, "application/json", response.Header.Get("Content-Type"))
 
-	var accepted archiveAccepted
+	var accepted ArchiveAccepted
 
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&accepted))
+
 	require.NotEmpty(t, accepted.ArchiveID)
-	require.Equal(t, archiveAccepted{
+
+	require.Equal(t, ArchiveAccepted{
 		ArchiveID: accepted.ArchiveID,
 		Status:    "ACCEPTED",
 		StatusURL: "/archives/" + accepted.ArchiveID,
 	}, accepted)
+
 	require.Equal(t, accepted.StatusURL, response.Header.Get("Location"))
 }
