@@ -12,7 +12,7 @@ import {
   ACCESS_KEY_ID,
   REGION,
   SEARCH_S3_ENDPOINT_URL,
-  SECRECT_ACCESS_KEY,
+  SECRET_ACCESS_KEY,
 } from "./env.js";
 
 function createS3TestSupport() {
@@ -21,7 +21,7 @@ function createS3TestSupport() {
     endpoint: SEARCH_S3_ENDPOINT_URL,
     credentials: {
       accessKeyId: ACCESS_KEY_ID,
-      secretAccessKey: SECRECT_ACCESS_KEY,
+      secretAccessKey: SECRET_ACCESS_KEY,
     },
     forcePathStyle: true,
   });
