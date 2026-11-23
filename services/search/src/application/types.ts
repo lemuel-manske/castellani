@@ -1,14 +1,15 @@
-import {
+import type {
   CompensationDecision,
+  CompletionCrawl,
   PublicationIdentity,
   TerminalIndexingOutcome,
 } from "../domain.js";
-import {
+import { ArtifactReferenceSchema } from "../ports/artifacts.js";
+import type {
   ArtifactReference,
-  ArtifactReferenceSchema,
   CapturedPageReference,
 } from "../ports/artifacts.js";
-import { SearchQuery } from "../ports/search-reader.js";
+import type { SearchQuery } from "../ports/search-reader.js";
 import { createSchemaValidator } from "../schema.js";
 
 interface SearchPublishedDocumentsInput extends SearchQuery {
@@ -16,30 +17,34 @@ interface SearchPublishedDocumentsInput extends SearchQuery {
   cursor?: string;
 }
 
-type PublicationEvent =
-  | { type: "ArchivePublicationDecided"; payload: PublicationIdentity }
-  | { type: "ArchivePublished"; payload: PublicationIdentity }
-  | { type: "ArchiveCompensationDecided"; payload: CompensationDecision }
-  | {
-      type: "CrawlCompleted";
-      payload: {
-        archiveId: string;
-        manifestDigest: string;
-        manifest: ArtifactReference;
-      };
-    };
-
-interface PageCapturedEvent {
+type Event = {
+  version: 1;
   messageId: string;
   correlationId: string;
   occurredAt: string;
+};
+
+type PublicationEvent =
+  | ({
+      type: "ArchivePublicationDecided";
+      payload: PublicationIdentity;
+    } & Event)
+  | ({ type: "ArchivePublished"; payload: PublicationIdentity } & Event)
+  | ({
+      type: "ArchiveCompensationDecided";
+      payload: CompensationDecision;
+    } & Event)
+  | ({ type: "CrawlCompleted"; payload: CompletionCrawl } & Event);
+
+type PageCapturedEvent = Event & {
+  type: "PageCaptured";
   payload: CapturedPageReference & {
     finalUrl: string;
     redirectChain: string[];
     urlKey: string;
     warcArtifacts: ArtifactReference[];
   };
-}
+};
 
 interface CrawlCompletedEvent {
   archiveId: string;
@@ -93,6 +98,98 @@ interface ManifestDocument {
 interface PublishedSearchPage {
   results: PublishedSearchResult[];
   nextCursor: string | null;
+}
+
+const PageCapturedEventSchema = {
+  type: "object",
+  properties: {
+    type: { type: "string", const: "PageCaptured" },
+    version: { type: "integer", const: 1 },
+    messageId: { type: "string", minLength: 1 },
+    correlationId: { type: "string", minLength: 1 },
+    occurredAt: { type: "string", format: "date-time" },
+    payload: {
+      type: "object",
+      properties: {
+        archiveId: { type: "string", minLength: 1 },
+        snapshotId: { type: "string", minLength: 1 },
+        url: { type: "string", minLength: 1 },
+        finalUrl: { type: "string", minLength: 1 },
+        capturedAt: { type: "string", format: "date-time" },
+        contentType: { type: "string", nullable: true },
+        urlKey: { type: "string", minLength: 1 },
+        redirectChain: {
+          type: "array",
+          items: { type: "string", minLength: 1 },
+        },
+        warcArtifacts: {
+          type: "array",
+          items: ArtifactReferenceSchema,
+          minItems: 1,
+        },
+      },
+      required: [
+        "archiveId",
+        "snapshotId",
+        "url",
+        "finalUrl",
+        "capturedAt",
+        "urlKey",
+        "redirectChain",
+        "warcArtifacts",
+      ],
+      additionalProperties: false,
+    },
+  },
+  required: [
+    "type",
+    "version",
+    "messageId",
+    "correlationId",
+    "occurredAt",
+    "payload",
+  ],
+  additionalProperties: false,
+} as const;
+
+const pageCapturedEventValidator = createSchemaValidator<PageCapturedEvent>(
+  PageCapturedEventSchema,
+);
+
+function isPageCapturedEvent(value: unknown): value is PageCapturedEvent {
+  return (
+    pageCapturedEventValidator.validate(value) &&
+    value.payload.archiveId === value.correlationId
+  );
+}
+
+const PublicationEventSchema = {
+  type: "object",
+  properties: {
+    type: { type: "string" },
+    version: { type: "integer", const: 1 },
+    messageId: { type: "string", minLength: 1 },
+    correlationId: { type: "string", minLength: 1 },
+    occurredAt: { type: "string", format: "date-time" },
+    payload: { type: "object" },
+  },
+  required: [
+    "type",
+    "version",
+    "messageId",
+    "correlationId",
+    "occurredAt",
+    "payload",
+  ],
+  additionalProperties: false,
+} as const;
+
+const publicationEventValidator = createSchemaValidator<PublicationEvent>(
+  PublicationEventSchema,
+);
+
+function isPublicationEvent(value: unknown): value is PublicationEvent {
+  return publicationEventValidator.validate(value);
 }
 
 const ManifestSnapshotSchema = {
@@ -161,8 +258,12 @@ function isManifestDocument(value: unknown): value is ManifestDocument {
 export {
   ManifestDocumentSchema,
   ManifestSnapshotSchema,
+  PageCapturedEventSchema,
+  PublicationEventSchema,
+  isPageCapturedEvent,
   isManifestDocument,
   isManifestSnapshot,
+  isPublicationEvent,
 };
 
 export type {
