@@ -121,9 +121,12 @@ func stackEnvironment(t *testing.T, terraformDir string) map[string]string {
 	t.Helper()
 
 	return map[string]string{
-		"TERRAFORM_DIR":            terraformDir,
-		"TERRAFORM_UID":            strconv.Itoa(os.Getuid()),
-		"TERRAFORM_GID":            strconv.Itoa(os.Getgid()),
+		"AWS_REGION": "us-east-1",
+
+		"TERRAFORM_DIR": terraformDir,
+		"TERRAFORM_UID": strconv.Itoa(os.Getuid()),
+		"TERRAFORM_GID": strconv.Itoa(os.Getgid()),
+
 		"MINISTACK_PORT":           "0",
 		"RABBITMQ_PORT":            "0",
 		"RABBITMQ_MANAGEMENT_PORT": "0",
@@ -289,7 +292,6 @@ func Start(t *testing.T) Dependencies {
 		Search:      search,
 	}
 }
-
 
 func logServiceContainer(t *testing.T, ctx context.Context, stack compose.ComposeStack, name string) {
 	t.Helper()
