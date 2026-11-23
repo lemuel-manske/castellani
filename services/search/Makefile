@@ -26,8 +26,10 @@ check:
 test-unit:
 	npm test
 
-test-integration:
-	SEARCH_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
+test-integration: test-infra-up
+	ACCESS_KEY_ID=minio \
+		SECRET_ACCESS_KEY=minio-secret \
+		SEARCH_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
 		SEARCH_S3_ENDPOINT_URL=http://localhost:9000 \
 		SEARCH_OPENSEARCH_URL=http://localhost:9200 \
 		SEARCH_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
