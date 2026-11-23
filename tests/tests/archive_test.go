@@ -20,7 +20,6 @@ func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-
 	request.Header.Set("Content-Type", "application/json")
 
 	response, err := http.DefaultClient.Do(request)
@@ -56,7 +55,6 @@ func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
 		strings.NewReader("{}"),
 	)
 	require.NoError(t, err)
-
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Idempotency-Key", "short")
@@ -98,7 +96,6 @@ func TestGateway_CreateArchiveAcceptsValidSubmission(t *testing.T) {
 		}`),
 	)
 	require.NoError(t, err)
-
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Idempotency-Key", "archive-test-0001")
