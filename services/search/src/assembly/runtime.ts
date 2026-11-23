@@ -110,7 +110,7 @@ class SearchRuntime {
     );
 
     try {
-      await ensureSearchIndex(opensearch, this.settings.searchIndexName);
+      await ensureSearchIndex(opensearch);
 
       await searchServer.listen({
         host: this.settings.httpHost,
