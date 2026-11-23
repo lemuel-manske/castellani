@@ -1,9 +1,6 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
-import type { ArtifactReference } from "../../../ports/artifacts.js";
-import type {
-  CompensationDecision,
-  PublicationIdentity,
-} from "../../../domain.js";
+import { isArtifactReference } from "../../../ports/artifacts.js";
+import { isCompensationDecision, isPublicationIdentity } from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
 
@@ -22,64 +19,11 @@ const DEAD_LETTER_QUEUE = "castellani.search.publication.dead.v1";
 const MAX_DELIVERY_RETRIES = 5;
 const RETRY_DELAY_MILLISECONDS = 5000;
 
-interface PublicationConsumerTopology {
-  eventsExchange: string;
-  routingKeys: readonly string[];
-  queue: string;
-  retryExchange: string;
-  retryQueue: string;
-  deadLetterExchange: string;
-  deadLetterQueue: string;
-}
-
-const DEFAULT_TOPOLOGY: PublicationConsumerTopology = {
-  eventsExchange: EVENTS_EXCHANGE,
-  routingKeys: PUBLICATION_ROUTING_KEYS,
-  queue: PUBLICATION_QUEUE,
-  retryExchange: RETRY_EXCHANGE,
-  retryQueue: RETRY_QUEUE,
-  deadLetterExchange: DEAD_LETTER_EXCHANGE,
-  deadLetterQueue: DEAD_LETTER_QUEUE,
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
-}
-function isIdentity(value: unknown): value is PublicationIdentity {
-  return (
-    isRecord(value) &&
-    nonEmpty(value.archiveId) &&
-    typeof value.decisionVersion === "number" &&
-    Number.isSafeInteger(value.decisionVersion) &&
-    value.decisionVersion >= 1 &&
-    nonEmpty(value.packageDigest)
-  );
-}
-function isCompensation(value: unknown): value is CompensationDecision {
-  return (
-    isRecord(value) &&
-    nonEmpty(value.archiveId) &&
-    typeof value.decisionVersion === "number" &&
-    Number.isSafeInteger(value.decisionVersion) &&
-    value.decisionVersion >= 1 &&
-    nonEmpty(value.reasonCode)
-  );
-}
-function isArtifact(value: unknown): value is ArtifactReference {
-  return (
-    isRecord(value) &&
-    nonEmpty(value.bucket) &&
-    nonEmpty(value.key) &&
-    nonEmpty(value.sha256) &&
-    /^[a-f0-9]{64}$/.test(value.sha256) &&
-    typeof value.sizeBytes === "number" &&
-    Number.isSafeInteger(value.sizeBytes) &&
-    value.sizeBytes >= 0 &&
-    (value.versionId === undefined || nonEmpty(value.versionId))
-  );
 }
 function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
   let envelope: unknown;
@@ -108,17 +52,17 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
     envelope.type === "ArchivePublicationDecided" ||
     envelope.type === "ArchivePublished"
   ) {
-    return isIdentity(payload) ? { type: envelope.type, payload } : null;
+    return isPublicationIdentity(payload) ? { type: envelope.type, payload } : null;
   }
 
   if (envelope.type === "ArchiveCompensationDecided") {
-    return isCompensation(payload) ? { type: envelope.type, payload } : null;
+    return isCompensationDecision(payload) ? { type: envelope.type, payload } : null;
   }
 
   if (envelope.type === "CrawlCompleted") {
     return nonEmpty(payload.archiveId) &&
       nonEmpty(payload.manifestDigest) &&
-      isArtifact(payload.manifest)
+      isArtifactReference(payload.manifest)
       ? {
           type: "CrawlCompleted",
           payload: {
@@ -132,13 +76,13 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
 
   return null;
 }
-function retryCount(message: ConsumeMessage, queue: string): number {
+function retryCount(message: ConsumeMessage): number {
   const deaths: unknown = message.properties.headers?.["x-death"];
 
   if (!Array.isArray(deaths)) return 0;
 
   const death = (deaths as unknown[]).find(
-    (entry: unknown) => isRecord(entry) && entry.queue === queue,
+    (entry: unknown) => isRecord(entry) && entry.queue === RETRY_QUEUE,
   );
 
   if (!isRecord(death)) return 0;
@@ -153,12 +97,11 @@ function retryCount(message: ConsumeMessage, queue: string): number {
 }
 function publishDeadLetter(
   channel: ConfirmChannel,
-  topology: PublicationConsumerTopology,
   message: ConsumeMessage,
 ): Promise<void> {
   return new Promise((resolve, reject) =>
     channel.publish(
-      topology.deadLetterExchange,
+      DEAD_LETTER_EXCHANGE,
       "",
       message.content,
       {
@@ -192,7 +135,6 @@ async function handleMessage(
   channel: ConfirmChannel,
   message: ConsumeMessage | null,
   handle: (event: PublicationEvent) => Promise<void>,
-  topology: PublicationConsumerTopology,
 ): Promise<void> {
   if (message === null) return;
 
@@ -200,10 +142,10 @@ async function handleMessage(
 
   if (
     event === null ||
-    retryCount(message, topology.retryQueue) >= MAX_DELIVERY_RETRIES
+    retryCount(message) >= MAX_DELIVERY_RETRIES
   ) {
     try {
-      await publishDeadLetter(channel, topology, message);
+      await publishDeadLetter(channel, message);
       channel.ack(message);
     } catch {
       channel.nack(message, false, true);
@@ -217,7 +159,7 @@ async function handleMessage(
   } catch (error) {
     if (error instanceof PublicationConflictError) {
       try {
-        await publishDeadLetter(channel, topology, message);
+        await publishDeadLetter(channel, message);
         channel.ack(message);
       } catch {
         channel.nack(message, false, true);
@@ -231,47 +173,46 @@ async function handleMessage(
 async function startPublicationConsumer(
   channel: ConfirmChannel,
   handle: (event: PublicationEvent) => Promise<void>,
-  topology: PublicationConsumerTopology = DEFAULT_TOPOLOGY,
 ): Promise<void> {
-  await channel.assertExchange(topology.eventsExchange, "topic", {
+  await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
     durable: true,
   });
-  await channel.assertExchange(topology.retryExchange, "direct", {
+  await channel.assertExchange(RETRY_EXCHANGE, "direct", {
     durable: true,
   });
-  await channel.assertExchange(topology.deadLetterExchange, "fanout", {
+  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", {
     durable: true,
   });
-  await channel.assertQueue(topology.deadLetterQueue, { durable: true });
+  await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
   await channel.bindQueue(
-    topology.deadLetterQueue,
-    topology.deadLetterExchange,
+    DEAD_LETTER_QUEUE,
+    DEAD_LETTER_EXCHANGE,
     "",
   );
-  await channel.assertQueue(topology.retryQueue, {
+  await channel.assertQueue(RETRY_QUEUE, {
     durable: true,
     arguments: {
       "x-message-ttl": RETRY_DELAY_MILLISECONDS,
-      "x-dead-letter-exchange": topology.eventsExchange,
+      "x-dead-letter-exchange": EVENTS_EXCHANGE,
     },
   });
   await Promise.all(
-    topology.routingKeys.map((key) =>
-      channel.bindQueue(topology.retryQueue, topology.retryExchange, key),
+    PUBLICATION_ROUTING_KEYS.map((key) =>
+      channel.bindQueue(RETRY_QUEUE, RETRY_EXCHANGE, key),
     ),
   );
-  await channel.assertQueue(topology.queue, {
+  await channel.assertQueue(PUBLICATION_QUEUE, {
     durable: true,
-    arguments: { "x-dead-letter-exchange": topology.retryExchange },
+    arguments: { "x-dead-letter-exchange": RETRY_EXCHANGE },
   });
   await Promise.all(
-    topology.routingKeys.map((key) =>
-      channel.bindQueue(topology.queue, topology.eventsExchange, key),
+    PUBLICATION_ROUTING_KEYS.map((key) =>
+      channel.bindQueue(PUBLICATION_QUEUE, EVENTS_EXCHANGE, key),
     ),
   );
   await channel.prefetch(1);
-  await channel.consume(topology.queue, (message) => {
-    void handleMessage(channel, message, handle, topology);
+  await channel.consume(PUBLICATION_QUEUE, (message) => {
+    void handleMessage(channel, message, handle);
   });
 }
 export {
@@ -286,4 +227,3 @@ export {
   parsePublicationEvent,
   startPublicationConsumer,
 };
-export type { PublicationConsumerTopology };
