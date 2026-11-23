@@ -149,6 +149,18 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue(common.ArchiveIDParameter)
 
+	if !httpx.ValidPathSegment(id) {
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Archive ID is invalid.",
+		))
+
+		return
+	}
+
 	archive, err := h.app.GetArchive(r.Context(), id)
 
 	if err != nil {
@@ -197,21 +209,11 @@ func writeFailure(
 		kind = "invalid-archive"
 		title = "Invalid Archive"
 		detail = err.Error()
-	case errors.Is(err, application.ErrInvalidIdempotencyKey):
-		status = http.StatusBadRequest
-		kind = "invalid-idempotency-key"
-		title = "Invalid Idempotency Key"
-		detail = "Idempotency-Key is invalid."
 	case errors.Is(err, application.ErrIdempotencyConflict):
 		status = http.StatusConflict
 		kind = "idempotency-conflict"
 		title = "Idempotency Conflict"
 		detail = "Idempotency-Key was used for a different archive submission."
-	case errors.Is(err, application.ErrInvalidArchiveID):
-		status = http.StatusBadRequest
-		kind = "invalid-archive-id"
-		title = "Invalid Archive ID"
-		detail = "Archive ID is invalid."
 	case errors.Is(err, application.ErrArchiveNotFound):
 		status = http.StatusNotFound
 		kind = "archive-not-found"
