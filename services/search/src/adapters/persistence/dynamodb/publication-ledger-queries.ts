@@ -6,6 +6,7 @@ import type {
   PublicationIdentity,
 } from "../../../domain.js";
 import { emptyPublicationFacts } from "../../../domain/publication.js";
+import { PUBLICATION_LEDGER } from "./tables.js";
 
 interface PublicationLedgerItem {
   publicationDecision?: string;
@@ -15,12 +16,11 @@ interface PublicationLedgerItem {
 
 async function getPublicationFacts(
   client: DynamoDBDocumentClient,
-  tableName: string,
   archiveId: string,
 ): Promise<PublicationFacts> {
   const response = await client.send(
     new GetCommand({
-      TableName: tableName,
+      TableName: PUBLICATION_LEDGER,
       Key: { archiveId },
       ConsistentRead: true,
     }),
@@ -31,12 +31,11 @@ async function getPublicationFacts(
 
 async function recordPublicationDecisionQuery(
   client: DynamoDBDocumentClient,
-  tableName: string,
   identity: PublicationIdentity,
 ): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: PUBLICATION_LEDGER,
       Key: { archiveId: identity.archiveId },
       UpdateExpression: "SET #publication = :identity",
       ConditionExpression:
@@ -53,12 +52,11 @@ async function recordPublicationDecisionQuery(
 
 async function recordReplayPublishedQuery(
   client: DynamoDBDocumentClient,
-  tableName: string,
   identity: PublicationIdentity,
 ): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: PUBLICATION_LEDGER,
       Key: { archiveId: identity.archiveId },
       UpdateExpression: "SET #replay = :identity",
       ConditionExpression:
@@ -75,12 +73,11 @@ async function recordReplayPublishedQuery(
 
 async function recordCompensationDecisionQuery(
   client: DynamoDBDocumentClient,
-  tableName: string,
   decision: CompensationDecision,
 ): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: PUBLICATION_LEDGER,
       Key: { archiveId: decision.archiveId },
       UpdateExpression: "SET #compensation = :identity",
       ConditionExpression:

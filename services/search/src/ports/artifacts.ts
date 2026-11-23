@@ -15,7 +15,6 @@ interface CapturedPageReference {
   url: string;
   finalUrl?: string;
   capturedAt: string;
-  contentType?: string;
 }
 
 interface ArtifactObjectReader {
@@ -27,6 +26,22 @@ interface CapturedPageReader {
     page: CapturedPageReference,
     artifacts: readonly ArtifactReference[],
   ): Promise<CapturedPage>;
+}
+
+class ArtifactIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    this.name = "ArtifactIntegrityError";
+  }
+}
+
+class CapturedResponseNotFoundError extends Error {
+  constructor(snapshotId: string, targetUrl: string) {
+    super(`no WARC response found for snapshot ${snapshotId} at ${targetUrl}`);
+
+    this.name = "CapturedResponseNotFoundError";
+  }
 }
 
 const ArtifactReferenceSchema = {
@@ -50,7 +65,12 @@ function isArtifactReference(value: unknown): value is ArtifactReference {
   return artifactReferenceValidator.validate(value);
 }
 
-export { ArtifactReferenceSchema, isArtifactReference };
+export {
+  ArtifactIntegrityError,
+  CapturedResponseNotFoundError,
+  ArtifactReferenceSchema,
+  isArtifactReference,
+};
 
 export type {
   ArtifactObjectReader,

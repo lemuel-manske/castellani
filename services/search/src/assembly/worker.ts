@@ -1,6 +1,8 @@
 import * as amqp from "amqplib";
+
 import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
+
 import type {
   PageCapturedEvent,
   PageCapturedResult,
@@ -54,6 +56,7 @@ class SearchWorker {
           pageCapturedChannel,
           this.handlers.pageCaptured,
         );
+
         await startPublicationConsumer(
           publicationChannel,
           this.handlers.publicationEvent,

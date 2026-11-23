@@ -16,23 +16,13 @@ import {
   recordPublicationDecisionQuery,
   recordReplayPublishedQuery,
 } from "./publication-ledger-queries.js";
+import { isConditionalCheckFailure } from "./error-handling.js";
 
 class DynamoDBPublicationLedger implements PublicationLedger {
-  constructor(
-    private readonly client: DynamoDBDocumentClient,
-    private readonly tableName: string,
-  ) {
-    if (!tableName.trim()) {
-      throw new Error("publication ledger table name must not be empty");
-    }
-  }
+  constructor(private readonly client: DynamoDBDocumentClient) {}
 
   async get(archiveId: string) {
-    if (!archiveId) {
-      throw new Error("archiveId must not be empty");
-    }
-
-    return getPublicationFacts(this.client, this.tableName, archiveId);
+    return getPublicationFacts(this.client, archiveId);
   }
 
   async recordPublicationDecision(
@@ -43,11 +33,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     recordPublicationDecision(facts, identity);
 
     try {
-      await recordPublicationDecisionQuery(
-        this.client,
-        this.tableName,
-        identity,
-      );
+      await recordPublicationDecisionQuery(this.client, identity);
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;
@@ -71,7 +57,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     recordReplayPublished(facts, identity);
 
     try {
-      await recordReplayPublishedQuery(this.client, this.tableName, identity);
+      await recordReplayPublishedQuery(this.client, identity);
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;
@@ -99,7 +85,6 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     try {
       await recordCompensationDecisionQuery(
         this.client,
-        this.tableName,
         decision,
       );
     } catch (error) {
@@ -118,12 +103,6 @@ class DynamoDBPublicationLedger implements PublicationLedger {
       );
     }
   }
-}
-
-function isConditionalCheckFailure(error: unknown): boolean {
-  return (
-    error instanceof Error && error.name === "ConditionalCheckFailedException"
-  );
 }
 
 export { DynamoDBPublicationLedger };

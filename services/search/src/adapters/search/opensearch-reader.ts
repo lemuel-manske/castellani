@@ -6,6 +6,9 @@ import type {
   SearchDocumentReader,
   SearchQuery,
 } from "../../ports/search-reader.js";
+import { readJSON } from "../../utils.js";
+
+import { SEARCH_INDEX_NAME } from "./topology.js";
 
 type SearchSortCursor = [number, string | number, string];
 
@@ -34,15 +37,14 @@ function decodeCursor(
   }
 
   try {
-    const value: unknown = JSON.parse(
-      Buffer.from(cursor, "base64url").toString("utf8"),
-    );
+    const value = readJSON(cursor);
 
     if (!Array.isArray(value) || value.length !== 3) {
       throw new Error("invalid search cursor");
     }
 
     const sortValues: unknown[] = value;
+
     const [score, capturedAt, snapshotId] = sortValues;
 
     if (
@@ -83,12 +85,7 @@ function snippetFromHit(hit: SearchHit, document: SearchDocument): string {
 
 function createOpenSearchDocumentReader(
   client: Client,
-  indexName: string,
 ): SearchDocumentReader {
-  if (!indexName.trim()) {
-    throw new Error("OpenSearch index name must not be empty");
-  }
-
   return {
     async search(
       query: SearchQuery,
@@ -99,9 +96,11 @@ function createOpenSearchDocumentReader(
         ...(query.archiveId === undefined
           ? []
           : [{ term: { archiveId: query.archiveId } }]),
+
         ...(query.snapshotId === undefined
           ? []
           : [{ term: { snapshotId: query.snapshotId } }]),
+
         ...(query.capturedFrom === undefined && query.capturedTo === undefined
           ? []
           : [
@@ -119,9 +118,11 @@ function createOpenSearchDocumentReader(
               },
             ]),
       ];
+
       const searchAfter = decodeCursor(cursor);
+
       const response = (await client.search({
-        index: indexName,
+        index: SEARCH_INDEX_NAME,
         body: {
           size: limit,
           query: {
@@ -155,6 +156,7 @@ function createOpenSearchDocumentReader(
       })) as unknown as { body: SearchResponse };
 
       const hits = response.body.hits?.hits ?? [];
+
       const candidates: SearchDocumentCandidate[] = hits.flatMap((hit) => {
         if (!hit._source) {
           return [];
@@ -169,6 +171,7 @@ function createOpenSearchDocumentReader(
           },
         ];
       });
+
       const nextCursor =
         hits.length === limit && hits.length > 0
           ? encodeCursor(hits[hits.length - 1]?.sort)

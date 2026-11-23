@@ -18,6 +18,24 @@ type IndexingClaimResult =
       outcome: TerminalIndexingOutcome;
     };
 
+class IndexingClaimLostError extends Error {
+  constructor(snapshotId: string) {
+    super(`indexing claim was lost for snapshot ${snapshotId}`);
+
+    this.name = "IndexingClaimLostError";
+  }
+}
+
+class IndexingIdentityConflictError extends Error {
+  constructor(snapshotId: string) {
+    super(
+      `snapshot identity conflicts with existing ledger entry: ${snapshotId}`,
+    );
+
+    this.name = "IndexingIdentityConflictError";
+  }
+}
+
 interface IndexingLedger {
   claim(
     archiveId: string,
@@ -37,5 +55,7 @@ interface IndexingLedger {
 
   listByArchive(archiveId: string): Promise<SnapshotLedgerEntry[]>;
 }
+
+export { IndexingClaimLostError, IndexingIdentityConflictError };
 
 export type { IndexingClaimResult, IndexingLedger, SnapshotClaim };

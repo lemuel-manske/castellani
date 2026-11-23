@@ -12,13 +12,7 @@ import {
 } from "./manifest-ledger-queries.js";
 
 class DynamoDBManifestLedger implements ManifestLedger {
-  constructor(
-    private readonly client: DynamoDBDocumentClient,
-    private readonly tableName: string,
-  ) {
-    if (!tableName.trim())
-      throw new Error("manifest ledger table name must not be empty");
-  }
+  constructor(private readonly client: DynamoDBDocumentClient) {}
 
   async record(manifest: ArchiveManifest): Promise<void> {
     if (
@@ -30,11 +24,7 @@ class DynamoDBManifestLedger implements ManifestLedger {
       throw new Error("invalid archive manifest");
     }
 
-    const existing = await getMetadata(
-      this.client,
-      this.tableName,
-      manifest.archiveId,
-    );
+    const existing = await getMetadata(this.client, manifest.archiveId);
 
     if (
       existing &&
@@ -47,9 +37,10 @@ class DynamoDBManifestLedger implements ManifestLedger {
     }
 
     for (const snapshotId of manifest.snapshotIds) {
-      await putSnapshot(this.client, this.tableName, manifest, snapshotId);
+      await putSnapshot(this.client, manifest, snapshotId);
     }
-    await putMetadata(this.client, this.tableName, manifest);
+
+    await putMetadata(this.client, manifest);
   }
 
   async contains(
@@ -57,7 +48,7 @@ class DynamoDBManifestLedger implements ManifestLedger {
     snapshotId: string,
     collectionId?: string,
   ): Promise<boolean> {
-    const metadata = await getMetadata(this.client, this.tableName, archiveId);
+    const metadata = await getMetadata(this.client, archiveId);
 
     if (
       !metadata ||
@@ -66,12 +57,8 @@ class DynamoDBManifestLedger implements ManifestLedger {
       return false;
 
     return (
-      (await getSnapshotDigest(
-        this.client,
-        this.tableName,
-        archiveId,
-        snapshotId,
-      )) === metadata.manifestDigest
+      (await getSnapshotDigest(this.client, archiveId, snapshotId)) ===
+      metadata.manifestDigest
     );
   }
 }

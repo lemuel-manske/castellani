@@ -3,13 +3,13 @@ import type {
   DynamoDBDocumentClient,
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
-import type { IndexingOutcome, SnapshotLedgerEntry } from "../../../domain.js";
-import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";
-
-type TerminalOutcome = Extract<
+import type {
   IndexingOutcome,
-  "INDEXED" | "UNSUPPORTED" | "FAILED"
->;
+  TerminalIndexingOutcome,
+  SnapshotLedgerEntry,
+} from "../../../domain.js";
+import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";
+import { INDEXING_LEDGER } from "./tables.js";
 
 interface LedgerItem {
   archiveId?: string;
@@ -39,7 +39,7 @@ interface ExhaustIndexingEntryInput {
 
 interface CompleteIndexingEntryInput {
   claim: SnapshotClaim;
-  outcome: TerminalOutcome;
+  outcome: TerminalIndexingOutcome;
   reasonCode?: string;
   now: number;
 }
@@ -52,12 +52,11 @@ interface ReleaseIndexingEntryInput {
 
 async function claimIndexingEntry(
   client: DynamoDBDocumentClient,
-  tableName: string,
   input: ClaimIndexingEntryInput,
 ): Promise<LedgerItem> {
   const response = await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: INDEXING_LEDGER,
       Key: { snapshotId: input.snapshotId },
       UpdateExpression:
         "SET #archive = :archive, #state = :processing, #token = :token, #lease = :lease, #attempts = if_not_exists(#attempts, :zero) + :one, #message = :message, #updated = :now",
@@ -94,12 +93,11 @@ async function claimIndexingEntry(
 
 async function exhaustIndexingEntry(
   client: DynamoDBDocumentClient,
-  tableName: string,
   input: ExhaustIndexingEntryInput,
 ): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: INDEXING_LEDGER,
       Key: { snapshotId: input.snapshotId },
       UpdateExpression:
         "SET #state = :failed, #reason = :reason, #updated = :now REMOVE #token, #lease",
@@ -130,7 +128,6 @@ async function exhaustIndexingEntry(
 
 async function listIndexingEntriesByArchive(
   client: DynamoDBDocumentClient,
-  tableName: string,
   archiveId: string,
 ): Promise<SnapshotLedgerEntry[]> {
   const entries: SnapshotLedgerEntry[] = [];
@@ -139,7 +136,7 @@ async function listIndexingEntriesByArchive(
   do {
     const response = await client.send(
       new QueryCommand({
-        TableName: tableName,
+        TableName: INDEXING_LEDGER,
         IndexName: "archiveId-snapshotId-index",
         KeyConditionExpression: "#archive = :archive",
         ProjectionExpression: "#snapshot, #state",
@@ -169,12 +166,11 @@ async function listIndexingEntriesByArchive(
 
 async function getIndexingEntry(
   client: DynamoDBDocumentClient,
-  tableName: string,
   snapshotId: string,
 ): Promise<LedgerItem | undefined> {
   const response = await client.send(
     new GetCommand({
-      TableName: tableName,
+      TableName: INDEXING_LEDGER,
       Key: { snapshotId },
       ConsistentRead: true,
     }),
@@ -185,14 +181,13 @@ async function getIndexingEntry(
 
 async function completeIndexingEntry(
   client: DynamoDBDocumentClient,
-  tableName: string,
   input: CompleteIndexingEntryInput,
 ): Promise<void> {
   const hasReason = input.reasonCode !== undefined;
 
   await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: INDEXING_LEDGER,
       Key: { snapshotId: input.claim.snapshotId },
       UpdateExpression: hasReason
         ? "SET #state = :outcome, #reason = :reason, #updated = :now REMOVE #token, #lease"
@@ -221,12 +216,11 @@ async function completeIndexingEntry(
 
 async function releaseIndexingEntry(
   client: DynamoDBDocumentClient,
-  tableName: string,
   input: ReleaseIndexingEntryInput,
 ): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: tableName,
+      TableName: INDEXING_LEDGER,
       Key: { snapshotId: input.claim.snapshotId },
       UpdateExpression:
         "SET #state = :pending, #reason = :reason, #updated = :now REMOVE #token, #lease",

@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
+
 import { WARCParser } from "warcio";
+
 import type { CapturedPage } from "../../domain/content.js";
+
+import {
+  ArtifactIntegrityError,
+  CapturedResponseNotFoundError,
+} from "../../ports/artifacts.js";
 import type {
   ArtifactObjectReader,
   ArtifactReference,
@@ -8,25 +15,12 @@ import type {
   CapturedPageReference,
 } from "../../ports/artifacts.js";
 
-class ArtifactIntegrityError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArtifactIntegrityError";
-  }
-}
-
-class CapturedResponseNotFoundError extends Error {
-  constructor(snapshotId: string, targetUrl: string) {
-    super(`no WARC response found for snapshot ${snapshotId} at ${targetUrl}`);
-    this.name = "CapturedResponseNotFoundError";
-  }
-}
-
 async function* verifiedChunks(
   body: AsyncIterable<Uint8Array>,
   reference: ArtifactReference,
 ): AsyncGenerator<Uint8Array> {
   const digest = createHash("sha256");
+
   let sizeBytes = 0;
 
   for await (const chunk of body) {
@@ -50,6 +44,7 @@ async function* verifiedChunks(
 
 async function drainRecord(record: AsyncIterable<Uint8Array>): Promise<void> {
   const iterator = record[Symbol.asyncIterator]();
+
   let result = await iterator.next();
 
   while (!result.done) {
@@ -60,16 +55,18 @@ async function drainRecord(record: AsyncIterable<Uint8Array>): Promise<void> {
 async function readWarcArtifact(
   reference: ArtifactReference,
   targetUrl: string,
-  contentType: string | undefined,
   reader: ArtifactObjectReader,
 ): Promise<{ content: string; contentType: string } | null> {
   const body = await reader.getObject(reference);
+
   const parser = new WARCParser(verifiedChunks(body, reference));
+
   let capturedResponse: { content: string; contentType: string } | null = null;
 
   for await (const record of parser) {
     if (record.warcType !== "response" || record.warcTargetURI !== targetUrl) {
       await drainRecord(record);
+
       continue;
     }
 
@@ -81,12 +78,11 @@ async function readWarcArtifact(
       );
     }
 
+    const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+
     capturedResponse = {
       content: await record.contentText(),
-      contentType:
-        response.headers.get("content-type") ??
-        contentType ??
-        "application/octet-stream",
+      contentType: contentType,
     };
   }
 
@@ -110,7 +106,6 @@ async function readCapturedPage(
     const response = await readWarcArtifact(
       artifact,
       finalUrl,
-      page.contentType,
       reader,
     );
 
@@ -124,7 +119,6 @@ async function readCapturedPage(
       url: page.url,
       finalUrl,
       capturedAt: page.capturedAt,
-      contentType: response.contentType,
       content: response.content,
     };
   }

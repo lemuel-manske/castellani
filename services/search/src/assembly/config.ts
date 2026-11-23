@@ -1,5 +1,7 @@
 interface SearchSettingsOptions {
   awsRegion: string;
+  awsAccessKeyId: string;
+  awsSecretAccessKey: string;
   httpHost: string;
   httpPort: number;
   dynamodbEndpointUrl: string;
@@ -7,10 +9,6 @@ interface SearchSettingsOptions {
   rabbitmqUrl: string;
   opensearchUrl: string;
   artifactBucket: string;
-  indexingLedgerTableName: string;
-  publicationLedgerTableName: string;
-  manifestLedgerTableName: string;
-  searchIndexName: string;
   indexingLeaseDurationSeconds?: number;
   indexingMaxAttempts?: number;
   reconnectDelayMilliseconds?: number;
@@ -18,6 +16,7 @@ interface SearchSettingsOptions {
 
 const DEFAULT_HTTP_HOST = "0.0.0.0";
 const DEFAULT_HTTP_PORT = 8082;
+
 const DEFAULT_INDEXING_LEASE_DURATION_SECONDS = 120;
 const DEFAULT_INDEXING_MAX_ATTEMPTS = 5;
 const DEFAULT_RECONNECT_DELAY_MILLISECONDS = 1000;
@@ -47,6 +46,8 @@ function required(name: string, value: string | undefined): string {
 /** Runtime configuration for one Search service process. */
 class SearchSettings {
   readonly awsRegion: string;
+  readonly awsAccessKeyId: string;
+  readonly awsSecretAccessKey: string;
   readonly httpHost: string;
   readonly httpPort: number;
   readonly dynamodbEndpointUrl: string;
@@ -54,16 +55,15 @@ class SearchSettings {
   readonly rabbitmqUrl: string;
   readonly opensearchUrl: string;
   readonly artifactBucket: string;
-  readonly indexingLedgerTableName: string;
-  readonly publicationLedgerTableName: string;
-  readonly manifestLedgerTableName: string;
-  readonly searchIndexName: string;
   readonly indexingLeaseDurationSeconds: number;
   readonly indexingMaxAttempts: number;
   readonly reconnectDelayMilliseconds: number;
 
   constructor(options: SearchSettingsOptions) {
     this.awsRegion = options.awsRegion;
+    this.awsAccessKeyId = options.awsAccessKeyId;
+    this.awsSecretAccessKey = options.awsSecretAccessKey;
+
     this.httpHost = options.httpHost;
     this.httpPort = options.httpPort;
 
@@ -73,10 +73,6 @@ class SearchSettings {
     this.opensearchUrl = options.opensearchUrl;
 
     this.artifactBucket = options.artifactBucket;
-    this.indexingLedgerTableName = options.indexingLedgerTableName;
-    this.publicationLedgerTableName = options.publicationLedgerTableName;
-    this.manifestLedgerTableName = options.manifestLedgerTableName;
-    this.searchIndexName = options.searchIndexName;
 
     this.indexingLeaseDurationSeconds =
       options.indexingLeaseDurationSeconds ??
@@ -91,6 +87,14 @@ class SearchSettings {
   static fromEnvironment(env: NodeJS.ProcessEnv = process.env): SearchSettings {
     return new SearchSettings({
       awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
+      awsAccessKeyId: required(
+        "SEARCH_AWS_ACCESS_KEY_ID",
+        env.SEARCH_AWS_ACCESS_KEY_ID,
+      ),
+      awsSecretAccessKey: required(
+        "SEARCH_AWS_SECRET_ACCESS_KEY",
+        env.SEARCH_AWS_SECRET_ACCESS_KEY,
+      ),
 
       httpHost: env.SEARCH_HTTP_HOST?.trim() || DEFAULT_HTTP_HOST,
       httpPort: positiveInteger(
@@ -117,21 +121,6 @@ class SearchSettings {
         "SEARCH_ARTIFACT_BUCKET",
         env.SEARCH_ARTIFACT_BUCKET,
       ),
-
-      indexingLedgerTableName: required(
-        "SEARCH_INDEXING_LEDGER_TABLE",
-        env.SEARCH_INDEXING_LEDGER_TABLE,
-      ),
-      publicationLedgerTableName: required(
-        "SEARCH_PUBLICATION_LEDGER_TABLE",
-        env.SEARCH_PUBLICATION_LEDGER_TABLE,
-      ),
-      manifestLedgerTableName: required(
-        "SEARCH_MANIFEST_LEDGER_TABLE",
-        env.SEARCH_MANIFEST_LEDGER_TABLE,
-      ),
-
-      searchIndexName: required("SEARCH_INDEX_NAME", env.SEARCH_INDEX_NAME),
 
       indexingLeaseDurationSeconds: positiveInteger(
         "SEARCH_INDEXING_LEASE_DURATION_SECONDS",

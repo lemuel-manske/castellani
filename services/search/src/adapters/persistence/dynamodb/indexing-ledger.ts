@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import type { IndexingOutcome, SnapshotLedgerEntry } from "../../../domain.js";
+import type {
+  SnapshotLedgerEntry,
+  TerminalIndexingOutcome,
+} from "../../../domain.js";
+import {
+  IndexingClaimLostError,
+  IndexingIdentityConflictError,
+} from "../../../ports/indexing-ledger.js";
 import type {
   IndexingClaimResult,
   IndexingLedger,
@@ -14,40 +21,15 @@ import {
   listIndexingEntriesByArchive,
   releaseIndexingEntry,
 } from "./indexing-ledger-queries.js";
-
-type TerminalOutcome = Extract<
-  IndexingOutcome,
-  "INDEXED" | "UNSUPPORTED" | "FAILED"
->;
+import { isConditionalCheckFailure } from "./error-handling.js";
 
 const DEFAULT_MAX_ATTEMPTS = 5;
-
-class IndexingClaimLostError extends Error {
-  constructor(snapshotId: string) {
-    super(`indexing claim was lost for snapshot ${snapshotId}`);
-    this.name = "IndexingClaimLostError";
-  }
-}
-
-class IndexingIdentityConflictError extends Error {
-  constructor(snapshotId: string) {
-    super(
-      `snapshot identity conflicts with existing ledger entry: ${snapshotId}`,
-    );
-    this.name = "IndexingIdentityConflictError";
-  }
-}
 
 class DynamoDBIndexingLedger implements IndexingLedger {
   constructor(
     private readonly client: DynamoDBDocumentClient,
-    private readonly tableName: string,
     private readonly clock: () => number = Date.now,
-  ) {
-    if (!tableName.trim()) {
-      throw new Error("indexing ledger table name must not be empty");
-    }
-  }
+  ) {}
 
   async claim(
     archiveId: string,
@@ -72,7 +54,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
     const token = randomUUID();
 
     try {
-      const item = await claimIndexingEntry(this.client, this.tableName, {
+      const item = await claimIndexingEntry(this.client, {
         archiveId,
         snapshotId,
         messageId,
@@ -98,11 +80,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         throw error;
       }
 
-      const item = await getIndexingEntry(
-        this.client,
-        this.tableName,
-        snapshotId,
-      );
+      const item = await getIndexingEntry(this.client, snapshotId);
 
       if (item === undefined) {
         throw error;
@@ -125,31 +103,26 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         (item.state === "PROCESSING" &&
           item.leaseUntil !== undefined &&
           item.leaseUntil <= now);
+
       const attempts = item.attempts;
 
       if (leaseExpired && attempts !== undefined && attempts >= maxAttempts) {
         try {
-          await exhaustIndexingEntry(this.client, this.tableName, {
+          await exhaustIndexingEntry(this.client, {
             archiveId,
             snapshotId,
             now,
             attempts,
             maxAttempts,
           });
+
           return { status: "TERMINAL", outcome: "FAILED" };
         } catch (exhaustionError) {
-          if (
-            !(exhaustionError instanceof Error) ||
-            exhaustionError.name !== "ConditionalCheckFailedException"
-          ) {
+          if (isConditionalCheckFailure(exhaustionError)) {
             throw exhaustionError;
           }
 
-          const current = await getIndexingEntry(
-            this.client,
-            this.tableName,
-            snapshotId,
-          );
+          const current = await getIndexingEntry(this.client, snapshotId);
 
           if (current === undefined) {
             throw exhaustionError;
@@ -183,26 +156,23 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       throw new Error("archiveId must not be empty");
     }
 
-    return listIndexingEntriesByArchive(this.client, this.tableName, archiveId);
+    return listIndexingEntriesByArchive(this.client, archiveId);
   }
 
   async complete(
     claim: SnapshotClaim,
-    outcome: TerminalOutcome,
+    outcome: TerminalIndexingOutcome,
     reasonCode?: string,
   ): Promise<void> {
     try {
-      await completeIndexingEntry(this.client, this.tableName, {
+      await completeIndexingEntry(this.client, {
         claim,
         outcome,
         ...(reasonCode === undefined ? {} : { reasonCode }),
         now: this.clock() / 1000,
       });
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === "ConditionalCheckFailedException"
-      ) {
+      if (isConditionalCheckFailure(error)) {
         throw new IndexingClaimLostError(claim.snapshotId);
       }
 
@@ -212,16 +182,13 @@ class DynamoDBIndexingLedger implements IndexingLedger {
 
   async release(claim: SnapshotClaim, reason: string): Promise<void> {
     try {
-      await releaseIndexingEntry(this.client, this.tableName, {
+      await releaseIndexingEntry(this.client, {
         claim,
         reason: reason.slice(0, 1000),
         now: this.clock() / 1000,
       });
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === "ConditionalCheckFailedException"
-      ) {
+      if (isConditionalCheckFailure(error)) {
         throw new IndexingClaimLostError(claim.snapshotId);
       }
 
