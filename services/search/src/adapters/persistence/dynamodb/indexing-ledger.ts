@@ -182,7 +182,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       await releaseIndexingEntry(this.client, {
         claim,
         reason: reason.slice(0, 1000),
-        now: this.clock() / 1000,
+        now: Date.now() / 1000,
       });
     } catch (error) {
       if (isConditionalCheckFailure(error)) {
