@@ -56,14 +56,12 @@ class SearchWorker {
           break;
         }
 
-        await startPageCapturedConsumer(
-          pageCapturedChannel,
-          (event) => this.handlers.pageCaptured(event),
+        await startPageCapturedConsumer(pageCapturedChannel, (event) =>
+          this.handlers.pageCaptured(event),
         );
 
-        await startPublicationConsumer(
-          publicationChannel,
-          (event) => this.handlers.publicationEvent(event),
+        await startPublicationConsumer(publicationChannel, (event) =>
+          this.handlers.publicationEvent(event),
         );
 
         await this.waitForConnectionOrShutdown(connection, signal);
