@@ -65,19 +65,3 @@ func Start(t *testing.T) Dependencies {
 	return services
 }
 
-func logServices(t *testing.T, ctx context.Context, stack compose.ComposeStack) {
-	t.Helper()
-
-	for _, name := range []string{
-		"provision",
-		"ministack",
-		"rabbitmq",
-		"opensearch",
-		"coordinator",
-		"capture",
-		"search",
-		"gateway",
-	} {
-		logServiceContainer(t, ctx, stack, name)
-	}
-}
