@@ -38,11 +38,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var submission application.Submission
-	data, err := httpx.DecodeJSONBytes(
-		w,
-		r,
-		&submission,
-	)
+	data, err := httpx.DecodeJSONBytes(w, r, &submission)
 
 	if err != nil {
 		switch {
@@ -83,56 +79,42 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accepted, err := h.app.CreateArchive(
-		r.Context(),
-		key,
-		submission,
-		data,
-	)
+	accepted, err := h.app.CreateArchive(r.Context(), key, submission, data)
 
 	if err != nil {
-		writeFailure(
-			w,
-			r,
-			err,
-			"Admission could not be confirmed. Retry with the same Idempotency-Key.",
-		)
-
+		writeFailure(w, r, err, "Admission could not be confirmed. Retry with the same Idempotency-Key.")
 		return
 	}
 
 	accepted.StatusURL = common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
-
 	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
 
-	httpx.JSON(
-		w,
-		http.StatusAccepted,
-		accepted,
-	)
+	httpx.JSON(w, http.StatusAccepted, accepted)
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, common.ArchiveIDParameter)
 
-	document, err := h.app.GetArchive(r.Context(), id)
-
-	if err != nil {
-		writeFailure(
-			w,
+	if !httpx.ValidPathSegment(id) {
+		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
-			err,
-			"Archive status is temporarily unavailable.",
-		)
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		))
 
 		return
 	}
 
-	httpx.JSON(
-		w,
-		http.StatusOK,
-		document,
-	)
+	document, err := h.app.GetArchive(r.Context(), id)
+
+	if err != nil {
+		writeFailure(w, r, err, "Archive status is temporarily unavailable.")
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, document)
 }
 
 func writeFailure(
@@ -143,27 +125,7 @@ func writeFailure(
 ) {
 	var dependencyFailure *application.DependencyFailure
 
-	var validation *application.ValidationError
-
 	switch {
-	case errors.As(err, &validation):
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusUnprocessableEntity,
-			"invalid-archive",
-			"Invalid Archive",
-			validation.Error(),
-		))
-
-	case errors.Is(err, application.ErrInvalidArchiveID):
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-archive-id",
-			"Invalid Archive ID",
-			err.Error(),
-		))
-
 	case errors.As(err, &dependencyFailure):
 		httpx.WriteProblem(w, httpx.Problem{
 			Type:     dependencyFailure.Type,
