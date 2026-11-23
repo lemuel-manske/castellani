@@ -19,9 +19,9 @@ const PUBLICATION_TOPOLOGY = {
   ],
   queue: "castellani.search.publication",
   retryExchange: "castellani.search.publication.retry",
-  retryQueue: "castellani.search.publication.retry",
+  retryQueue: "castellani.search.publication.retry.queue",
   deadLetterExchange: "castellani.search.publication.dead",
-  deadLetterQueue: "castellani.search.publication.dead",
+  deadLetterQueue: "castellani.search.publication.dead.queue",
   retryDelayMilliseconds: 5_000,
 } as const;
 
