@@ -11,7 +11,11 @@ func (a Application) ListPages(
 		return Pages{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.ListPages(ctx, archiveID, pagination)
+	return a.capture.ListPages(
+		ctx,
+		archiveID,
+		pagination,
+	)
 }
 
 func (a Application) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (Snapshot, error) {
@@ -19,7 +23,11 @@ func (a Application) GetSnapshot(ctx context.Context, archiveID, snapshotID stri
 		return Snapshot{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.GetSnapshot(ctx, archiveID, snapshotID)
+	return a.capture.GetSnapshot(
+		ctx,
+		archiveID,
+		snapshotID,
+	)
 }
 
 func (a Application) GetWACZ(
@@ -31,5 +39,9 @@ func (a Application) GetWACZ(
 		return WACZ{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.GetWACZ(ctx, archiveID, options)
+	return a.capture.GetWACZ(
+		ctx,
+		archiveID,
+		options,
+	)
 }

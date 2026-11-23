@@ -19,7 +19,9 @@ type WACZHandler struct {
 }
 
 func NewWACZHandler(app application.Application) WACZHandler {
-	return WACZHandler{app: app}
+	return WACZHandler{
+		app: app,
+	}
 }
 
 func (h WACZHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +43,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 			"Invalid Archive ID",
 			"Invalid archive ID.",
 		))
+
 		return
 	}
 
@@ -58,6 +61,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 			"Invalid Range",
 			"Only one valid byte range is supported.",
 		))
+
 		return
 	}
 
@@ -67,10 +71,21 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 		IfRange:      ifRange,
 	}
 
-	result, err := h.app.GetWACZ(r.Context(), id, options)
+	result, err := h.app.GetWACZ(
+		r.Context(),
+		id,
+		options,
+	)
 
 	if err != nil {
-		response.WriteDependencyError(w, r, err, "Capture", "Capture returned unexpected WACZ metadata.")
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Capture",
+			"Capture returned unexpected WACZ metadata.",
+		)
+
 		return
 	}
 
@@ -93,6 +108,7 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	status := http.StatusOK
+
 	if result.Partial {
 		status = http.StatusPartialContent
 	}

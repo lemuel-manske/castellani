@@ -12,8 +12,13 @@ type Pagination struct {
 }
 
 type SearchQuery struct {
-	Text, CollectionID, ArchiveID, SnapshotID, CapturedFrom, CapturedTo string
-	Pagination                                                          Pagination
+	Text         string
+	CollectionID string
+	ArchiveID    string
+	SnapshotID   string
+	CapturedFrom string
+	CapturedTo   string
+	Pagination   Pagination
 }
 
 type SessionRequest struct {
@@ -27,9 +32,13 @@ type WACZOptions struct {
 }
 
 type WACZ struct {
-	Body                                                          io.ReadCloser
-	Partial                                                       bool
-	AcceptRanges, ContentRange, ETag, LastModified, ContentLength string
+	Body          io.ReadCloser
+	Partial       bool
+	AcceptRanges  string
+	ContentRange  string
+	ETag          string
+	LastModified  string
+	ContentLength string
 }
 
 type Pages struct {
@@ -66,12 +75,38 @@ type ArchiveAccepted struct {
 }
 
 type Capture interface {
-	ListPages(context.Context, string, Pagination) (Pages, error)
-	GetSnapshot(context.Context, string, string) (Snapshot, error)
-	GetWACZ(context.Context, string, WACZOptions) (WACZ, error)
-	CreateSession(context.Context, string, SessionRequest, []byte) (Session, error)
+	ListPages(
+		context.Context,
+		string,
+		Pagination,
+	) (Pages, error)
+
+	GetSnapshot(
+		context.Context,
+		string,
+		string,
+	) (Snapshot, error)
+
+	GetWACZ(
+		context.Context,
+		string,
+		WACZOptions,
+	) (WACZ, error)
+
+	CreateSession(
+		context.Context,
+		string,
+		SessionRequest,
+		[]byte,
+	) (Session, error)
+
 	GetSession(context.Context, string) (Session, error)
-	UpdateSession(context.Context, string, []byte) (Session, error)
+
+	UpdateSession(
+		context.Context,
+		string,
+		[]byte,
+	) (Session, error)
 }
 
 type Search interface {
@@ -79,6 +114,11 @@ type Search interface {
 }
 
 type Coordinator interface {
-	CreateArchive(context.Context, string, []byte) (ArchiveAccepted, error)
+	CreateArchive(
+		context.Context,
+		string,
+		[]byte,
+	) (ArchiveAccepted, error)
+
 	GetArchive(context.Context, string) (json.RawMessage, error)
 }

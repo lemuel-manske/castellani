@@ -26,7 +26,9 @@ type createRequest struct {
 }
 
 func NewHandler(app application.Application) Handler {
-	return Handler{app: app}
+	return Handler{
+		app: app,
+	}
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -40,57 +42,123 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			"Invalid Idempotency Key",
 			"Idempotency-Key must be 8 to 200 characters without surrounding whitespace.",
 		))
+
 		return
 	}
 
 	var input createRequest
-	raw, err := httpx.DecodeJSONBytes(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(
+		w,
+		r,
+		&input,
+	)
 
 	if err != nil {
 		switch {
 		case errors.Is(err, httpx.ErrContentType):
-			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "content-type", "Invalid Content Type", "Expected application/json."))
+			httpx.WriteProblem(w, httpx.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"content-type",
+				"Invalid Content Type",
+				"Expected application/json.",
+			))
 		case errors.Is(err, httpx.ErrExtraJSON):
-			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected exactly one JSON object."))
+			httpx.WriteProblem(w, httpx.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"invalid-json",
+				"Invalid Request",
+				"Expected exactly one JSON object.",
+			))
 		case errors.Is(err, httpx.ErrInvalidJSON):
-			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-json", "Invalid Request", "Expected a valid archive JSON object."))
+			httpx.WriteProblem(w, httpx.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"invalid-json",
+				"Invalid Request",
+				"Expected a valid archive JSON object.",
+			))
 		default:
-			httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-json", "Invalid Request", "The archive request is invalid or exceeds the size limit."))
+			httpx.WriteProblem(w, httpx.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"invalid-json",
+				"Invalid Request",
+				"The archive request is invalid or exceeds the size limit.",
+			))
 		}
+
 		return
 	}
 
-	accepted, err := h.app.CreateArchive(r.Context(), key, raw)
+	accepted, err := h.app.CreateArchive(
+		r.Context(),
+		key,
+		raw,
+	)
 
 	if err != nil {
-		writeFailure(w, r, err, "Admission could not be confirmed. Retry with the same Idempotency-Key.")
+		writeFailure(
+			w,
+			r,
+			err,
+			"Admission could not be confirmed. Retry with the same Idempotency-Key.",
+		)
+
 		return
 	}
 
 	accepted.StatusURL = common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
 	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
-	httpx.JSON(w, http.StatusAccepted, accepted)
+	httpx.JSON(
+		w,
+		http.StatusAccepted,
+		accepted,
+	)
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, common.ArchiveIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-archive-id", "Invalid Archive ID", "Invalid archive ID."))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		))
+
 		return
 	}
 
 	document, err := h.app.GetArchive(r.Context(), id)
 
 	if err != nil {
-		writeFailure(w, r, err, "Archive status is temporarily unavailable.")
+		writeFailure(
+			w,
+			r,
+			err,
+			"Archive status is temporarily unavailable.",
+		)
+
 		return
 	}
 
-	httpx.JSON(w, http.StatusOK, document)
+	httpx.JSON(
+		w,
+		http.StatusOK,
+		document,
+	)
 }
 
-func writeFailure(w http.ResponseWriter, r *http.Request, err error, unavailableDetail string) {
+func writeFailure(
+	w http.ResponseWriter,
+	r *http.Request,
+	err error,
+	unavailableDetail string,
+) {
 	var dependencyFailure *application.DependencyFailure
 
 	switch {
@@ -103,8 +171,20 @@ func writeFailure(w http.ResponseWriter, r *http.Request, err error, unavailable
 			Instance: r.URL.Path,
 		})
 	case errors.Is(err, application.ErrInvalidUpstream):
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadGateway, "invalid-upstream", "Invalid Upstream Response", "Coordinator returned an unexpected response."))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadGateway,
+			"invalid-upstream",
+			"Invalid Upstream Response",
+			"Coordinator returned an unexpected response.",
+		))
 	default:
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusServiceUnavailable, "coordinator-unavailable", "Coordinator Unavailable", unavailableDetail))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusServiceUnavailable,
+			"coordinator-unavailable",
+			"Coordinator Unavailable",
+			unavailableDetail,
+		))
 	}
 }

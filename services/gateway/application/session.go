@@ -12,7 +12,12 @@ func (a Application) CreateSession(
 		return Session{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.CreateSession(ctx, key, input, raw)
+	return a.capture.CreateSession(
+		ctx,
+		key,
+		input,
+		raw,
+	)
 }
 
 func (a Application) GetSession(ctx context.Context, sessionID string) (Session, error) {
@@ -32,5 +37,9 @@ func (a Application) UpdateSession(
 		return Session{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.UpdateSession(ctx, sessionID, raw)
+	return a.capture.UpdateSession(
+		ctx,
+		sessionID,
+		raw,
+	)
 }

@@ -30,14 +30,6 @@ type Client struct {
 	http    *http.Client
 }
 
-type Failure struct {
-	Problem httpx.Problem
-}
-
-func (f *Failure) Error() string {
-	return fmt.Sprintf("coordinator returned HTTP %d", f.Problem.Status)
-}
-
 func NewClient(origin url.URL, timeout time.Duration) *Client {
 	return &Client{
 		baseURL: origin,
@@ -65,7 +57,12 @@ func (c *Client) CreateArchive(
 	target := c.baseURL
 	target.Path = common.ArchivesPath
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), bytes.NewReader(raw))
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		target.String(),
+		bytes.NewReader(raw),
+	)
 
 	if err != nil {
 		return Accepted{}, err
@@ -81,13 +78,23 @@ func (c *Client) CreateArchive(
 	}
 
 	if status != http.StatusAccepted {
-		return Accepted{}, parseFailure(status, rawResponse)
+		var problem httpx.Problem
+
+		if err := json.Unmarshal(rawResponse, &problem); err != nil {
+			return Accepted{}, ErrInvalidResponse
+		}
+
+		return Accepted{}, &Failure{
+			Status: problem.Status,
+			Type:   problem.Type,
+			Title:  problem.Title,
+			Detail: problem.Detail,
+		}
 	}
 
 	var accepted Accepted
-	if json.Unmarshal(rawResponse, &accepted) != nil ||
-		accepted.Status != acceptedStatus ||
-		!httpx.ValidPathSegment(accepted.ArchiveID) {
+
+	if json.Unmarshal(rawResponse, &accepted) != nil {
 		return Accepted{}, ErrInvalidResponse
 	}
 
@@ -98,7 +105,12 @@ func (c *Client) GetArchive(ctx context.Context, id string) (json.RawMessage, er
 	target := c.baseURL
 	target.Path = common.ArchivePathPrefix + id
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		target.String(),
+		nil,
+	)
 
 	if err != nil {
 		return nil, err
@@ -111,7 +123,18 @@ func (c *Client) GetArchive(ctx context.Context, id string) (json.RawMessage, er
 	}
 
 	if status != http.StatusOK {
-		return nil, parseFailure(status, data)
+		var problem httpx.Problem
+
+		if err := json.Unmarshal(data, &problem); err != nil {
+			return nil, ErrInvalidResponse
+		}
+
+		return nil, &Failure{
+			Status: problem.Status,
+			Type:   problem.Type,
+			Title:  problem.Title,
+			Detail: problem.Detail,
+		}
 	}
 
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
@@ -141,18 +164,4 @@ func (c *Client) execute(request *http.Request) (int, []byte, error) {
 	}
 
 	return response.StatusCode, data, nil
-}
-
-func parseFailure(status int, data []byte) error {
-	var problem httpx.Problem
-
-	if status < http.StatusBadRequest ||
-		json.Unmarshal(data, &problem) != nil ||
-		problem.Status != status ||
-		problem.Type == "" ||
-		problem.Title == "" {
-		return ErrInvalidResponse
-	}
-
-	return &Failure{Problem: problem}
 }

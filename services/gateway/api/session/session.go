@@ -21,76 +21,163 @@ type updateRequest struct {
 }
 
 func NewHandler(app application.Application) Handler {
-	return Handler{app: app}
+	return Handler{
+		app: app,
+	}
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
 	if !httpx.ValidIdempotencyKey(key) {
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-idempotency-key", "Invalid Idempotency Key", "Idempotency-Key is required and must contain 8 to 200 characters."))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-idempotency-key",
+			"Invalid Idempotency Key",
+			"Idempotency-Key is required and must contain 8 to 200 characters.",
+		))
+
 		return
 	}
 
 	var input application.SessionRequest
-	raw, err := httpx.DecodeJSONBytes(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(
+		w,
+		r,
+		&input,
+	)
 
 	if err != nil {
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error()))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session",
+			"Invalid Session",
+			err.Error(),
+		))
+
 		return
 	}
 
-	result, err := h.app.CreateSession(r.Context(), key, input, raw)
+	result, err := h.app.CreateSession(
+		r.Context(),
+		key,
+		input,
+		raw,
+	)
 
 	if err != nil {
-		response.WriteDependencyError(w, r, err, "Capture", "Capture returned invalid session metadata.")
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Capture",
+			"Capture returned invalid session metadata.",
+		)
+
 		return
 	}
 
 	w.Header().Set(httpx.LocationHeader, common.SessionPathPrefix+url.PathEscape(result.SessionID))
-	httpx.JSON(w, http.StatusCreated, result)
+	httpx.JSON(
+		w,
+		http.StatusCreated,
+		result,
+	)
 }
 
 func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID."))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session-id",
+			"Invalid Session ID",
+			"Invalid session ID.",
+		))
+
 		return
 	}
 
 	result, err := h.app.GetSession(r.Context(), id)
 
 	if err != nil {
-		response.WriteDependencyError(w, r, err, "Capture", "Capture returned invalid session metadata.")
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Capture",
+			"Capture returned invalid session metadata.",
+		)
+
 		return
 	}
 
-	httpx.JSON(w, http.StatusOK, result)
+	httpx.JSON(
+		w,
+		http.StatusOK,
+		result,
+	)
 }
 
 func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	var input updateRequest
-	raw, err := httpx.DecodeJSONBytes(w, r, &input)
+	raw, err := httpx.DecodeJSONBytes(
+		w,
+		r,
+		&input,
+	)
 
 	if err != nil {
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error()))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session",
+			"Invalid Session",
+			err.Error(),
+		))
+
 		return
 	}
 
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
-		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID."))
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-session-id",
+			"Invalid Session ID",
+			"Invalid session ID.",
+		))
+
 		return
 	}
 
-	result, err := h.app.UpdateSession(r.Context(), id, raw)
+	result, err := h.app.UpdateSession(
+		r.Context(),
+		id,
+		raw,
+	)
 
 	if err != nil {
-		response.WriteDependencyError(w, r, err, "Capture", "Capture returned invalid session metadata.")
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Capture",
+			"Capture returned invalid session metadata.",
+		)
+
 		return
 	}
 
-	httpx.JSON(w, http.StatusOK, result)
+	httpx.JSON(
+		w,
+		http.StatusOK,
+		result,
+	)
 }

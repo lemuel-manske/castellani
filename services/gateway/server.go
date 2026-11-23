@@ -69,7 +69,11 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	}
 
 	coordinatorClient := coordinator.NewClient(*coordinatorURL, cfg.upstreamTimeout)
-	captureClient := capture.NewClient(*captureURL, cfg.upstreamTimeout, cfg.streamTimeout)
+	captureClient := capture.NewClient(
+		*captureURL,
+		cfg.upstreamTimeout,
+		cfg.streamTimeout,
+	)
 	searchClient := search.NewClient(*searchURL, cfg.upstreamTimeout)
 
 	app := assembly.NewApplication(
@@ -88,7 +92,6 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 			app,
 			logger,
 		),
-
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 		IdleTimeout:       serverIdleTimeout,

@@ -12,8 +12,10 @@ var (
 )
 
 type Failure struct {
-	Status              int
-	Type, Title, Detail string
+	Status int
+	Type   string
+	Title  string
+	Detail string
 }
 
 func (f *Failure) Error() string {

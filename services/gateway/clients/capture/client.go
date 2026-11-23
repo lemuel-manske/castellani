@@ -26,14 +26,17 @@ type Client struct {
 	http, stream *http.Client
 }
 
-func NewClient(origin url.URL, timeout, streamTimeout time.Duration) *Client {
+func NewClient(origin url.URL, httpTimeout, streamTimeout time.Duration) *Client {
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		ResponseHeaderTimeout: timeout,
+		ResponseHeaderTimeout: httpTimeout,
 		IdleConnTimeout:       90 * time.Second,
 		MaxIdleConnsPerHost:   16,
 	}
-	noRedirect := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+	noRedirect := func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 
 	if streamTimeout <= 0 {
 		streamTimeout = defaultStreamTimeout
@@ -42,7 +45,7 @@ func NewClient(origin url.URL, timeout, streamTimeout time.Duration) *Client {
 	return &Client{
 		origin: origin,
 		http: &http.Client{
-			Timeout:       timeout,
+			Timeout:       httpTimeout,
 			CheckRedirect: noRedirect,
 			Transport:     transport,
 		},
@@ -69,8 +72,17 @@ func (c *Client) ListPages(
 		query.Set("cursor", page.Cursor)
 	}
 
-	path := common.ArchivePathPrefix + url.PathEscape(archiveID) + common.PagesPathSuffix
-	request, err := c.request(ctx, http.MethodGet, path, query.Encode(), nil)
+	target := c.origin
+
+	target.Path = common.ArchivePathPrefix + url.PathEscape(archiveID) + common.PagesPathSuffix
+	target.RawQuery = query.Encode()
+
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		target.String(),
+		nil,
+	)
 
 	if err != nil {
 		return Pages{}, err
@@ -84,7 +96,7 @@ func (c *Client) ListPages(
 
 	var result Pages
 
-	if json.Unmarshal(data, &result) != nil || result.Items == nil {
+	if err := json.Unmarshal(data, &result); err != nil {
 		return Pages{}, ErrInvalidResponse
 	}
 
@@ -92,8 +104,18 @@ func (c *Client) ListPages(
 }
 
 func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (Snapshot, error) {
-	path := common.ArchivePathPrefix + url.PathEscape(archiveID) + common.SnapshotPathSegment + url.PathEscape(snapshotID)
-	request, err := c.request(ctx, http.MethodGet, path, "", nil)
+	target := c.origin
+	target.Path = common.ArchivePathPrefix +
+		url.PathEscape(archiveID) +
+		common.SnapshotPathSegment +
+		url.PathEscape(snapshotID)
+
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		target.String(),
+		nil,
+	)
 
 	if err != nil {
 		return Snapshot{}, err
@@ -107,11 +129,7 @@ func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) 
 
 	var result Snapshot
 
-	if json.Unmarshal(data, &result) != nil ||
-		result.ArchiveID != archiveID ||
-		result.SnapshotID != snapshotID ||
-		result.URL == "" ||
-		result.CapturedAt == "" {
+	if err := json.Unmarshal(data, &result); err != nil {
 		return Snapshot{}, ErrInvalidResponse
 	}
 
@@ -124,7 +142,15 @@ func (c *Client) CreateSession(
 	session SessionRequest,
 	raw []byte,
 ) (Session, error) {
-	request, err := c.request(ctx, http.MethodPost, common.SessionsPath, "", raw)
+	target := c.origin
+	target.Path = common.SessionsPath
+
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		target.String(),
+		bytes.NewReader(raw),
+	)
 
 	if err != nil {
 		return Session{}, err
@@ -139,26 +165,28 @@ func (c *Client) CreateSession(
 		return Session{}, err
 	}
 
-	return decodeSession(data, "", session.ArchiveID)
+	var result Session
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return Session{}, ErrInvalidResponse
+	}
+
+	return result, nil
 }
 
 func (c *Client) GetSession(ctx context.Context, id string) (Session, error) {
-	return c.session(ctx, http.MethodGet, id, nil)
-}
+	target := c.origin
+	target.Path = common.SessionPathPrefix + url.PathEscape(id)
 
-func (c *Client) UpdateSession(ctx context.Context, id string, raw []byte) (Session, error) {
-	return c.session(ctx, http.MethodPut, id, raw)
-}
-
-func (c *Client) session(ctx context.Context, method, id string, raw []byte) (Session, error) {
-	request, err := c.request(ctx, method, common.SessionPathPrefix+url.PathEscape(id), "", raw)
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		target.String(),
+		nil,
+	)
 
 	if err != nil {
 		return Session{}, err
-	}
-
-	if raw != nil {
-		request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
 	}
 
 	data, err := c.execute(request, http.StatusOK)
@@ -167,21 +195,45 @@ func (c *Client) session(ctx context.Context, method, id string, raw []byte) (Se
 		return Session{}, err
 	}
 
-	return decodeSession(data, id, "")
-}
-
-func decodeSession(data []byte, id, archiveID string) (Session, error) {
 	var result Session
 
-	valid := json.Unmarshal(data, &result) == nil &&
-		httpx.ValidPathSegment(result.SessionID) &&
-		httpx.ValidPathSegment(result.ArchiveID) &&
-		result.Status != "" &&
-		result.ExpiresAt != "" &&
-		(id == "" || result.SessionID == id) &&
-		(archiveID == "" || result.ArchiveID == archiveID)
+	if err := json.Unmarshal(data, &result); err != nil {
+		return Session{}, ErrInvalidResponse
+	}
 
-	if !valid {
+	return result, nil
+}
+
+func (c *Client) UpdateSession(
+	ctx context.Context,
+	id string,
+	raw []byte,
+) (Session, error) {
+	target := c.origin
+	target.Path = common.SessionPathPrefix + url.PathEscape(id)
+
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPut,
+		target.String(),
+		bytes.NewReader(raw),
+	)
+
+	if err != nil {
+		return Session{}, err
+	}
+
+	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
+
+	data, err := c.execute(request, http.StatusOK)
+
+	if err != nil {
+		return Session{}, err
+	}
+
+	var result Session
+
+	if err := json.Unmarshal(data, &result); err != nil {
 		return Session{}, ErrInvalidResponse
 	}
 
@@ -199,8 +251,15 @@ func (c *Client) GetWACZ(
 		method = http.MethodHead
 	}
 
-	path := common.ArchivePathPrefix + url.PathEscape(id) + common.WACZPathSuffix
-	request, err := c.request(ctx, method, path, "", nil)
+	target := c.origin
+	target.Path = common.ArchivePathPrefix + url.PathEscape(id) + common.WACZPathSuffix
+
+	request, err := http.NewRequestWithContext(
+		ctx,
+		method,
+		target.String(),
+		nil,
+	)
 
 	if err != nil {
 		return WACZ{}, err
@@ -217,7 +276,11 @@ func (c *Client) GetWACZ(
 	response, err := c.stream.Do(request)
 
 	if err != nil {
-		return WACZ{}, fmt.Errorf("%w: capture WACZ: %v", ErrUnavailable, err)
+		return WACZ{}, fmt.Errorf(
+			"%w: capture WACZ: %v",
+			ErrUnavailable,
+			err,
+		)
 	}
 
 	if response.StatusCode >= http.StatusBadRequest {
@@ -229,20 +292,26 @@ func (c *Client) GetWACZ(
 			return WACZ{}, ErrInvalidResponse
 		}
 
-		failure, parseErr := parseFailure(response.StatusCode, data)
+		var problem httpx.Problem
 
-		if parseErr != nil {
-			return WACZ{}, parseErr
+		if err := json.Unmarshal(data, &problem); err != nil {
+			return WACZ{}, ErrInvalidResponse
 		}
 
-		failure.ContentRange = response.Header.Get("Content-Range")
-		return WACZ{}, failure
+		return WACZ{}, &Failure{
+			Status: response.StatusCode,
+			Type:   problem.Type,
+			Title:  problem.Title,
+			Detail: problem.Detail,
+		}
 	}
 
-	success := response.StatusCode == http.StatusOK || response.StatusCode == http.StatusPartialContent
+	success := response.StatusCode == http.StatusOK ||
+		response.StatusCode == http.StatusPartialContent
 
 	if !success || response.Header.Get(httpx.HeaderContentType) != httpx.WACZMediaType {
 		response.Body.Close()
+
 		return WACZ{}, ErrInvalidResponse
 	}
 
@@ -261,7 +330,11 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	response, err := c.http.Do(request)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: capture request: %v", ErrUnavailable, err)
+		return nil, fmt.Errorf(
+			"%w: capture request: %v",
+			ErrUnavailable,
+			err,
+		)
 	}
 
 	defer response.Body.Close()
@@ -269,7 +342,11 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: read capture: %v", ErrUnavailable, err)
+		return nil, fmt.Errorf(
+			"%w: read capture: %v",
+			ErrUnavailable,
+			err,
+		)
 	}
 
 	if len(data) > maxJSONBytes {
@@ -281,13 +358,18 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 			return nil, ErrInvalidResponse
 		}
 
-		failure, parseErr := parseFailure(response.StatusCode, data)
+		var problem httpx.Problem
 
-		if parseErr != nil {
-			return nil, parseErr
+		if err := json.Unmarshal(data, &problem); err != nil {
+			return nil, ErrInvalidResponse
 		}
 
-		return nil, failure
+		return nil, &Failure{
+			Status: problem.Status,
+			Type:   problem.Type,
+			Title:  problem.Title,
+			Detail: problem.Detail,
+		}
 	}
 
 	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
@@ -295,41 +377,4 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	}
 
 	return data, nil
-}
-
-func (c *Client) request(
-	ctx context.Context,
-	method, path, query string,
-	body []byte,
-) (*http.Request, error) {
-	target := c.origin
-	target.Path = path
-	target.RawPath = ""
-	target.RawQuery = query
-
-	return http.NewRequestWithContext(
-		ctx,
-		method,
-		target.String(),
-		bytes.NewReader(body),
-	)
-}
-
-func parseFailure(status int, data []byte) (*Failure, error) {
-	var problem httpx.Problem
-
-	if status < http.StatusBadRequest ||
-		json.Unmarshal(data, &problem) != nil ||
-		problem.Status != status ||
-		problem.Type == "" ||
-		problem.Title == "" {
-		return nil, ErrInvalidResponse
-	}
-
-	return &Failure{
-		Status: status,
-		Type:   problem.Type,
-		Title:  problem.Title,
-		Detail: problem.Detail,
-	}, nil
 }
