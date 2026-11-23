@@ -83,10 +83,7 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     recordCompensationDecision(facts, decision);
 
     try {
-      await recordCompensationDecisionQuery(
-        this.client,
-        decision,
-      );
+      await recordCompensationDecisionQuery(this.client, decision);
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;

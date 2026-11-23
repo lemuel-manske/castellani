@@ -83,9 +83,7 @@ function snippetFromHit(hit: SearchHit, document: SearchDocument): string {
     .trim();
 }
 
-function createOpenSearchDocumentReader(
-  client: Client,
-): SearchDocumentReader {
+function createOpenSearchDocumentReader(client: Client): SearchDocumentReader {
   return {
     async search(
       query: SearchQuery,

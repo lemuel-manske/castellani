@@ -26,9 +26,7 @@ import { isConditionalCheckFailure } from "./error-handling.js";
 const DEFAULT_MAX_ATTEMPTS = 5;
 
 class DynamoDBIndexingLedger implements IndexingLedger {
-  constructor(
-    private readonly client: DynamoDBDocumentClient,
-  ) {}
+  constructor(private readonly client: DynamoDBDocumentClient) {}
 
   async claim(
     archiveId: string,

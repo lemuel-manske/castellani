@@ -91,11 +91,7 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
   });
 
   expect(
-    await dynamodb.manifestLedger.contains(
-      archiveId,
-      snapshotId,
-      collectionId,
-    ),
+    await dynamodb.manifestLedger.contains(archiveId, snapshotId, collectionId),
   ).toBe(true);
 
   const indexingEntry = await dynamodb.getIndexingEntry(snapshotId);

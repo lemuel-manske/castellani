@@ -43,7 +43,9 @@ function createDynamoDbTestSupport() {
 
   return {
     ledger,
-    async getIndexingEntry(snapshotId: string): Promise<Record<string, unknown> | undefined> {
+    async getIndexingEntry(
+      snapshotId: string,
+    ): Promise<Record<string, unknown> | undefined> {
       const response = await documentClient.send(
         new GetCommand({
           TableName: INDEXING_LEDGER,

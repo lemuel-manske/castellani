@@ -48,9 +48,7 @@ async function ensureSearchIndex(client: Client): Promise<void> {
   }
 }
 
-function createOpenSearchDocumentWriter(
-  client: Client,
-): SearchDocumentWriter {
+function createOpenSearchDocumentWriter(client: Client): SearchDocumentWriter {
   return {
     async index(document: SearchDocument) {
       await client.index({
