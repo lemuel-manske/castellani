@@ -1,22 +1,23 @@
 import { afterAll, beforeAll } from "vitest";
 
+import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
+import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
+import { processPageCaptured } from "../../src/application/processPageCaptured.js";
+import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
+import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 import type {
   CrawlCompletedEvent,
   PageCapturedEvent,
   PageCapturedResult,
   SearchPublishedDocumentsInput,
 } from "../../src/application/types.js";
-import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
-import type { SearchQuery } from "../../src/ports/search-reader.js";
-import { processPageCaptured } from "../../src/application/processPageCaptured.js";
-import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
-import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
-import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 
-import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
-import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
+import type { SearchQuery } from "../../src/ports/search-reader.js";
+
 import { createOpenSearchDocumentReader } from "../../src/adapters/search/opensearch-reader.js";
 import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
+import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
+import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
 
 import { createDynamoDbTestSupport } from "./dynamoDb.js";
 import { createOpenSearchTestSupport } from "./openSearch.js";
@@ -30,9 +31,7 @@ import {
   SEARCH_S3_ENDPOINT_URL,
 } from "./env.js";
 
-const clock = { now: 1_000_000 };
-
-const dynamodb = createDynamoDbTestSupport(() => clock.now);
+const dynamodb = createDynamoDbTestSupport();
 const opensearch = createOpenSearchTestSupport();
 const rabbitmq = createRabbitMqTestSupport();
 const s3 = createS3TestSupport();
@@ -63,7 +62,9 @@ const application = {
     );
   },
 
-  processPublicationEvent(event: Exclude<PublicationEvent, { type: "CrawlCompleted" }>): Promise<void> {
+  processPublicationEvent(
+    event: Exclude<PublicationEvent, { type: "CrawlCompleted" }>,
+  ): Promise<void> {
     return processPublicationEvent(event, dynamodb.publicationLedger);
   },
 
@@ -92,7 +93,9 @@ const publicationDeliveryWaiters: ((event: PublicationEvent) => void)[] = [];
 
 let publicationLedgerReady = false;
 
-async function receivePageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
+async function receivePageCaptured(
+  event: PageCapturedEvent,
+): Promise<PageCapturedResult> {
   const result = await application.processPageCaptured(event);
   const waiter = deliveryWaiters.shift();
 
@@ -202,7 +205,6 @@ function setupIntegrationEnvironment(
 
 export {
   application,
-  clock,
   dynamodb,
   nextPageCaptured,
   nextPublicationEvent,
