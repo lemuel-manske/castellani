@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   CreateTableCommand,
   DeleteTableCommand,
@@ -6,33 +5,41 @@ import {
   waitUntilTableExists,
 } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import {
+  MANIFEST_LEDGER,
+  PUBLICATION_LEDGER,
+  INDEXING_LEDGER,
+} from "../../src/adapters/persistence/dynamodb/tables.js";
+
 import { DynamoDBIndexingLedger } from "../../src/adapters/persistence/dynamodb/indexing-ledger.js";
 import { DynamoDBManifestLedger } from "../../src/adapters/persistence/dynamodb/manifest-ledger.js";
 import { DynamoDBPublicationLedger } from "../../src/adapters/persistence/dynamodb/publication-ledger.js";
 
-const SEARCH_DYNAMODB_ENDPOINT_URL = process.env.SEARCH_DYNAMODB_ENDPOINT_URL;
+import {
+  REGION,
+  SEARCH_DYNAMODB_ENDPOINT_URL,
+  ACCESS_KEY_ID,
+  SECRECT_ACCESS_KEY,
+} from "./env.js";
 
-function createDynamoDbTestSupport(clock: () => number) {
+function createDynamoDbTestSupport() {
   const client = new DynamoDBClient({
-    region: "us-east-1",
-    endpoint: SEARCH_DYNAMODB_ENDPOINT_URL ?? "http://localhost:8000",
-    credentials: { accessKeyId: "test", secretAccessKey: "test" },
+    region: REGION,
+    endpoint: SEARCH_DYNAMODB_ENDPOINT_URL,
+    credentials: {
+      accessKeyId: ACCESS_KEY_ID,
+      secretAccessKey: SECRECT_ACCESS_KEY,
+    },
   });
+
   const documentClient = DynamoDBDocumentClient.from(client, {
     marshallOptions: { removeUndefinedValues: true },
   });
-  const tableName = `search-ledger-${randomUUID().replaceAll("-", "")}`;
-  const publicationTableName = `search-publication-${randomUUID().replaceAll("-", "")}`;
-  const manifestTableName = `search-manifest-${randomUUID().replaceAll("-", "")}`;
-  const ledger = new DynamoDBIndexingLedger(documentClient, tableName, clock);
-  const publicationLedger = new DynamoDBPublicationLedger(
-    documentClient,
-    publicationTableName,
-  );
-  const manifestLedger = new DynamoDBManifestLedger(
-    documentClient,
-    manifestTableName,
-  );
+
+  const ledger = new DynamoDBIndexingLedger(documentClient);
+  const publicationLedger = new DynamoDBPublicationLedger(documentClient);
+  const manifestLedger = new DynamoDBManifestLedger(documentClient);
 
   return {
     ledger,
@@ -41,7 +48,7 @@ function createDynamoDbTestSupport(clock: () => number) {
     async setup(): Promise<void> {
       await client.send(
         new CreateTableCommand({
-          TableName: tableName,
+          TableName: INDEXING_LEDGER,
           AttributeDefinitions: [
             { AttributeName: "snapshotId", AttributeType: "S" },
             { AttributeName: "archiveId", AttributeType: "S" },
@@ -60,13 +67,15 @@ function createDynamoDbTestSupport(clock: () => number) {
           BillingMode: "PAY_PER_REQUEST",
         }),
       );
+
       await waitUntilTableExists(
         { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
-        { TableName: tableName },
+        { TableName: INDEXING_LEDGER },
       );
+
       await client.send(
         new CreateTableCommand({
-          TableName: publicationTableName,
+          TableName: PUBLICATION_LEDGER,
           AttributeDefinitions: [
             { AttributeName: "archiveId", AttributeType: "S" },
           ],
@@ -74,13 +83,15 @@ function createDynamoDbTestSupport(clock: () => number) {
           BillingMode: "PAY_PER_REQUEST",
         }),
       );
+
       await waitUntilTableExists(
         { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
-        { TableName: publicationTableName },
+        { TableName: PUBLICATION_LEDGER },
       );
+
       await client.send(
         new CreateTableCommand({
-          TableName: manifestTableName,
+          TableName: MANIFEST_LEDGER,
           AttributeDefinitions: [
             { AttributeName: "archiveId", AttributeType: "S" },
             { AttributeName: "snapshotId", AttributeType: "S" },
@@ -92,19 +103,23 @@ function createDynamoDbTestSupport(clock: () => number) {
           BillingMode: "PAY_PER_REQUEST",
         }),
       );
+
       await waitUntilTableExists(
         { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
-        { TableName: manifestTableName },
+        { TableName: MANIFEST_LEDGER },
       );
     },
+
     async teardown(): Promise<void> {
       try {
         await Promise.all([
-          client.send(new DeleteTableCommand({ TableName: tableName })),
+          client.send(new DeleteTableCommand({ TableName: INDEXING_LEDGER })),
+
           client.send(
-            new DeleteTableCommand({ TableName: publicationTableName }),
+            new DeleteTableCommand({ TableName: PUBLICATION_LEDGER }),
           ),
-          client.send(new DeleteTableCommand({ TableName: manifestTableName })),
+
+          client.send(new DeleteTableCommand({ TableName: MANIFEST_LEDGER })),
         ]);
       } finally {
         client.destroy();
@@ -113,4 +128,4 @@ function createDynamoDbTestSupport(clock: () => number) {
   };
 }
 
-export { SEARCH_DYNAMODB_ENDPOINT_URL, createDynamoDbTestSupport };
+export { createDynamoDbTestSupport };

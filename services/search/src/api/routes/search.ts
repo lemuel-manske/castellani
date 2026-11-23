@@ -1,20 +1,26 @@
 import type { FastifyPluginAsync } from "fastify";
+
 import { handleSearch } from "../handlers/search.js";
 import type { SearchHandlerDependencies } from "../handlers/search.js";
+
 import { searchQuerySchema } from "../schemas/search.js";
 import type { SearchQuery } from "../schemas/search.js";
+
+const GET_METHOD = "GET";
+
+const SEARCH_ROUTE = "/search";
 
 const searchRoutes: FastifyPluginAsync<SearchHandlerDependencies> = async (
   server,
   dependencies,
 ) => {
   server.route<{ Querystring: SearchQuery }>({
-    method: "GET",
-    url: "/search",
+    method: GET_METHOD,
+    url: SEARCH_ROUTE,
     schema: {
       querystring: searchQuerySchema,
     },
-    handler: (request, reply) => handleSearch(request, reply, dependencies),
+    handler: (request) => handleSearch(request, dependencies),
   });
 };
 

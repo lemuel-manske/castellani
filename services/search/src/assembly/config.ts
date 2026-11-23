@@ -8,7 +8,6 @@ interface SearchSettingsOptions {
   s3EndpointUrl: string;
   rabbitmqUrl: string;
   opensearchUrl: string;
-  artifactBucket: string;
   indexingLeaseDurationSeconds?: number;
   indexingMaxAttempts?: number;
   reconnectDelayMilliseconds?: number;
@@ -54,7 +53,6 @@ class SearchSettings {
   readonly s3EndpointUrl: string;
   readonly rabbitmqUrl: string;
   readonly opensearchUrl: string;
-  readonly artifactBucket: string;
   readonly indexingLeaseDurationSeconds: number;
   readonly indexingMaxAttempts: number;
   readonly reconnectDelayMilliseconds: number;
@@ -71,8 +69,6 @@ class SearchSettings {
     this.s3EndpointUrl = options.s3EndpointUrl;
     this.rabbitmqUrl = options.rabbitmqUrl;
     this.opensearchUrl = options.opensearchUrl;
-
-    this.artifactBucket = options.artifactBucket;
 
     this.indexingLeaseDurationSeconds =
       options.indexingLeaseDurationSeconds ??
@@ -115,11 +111,6 @@ class SearchSettings {
       opensearchUrl: required(
         "SEARCH_OPENSEARCH_URL",
         env.SEARCH_OPENSEARCH_URL,
-      ),
-
-      artifactBucket: required(
-        "SEARCH_ARTIFACT_BUCKET",
-        env.SEARCH_ARTIFACT_BUCKET,
       ),
 
       indexingLeaseDurationSeconds: positiveInteger(

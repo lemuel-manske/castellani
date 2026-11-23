@@ -10,4 +10,5 @@ function problem(status: number, title: string, detail: string): ProblemDetails 
 }
 
 export { problem };
+
 export type { ProblemDetails };

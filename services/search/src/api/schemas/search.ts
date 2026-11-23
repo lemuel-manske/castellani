@@ -30,4 +30,5 @@ const searchQuerySchema = {
 } as const;
 
 export { searchQuerySchema };
+
 export type { SearchQuery };

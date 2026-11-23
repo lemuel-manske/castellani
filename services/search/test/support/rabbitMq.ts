@@ -12,13 +12,14 @@ import type {
   PublicationEvent,
 } from "../../src/application/types.js";
 
-const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
+import { SEARCH_RABBITMQ_URL } from "./env.js";
 
 function createRabbitMqTestSupport() {
   let connection: amqp.ChannelModel | undefined;
   let consumerChannel: amqp.ConfirmChannel | undefined;
   let publicationConsumerChannel: amqp.ConfirmChannel | undefined;
   let publisherChannel: amqp.ConfirmChannel | undefined;
+
   const deadLetters: ConsumeMessage[] = [];
   const deadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
   const publicationDeadLetters: ConsumeMessage[] = [];
@@ -54,11 +55,14 @@ function createRabbitMqTestSupport() {
       consumerChannel = await connection.createConfirmChannel();
       publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
+
       await startPageCapturedConsumer(consumerChannel, handle);
+
       await startPublicationConsumer(
         publicationConsumerChannel,
         handlePublication,
       );
+
       await consumerChannel.consume(
         PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
         (message) => {
@@ -74,6 +78,7 @@ function createRabbitMqTestSupport() {
           );
         },
       );
+
       await publicationConsumerChannel.consume(
         PUBLICATION_TOPOLOGY.deadLetterQueue,
         (message) => {
@@ -102,6 +107,7 @@ function createRabbitMqTestSupport() {
         Buffer.from(JSON.stringify(event)),
         { contentType: "application/json", persistent: true },
       );
+
       await publisherChannel.waitForConfirms();
     },
 
@@ -119,6 +125,7 @@ function createRabbitMqTestSupport() {
         Buffer.from(JSON.stringify(event)),
         { contentType: "application/json", persistent: true },
       );
+
       await publisherChannel.waitForConfirms();
     },
 
@@ -161,6 +168,7 @@ function createRabbitMqTestSupport() {
               PUBLICATION_TOPOLOGY.deadLetterQueue,
             ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)),
           );
+
           await Promise.all(
             [
               PAGE_CAPTURED_TOPOLOGY.retryExchange,
@@ -181,4 +189,4 @@ function createRabbitMqTestSupport() {
   };
 }
 
-export { SEARCH_RABBITMQ_URL, createRabbitMqTestSupport };
+export { createRabbitMqTestSupport };

@@ -8,31 +8,40 @@ import {
 } from "@aws-sdk/client-s3";
 import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
 
-const SEARCH_S3_ENDPOINT_URL = process.env.SEARCH_S3_ENDPOINT_URL;
+import { ACCESS_KEY_ID, REGION, SECRECT_ACCESS_KEY } from "./env.js";
 
 function createS3TestSupport() {
   const client = new S3Client({
-    region: "us-east-1",
-    endpoint: SEARCH_S3_ENDPOINT_URL ?? "http://localhost:9000",
+    region: REGION,
+    endpoint: SEARCH_S3_ENDPOINT_URL,
+    credentials: {
+      accessKeyId: ACCESS_KEY_ID,
+      secretAccessKey: SECRECT_ACCESS_KEY,
+    },
     forcePathStyle: true,
-    credentials: { accessKeyId: "minio", secretAccessKey: "minio-secret" },
   });
+
   const bucketName = `search-integration-${randomUUID().replaceAll("-", "")}`;
+
   const objectKeys = new Set<string>();
 
   return {
     client,
     bucketName,
     reader: createS3ArtifactReader(client),
+
     async setup(): Promise<void> {
       await client.send(new CreateBucketCommand({ Bucket: bucketName }));
     },
+
     async putObject(body: Uint8Array, key: string): Promise<void> {
       await client.send(
         new PutObjectCommand({ Bucket: bucketName, Key: key, Body: body }),
       );
+
       objectKeys.add(key);
     },
+
     async teardown(): Promise<void> {
       try {
         await Promise.all(
@@ -42,6 +51,7 @@ function createS3TestSupport() {
             ),
           ),
         );
+
         await client.send(new DeleteBucketCommand({ Bucket: bucketName }));
       } finally {
         client.destroy();
@@ -50,4 +60,4 @@ function createS3TestSupport() {
   };
 }
 
-export { SEARCH_S3_ENDPOINT_URL, createS3TestSupport };
+export { createS3TestSupport };

@@ -1,8 +1,11 @@
-import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
+
+import type { PageCapturedEvent } from "../../src/application/types.js";
+
 import type { SearchDocument } from "../../src/domain/content.js";
+
 import type {
   ArtifactObjectReader,
   ArtifactReference,
@@ -11,7 +14,6 @@ import type {
 
 interface CapturedPageFixtureOptions {
   bucket?: string;
-  contentType?: string;
   body?: string;
   validChecksum?: boolean;
 }
@@ -20,7 +22,7 @@ function createCapturedPageFixture(
   snapshotId: string,
   options: CapturedPageFixtureOptions = {},
 ) {
-  const contentType = options.contentType ?? "text/html; charset=utf-8";
+  const contentType = "text/html; charset=utf-8";
 
   const body =
     options.body ??
@@ -74,7 +76,6 @@ function createCapturedPageFixture(
       finalUrl: page.finalUrl ?? page.url,
       redirectChain: [page.url, page.finalUrl ?? page.url],
       capturedAt: page.capturedAt,
-      contentType,
       warcArtifacts: [artifact],
     },
   };
@@ -95,7 +96,6 @@ function createSearchDocumentFixture(
     url: "https://example.com/",
     finalUrl: "https://example.com/final",
     capturedAt: "2026-11-22T10:00:00.000Z",
-    contentType: "text/html",
     title: "Integration document",
     description: "Indexed against a real OpenSearch node",
     language: "en",
