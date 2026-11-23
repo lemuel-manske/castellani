@@ -8,7 +8,12 @@ import {
 } from "@aws-sdk/client-s3";
 import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
 
-import { ACCESS_KEY_ID, REGION, SECRECT_ACCESS_KEY } from "./env.js";
+import {
+  ACCESS_KEY_ID,
+  REGION,
+  SEARCH_S3_ENDPOINT_URL,
+  SECRECT_ACCESS_KEY,
+} from "./env.js";
 
 function createS3TestSupport() {
   const client = new S3Client({
