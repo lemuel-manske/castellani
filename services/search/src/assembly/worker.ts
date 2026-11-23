@@ -15,7 +15,7 @@ interface SearchWorkerHandlers {
 }
 
 function isAborted(signal: AbortSignal): boolean {
-  return isAborted(signal);
+  return signal.aborted;
 }
 
 interface SearchWorkerSettings {
