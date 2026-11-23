@@ -1,25 +1,27 @@
 package tests_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
 	"github.com/stretchr/testify/require"
 )
 
+type problemDetails struct {
+	Type     string `json:"type"`
+	Title    string `json:"title"`
+	Status   int    `json:"status"`
+	Detail   string `json:"detail"`
+	Instance string `json:"instance"`
+}
+
 func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 	services := infra.Start(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	request, err := http.NewRequestWithContext(
-		ctx,
+	request, err := http.NewRequest(
 		http.MethodPost,
 		services.Gateway.URL("/archives"),
 		strings.NewReader("{}"),
@@ -35,30 +37,26 @@ func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 
-	var problem struct {
-		Type     string `json:"type"`
-		Title    string `json:"title"`
-		Status   int    `json:"status"`
-		Detail   string `json:"detail"`
-		Instance string `json:"instance"`
-	}
-
+	var problem problemDetails
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-	require.Equal(t, "urn:distributed-web-archive:problem:idempotency-key", problem.Type)
-	require.Equal(t, "Invalid Idempotency Key", problem.Title)
-	require.Equal(t, http.StatusBadRequest, problem.Status)
-	require.Equal(t, "/archives", problem.Instance)
+	require.Equal(t, problemDetails{
+		Type:     "urn:distributed-web-archive:problem:idempotency-key",
+		Title:    "Invalid Idempotency Key",
+		Status:   http.StatusBadRequest,
+		Instance: "/archives",
+	}, problemDetails{
+		Type:     problem.Type,
+		Title:    problem.Title,
+		Status:   problem.Status,
+		Instance: problem.Instance,
+	})
 	require.NotEmpty(t, problem.Detail)
 }
 
 func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
 	services := infra.Start(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	request, err := http.NewRequestWithContext(
-		ctx,
+	request, err := http.NewRequest(
 		http.MethodPost,
 		services.Gateway.URL("/archives"),
 		strings.NewReader("{}"),
@@ -75,18 +73,18 @@ func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 
-	var problem struct {
-		Type     string `json:"type"`
-		Title    string `json:"title"`
-		Status   int    `json:"status"`
-		Detail   string `json:"detail"`
-		Instance string `json:"instance"`
-	}
-
+	var problem problemDetails
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-	require.Equal(t, "urn:distributed-web-archive:problem:idempotency-key", problem.Type)
-	require.Equal(t, "Invalid Idempotency Key", problem.Title)
-	require.Equal(t, http.StatusBadRequest, problem.Status)
-	require.Equal(t, "/archives", problem.Instance)
+	require.Equal(t, problemDetails{
+		Type:     "urn:distributed-web-archive:problem:idempotency-key",
+		Title:    "Invalid Idempotency Key",
+		Status:   http.StatusBadRequest,
+		Instance: "/archives",
+	}, problemDetails{
+		Type:     problem.Type,
+		Title:    problem.Title,
+		Status:   problem.Status,
+		Instance: problem.Instance,
+	})
 	require.NotEmpty(t, problem.Detail)
 }
