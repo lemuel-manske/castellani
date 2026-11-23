@@ -42,7 +42,7 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
       : null;
   }
 
-  if (envelope.type === "CrawlCompleted") {
+  if (isCompletionCrawl(payload)) {
     return isCompletionCrawl(payload)
       ? {
           type: "CrawlCompleted",
