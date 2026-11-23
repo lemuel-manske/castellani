@@ -4,8 +4,10 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"os/exec"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,21 +23,89 @@ const (
 
 	rabbitMQUsername = "castellani"
 	rabbitMQPassword = "local-development-only"
+
+	terraformLockFile = ".terraform.lock.hcl"
 )
 
 var httpClient = &http.Client{Timeout: requestTimeout}
 
-func prepareSearchImage(t *testing.T) {
+func repositoryRoot(t *testing.T) string {
 	t.Helper()
 
-	searchDir := filepath.Join("..", "services", "search")
+	_, file, _, ok := runtime.Caller(0)
+	require.True(t, ok, "locate repository root")
 
-	for _, args := range [][]string{{"ci"}, {"run", "build"}} {
-		command := exec.Command("npm", args...)
-		command.Dir = searchDir
+	return filepath.Join(filepath.Dir(file), "..", "..", "..")
+}
 
-		output, err := command.CombinedOutput()
-		require.NoError(t, err, string(output))
+func prepareTerraform(t *testing.T, root string) string {
+	t.Helper()
+
+	source := filepath.Join(root, "infra", "terraform")
+	target := t.TempDir()
+
+	entries, err := os.ReadDir(source)
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+
+		if !strings.HasSuffix(name, ".tf") && name != terraformLockFile {
+			continue
+		}
+
+		contents, err := os.ReadFile(filepath.Join(source, name))
+		require.NoError(t, err)
+
+		require.NoError(
+			t,
+			os.WriteFile(filepath.Join(target, name), contents, 0o600),
+		)
+	}
+
+	return target
+}
+
+func newComposeStack(t *testing.T, composeFile string) *compose.DockerCompose {
+	t.Helper()
+
+	var (
+		stack *compose.DockerCompose
+		err   error
+	)
+
+	require.NotPanics(
+		t,
+		func() {
+			stack, err = compose.NewDockerComposeWith(
+				compose.WithStackFiles(composeFile),
+			)
+		},
+		"Docker must be running to execute the e2e suite",
+	)
+
+	require.NoError(t, err)
+
+	return stack
+}
+
+func stackEnvironment(t *testing.T, terraformDir string) map[string]string {
+	t.Helper()
+
+	return map[string]string{
+		"TERRAFORM_DIR":            terraformDir,
+		"MINISTACK_PORT":           "0",
+		"RABBITMQ_PORT":            "0",
+		"RABBITMQ_MANAGEMENT_PORT": "0",
+		"OPENSEARCH_PORT":          "0",
+		"GATEWAY_PORT":             "0",
+		"COORDINATOR_PORT":         "0",
+		"CAPTURE_PORT":             "0",
+		"SEARCH_PORT":              "0",
 	}
 }
 
@@ -64,13 +134,17 @@ func Start(t *testing.T) Dependencies {
 
 	ctx := context.Background()
 
-	prepareSearchImage(t)
+	root := repositoryRoot(t)
+	terraformDir := prepareTerraform(t, root)
+	stack := newComposeStack(t, filepath.Join(root, "docker-compose.yaml"))
 
-	stack, err := compose.NewDockerComposeWith(compose.WithStackFiles("compose.yaml"))
-	require.NoError(t, err)
+	stack.WithEnv(stackEnvironment(t, terraformDir))
 
 	t.Cleanup(func() {
-		require.NoError(t, stack.Down(context.Background()))
+		require.NoError(
+			t,
+			stack.Down(context.Background(), compose.RemoveVolumes(true)),
+		)
 	})
 
 	require.NoError(t, stack.Up(ctx))
