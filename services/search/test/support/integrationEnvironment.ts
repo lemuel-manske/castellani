@@ -7,6 +7,7 @@ import type {
   SearchPublishedDocumentsInput,
 } from "../../src/application/types.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
+import type { SearchQuery } from "../../src/ports/search-reader.js";
 import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
@@ -73,6 +74,13 @@ const application = {
       dynamodb.publicationLedger,
       dynamodb.manifestLedger,
     );
+  },
+};
+
+// Raw index inspection is kept in integration support so tests do not compose adapters.
+const searchIndex = {
+  search(query: SearchQuery, limit: number) {
+    return documentReader.search(query, limit);
   },
 };
 
@@ -201,5 +209,6 @@ export {
   opensearch,
   rabbitmq,
   s3,
+  searchIndex,
   setupIntegrationEnvironment,
 };
