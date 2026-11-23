@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type problemDetails struct {
+type Problem struct {
 	Type     string `json:"type"`
 	Title    string `json:"title"`
 	Status   int    `json:"status"`
@@ -37,16 +37,19 @@ func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 
-	var problem problemDetails
+	var problem Problem
+
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-	require.Equal(t, problemDetails{
+
+	require.NotEmpty(t, problem.Detail)
+
+	require.Equal(t, Problem{
 		Type:     "urn:distributed-web-archive:problem:idempotency-key",
 		Title:    "Invalid Idempotency Key",
 		Status:   http.StatusBadRequest,
 		Detail:   problem.Detail,
 		Instance: "/archives",
 	}, problem)
-	require.NotEmpty(t, problem.Detail)
 }
 
 func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
@@ -69,14 +72,17 @@ func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
 
-	var problem problemDetails
+	var problem Problem
+
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-	require.Equal(t, problemDetails{
+
+	require.NotEmpty(t, problem.Detail)
+
+	require.Equal(t, Problem{
 		Type:     "urn:distributed-web-archive:problem:idempotency-key",
 		Title:    "Invalid Idempotency Key",
 		Status:   http.StatusBadRequest,
 		Detail:   problem.Detail,
 		Instance: "/archives",
 	}, problem)
-	require.NotEmpty(t, problem.Detail)
 }
