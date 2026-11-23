@@ -111,19 +111,11 @@ func TestGateway_CreateArchiveAcceptsValidSubmission(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, response.StatusCode)
 	require.Equal(t, "application/json", response.Header.Get("Content-Type"))
 
-	var accepted struct {
-		ArchiveID string `json:"archiveId"`
-		Status    string `json:"status"`
-		StatusURL string `json:"statusUrl"`
-	}
+	var accepted archiveAccepted
 
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&accepted))
 	require.NotEmpty(t, accepted.ArchiveID)
-	require.Equal(t, struct {
-		ArchiveID string `json:"archiveId"`
-		Status    string `json:"status"`
-		StatusURL string `json:"statusUrl"`
-	}{
+	require.Equal(t, archiveAccepted{
 		ArchiveID: accepted.ArchiveID,
 		Status:    "ACCEPTED",
 		StatusURL: "/archives/" + accepted.ArchiveID,
