@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -174,7 +175,10 @@ func Start(t *testing.T) Dependencies {
 	})
 
 	composeStarted := time.Now()
-	require.NoError(t, stack.Up(ctx))
+	if err := stack.Up(ctx); err != nil {
+		logServiceContainer(t, ctx, stack, "provision")
+		t.Fatalf("compose up: %v", err)
+	}
 	t.Logf("compose startup: %s", time.Since(composeStarted))
 
 	miniStack := newService(
@@ -284,6 +288,32 @@ func Start(t *testing.T) Dependencies {
 		Capture:     capture,
 		Search:      search,
 	}
+}
+
+
+func logServiceContainer(t *testing.T, ctx context.Context, stack compose.ComposeStack, name string) {
+	t.Helper()
+
+	container, err := stack.ServiceContainer(ctx, name)
+	if err != nil {
+		t.Logf("could not retrieve %s container: %v", name, err)
+		return
+	}
+
+	logs, err := container.Logs(ctx)
+	if err != nil {
+		t.Logf("could not read %s container logs: %v", name, err)
+		return
+	}
+	defer logs.Close()
+
+	output, err := io.ReadAll(logs)
+	if err != nil {
+		t.Logf("could not consume %s container logs: %v", name, err)
+		return
+	}
+
+	t.Logf("%s container logs:\n%s", name, output)
 }
 
 // HealthStatus performs the service's health request and reports its result.
