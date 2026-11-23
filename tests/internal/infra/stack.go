@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -120,6 +121,8 @@ func stackEnvironment(t *testing.T, terraformDir string) map[string]string {
 
 	return map[string]string{
 		"TERRAFORM_DIR":            terraformDir,
+		"TERRAFORM_UID":            strconv.Itoa(os.Getuid()),
+		"TERRAFORM_GID":            strconv.Itoa(os.Getgid()),
 		"MINISTACK_PORT":           "0",
 		"RABBITMQ_PORT":            "0",
 		"RABBITMQ_MANAGEMENT_PORT": "0",
