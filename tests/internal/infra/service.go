@@ -18,7 +18,6 @@ var httpClient = &http.Client{
 	Timeout: requestTimeout,
 }
 
-// Dependencies are the local services the end-to-end suite runs against.
 type Dependencies struct {
 	MiniStack   Service
 	RabbitMQ    Service
@@ -29,7 +28,6 @@ type Dependencies struct {
 	Search      Service
 }
 
-// Service is one dependency's observable health endpoint.
 type Service struct {
 	name      string
 	baseURL   string
@@ -38,12 +36,10 @@ type Service struct {
 	password  string
 }
 
-// URL returns an absolute URL for a path on this service.
 func (s Service) URL(path string) string {
 	return s.baseURL + path
 }
 
-// HealthStatus performs the service's health request and reports its result.
 func (s Service) HealthStatus(ctx context.Context) (int, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, s.healthURL, nil)
 	if err != nil {

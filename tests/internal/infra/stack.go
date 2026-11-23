@@ -1,3 +1,4 @@
+// Package infra provides utilities for managing the infrastructure required for end-to-end tests.
 package infra
 
 import (
@@ -10,14 +11,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
-// Start brings up the full stack and waits until every service answers its
-// health check. The stack is torn down when the test finishes.
 func Start(t *testing.T) Dependencies {
 	t.Helper()
 
 	ctx := context.Background()
+
 	root := repositoryRoot(t)
+
 	terraformDir := prepareTerraform(t, root)
+
 	stack := newComposeStack(t, filepath.Join(root, "docker-compose.yaml"))
 
 	stack.WithEnv(stackEnvironment(terraformDir))
@@ -26,9 +28,7 @@ func Start(t *testing.T) Dependencies {
 		require.NoError(t, stack.Down(context.Background(), compose.RemoveVolumes(true)))
 	})
 
-	// Start Compose before looking up its service containers.
 	if err := stack.Up(ctx); err != nil {
-		logServices(t, ctx, stack)
 		require.NoError(t, err, "start e2e services")
 	}
 
@@ -46,6 +46,7 @@ func Start(t *testing.T) Dependencies {
 	defer cancel()
 
 	readinessStarted := time.Now()
+
 	if err := waitForAllHealthy(
 		readinessCtx,
 		services.MiniStack,
@@ -56,7 +57,6 @@ func Start(t *testing.T) Dependencies {
 		services.Capture,
 		services.Search,
 	); err != nil {
-		logServices(t, context.Background(), stack)
 		require.NoError(t, err, "wait for e2e services to become healthy")
 	}
 
@@ -64,4 +64,3 @@ func Start(t *testing.T) Dependencies {
 
 	return services
 }
-
