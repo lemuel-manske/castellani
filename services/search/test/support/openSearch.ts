@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { Client } from "@opensearch-project/opensearch";
 import { ensureSearchIndex } from "../../src/adapters/search/opensearch.js";
+import { SEARCH_INDEX_NAME } from "../../src/adapters/search/topology.js";
 
 import { SEARCH_OPENSEARCH_URL } from "./env.js";
 
@@ -9,19 +9,28 @@ function createOpenSearchTestSupport() {
     node: SEARCH_OPENSEARCH_URL,
   });
 
-  const indexName = `search-integration-${randomUUID().replaceAll("-", "")}`;
+  async function clearIndex(): Promise<void> {
+    await client.deleteByQuery({
+      index: SEARCH_INDEX_NAME,
+      body: { query: { match_all: {} } },
+      refresh: true,
+    });
+  }
 
   return {
     client,
-    indexName,
 
     async setup(): Promise<void> {
-      await ensureSearchIndex(client, indexName);
+      await ensureSearchIndex(client);
+      await clearIndex();
     },
 
     async teardown(): Promise<void> {
-      await client.indices.delete({ index: indexName }).catch(() => undefined);
-      await client.close();
+      try {
+        await clearIndex();
+      } finally {
+        await client.close();
+      }
     },
   };
 }
