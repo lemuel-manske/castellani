@@ -2,12 +2,10 @@ import { expect, it } from "vitest";
 
 import { createOpenSearchDocumentReader } from "../../src/adapters/search/opensearch-reader.js";
 import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
-import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
-import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
-  dynamodb,
+  application,
   nextPageCaptured,
   opensearch,
   rabbitmq,
@@ -36,23 +34,17 @@ it("indexes a captured page delivered through RabbitMQ from its WARC artifact", 
     },
   });
 
-  const result = await processPageCaptured(
-    event,
-    dynamodb.ledger,
-    createWarcCapturedPageReader(s3.reader),
-    createOpenSearchDocumentWriter(opensearch.client, opensearch.indexName),
-  );
+  const result = await application.processPageCaptured(event);
 
   expect(result).toEqual({
     status: "COMPLETED",
     outcome: "INDEXED",
   });
 
-  await opensearch.client.indices.refresh({ index: opensearch.indexName });
+  await opensearch.client.indices.refresh();
 
   const indexed = await createOpenSearchDocumentReader(
     opensearch.client,
-    opensearch.indexName,
   ).search({ text: "Integrated content" }, 10);
 
   expect(indexed.candidates).toMatchObject([
