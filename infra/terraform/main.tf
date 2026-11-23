@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "coordinator_archives" {
-  name         = "coordinator_archive_runs"
+  name         = "coordinator_archives"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key     = "archiveId"
@@ -28,7 +28,7 @@ resource "aws_dynamodb_table" "coordinator_archives" {
 }
 
 resource "aws_dynamodb_table" "coordinator_submissions" {
-  name         = "coordinator_submission_keys"
+  name         = "coordinator_submissions"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key     = "idempotencyKey"
