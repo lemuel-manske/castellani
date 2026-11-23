@@ -184,6 +184,7 @@ func Start(t *testing.T) Dependencies {
 		"",
 		"",
 	)
+
 	rabbitMQ := newService(
 		t,
 		ctx,
@@ -194,6 +195,7 @@ func Start(t *testing.T) Dependencies {
 		rabbitMQUsername,
 		rabbitMQPassword,
 	)
+
 	openSearch := newService(
 		t,
 		ctx,
@@ -204,6 +206,7 @@ func Start(t *testing.T) Dependencies {
 		"",
 		"",
 	)
+
 	gateway := newService(
 		t,
 		ctx,
@@ -214,6 +217,7 @@ func Start(t *testing.T) Dependencies {
 		"",
 		"",
 	)
+
 	coordinator := newService(
 		t,
 		ctx,
@@ -224,6 +228,7 @@ func Start(t *testing.T) Dependencies {
 		"",
 		"",
 	)
+
 	capture := newService(
 		t,
 		ctx,
@@ -234,6 +239,7 @@ func Start(t *testing.T) Dependencies {
 		"",
 		"",
 	)
+
 	search := newService(
 		t,
 		ctx,
@@ -249,6 +255,7 @@ func Start(t *testing.T) Dependencies {
 	defer cancel()
 
 	readinessStarted := time.Now()
+
 	require.NoError(
 		t,
 		waitForAllHealthy(
@@ -262,6 +269,7 @@ func Start(t *testing.T) Dependencies {
 			search,
 		),
 	)
+
 	t.Logf("service readiness: %s", time.Since(readinessStarted))
 
 	return Dependencies{
@@ -335,8 +343,6 @@ func waitForAllHealthy(ctx context.Context, services ...Service) error {
 	)
 
 	for _, service := range services {
-		service := service
-
 		group.Go(func() {
 			if err := waitForHealthy(ctx, service); err != nil {
 				errs <- err
@@ -360,12 +366,13 @@ func waitForHealthy(ctx context.Context, service Service) error {
 	defer ticker.Stop()
 
 	var (
-		status int
+		status  int
 		lastErr error
 	)
 
 	for {
 		status, lastErr = service.HealthStatus(ctx)
+
 		if lastErr == nil && status == http.StatusOK {
 			return nil
 		}
