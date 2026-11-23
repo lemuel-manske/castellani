@@ -11,6 +11,7 @@ import {
   PUBLICATION_TOPOLOGY,
 } from "./topology.js";
 
+const MAX_DELIVERY_RETRIES = 5;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -75,7 +76,8 @@ function retryCount(message: ConsumeMessage): number {
   if (!Array.isArray(deaths)) return 0;
 
   const death = (deaths as unknown[]).find(
-    (entry: unknown) => isRecord(entry) && entry.queue === PUBLICATION_TOPOLOGY.retryQueue,
+    (entry: unknown) =>
+      isRecord(entry) && entry.queue === PUBLICATION_TOPOLOGY.retryQueue,
   );
 
   if (!isRecord(death)) return 0;
@@ -170,13 +172,23 @@ async function startPublicationConsumer(
   await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
     durable: true,
   });
-  await channel.assertExchange(PUBLICATION_TOPOLOGY.retryExchange, "direct", {
+  await channel.assertExchange(
+    PUBLICATION_TOPOLOGY.retryExchange,
+    "direct",
+    {
+      durable: true,
+    },
+  );
+  await channel.assertExchange(
+    PUBLICATION_TOPOLOGY.deadLetterExchange,
+    "fanout",
+    {
+      durable: true,
+    },
+  );
+  await channel.assertQueue(PUBLICATION_TOPOLOGY.deadLetterQueue, {
     durable: true,
   });
-  await channel.assertExchange(PUBLICATION_TOPOLOGY.deadLetterExchange, "fanout", {
-    durable: true,
-  });
-  await channel.assertQueue(PUBLICATION_TOPOLOGY.deadLetterQueue, { durable: true });
   await channel.bindQueue(
     PUBLICATION_TOPOLOGY.deadLetterQueue,
     PUBLICATION_TOPOLOGY.deadLetterExchange,
@@ -191,7 +203,11 @@ async function startPublicationConsumer(
   });
   await Promise.all(
     PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
-      channel.bindQueue(PUBLICATION_TOPOLOGY.retryQueue, PUBLICATION_TOPOLOGY.retryExchange, key),
+      channel.bindQueue(
+        PUBLICATION_TOPOLOGY.retryQueue,
+        PUBLICATION_TOPOLOGY.retryExchange,
+        key,
+      ),
     ),
   );
   await channel.assertQueue(PUBLICATION_TOPOLOGY.queue, {
