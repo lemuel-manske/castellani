@@ -15,8 +15,10 @@ setupIntegrationEnvironment(["dynamodb", "opensearch", "s3"]);
 
 it("does not repeat indexing work when a PageCaptured event is delivered again", async () => {
   const token = randomUUID().replaceAll("-", "");
+
   const snapshotId = `duplicate-${token}`;
   const content = `Duplicate delivery ${token}`;
+
   const fixture = createCapturedPageFixture(snapshotId, {
     bucket: s3.bucketName,
     body: `<html><head><title>${content}</title></head><body><h1>${content}</h1></body></html>`,
@@ -49,8 +51,10 @@ it("does not repeat indexing work when a PageCaptured event is delivered again",
 
 it("releases a failed indexing claim so the same event can be retried", async () => {
   const token = randomUUID().replaceAll("-", "");
+
   const snapshotId = `recovery-${token}`;
   const content = `Recovered artifact ${token}`;
+
   const fixture = createCapturedPageFixture(snapshotId, {
     bucket: s3.bucketName,
     body: `<html><head><title>${content}</title></head><body><h1>${content}</h1></body></html>`,
