@@ -25,7 +25,7 @@ func (a Application) GetSession(ctx context.Context, sessionID string) (Session,
 
 func (a Application) UpdateSession(
 	ctx context.Context,
-	sessionID, status string,
+	sessionID string,
 	raw []byte,
 ) (Session, error) {
 	if a.capture == nil {
