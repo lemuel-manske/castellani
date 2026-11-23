@@ -337,14 +337,11 @@ func waitForAllHealthy(ctx context.Context, services ...Service) error {
 	for _, service := range services {
 		service := service
 
-		group.Add(1)
-		go func() {
-			defer group.Done()
-
+		group.Go(func() {
 			if err := waitForHealthy(ctx, service); err != nil {
 				errs <- err
 			}
-		}()
+		})
 	}
 
 	group.Wait()
