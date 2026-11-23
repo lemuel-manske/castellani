@@ -7,6 +7,7 @@ interface ArchiveManifest {
 
 interface ManifestLedger {
   record(manifest: ArchiveManifest): Promise<void>;
+
   contains(
     archiveId: string,
     snapshotId: string,

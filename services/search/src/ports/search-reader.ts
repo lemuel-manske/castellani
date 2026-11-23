@@ -24,7 +24,7 @@ interface SearchDocumentPage {
 interface SearchDocumentReader {
   search(
     query: SearchQuery,
-    limit: number,
+    limit?: number,
     cursor?: string,
   ): Promise<SearchDocumentPage>;
 }
