@@ -188,6 +188,7 @@ func Start(t *testing.T) Dependencies {
 	composeStarted := time.Now()
 	if err := stack.Up(ctx); err != nil {
 		logServiceContainer(t, ctx, stack, "provision")
+		logServiceContainer(t, ctx, stack, "coordinator")
 		t.Fatalf("compose up: %v", err)
 	}
 	t.Logf("compose startup: %s", time.Since(composeStarted))
