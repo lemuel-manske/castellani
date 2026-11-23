@@ -71,16 +71,10 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	}
 
 	target := c.origin
-
 	target.Path = common.SearchPath
 	target.RawQuery = values.Encode()
 
-	request, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		target.String(),
-		nil,
-	)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 
 	if err != nil {
 		return Results{}, err
@@ -89,11 +83,7 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	response, err := c.http.Do(request)
 
 	if err != nil {
-		return Results{}, fmt.Errorf(
-			"%w: search request: %v",
-			ErrUnavailable,
-			err,
-		)
+		return Results{}, fmt.Errorf("%w: search request: %v", ErrUnavailable, err)
 	}
 
 	defer response.Body.Close()
@@ -101,11 +91,7 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 	if err != nil {
-		return Results{}, fmt.Errorf(
-			"%w: read search: %v",
-			ErrUnavailable,
-			err,
-		)
+		return Results{}, fmt.Errorf("%w: read search: %v", ErrUnavailable, err)
 	}
 
 	if len(data) > maxJSONBytes {
@@ -113,13 +99,24 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	}
 
 	if response.StatusCode != http.StatusOK {
-		var p httpx.Problem
+		if response.StatusCode < http.StatusBadRequest {
+			return Results{}, ErrInvalidResponse
+		}
+
+		var problem httpx.Problem
+
+		if json.Unmarshal(data, &problem) != nil ||
+			problem.Status != response.StatusCode ||
+			problem.Type == "" ||
+			problem.Title == "" {
+			return Results{}, ErrInvalidResponse
+		}
 
 		return Results{}, &Failure{
-			Status: p.Status,
-			Type:   p.Type,
-			Title:  p.Title,
-			Detail: p.Detail,
+			Status: response.StatusCode,
+			Type:   problem.Type,
+			Title:  problem.Title,
+			Detail: problem.Detail,
 		}
 	}
 
