@@ -10,7 +10,7 @@ const GET_METHOD = "GET";
 
 const SEARCH_ROUTE = "/search";
 
-const searchRoutes: FastifyPluginAsync<SearchHandlerDependencies> = async (
+const searchRoutes: FastifyPluginAsync<SearchHandlerDependencies> = (
   server,
   dependencies,
 ) => {
@@ -22,6 +22,8 @@ const searchRoutes: FastifyPluginAsync<SearchHandlerDependencies> = async (
     },
     handler: (request) => handleSearch(request, dependencies),
   });
+
+  return Promise.resolve();
 };
 
 export { searchRoutes };
