@@ -15,7 +15,7 @@ interface SearchWorkerHandlers {
 }
 
 function isAborted(signal: AbortSignal): boolean {
-  return signal.aborted;
+  return isAborted(signal);
 }
 
 interface SearchWorkerSettings {
@@ -47,7 +47,7 @@ class SearchWorker {
         pageCapturedChannel = await connection.createConfirmChannel();
         publicationChannel = await connection.createConfirmChannel();
 
-        if (signal.aborted) {
+        if (isAborted(signal)) {
           await Promise.all([
             pageCapturedChannel.close(),
             publicationChannel.close(),
@@ -97,14 +97,14 @@ class SearchWorker {
       connection.once("error", finish);
       signal.addEventListener("abort", finish, { once: true });
 
-      if (signal.aborted) {
+      if (isAborted(signal)) {
         finish();
       }
     });
   }
 
   private waitForReconnectDelay(signal: AbortSignal): Promise<void> {
-    if (signal.aborted) {
+    if (isAborted(signal)) {
       return Promise.resolve();
     }
 
@@ -122,7 +122,7 @@ class SearchWorker {
 
       signal.addEventListener("abort", finish, { once: true });
 
-      if (signal.aborted) {
+      if (isAborted(signal)) {
         finish();
       }
     });
