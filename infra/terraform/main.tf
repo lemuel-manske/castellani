@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "coordinator_archives" {
-  name         = "coordinator_archive_runs"
+  name         = "coordinator_archives"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key     = "archiveId"
@@ -28,7 +28,7 @@ resource "aws_dynamodb_table" "coordinator_archives" {
 }
 
 resource "aws_dynamodb_table" "coordinator_submissions" {
-  name         = "coordinator_submission_keys"
+  name         = "coordinator_submissions"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key     = "idempotencyKey"
@@ -110,44 +110,6 @@ resource "aws_s3_bucket_public_access_block" "archive_manifests" {
   restrict_public_buckets = true
 }
 
-resource "aws_opensearch_domain" "archive_search" {
-  domain_name    = "castellani-search"
-  engine_version = "OpenSearch_2.15"
-
-  cluster_config {
-    instance_type  = "t3.small.search"
-    instance_count = 1
-  }
-
-  ebs_options {
-    ebs_enabled = true
-    volume_type = "gp3"
-    volume_size = 10
-  }
-
-  domain_endpoint_options {
-    enforce_https = false
-  }
-
-  access_policies = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { AWS = "*" }
-      Action    = "es:*"
-      Resource  = "arn:aws:es:${var.aws_region}:000000000000:domain/castellani-search/*"
-    }]
-  })
-
-  depends_on = [
-    aws_dynamodb_table.coordinator_archives,
-    aws_dynamodb_table.coordinator_submissions,
-    aws_dynamodb_table.coordinator_outbox,
-    aws_dynamodb_table.coordinator_inbox,
-    aws_s3_bucket.archive_artifacts,
-    aws_s3_bucket.archive_manifests,
-  ]
-}
 
 resource "aws_dynamodb_table" "capture_runs" {
   name         = "capture_runs"

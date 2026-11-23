@@ -1,16 +1,6 @@
 package application
 
-import (
-	"context"
-	"fmt"
-
-	"github.com/lemuel-manske/castellani/libs/httpx"
-)
-
-const (
-	SessionCompleted = "COMPLETED"
-	SessionCancelled = "CANCELLED"
-)
+import "context"
 
 func (a Application) CreateSession(
 	ctx context.Context,
@@ -18,14 +8,6 @@ func (a Application) CreateSession(
 	input SessionRequest,
 	raw []byte,
 ) (Session, error) {
-	if !httpx.ValidIdempotencyKey(key) {
-		return Session{}, fmt.Errorf("%w: invalid idempotency key", ErrInvalidSession)
-	}
-
-	if err := input.Validate(); err != nil {
-		return Session{}, err
-	}
-
 	if a.capture == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
@@ -39,10 +21,6 @@ func (a Application) CreateSession(
 }
 
 func (a Application) GetSession(ctx context.Context, sessionID string) (Session, error) {
-	if err := validateSessionID(sessionID); err != nil {
-		return Session{}, err
-	}
-
 	if a.capture == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
@@ -52,17 +30,9 @@ func (a Application) GetSession(ctx context.Context, sessionID string) (Session,
 
 func (a Application) UpdateSession(
 	ctx context.Context,
-	sessionID, status string,
+	sessionID string,
 	raw []byte,
 ) (Session, error) {
-	if err := validateSessionID(sessionID); err != nil {
-		return Session{}, err
-	}
-
-	if status != SessionCompleted && status != SessionCancelled {
-		return Session{}, fmt.Errorf("%w: status must be COMPLETED or CANCELLED", ErrInvalidSession)
-	}
-
 	if a.capture == nil {
 		return Session{}, ErrDependencyUnavailable
 	}

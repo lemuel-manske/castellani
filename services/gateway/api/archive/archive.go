@@ -16,6 +16,15 @@ type Handler struct {
 	app application.Application
 }
 
+type createRequest struct {
+	SeedURL        string   `json:"seedUrl"`
+	CollectionID   string   `json:"collectionId,omitempty"`
+	MaxDepth       *int     `json:"maxDepth"`
+	MaxPages       *int     `json:"maxPages"`
+	AllowedOrigins []string `json:"allowedOrigins,omitempty"`
+	AuthGeneration *int     `json:"authGeneration,omitempty"`
+}
+
 func NewHandler(app application.Application) Handler {
 	return Handler{
 		app: app,
@@ -37,11 +46,11 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var submission application.Submission
-	data, err := httpx.DecodeJSONBytes(
+	var input createRequest
+	raw, err := httpx.DecodeJSONBytes(
 		w,
 		r,
-		&submission,
+		&input,
 	)
 
 	if err != nil {
@@ -86,8 +95,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	accepted, err := h.app.CreateArchive(
 		r.Context(),
 		key,
-		submission,
-		data,
+		raw,
 	)
 
 	if err != nil {
@@ -102,9 +110,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accepted.StatusURL = common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
-
 	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
-
 	httpx.JSON(
 		w,
 		http.StatusAccepted,
@@ -114,6 +120,18 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, common.ArchiveIDParameter)
+
+	if !httpx.ValidPathSegment(id) {
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Invalid archive ID.",
+		))
+
+		return
+	}
 
 	document, err := h.app.GetArchive(r.Context(), id)
 
@@ -143,27 +161,7 @@ func writeFailure(
 ) {
 	var dependencyFailure *application.DependencyFailure
 
-	var validation *application.ValidationError
-
 	switch {
-	case errors.As(err, &validation):
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusUnprocessableEntity,
-			"invalid-archive",
-			"Invalid Archive",
-			validation.Error(),
-		))
-
-	case errors.Is(err, application.ErrInvalidArchiveID):
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-archive-id",
-			"Invalid Archive ID",
-			err.Error(),
-		))
-
 	case errors.As(err, &dependencyFailure):
 		httpx.WriteProblem(w, httpx.Problem{
 			Type:     dependencyFailure.Type,
@@ -172,7 +170,6 @@ func writeFailure(
 			Detail:   dependencyFailure.Detail,
 			Instance: r.URL.Path,
 		})
-
 	case errors.Is(err, application.ErrInvalidUpstream):
 		httpx.WriteProblem(w, httpx.NewProblem(
 			r,
@@ -181,7 +178,6 @@ func writeFailure(
 			"Invalid Upstream Response",
 			"Coordinator returned an unexpected response.",
 		))
-
 	default:
 		httpx.WriteProblem(w, httpx.NewProblem(
 			r,

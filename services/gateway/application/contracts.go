@@ -11,18 +11,14 @@ type Pagination struct {
 	Cursor string
 }
 
-type Submission struct {
-	SeedURL        string   `json:"seedUrl"`
-	CollectionID   string   `json:"collectionId,omitempty"`
-	MaxDepth       *int     `json:"maxDepth"`
-	MaxPages       *int     `json:"maxPages"`
-	AllowedOrigins []string `json:"allowedOrigins,omitempty"`
-	AuthGeneration *int     `json:"authGeneration,omitempty"`
-}
-
 type SearchQuery struct {
-	Text, CollectionID, ArchiveID, SnapshotID, CapturedFrom, CapturedTo string
-	Pagination                                                          Pagination
+	Text         string
+	CollectionID string
+	ArchiveID    string
+	SnapshotID   string
+	CapturedFrom string
+	CapturedTo   string
+	Pagination   Pagination
 }
 
 type SessionRequest struct {
@@ -36,9 +32,13 @@ type WACZOptions struct {
 }
 
 type WACZ struct {
-	Body                                                          io.ReadCloser
-	Partial                                                       bool
-	AcceptRanges, ContentRange, ETag, LastModified, ContentLength string
+	Body          io.ReadCloser
+	Partial       bool
+	AcceptRanges  string
+	ContentRange  string
+	ETag          string
+	LastModified  string
+	ContentLength string
 }
 
 type Pages struct {

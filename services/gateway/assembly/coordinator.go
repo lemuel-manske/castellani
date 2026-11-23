@@ -52,10 +52,10 @@ func coordinatorError(err error) error {
 		return application.ErrInvalidUpstream
 	case errors.As(err, &failure):
 		return &application.DependencyFailure{
-			Status: failure.Problem.Status,
-			Type:   failure.Problem.Type,
-			Title:  failure.Problem.Title,
-			Detail: failure.Problem.Detail,
+			Status: failure.Status,
+			Type:   failure.Type,
+			Title:  failure.Title,
+			Detail: failure.Detail,
 		}
 	default:
 		return errUnavailable(err)

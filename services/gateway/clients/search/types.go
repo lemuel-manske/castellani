@@ -12,8 +12,10 @@ var (
 )
 
 type Failure struct {
-	Status              int
-	Type, Title, Detail string
+	Status int
+	Type   string
+	Title  string
+	Detail string
 }
 
 func (f *Failure) Error() string {
@@ -30,8 +32,13 @@ type Pagination struct {
 }
 
 type Query struct {
-	Text, CollectionID, ArchiveID, SnapshotID, CapturedFrom, CapturedTo string
-	Pagination                                                          Pagination
+	Text         string
+	CollectionID string
+	ArchiveID    string
+	SnapshotID   string
+	CapturedFrom string
+	CapturedTo   string
+	Pagination   Pagination
 }
 
 type Results struct {

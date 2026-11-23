@@ -1,6 +1,21 @@
 package coordinator
 
+import (
+	"fmt"
+)
+
 const acceptedStatus = "ACCEPTED"
+
+type Failure struct {
+	Status int
+	Type   string
+	Title  string
+	Detail string
+}
+
+func (f *Failure) Error() string {
+	return fmt.Sprintf("coordinator returned HTTP %d", f.Status)
+}
 
 type Submission struct {
 	SeedURL        string   `json:"seedUrl"`

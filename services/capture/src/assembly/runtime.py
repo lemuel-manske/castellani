@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
-from mypy_boto3_dynamodb.client import DynamoDBClient
 
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
@@ -21,6 +20,9 @@ from application import OutboxDispatcher
 from worker import new_worker
 
 from .config import CaptureSettings
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 CONSUMER_START_TIMEOUT_SECONDS = 10
 

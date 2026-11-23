@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	portEnvironment = "GATEWAY_ADDR"
+	portEnvironment = "GATEWAY_PORT"
 
 	coordinatorEnvironment = "GATEWAY_COORDINATOR_URL"
 	captureEnvironment     = "GATEWAY_CAPTURE_URL"

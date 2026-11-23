@@ -65,7 +65,11 @@ type WACZOptions struct {
 }
 
 type WACZ struct {
-	Body                                                          io.ReadCloser
-	Partial                                                       bool
-	AcceptRanges, ContentRange, ETag, LastModified, ContentLength string
+	Body          io.ReadCloser
+	Partial       bool
+	AcceptRanges  string
+	ContentRange  string
+	ETag          string
+	LastModified  string
+	ContentLength string
 }

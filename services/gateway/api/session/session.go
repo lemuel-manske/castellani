@@ -60,18 +60,6 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !httpx.ValidPathSegment(input.ArchiveID) || !httpx.ValidHTTPURL(input.TargetURL) {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-session",
-			"Invalid Session",
-			"Expected archiveId and absolute HTTP(S) targetUrl.",
-		))
-
-		return
-	}
-
 	result, err := h.app.CreateSession(
 		r.Context(),
 		key,
@@ -92,7 +80,6 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(httpx.LocationHeader, common.SessionPathPrefix+url.PathEscape(result.SessionID))
-
 	httpx.JSON(
 		w,
 		http.StatusCreated,
@@ -156,18 +143,6 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Status != application.SessionCompleted && input.Status != application.SessionCancelled {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-session",
-			"Invalid Session",
-			"status must be COMPLETED or CANCELLED.",
-		))
-
-		return
-	}
-
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
@@ -185,7 +160,6 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	result, err := h.app.UpdateSession(
 		r.Context(),
 		id,
-		input.Status,
 		raw,
 	)
 

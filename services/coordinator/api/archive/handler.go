@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 	"github.com/lemuel-manske/castellani/services/coordinator/common"
@@ -82,22 +83,26 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 		r,
 		&input,
 	); err != nil {
-		kind := "invalid-json"
-		title := "Invalid Request"
-		detail := "Expected one valid archive JSON object."
-
 		if errors.Is(err, httpx.ErrContentType) {
-			kind = "content-type"
-			title = "Invalid Content Type"
-			detail = "Expected application/json."
+			problem := httpx.NewProblem(
+				r,
+				http.StatusBadRequest,
+				"content-type",
+				"Invalid Content Type",
+				"Expected application/json.",
+			)
+
+			httpx.WriteProblem(w, problem)
+
+			return
 		}
 
 		problem := httpx.NewProblem(
 			r,
 			http.StatusBadRequest,
-			kind,
-			title,
-			detail,
+			"invalid-json",
+			"Invalid Request",
+			"Expected one valid archive JSON object.",
 		)
 
 		httpx.WriteProblem(w, problem)
@@ -131,6 +136,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	statusURL := common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
+
 	w.Header().Set(httpx.LocationHeader, statusURL)
 
 	response := AcceptedResponse{
@@ -147,7 +153,19 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue(common.ArchiveIDParameter)
+	id := chi.URLParam(r, common.ArchiveIDParameter)
+
+	if !httpx.ValidPathSegment(id) {
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-archive-id",
+			"Invalid Archive ID",
+			"Archive ID is invalid.",
+		))
+
+		return
+	}
 
 	archive, err := h.app.GetArchive(r.Context(), id)
 
@@ -197,21 +215,11 @@ func writeFailure(
 		kind = "invalid-archive"
 		title = "Invalid Archive"
 		detail = err.Error()
-	case errors.Is(err, application.ErrInvalidIdempotencyKey):
-		status = http.StatusBadRequest
-		kind = "invalid-idempotency-key"
-		title = "Invalid Idempotency Key"
-		detail = "Idempotency-Key is invalid."
 	case errors.Is(err, application.ErrIdempotencyConflict):
 		status = http.StatusConflict
 		kind = "idempotency-conflict"
 		title = "Idempotency Conflict"
 		detail = "Idempotency-Key was used for a different archive submission."
-	case errors.Is(err, application.ErrInvalidArchiveID):
-		status = http.StatusBadRequest
-		kind = "invalid-archive-id"
-		title = "Invalid Archive ID"
-		detail = "Archive ID is invalid."
 	case errors.Is(err, application.ErrArchiveNotFound):
 		status = http.StatusNotFound
 		kind = "archive-not-found"

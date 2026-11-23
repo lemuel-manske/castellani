@@ -1,9 +1,9 @@
 package archiveapi
 
 import (
-	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
@@ -11,6 +11,8 @@ import (
 	"github.com/lemuel-manske/castellani/services/gateway/application"
 	"github.com/lemuel-manske/castellani/services/gateway/common"
 )
+
+const maxRangeHeaderBytes = 256
 
 type WACZHandler struct {
 	app application.Application
@@ -45,10 +47,28 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rangeHeader := r.Header.Get("Range")
+	ifRange := r.Header.Get("If-Range")
+
+	if len(rangeHeader) > maxRangeHeaderBytes ||
+		strings.ContainsAny(rangeHeader, "\r\n,") ||
+		len(ifRange) > maxRangeHeaderBytes ||
+		strings.ContainsAny(ifRange, "\r\n") {
+		httpx.WriteProblem(w, httpx.NewProblem(
+			r,
+			http.StatusBadRequest,
+			"invalid-range",
+			"Invalid Range",
+			"Only one valid byte range is supported.",
+		))
+
+		return
+	}
+
 	options := application.WACZOptions{
 		MetadataOnly: r.Method == http.MethodHead,
-		Range:        r.Header.Get("Range"),
-		IfRange:      r.Header.Get("If-Range"),
+		Range:        rangeHeader,
+		IfRange:      ifRange,
 	}
 
 	result, err := h.app.GetWACZ(
@@ -58,18 +78,6 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		if errors.Is(err, application.ErrInvalidWACZRange) {
-			httpx.WriteProblem(w, httpx.NewProblem(
-				r,
-				http.StatusBadRequest,
-				"invalid-range",
-				"Invalid Range",
-				"Only one valid byte range is supported.",
-			))
-
-			return
-		}
-
 		response.WriteDependencyError(
 			w,
 			r,

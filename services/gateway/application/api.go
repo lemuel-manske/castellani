@@ -7,12 +7,6 @@ type Application struct {
 	search      Search
 }
 
-type ValidationError struct {
-	Cause error
-}
-
-func (e *ValidationError) Error() string { return e.Cause.Error() }
-
 func NewApplication(
 	coordinator Coordinator,
 	capture Capture,

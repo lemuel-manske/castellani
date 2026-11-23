@@ -34,10 +34,6 @@ func Pagination(values url.Values) (application.Pagination, error) {
 		pagination.Limit = &limit
 	}
 
-	if err := pagination.Validate(); err != nil {
-		return application.Pagination{}, err
-	}
-
 	return pagination, nil
 }
 
@@ -65,7 +61,7 @@ func Search(values url.Values) (application.SearchQuery, error) {
 		return application.SearchQuery{}, err
 	}
 
-	query := application.SearchQuery{
+	return application.SearchQuery{
 		Text:         values.Get("q"),
 		CollectionID: values.Get("collectionId"),
 		ArchiveID:    values.Get("archiveId"),
@@ -73,11 +69,5 @@ func Search(values url.Values) (application.SearchQuery, error) {
 		CapturedFrom: values.Get("capturedFrom"),
 		CapturedTo:   values.Get("capturedTo"),
 		Pagination:   pagination,
-	}
-
-	if err := query.Validate(); err != nil {
-		return application.SearchQuery{}, err
-	}
-
-	return query, nil
+	}, nil
 }

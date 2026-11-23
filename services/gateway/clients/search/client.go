@@ -69,11 +69,12 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	if query.Pagination.Cursor != "" {
 		values.Set("cursor", query.Pagination.Cursor)
 	}
+
 	target := c.origin
 
 	target.Path = common.SearchPath
-	target.RawPath = ""
 	target.RawQuery = values.Encode()
+
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
@@ -84,6 +85,7 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	if err != nil {
 		return Results{}, err
 	}
+
 	response, err := c.http.Do(request)
 
 	if err != nil {
@@ -93,7 +95,9 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 			err,
 		)
 	}
+
 	defer response.Body.Close()
+
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxJSONBytes+1))
 
 	if err != nil {
@@ -109,27 +113,30 @@ func (c *Client) Search(ctx context.Context, query Query) (Results, error) {
 	}
 
 	if response.StatusCode != http.StatusOK {
-		switch response.StatusCode {
-		case 400, 401, 403, 404, 409, 422, 503:
-		default:
+		if response.StatusCode < http.StatusBadRequest {
 			return Results{}, ErrInvalidResponse
 		}
-		var p httpx.Problem
 
-		if json.Unmarshal(data, &p) != nil || p.Status != response.StatusCode || p.Title == "" || p.Type == "" {
+		var problem httpx.Problem
+
+		if json.Unmarshal(data, &problem) != nil ||
+			problem.Status != response.StatusCode ||
+			problem.Type == "" ||
+			problem.Title == "" {
 			return Results{}, ErrInvalidResponse
 		}
 
 		return Results{}, &Failure{
-			Status: p.Status,
-			Type:   p.Type,
-			Title:  p.Title,
-			Detail: p.Detail,
+			Status: response.StatusCode,
+			Type:   problem.Type,
+			Title:  problem.Title,
+			Detail: problem.Detail,
 		}
 	}
+
 	var result Results
 
-	if json.Unmarshal(data, &result) != nil || result.Results == nil {
+	if err = json.Unmarshal(data, &result); err != nil {
 		return Results{}, ErrInvalidResponse
 	}
 
