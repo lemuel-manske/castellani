@@ -1,4 +1,5 @@
-import Ajv, { type JSONSchemaType, type ValidateFunction } from "ajv";
+import Ajv from "ajv/dist/ajv.js";
+import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export interface SchemaValidator<T> {
   validate(value: unknown): value is T;
