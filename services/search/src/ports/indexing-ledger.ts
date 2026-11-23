@@ -1,4 +1,7 @@
-import type { TerminalIndexingOutcome, SnapshotLedgerEntry } from "../domain.js";
+import type {
+  TerminalIndexingOutcome,
+  SnapshotLedgerEntry,
+} from "../domain.js";
 
 interface SnapshotClaim {
   archiveId: string;
@@ -20,15 +23,18 @@ interface IndexingLedger {
     archiveId: string,
     snapshotId: string,
     messageId: string,
-    leaseDurationSeconds: number,
+    leaseDurationSeconds?: number,
     maxAttempts?: number,
   ): Promise<IndexingClaimResult>;
+
   complete(
     claim: SnapshotClaim,
     outcome: TerminalIndexingOutcome,
     reasonCode?: string,
   ): Promise<void>;
+
   release(claim: SnapshotClaim, reason: string): Promise<void>;
+
   listByArchive(archiveId: string): Promise<SnapshotLedgerEntry[]>;
 }
 
