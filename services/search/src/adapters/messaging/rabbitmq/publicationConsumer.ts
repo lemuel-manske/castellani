@@ -1,6 +1,9 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
 import { isArtifactReference } from "../../../ports/artifacts.js";
-import { isCompensationDecision, isPublicationIdentity } from "../../../domain.js";
+import {
+  isCompensationDecision,
+  isPublicationIdentity,
+} from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
 
