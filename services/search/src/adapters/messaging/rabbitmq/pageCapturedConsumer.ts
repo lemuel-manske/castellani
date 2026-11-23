@@ -42,7 +42,8 @@ function deliveryRetryCount(message: ConsumeMessage): number {
   }
 
   const retryDeath = (deaths as unknown[]).find(
-    (death: unknown) => isRecord(death) && death.queue === PAGE_CAPTURED_TOPOLOGY.retryQueue,
+    (death: unknown) =>
+      isRecord(death) && death.queue === PAGE_CAPTURED_TOPOLOGY.retryQueue,
   );
 
   if (!isRecord(retryDeath)) {
@@ -139,15 +140,25 @@ async function startPageCapturedConsumer(
     durable: true,
   });
 
-  await channel.assertExchange(PAGE_CAPTURED_TOPOLOGY.retryExchange, "direct", {
+  await channel.assertExchange(
+    PAGE_CAPTURED_TOPOLOGY.retryExchange,
+    "direct",
+    {
+      durable: true,
+    },
+  );
+
+  await channel.assertExchange(
+    PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
+    "fanout",
+    {
+      durable: true,
+    },
+  );
+
+  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.deadLetterQueue, {
     durable: true,
   });
-
-  await channel.assertExchange(PAGE_CAPTURED_TOPOLOGY.deadLetterExchange, "fanout", {
-    durable: true,
-  });
-
-  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.deadLetterQueue, { durable: true });
 
   await channel.bindQueue(
     PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
