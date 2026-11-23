@@ -1,44 +1,29 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
-import { isArtifactReference } from "../../../ports/artifacts.js";
 import {
   isCompensationDecision,
+  isCompletionCrawl,
   isPublicationIdentity,
 } from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
-import {
-  EVENTS_EXCHANGE,
-  PUBLICATION_TOPOLOGY,
-} from "./topology.js";
+import { EVENTS_EXCHANGE, PUBLICATION_TOPOLOGY } from "./topology.js";
+import { readJSON } from "../../../utils.js";
+import { isPublicationEvent } from "../../../application/types.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function nonEmpty(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
 function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
-  let envelope: unknown;
+  let envelope;
 
   try {
-    envelope = JSON.parse(Buffer.from(body).toString("utf8")) as unknown;
+    envelope = readJSON(body);
   } catch {
     return null;
   }
 
-  if (
-    !isRecord(envelope) ||
-    !nonEmpty(envelope.messageId) ||
-    !nonEmpty(envelope.correlationId) ||
-    !nonEmpty(envelope.occurredAt) ||
-    !Number.isFinite(Date.parse(envelope.occurredAt)) ||
-    envelope.version !== 1 ||
-    !isRecord(envelope.payload) ||
-    envelope.correlationId !== envelope.payload.archiveId
-  )
+  if (!isPublicationEvent(envelope)) {
     return null;
+  }
 
   const payload = envelope.payload;
 
@@ -46,17 +31,19 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
     envelope.type === "ArchivePublicationDecided" ||
     envelope.type === "ArchivePublished"
   ) {
-    return isPublicationIdentity(payload) ? { type: envelope.type, payload } : null;
+    return isPublicationIdentity(payload)
+      ? { type: envelope.type, payload }
+      : null;
   }
 
   if (envelope.type === "ArchiveCompensationDecided") {
-    return isCompensationDecision(payload) ? { type: envelope.type, payload } : null;
+    return isCompensationDecision(payload)
+      ? { type: envelope.type, payload }
+      : null;
   }
 
   if (envelope.type === "CrawlCompleted") {
-    return nonEmpty(payload.archiveId) &&
-      nonEmpty(payload.manifestDigest) &&
-      isArtifactReference(payload.manifest)
+    return isCompletionCrawl(payload)
       ? {
           type: "CrawlCompleted",
           payload: {
@@ -70,26 +57,27 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
 
   return null;
 }
+
 function retryCount(message: ConsumeMessage): number {
-  const deaths: unknown = message.properties.headers?.["x-death"];
+  const deaths = message.properties.headers?.["x-death"];
 
-  if (!Array.isArray(deaths)) return 0;
+  if (!Array.isArray(deaths)) {
+    return 0;
+  }
 
-  const death = (deaths as unknown[]).find(
-    (entry: unknown) =>
-      isRecord(entry) && entry.queue === PUBLICATION_TOPOLOGY.retryQueue,
+  const death = deaths.find(
+    (entry) => entry.queue === PUBLICATION_TOPOLOGY.retryQueue,
   );
 
-  if (!isRecord(death)) return 0;
+  if (!death) {
+    return 0;
+  }
 
   const count = death.count;
 
-  return typeof count === "number"
-    ? count
-    : typeof count === "bigint"
-      ? Number(count)
-      : 0;
+  return count;
 }
+
 function publishDeadLetter(
   channel: ConfirmChannel,
   message: ConsumeMessage,
@@ -104,12 +92,15 @@ function publishDeadLetter(
           typeof message.properties.contentType === "string"
             ? message.properties.contentType
             : "application/json",
+
         ...(typeof message.properties.messageId === "string"
           ? { messageId: message.properties.messageId }
           : {}),
+
         ...(typeof message.properties.correlationId === "string"
           ? { correlationId: message.properties.correlationId }
           : {}),
+
         ...(message.properties.headers === undefined
           ? {}
           : { headers: message.properties.headers }),
@@ -126,6 +117,7 @@ function publishDeadLetter(
     ),
   );
 }
+
 async function handleMessage(
   channel: ConfirmChannel,
   message: ConsumeMessage | null,
@@ -135,36 +127,39 @@ async function handleMessage(
 
   const event = parsePublicationEvent(message.content);
 
-  if (
-    event === null ||
-    retryCount(message) >= MAX_DELIVERY_RETRIES
-  ) {
+  if (event === null || retryCount(message) >= MAX_DELIVERY_RETRIES) {
     try {
       await publishDeadLetter(channel, message);
+
       channel.ack(message);
     } catch {
       channel.nack(message, false, true);
     }
+
     return;
   }
 
   try {
     await handle(event);
+
     channel.ack(message);
   } catch (error) {
     if (error instanceof PublicationConflictError) {
       try {
         await publishDeadLetter(channel, message);
+
         channel.ack(message);
       } catch {
         channel.nack(message, false, true);
       }
+
       return;
     }
 
     channel.nack(message, false, false);
   }
 }
+
 async function startPublicationConsumer(
   channel: ConfirmChannel,
   handle: (event: PublicationEvent) => Promise<void>,
@@ -172,13 +167,11 @@ async function startPublicationConsumer(
   await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
     durable: true,
   });
-  await channel.assertExchange(
-    PUBLICATION_TOPOLOGY.retryExchange,
-    "direct",
-    {
-      durable: true,
-    },
-  );
+
+  await channel.assertExchange(PUBLICATION_TOPOLOGY.retryExchange, "direct", {
+    durable: true,
+  });
+
   await channel.assertExchange(
     PUBLICATION_TOPOLOGY.deadLetterExchange,
     "fanout",
@@ -186,14 +179,17 @@ async function startPublicationConsumer(
       durable: true,
     },
   );
+
   await channel.assertQueue(PUBLICATION_TOPOLOGY.deadLetterQueue, {
     durable: true,
   });
+
   await channel.bindQueue(
     PUBLICATION_TOPOLOGY.deadLetterQueue,
     PUBLICATION_TOPOLOGY.deadLetterExchange,
     "",
   );
+
   await channel.assertQueue(PUBLICATION_TOPOLOGY.retryQueue, {
     durable: true,
     arguments: {
@@ -201,6 +197,7 @@ async function startPublicationConsumer(
       "x-dead-letter-exchange": EVENTS_EXCHANGE,
     },
   });
+
   await Promise.all(
     PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
       channel.bindQueue(
@@ -210,18 +207,27 @@ async function startPublicationConsumer(
       ),
     ),
   );
+
   await channel.assertQueue(PUBLICATION_TOPOLOGY.queue, {
     durable: true,
     arguments: { "x-dead-letter-exchange": PUBLICATION_TOPOLOGY.retryExchange },
   });
+
   await Promise.all(
     PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
       channel.bindQueue(PUBLICATION_TOPOLOGY.queue, EVENTS_EXCHANGE, key),
     ),
   );
+
   await channel.prefetch(1);
+
   await channel.consume(PUBLICATION_TOPOLOGY.queue, (message) => {
     void handleMessage(channel, message, handle);
   });
 }
-export { MAX_DELIVERY_RETRIES, parsePublicationEvent, startPublicationConsumer };
+
+export {
+  MAX_DELIVERY_RETRIES,
+  parsePublicationEvent,
+  startPublicationConsumer,
+};

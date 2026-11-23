@@ -1,22 +1,19 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
 import { isPageCapturedEvent } from "../../../application/types.js";
-import type { PageCapturedEvent } from "../../../application/types.js";
-import {
-  EVENTS_EXCHANGE,
-  PAGE_CAPTURED_TOPOLOGY,
-} from "./topology.js";
+import type {
+  PageCapturedEvent,
+  PageCapturedResult,
+} from "../../../application/types.js";
+import { EVENTS_EXCHANGE, PAGE_CAPTURED_TOPOLOGY } from "./topology.js";
+import { readJSON } from "../../../utils.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
-  let value: unknown;
+  let value;
 
   try {
-    value = JSON.parse(Buffer.from(body).toString("utf8")) as unknown;
+    value = readJSON(body);
   } catch {
     return null;
   }
@@ -35,28 +32,23 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
 }
 
 function deliveryRetryCount(message: ConsumeMessage): number {
-  const deaths: unknown = message.properties.headers?.["x-death"];
+  const deaths = message.properties.headers?.["x-death"];
 
   if (!Array.isArray(deaths)) {
     return 0;
   }
 
-  const retryDeath = (deaths as unknown[]).find(
-    (death: unknown) =>
-      isRecord(death) && death.queue === PAGE_CAPTURED_TOPOLOGY.retryQueue,
+  const death = deaths.find(
+    (death) => death.queue === PAGE_CAPTURED_TOPOLOGY.retryQueue,
   );
 
-  if (!isRecord(retryDeath)) {
+  if (!death) {
     return 0;
   }
 
-  const count = retryDeath.count;
+  const count = death.count;
 
-  return typeof count === "number"
-    ? count
-    : typeof count === "bigint"
-      ? Number(count)
-      : 0;
+  return count;
 }
 
 function publishDeadLetter(
@@ -73,12 +65,15 @@ function publishDeadLetter(
           typeof message.properties.contentType === "string"
             ? message.properties.contentType
             : "application/json",
+
         ...(typeof message.properties.messageId === "string"
           ? { messageId: message.properties.messageId }
           : {}),
+
         ...(typeof message.properties.correlationId === "string"
           ? { correlationId: message.properties.correlationId }
           : {}),
+
         ...(message.properties.headers === undefined
           ? {}
           : { headers: message.properties.headers }),
@@ -99,30 +94,34 @@ function publishDeadLetter(
 async function handlePageCapturedMessage(
   channel: ConfirmChannel,
   message: ConsumeMessage | null,
-  handle: (event: PageCapturedEvent) => Promise<unknown>,
+  handle: (event: PageCapturedEvent) => Promise<PageCapturedResult>,
 ): Promise<void> {
   if (message === null) {
     return;
   }
 
   const event = parsePageCaptured(message.content);
+
   const retries = deliveryRetryCount(message);
 
   if (event === null || retries >= MAX_DELIVERY_RETRIES) {
     try {
       await publishDeadLetter(channel, message);
+
       channel.ack(message);
     } catch {
       channel.nack(message, false, true);
     }
+
     return;
   }
 
   try {
     const result = await handle(event);
 
-    if (isRecord(result) && result.status === "BUSY") {
+    if (result.status === "BUSY") {
       channel.nack(message, false, false);
+
       return;
     }
 
@@ -140,13 +139,9 @@ async function startPageCapturedConsumer(
     durable: true,
   });
 
-  await channel.assertExchange(
-    PAGE_CAPTURED_TOPOLOGY.retryExchange,
-    "direct",
-    {
-      durable: true,
-    },
-  );
+  await channel.assertExchange(PAGE_CAPTURED_TOPOLOGY.retryExchange, "direct", {
+    durable: true,
+  });
 
   await channel.assertExchange(
     PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
@@ -203,4 +198,3 @@ async function startPageCapturedConsumer(
 }
 
 export { MAX_DELIVERY_RETRIES, parsePageCaptured, startPageCapturedConsumer };
-

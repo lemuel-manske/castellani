@@ -1,3 +1,7 @@
+import {
+  ArtifactReference,
+  ArtifactReferenceSchema,
+} from "./ports/artifacts.js";
 import { createSchemaValidator } from "./schema.js";
 
 /**
@@ -18,6 +22,12 @@ interface CompensationDecision {
   reasonCode: string;
 }
 
+interface CompletionCrawl {
+  archiveId: string;
+  manifestDigest: string;
+  manifest: ArtifactReference;
+}
+
 interface PublicationFacts {
   publicationDecision: PublicationIdentity | null;
   replayPublication: PublicationIdentity | null;
@@ -25,11 +35,7 @@ interface PublicationFacts {
 }
 
 type IndexingOutcome =
-  | "PENDING"
-  | "PROCESSING"
-  | "INDEXED"
-  | "UNSUPPORTED"
-  | "FAILED";
+  "PENDING" | "PROCESSING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
 
 type NonTerminalIndexingOutcome = Extract<
   IndexingOutcome,
@@ -95,15 +101,37 @@ function isCompensationDecision(value: unknown): value is CompensationDecision {
   return compensationDecisionValidator.validate(value);
 }
 
+const CompletionCrawlSchema = {
+  type: "object",
+  properties: {
+    archiveId: { type: "string", minLength: 1 },
+    manifestDigest: { type: "string", minLength: 1 },
+    manifest: ArtifactReferenceSchema,
+  },
+  required: ["archiveId", "manifestDigest", "manifest"],
+  additionalProperties: false,
+} as const;
+
+const completionCrawlValidator = createSchemaValidator<CompletionCrawl>(
+  CompletionCrawlSchema,
+);
+
+function isCompletionCrawl(value: unknown): value is CompletionCrawl {
+  return completionCrawlValidator.validate(value);
+}
+
 export {
   CompensationDecisionSchema,
-  isCompensationDecision,
-  isPublicationIdentity,
+  CompletionCrawlSchema,
   PublicationIdentitySchema,
+  isCompensationDecision,
+  isCompletionCrawl,
+  isPublicationIdentity,
 };
 
 export type {
   CompensationDecision,
+  CompletionCrawl,
   IndexingOutcome,
   ManifestReconciliation,
   ManifestSnapshot,
