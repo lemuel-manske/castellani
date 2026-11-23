@@ -3,6 +3,8 @@ import type { ConsumeMessage } from "amqplib";
 import {
   DEAD_LETTER_QUEUE as PAGE_CAPTURED_DEAD_LETTER_QUEUE,
   EVENTS_EXCHANGE,
+  RETRY_EXCHANGE as PAGE_CAPTURED_RETRY_EXCHANGE,
+  DEAD_LETTER_EXCHANGE as PAGE_CAPTURED_DEAD_LETTER_EXCHANGE,
   PAGE_CAPTURED_QUEUE,
   PAGE_CAPTURED_ROUTING_KEY,
   RETRY_QUEUE as PAGE_CAPTURED_RETRY_QUEUE,
@@ -11,6 +13,8 @@ import {
 import {
   DEAD_LETTER_QUEUE as PUBLICATION_DEAD_LETTER_QUEUE,
   PUBLICATION_QUEUE,
+  RETRY_EXCHANGE as PUBLICATION_RETRY_EXCHANGE,
+  DEAD_LETTER_EXCHANGE as PUBLICATION_DEAD_LETTER_EXCHANGE,
   RETRY_QUEUE as PUBLICATION_RETRY_QUEUE,
   startPublicationConsumer,
 } from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
@@ -153,18 +157,18 @@ function createRabbitMqTestSupport() {
             [
               PAGE_CAPTURED_QUEUE,
               PAGE_CAPTURED_RETRY_QUEUE,
-              topology.deadLetterQueue,
+              PAGE_CAPTURED_DEAD_LETTER_QUEUE,
               PUBLICATION_QUEUE,
               PUBLICATION_RETRY_QUEUE,
-              publicationTopology.deadLetterQueue,
+              PUBLICATION_DEAD_LETTER_QUEUE,
             ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)),
           );
           await Promise.all(
             [
-              topology.eventsExchange,
+              EVENTS_EXCHANGE,
               "castellani.search.retry",
               "castellani.search.dead",
-              publicationTopology.eventsExchange,
+              EVENTS_EXCHANGE,
               "castellani.search.publication.retry",
               "castellani.search.publication.dead",
             ].map((exchange) =>
