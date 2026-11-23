@@ -26,9 +26,7 @@ import { isConditionalCheckFailure } from "./error-handling.js";
 const DEFAULT_MAX_ATTEMPTS = 5;
 
 class DynamoDBIndexingLedger implements IndexingLedger {
-  constructor(
-    private readonly client: DynamoDBDocumentClient,
-  ) {}
+  constructor(private readonly client: DynamoDBDocumentClient) {}
 
   async claim(
     archiveId: string,
@@ -49,7 +47,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       throw new Error("maximum indexing attempts must be a positive integer");
     }
 
-    const now = clock_provider.now() / 1000;
+    const now = Date.now() / 1000;
     const token = randomUUID();
 
     try {
@@ -168,7 +166,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         claim,
         outcome,
         ...(reasonCode === undefined ? {} : { reasonCode }),
-        now: this.clock() / 1000,
+        now: Date.now() / 1000,
       });
     } catch (error) {
       if (isConditionalCheckFailure(error)) {
@@ -184,7 +182,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       await releaseIndexingEntry(this.client, {
         claim,
         reason: reason.slice(0, 1000),
-        now: this.clock() / 1000,
+        now: Date.now() / 1000,
       });
     } catch (error) {
       if (isConditionalCheckFailure(error)) {

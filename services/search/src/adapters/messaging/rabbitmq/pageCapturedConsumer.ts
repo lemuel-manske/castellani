@@ -133,7 +133,7 @@ async function handlePageCapturedMessage(
 
 async function startPageCapturedConsumer(
   channel: ConfirmChannel,
-  handle: (event: PageCapturedEvent) => Promise<unknown>,
+  handle: (event: PageCapturedEvent) => Promise<PageCapturedResult>,
 ): Promise<void> {
   await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
     durable: true,

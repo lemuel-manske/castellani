@@ -13,6 +13,7 @@ import type {
 } from "../../src/ports/artifacts.js";
 
 interface CapturedPageFixtureOptions {
+  archiveId?: string;
   bucket?: string;
   body?: string;
   validChecksum?: boolean;
@@ -48,7 +49,7 @@ function createCapturedPageFixture(
   const checksum = createHash("sha256").update(bytes).digest("hex");
 
   const page: CapturedPageReference = {
-    archiveId: "integration-archive",
+    archiveId: options.archiveId ?? "integration-archive",
     snapshotId,
     url: "https://example.com/",
     finalUrl: "https://example.com/final",

@@ -25,21 +25,21 @@ const SEARCH_INDEX_BODY = {
   },
 } as const;
 
-async function ensureSearchIndex(
-  client: Client,
-  indexName: string = SEARCH_INDEX_NAME,
-): Promise<void> {
-  const existing = await client.indices.exists({ index: indexName });
+async function ensureSearchIndex(client: Client): Promise<void> {
+  const existing = await client.indices.exists({ index: SEARCH_INDEX_NAME });
 
   if (existing.body) {
     return;
   }
 
   try {
-    await client.indices.create({ index: indexName, body: SEARCH_INDEX_BODY });
+    await client.indices.create({
+      index: SEARCH_INDEX_NAME,
+      body: SEARCH_INDEX_BODY,
+    });
   } catch (error) {
     const createdByAnotherInstance = await client.indices.exists({
-      index: indexName,
+      index: SEARCH_INDEX_NAME,
     });
 
     if (!createdByAnotherInstance.body) {
@@ -48,9 +48,7 @@ async function ensureSearchIndex(
   }
 }
 
-function createOpenSearchDocumentWriter(
-  client: Client,
-): SearchDocumentWriter {
+function createOpenSearchDocumentWriter(client: Client): SearchDocumentWriter {
   return {
     async index(document: SearchDocument) {
       await client.index({

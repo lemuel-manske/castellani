@@ -78,7 +78,8 @@ async function readWarcArtifact(
       );
     }
 
-    const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+    const contentType =
+      response.headers.get("content-type") ?? "application/octet-stream";
 
     capturedResponse = {
       content: await record.contentText(),
@@ -103,11 +104,7 @@ async function readCapturedPage(
   }
 
   for (const artifact of artifacts) {
-    const response = await readWarcArtifact(
-      artifact,
-      finalUrl,
-      reader,
-    );
+    const response = await readWarcArtifact(artifact, finalUrl, reader);
 
     if (response === null) {
       continue;

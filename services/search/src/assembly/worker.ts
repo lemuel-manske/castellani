@@ -14,6 +14,10 @@ interface SearchWorkerHandlers {
   publicationEvent(event: PublicationEvent): Promise<void>;
 }
 
+function isAborted(signal: AbortSignal): boolean {
+  return signal.aborted;
+}
+
 interface SearchWorkerSettings {
   rabbitmqUrl: string;
   reconnectDelayMilliseconds: number;
@@ -27,7 +31,7 @@ class SearchWorker {
   ) {}
 
   async start(signal: AbortSignal): Promise<void> {
-    while (!signal.aborted) {
+    while (!isAborted(signal)) {
       let connection: amqp.ChannelModel | undefined;
       let pageCapturedChannel: amqp.ConfirmChannel | undefined;
       let publicationChannel: amqp.ConfirmChannel | undefined;
@@ -35,7 +39,7 @@ class SearchWorker {
       try {
         connection = await amqp.connect(this.settings.rabbitmqUrl);
 
-        if (signal.aborted) {
+        if (isAborted(signal)) {
           await connection.close();
           break;
         }
@@ -43,7 +47,7 @@ class SearchWorker {
         pageCapturedChannel = await connection.createConfirmChannel();
         publicationChannel = await connection.createConfirmChannel();
 
-        if (signal.aborted) {
+        if (isAborted(signal)) {
           await Promise.all([
             pageCapturedChannel.close(),
             publicationChannel.close(),
@@ -52,19 +56,17 @@ class SearchWorker {
           break;
         }
 
-        await startPageCapturedConsumer(
-          pageCapturedChannel,
-          this.handlers.pageCaptured,
+        await startPageCapturedConsumer(pageCapturedChannel, (event) =>
+          this.handlers.pageCaptured(event),
         );
 
-        await startPublicationConsumer(
-          publicationChannel,
-          this.handlers.publicationEvent,
+        await startPublicationConsumer(publicationChannel, (event) =>
+          this.handlers.publicationEvent(event),
         );
 
         await this.waitForConnectionOrShutdown(connection, signal);
       } catch (error) {
-        if (!signal.aborted) {
+        if (!isAborted(signal)) {
           console.error("Search consumer connection failed", error);
         }
       } finally {
@@ -93,14 +95,14 @@ class SearchWorker {
       connection.once("error", finish);
       signal.addEventListener("abort", finish, { once: true });
 
-      if (signal.aborted) {
+      if (isAborted(signal)) {
         finish();
       }
     });
   }
 
   private waitForReconnectDelay(signal: AbortSignal): Promise<void> {
-    if (signal.aborted) {
+    if (isAborted(signal)) {
       return Promise.resolve();
     }
 
@@ -118,7 +120,7 @@ class SearchWorker {
 
       signal.addEventListener("abort", finish, { once: true });
 
-      if (signal.aborted) {
+      if (isAborted(signal)) {
         finish();
       }
     });

@@ -4,7 +4,7 @@ import {
   DynamoDBClient,
   waitUntilTableExists,
 } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 import {
   MANIFEST_LEDGER,
@@ -20,7 +20,7 @@ import {
   REGION,
   SEARCH_DYNAMODB_ENDPOINT_URL,
   ACCESS_KEY_ID,
-  SECRECT_ACCESS_KEY,
+  SECRET_ACCESS_KEY,
 } from "./env.js";
 
 function createDynamoDbTestSupport() {
@@ -29,7 +29,7 @@ function createDynamoDbTestSupport() {
     endpoint: SEARCH_DYNAMODB_ENDPOINT_URL,
     credentials: {
       accessKeyId: ACCESS_KEY_ID,
-      secretAccessKey: SECRECT_ACCESS_KEY,
+      secretAccessKey: SECRET_ACCESS_KEY,
     },
   });
 
@@ -43,6 +43,19 @@ function createDynamoDbTestSupport() {
 
   return {
     ledger,
+    async getIndexingEntry(
+      snapshotId: string,
+    ): Promise<Record<string, unknown> | undefined> {
+      const response = await documentClient.send(
+        new GetCommand({
+          TableName: INDEXING_LEDGER,
+          Key: { snapshotId },
+          ConsistentRead: true,
+        }),
+      );
+
+      return response.Item;
+    },
     publicationLedger,
     manifestLedger,
     async setup(): Promise<void> {

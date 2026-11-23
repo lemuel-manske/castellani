@@ -5,7 +5,11 @@ interface ProblemDetails {
   detail: string;
 }
 
-function problem(status: number, title: string, detail: string): ProblemDetails {
+function problem(
+  status: number,
+  title: string,
+  detail: string,
+): ProblemDetails {
   return { type: "about:blank", title, status, detail };
 }
 

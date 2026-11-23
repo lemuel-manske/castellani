@@ -1,5 +1,6 @@
 import * as amqp from "amqplib";
 import type { ConsumeMessage } from "amqplib";
+
 import {
   EVENTS_EXCHANGE,
   PAGE_CAPTURED_TOPOLOGY,
@@ -7,12 +8,15 @@ import {
 } from "../../src/adapters/messaging/rabbitmq/topology.js";
 import { startPageCapturedConsumer } from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { startPublicationConsumer } from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
+
 import type {
   PageCapturedEvent,
+  PageCapturedResult,
   PublicationEvent,
 } from "../../src/application/types.js";
 
 import { SEARCH_RABBITMQ_URL } from "./env.js";
+import { bufferJSON } from "../../src/utils.js";
 
 function createRabbitMqTestSupport() {
   let connection: amqp.ChannelModel | undefined;
@@ -46,7 +50,7 @@ function createRabbitMqTestSupport() {
 
   return {
     async setup(
-      handle: (event: PageCapturedEvent) => Promise<unknown>,
+      handleCapture: (event: PageCapturedEvent) => Promise<PageCapturedResult>,
       handlePublication: (event: PublicationEvent) => Promise<void>,
     ): Promise<void> {
       connection = await amqp.connect(
@@ -56,7 +60,7 @@ function createRabbitMqTestSupport() {
       publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
 
-      await startPageCapturedConsumer(consumerChannel, handle);
+      await startPageCapturedConsumer(consumerChannel, handleCapture);
 
       await startPublicationConsumer(
         publicationConsumerChannel,
@@ -104,7 +108,7 @@ function createRabbitMqTestSupport() {
       publisherChannel.publish(
         EVENTS_EXCHANGE,
         PAGE_CAPTURED_TOPOLOGY.routingKey,
-        Buffer.from(JSON.stringify(event)),
+        bufferJSON(event),
         { contentType: "application/json", persistent: true },
       );
 
@@ -119,12 +123,10 @@ function createRabbitMqTestSupport() {
         throw new Error("RabbitMQ integration environment is not initialized");
       }
 
-      publisherChannel.publish(
-        EVENTS_EXCHANGE,
-        routingKey,
-        Buffer.from(JSON.stringify(event)),
-        { contentType: "application/json", persistent: true },
-      );
+      publisherChannel.publish(EVENTS_EXCHANGE, routingKey, bufferJSON(event), {
+        contentType: "application/json",
+        persistent: true,
+      });
 
       await publisherChannel.waitForConfirms();
     },
