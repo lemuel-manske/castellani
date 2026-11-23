@@ -8,7 +8,6 @@ import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from mypy_boto3_s3.client import S3Client
 
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
