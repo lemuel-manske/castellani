@@ -1,23 +1,12 @@
 import * as amqp from "amqplib";
 import type { ConsumeMessage } from "amqplib";
 import {
-  DEAD_LETTER_QUEUE as PAGE_CAPTURED_DEAD_LETTER_QUEUE,
   EVENTS_EXCHANGE,
-  RETRY_EXCHANGE as PAGE_CAPTURED_RETRY_EXCHANGE,
-  DEAD_LETTER_EXCHANGE as PAGE_CAPTURED_DEAD_LETTER_EXCHANGE,
-  PAGE_CAPTURED_QUEUE,
-  PAGE_CAPTURED_ROUTING_KEY,
-  RETRY_QUEUE as PAGE_CAPTURED_RETRY_QUEUE,
-  startPageCapturedConsumer,
-} from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
-import {
-  DEAD_LETTER_QUEUE as PUBLICATION_DEAD_LETTER_QUEUE,
-  PUBLICATION_QUEUE,
-  RETRY_EXCHANGE as PUBLICATION_RETRY_EXCHANGE,
-  DEAD_LETTER_EXCHANGE as PUBLICATION_DEAD_LETTER_EXCHANGE,
-  RETRY_QUEUE as PUBLICATION_RETRY_QUEUE,
-  startPublicationConsumer,
-} from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
+  PAGE_CAPTURED_TOPOLOGY,
+  PUBLICATION_TOPOLOGY,
+} from "../../src/adapters/messaging/rabbitmq/topology.js";
+import { startPageCapturedConsumer } from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
+import { startPublicationConsumer } from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
 import type {
   PageCapturedEvent,
   PublicationEvent,
@@ -71,7 +60,7 @@ function createRabbitMqTestSupport() {
         handlePublication,
       );
       await consumerChannel.consume(
-        PAGE_CAPTURED_DEAD_LETTER_QUEUE,
+        PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
         (message) => {
           if (message === null) {
             return;
@@ -86,7 +75,7 @@ function createRabbitMqTestSupport() {
         },
       );
       await publicationConsumerChannel.consume(
-        PUBLICATION_DEAD_LETTER_QUEUE,
+        PUBLICATION_TOPOLOGY.deadLetterQueue,
         (message) => {
           if (message === null) {
             return;
@@ -109,7 +98,7 @@ function createRabbitMqTestSupport() {
 
       publisherChannel.publish(
         EVENTS_EXCHANGE,
-        PAGE_CAPTURED_ROUTING_KEY,
+        PAGE_CAPTURED_TOPOLOGY.routingKey,
         Buffer.from(JSON.stringify(event)),
         { contentType: "application/json", persistent: true },
       );
@@ -164,20 +153,20 @@ function createRabbitMqTestSupport() {
         try {
           await Promise.all(
             [
-              PAGE_CAPTURED_QUEUE,
-              PAGE_CAPTURED_RETRY_QUEUE,
-              PAGE_CAPTURED_DEAD_LETTER_QUEUE,
-              PUBLICATION_QUEUE,
-              PUBLICATION_RETRY_QUEUE,
-              PUBLICATION_DEAD_LETTER_QUEUE,
+              PAGE_CAPTURED_TOPOLOGY.queue,
+              PAGE_CAPTURED_TOPOLOGY.retryQueue,
+              PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
+              PUBLICATION_TOPOLOGY.queue,
+              PUBLICATION_TOPOLOGY.retryQueue,
+              PUBLICATION_TOPOLOGY.deadLetterQueue,
             ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)),
           );
           await Promise.all(
             [
-              PAGE_CAPTURED_RETRY_EXCHANGE,
-              PAGE_CAPTURED_DEAD_LETTER_EXCHANGE,
-              PUBLICATION_RETRY_EXCHANGE,
-              PUBLICATION_DEAD_LETTER_EXCHANGE,
+              PAGE_CAPTURED_TOPOLOGY.retryExchange,
+              PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
+              PUBLICATION_TOPOLOGY.retryExchange,
+              PUBLICATION_TOPOLOGY.deadLetterExchange,
             ].map((exchange) =>
               cleanup.deleteExchange(exchange).catch(() => undefined),
             ),
