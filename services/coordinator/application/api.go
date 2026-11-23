@@ -8,12 +8,22 @@ import (
 )
 
 var (
-	ErrInvalidSubmission     = errors.New("invalid archive submission")
-	ErrInvalidIdempotencyKey = errors.New("invalid idempotency key")
-	ErrIdempotencyConflict   = errors.New("idempotency key belongs to another submission")
-	ErrArchiveNotFound       = errors.New("archive not found")
-	ErrInvalidArchiveID      = errors.New("invalid archive ID")
+	ErrInvalidSubmission   = errors.New("invalid archive submission")
+	ErrIdempotencyConflict = errors.New("idempotency key belongs to another submission")
+	ErrArchiveNotFound     = errors.New("archive not found")
 )
+
+type SubmissionValidationError struct {
+	cause error
+}
+
+func (e SubmissionValidationError) Error() string {
+	return e.cause.Error()
+}
+
+func (e SubmissionValidationError) Unwrap() []error {
+	return []error{ErrInvalidSubmission, e.cause}
+}
 
 type AcceptedArchive struct {
 	ArchiveID string
