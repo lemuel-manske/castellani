@@ -163,9 +163,15 @@ type Dependencies struct {
 // Service is one dependency's observable health endpoint.
 type Service struct {
 	name      string
+	baseURL   string
 	healthURL string
 	username  string
 	password  string
+}
+
+// URL returns an absolute URL for a path on this service.
+func (s Service) URL(path string) string {
+	return s.baseURL + path
 }
 
 // Start brings up the full stack and waits until every service answers its
@@ -398,9 +404,12 @@ func newService(
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 	require.NoError(t, err)
 
+	baseURL := "http://" + net.JoinHostPort("localhost", mappedPort.Port())
+
 	return Service{
 		name:      name,
-		healthURL: "http://" + net.JoinHostPort("localhost", mappedPort.Port()) + path,
+		baseURL:   baseURL,
+		healthURL: baseURL + path,
 		username:  username,
 		password:  password,
 	}
