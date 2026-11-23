@@ -1,14 +1,16 @@
-import {
+import type {
   CompensationDecision,
   PublicationIdentity,
   TerminalIndexingOutcome,
 } from "../domain.js";
 import {
-  ArtifactReference,
   ArtifactReferenceSchema,
+} from "../ports/artifacts.js";
+import type {
+  ArtifactReference,
   CapturedPageReference,
 } from "../ports/artifacts.js";
-import { SearchQuery } from "../ports/search-reader.js";
+import type { SearchQuery } from "../ports/search-reader.js";
 import { createSchemaValidator } from "../schema.js";
 
 interface SearchPublishedDocumentsInput extends SearchQuery {
@@ -138,7 +140,14 @@ const PageCapturedEventSchema = {
       additionalProperties: false,
     },
   },
-  required: ["type", "version", "messageId", "correlationId", "occurredAt", "payload"],
+  required: [
+    "type",
+    "version",
+    "messageId",
+    "correlationId",
+    "occurredAt",
+    "payload",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -218,9 +227,9 @@ function isManifestDocument(value: unknown): value is ManifestDocument {
 
 export {
   ManifestDocumentSchema,
+  ManifestSnapshotSchema,
   PageCapturedEventSchema,
   isPageCapturedEvent,
-  ManifestSnapshotSchema,
   isManifestDocument,
   isManifestSnapshot,
 };
