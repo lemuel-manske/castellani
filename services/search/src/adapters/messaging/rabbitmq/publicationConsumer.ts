@@ -6,21 +6,11 @@ import {
 } from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
+import {
+  EVENTS_EXCHANGE,
+  PUBLICATION_TOPOLOGY,
+} from "./topology.js";
 
-const EVENTS_EXCHANGE = "castellani.events";
-const PUBLICATION_ROUTING_KEYS = [
-  "ArchivePublicationDecided",
-  "ArchivePublished",
-  "ArchiveCompensationDecided",
-  "CrawlCompleted",
-] as const;
-const PUBLICATION_QUEUE = "castellani.search.publication.v1";
-const RETRY_EXCHANGE = "castellani.search.publication.retry";
-const RETRY_QUEUE = "castellani.search.publication.retry.v1";
-const DEAD_LETTER_EXCHANGE = "castellani.search.publication.dead";
-const DEAD_LETTER_QUEUE = "castellani.search.publication.dead.v1";
-const MAX_DELIVERY_RETRIES = 5;
-const RETRY_DELAY_MILLISECONDS = 5000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -85,7 +75,7 @@ function retryCount(message: ConsumeMessage): number {
   if (!Array.isArray(deaths)) return 0;
 
   const death = (deaths as unknown[]).find(
-    (entry: unknown) => isRecord(entry) && entry.queue === RETRY_QUEUE,
+    (entry: unknown) => isRecord(entry) && entry.queue === PUBLICATION_TOPOLOGY.retryQueue,
   );
 
   if (!isRecord(death)) return 0;
@@ -104,7 +94,7 @@ function publishDeadLetter(
 ): Promise<void> {
   return new Promise((resolve, reject) =>
     channel.publish(
-      DEAD_LETTER_EXCHANGE,
+      PUBLICATION_TOPOLOGY.deadLetterExchange,
       "",
       message.content,
       {
@@ -180,53 +170,42 @@ async function startPublicationConsumer(
   await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
     durable: true,
   });
-  await channel.assertExchange(RETRY_EXCHANGE, "direct", {
+  await channel.assertExchange(PUBLICATION_TOPOLOGY.retryExchange, "direct", {
     durable: true,
   });
-  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", {
+  await channel.assertExchange(PUBLICATION_TOPOLOGY.deadLetterExchange, "fanout", {
     durable: true,
   });
-  await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
+  await channel.assertQueue(PUBLICATION_TOPOLOGY.deadLetterQueue, { durable: true });
   await channel.bindQueue(
-    DEAD_LETTER_QUEUE,
-    DEAD_LETTER_EXCHANGE,
+    PUBLICATION_TOPOLOGY.deadLetterQueue,
+    PUBLICATION_TOPOLOGY.deadLetterExchange,
     "",
   );
-  await channel.assertQueue(RETRY_QUEUE, {
+  await channel.assertQueue(PUBLICATION_TOPOLOGY.retryQueue, {
     durable: true,
     arguments: {
-      "x-message-ttl": RETRY_DELAY_MILLISECONDS,
+      "x-message-ttl": PUBLICATION_TOPOLOGY.retryDelayMilliseconds,
       "x-dead-letter-exchange": EVENTS_EXCHANGE,
     },
   });
   await Promise.all(
-    PUBLICATION_ROUTING_KEYS.map((key) =>
-      channel.bindQueue(RETRY_QUEUE, RETRY_EXCHANGE, key),
+    PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
+      channel.bindQueue(PUBLICATION_TOPOLOGY.retryQueue, PUBLICATION_TOPOLOGY.retryExchange, key),
     ),
   );
-  await channel.assertQueue(PUBLICATION_QUEUE, {
+  await channel.assertQueue(PUBLICATION_TOPOLOGY.queue, {
     durable: true,
-    arguments: { "x-dead-letter-exchange": RETRY_EXCHANGE },
+    arguments: { "x-dead-letter-exchange": PUBLICATION_TOPOLOGY.retryExchange },
   });
   await Promise.all(
-    PUBLICATION_ROUTING_KEYS.map((key) =>
-      channel.bindQueue(PUBLICATION_QUEUE, EVENTS_EXCHANGE, key),
+    PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
+      channel.bindQueue(PUBLICATION_TOPOLOGY.queue, EVENTS_EXCHANGE, key),
     ),
   );
   await channel.prefetch(1);
-  await channel.consume(PUBLICATION_QUEUE, (message) => {
+  await channel.consume(PUBLICATION_TOPOLOGY.queue, (message) => {
     void handleMessage(channel, message, handle);
   });
 }
-export {
-  DEAD_LETTER_EXCHANGE,
-  DEAD_LETTER_QUEUE,
-  EVENTS_EXCHANGE,
-  MAX_DELIVERY_RETRIES,
-  PUBLICATION_QUEUE,
-  PUBLICATION_ROUTING_KEYS,
-  RETRY_EXCHANGE,
-  RETRY_QUEUE,
-  parsePublicationEvent,
-  startPublicationConsumer,
-};
+export { MAX_DELIVERY_RETRIES, parsePublicationEvent, startPublicationConsumer };
