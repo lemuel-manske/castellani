@@ -112,7 +112,7 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
 @pytest.mark.integration
 def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient, clock: FakeClock) -> None:
     with pytest.raises(ValueError):
-        DynamoDBCaptureAllocator(dynamodb,  0, 30, clock)
+        DynamoDBCaptureAllocator(dynamodb, 0, 30, clock)
 
     with pytest.raises(ValueError):
         DynamoDBCaptureAllocator(dynamodb, 1, 0, clock)

@@ -3,10 +3,19 @@ const SEARCH_OPENSEARCH_URL = process.env.SEARCH_OPENSEARCH_URL;
 const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
 const SEARCH_S3_ENDPOINT_URL = process.env.SEARCH_S3_ENDPOINT_URL;
 
-const ACCESS_KEY_ID = process.env.ACCESS_KEY_ID;
-const SECRET_ACCESS_KEY = process.env.SECRET_ACCESS_KEY;
+const REGION = required("SEARCH_AWS_REGION");
+const ACCESS_KEY_ID = required("SEARCH_AWS_ACCESS_KEY_ID");
+const SECRET_ACCESS_KEY = required("SEARCH_AWS_SECRET_ACCESS_KEY");
 
-const REGION = "us-east-1";
+function required(name: string): string {
+  const value = process.env[name];
+
+  if (!value?.trim()) {
+    throw new Error(`${name} must not be empty`);
+  }
+
+  return value;
+}
 
 export {
   ACCESS_KEY_ID,

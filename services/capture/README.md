@@ -25,8 +25,15 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. The runti
 
 | Variable | Description |
 |---|---|
+| `CAPTURE_AWS_REGION` | AWS SDK region |
 | `CAPTURE_AWS_ACCESS_KEY_ID` | AWS SDK access key |
 | `CAPTURE_AWS_SECRET_ACCESS_KEY` | AWS SDK secret key |
 | `CAPTURE_DYNAMODB_ENDPOINT_URL` | DynamoDB endpoint |
 | `CAPTURE_S3_ENDPOINT_URL` | S3 endpoint |
 | `CAPTURE_RABBITMQ_URL` | RabbitMQ endpoint |
+| `CAPTURE_BROWSER_SLOT_COUNT` | Maximum concurrent browser slots. Defaults to 10 |
+| `CAPTURE_LEASE_DURATION_SECONDS` | Capture lease duration. Defaults to 60 seconds |
+| `CAPTURE_OUTBOX_LEASE_SECONDS` | Outbox lease duration. Defaults to 30 seconds |
+| `CAPTURE_OUTBOX_POLL_SECONDS` | Outbox polling interval. Defaults to 0.5 seconds |
+| `CAPTURE_OUTBOX_RETRY_SECONDS` | Outbox retry delay. Defaults to 5 seconds |
+| `CAPTURE_ARTIFACT_DIRECTORY` | Local artifact staging directory. Defaults to `/tmp/castellani/capture` |

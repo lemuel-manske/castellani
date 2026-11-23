@@ -17,6 +17,8 @@ class CaptureSettings:
     """Runtime configuration for one Capture service process."""
 
     aws_region: str
+    aws_access_key_id: str
+    aws_secret_access_key: str
 
     dynamodb_endpoint_url: str
     rabbitmq_url: str
@@ -35,22 +37,20 @@ class CaptureSettings:
     @classmethod
     def from_environment(cls) -> "CaptureSettings":
         return cls(
-            aws_region=required("AWS_REGION"),
-
-            dynamodb_endpoint_url=required("DYNAMODB_ENDPOINT_URL"),
-            rabbitmq_url=required("RABBITMQ_URL"),
-            s3_endpoint_url=required("S3_ENDPOINT_URL"),
-
+            aws_region=required("CAPTURE_AWS_REGION"),
+            aws_access_key_id=required("CAPTURE_AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=required("CAPTURE_AWS_SECRET_ACCESS_KEY"),
+            dynamodb_endpoint_url=required("CAPTURE_DYNAMODB_ENDPOINT_URL"),
+            rabbitmq_url=required("CAPTURE_RABBITMQ_URL"),
+            s3_endpoint_url=required("CAPTURE_S3_ENDPOINT_URL"),
             browser_slot_count=positive_int(
                 "CAPTURE_BROWSER_SLOT_COUNT",
                 DEFAULT_BROWSER_SLOT_COUNT,
             ),
-
             lease_duration=positive_float(
                 "CAPTURE_LEASE_DURATION_SECONDS",
                 DEFAULT_LEASE_DURATION,
             ),
-
             outbox_lease_duration=positive_float(
                 "CAPTURE_OUTBOX_LEASE_SECONDS",
                 DEFAULT_OUTBOX_LEASE_DURATION,
@@ -63,17 +63,17 @@ class CaptureSettings:
                 "CAPTURE_OUTBOX_RETRY_SECONDS",
                 DEFAULT_OUTBOX_RETRY_DELAY,
             ),
-
             artifact_directory=os.getenv(
                 "CAPTURE_ARTIFACT_DIRECTORY",
                 DEFAULT_ARTIFACT_DIRECTORY,
             ),
         )
 
+
 def required(name: str) -> str:
     value = os.getenv(name)
 
-    if value is None:
+    if value is None or not value.strip():
         raise ValueError(f"{name} is required")
 
     return value

@@ -8,7 +8,6 @@ import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from mypy_boto3_s3.client import S3Client
 
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
@@ -58,7 +57,10 @@ class CaptureRuntime:
             raise RuntimeError("Capture runtime has already started")
 
         try:
-            session = boto3.Session()
+            session = boto3.Session(
+                aws_access_key_id=self.settings.aws_access_key_id,
+                aws_secret_access_key=self.settings.aws_secret_access_key,
+            )
 
             self.dynamodb_client = session.client(
                 "dynamodb",

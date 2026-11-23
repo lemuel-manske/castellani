@@ -33,7 +33,7 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
 
     reference = references[0]
 
-    assert reference.bucket == "castellani-archive-artifact"
+    assert reference.bucket == "castellani-archive-artifacts"
 
     assert reference.key.startswith("capture-staging/archive%2Fone/url-key/attempt-1/")
     assert reference.key.endswith("records/capture.warc.gz")
@@ -42,7 +42,7 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     assert reference.size_bytes == len(b"warc-content")
     assert reference.version_id == "version-1"
 
-    assert s3.objects[("castellani-archive-artifact", reference.key)][0] == b"warc-content"
+    assert s3.objects[("castellani-archive-artifacts", reference.key)][0] == b"warc-content"
 
 
 @pytest.mark.asyncio

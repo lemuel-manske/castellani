@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/lemuel-manske/castellani/services/coordinator/assembly"
 	persistence "github.com/lemuel-manske/castellani/services/coordinator/persistence/dynamodb"
@@ -68,6 +69,13 @@ func run(logger *slog.Logger) error {
 	awsConfig, err := awsconfig.LoadDefaultConfig(
 		ctx,
 		awsconfig.WithRegion(config.region),
+		awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				config.awsAccessKeyID,
+				config.awsSecretAccessKey,
+				"",
+			),
+		),
 	)
 
 	if err != nil {
