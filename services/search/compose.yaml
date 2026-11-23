@@ -27,9 +27,10 @@ services:
       - "9001:9001"
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      test: ["CMD", "silo", "healthcheck", "ready"]
       interval: 5s
       timeout: 3s
+      start_period: 30s
       retries: 20
 
   opensearch:
