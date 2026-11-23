@@ -72,6 +72,7 @@ services:
   provision:
     image: hashicorp/terraform:1.16.5
     working_dir: /workspace
+    user: "${TERRAFORM_UID:-1000}:${TERRAFORM_GID:-1000}"
 
     environment:
       TF_VAR_ministack_endpoint: http://ministack:4566
