@@ -84,7 +84,8 @@ const publicationDeliveryWaiters: ((event: PublicationEvent) => void)[] = [];
 
 let publicationLedgerReady = false;
 
-function receivePageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
+async function receivePageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
+  const result = await application.processPageCaptured(event);
   const waiter = deliveryWaiters.shift();
 
   if (waiter) {
@@ -93,7 +94,7 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<PageCapturedResu
     deliveries.push(event);
   }
 
-  return Promise.resolve({ status: "COMPLETED", outcome: "INDEXED" });
+  return result;
 }
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
