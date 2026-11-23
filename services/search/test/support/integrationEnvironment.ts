@@ -31,6 +31,9 @@ import {
   SEARCH_S3_ENDPOINT_URL,
 } from "./env.js";
 
+const INDEXING_LEASE_DURATION_SECONDS = 120;
+const INDEXING_MAX_ATTEMPTS = 5;
+
 const dynamodb = createDynamoDbTestSupport();
 const opensearch = createOpenSearchTestSupport();
 const rabbitmq = createRabbitMqTestSupport();
@@ -48,6 +51,8 @@ const application = {
       dynamodb.ledger,
       capturedPageReader,
       documentWriter,
+      INDEXING_LEASE_DURATION_SECONDS,
+      INDEXING_MAX_ATTEMPTS,
     );
   },
 
@@ -59,6 +64,8 @@ const application = {
       dynamodb.ledger,
       capturedPageReader,
       documentWriter,
+      INDEXING_LEASE_DURATION_SECONDS,
+      INDEXING_MAX_ATTEMPTS,
     );
   },
 
