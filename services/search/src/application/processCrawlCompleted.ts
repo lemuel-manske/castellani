@@ -51,11 +51,15 @@ function parseManifest(
 
   const manifest: unknown = JSON.parse(data.toString("utf8"));
 
-  if (isManifestDocument(manifest)) {
+  if (!isManifestDocument(manifest)) {
     throw new Error("archive manifest does not match the v1 manifest contract");
   }
 
-  return manifest as ManifestDocument;
+  if (manifest.archiveId !== event.archiveId) {
+    throw new Error("archive manifest archive ID does not match its event");
+  }
+
+  return manifest;
 }
 
 async function processCrawlCompleted(
