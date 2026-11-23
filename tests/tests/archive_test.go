@@ -43,13 +43,9 @@ func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
 		Type:     "urn:distributed-web-archive:problem:idempotency-key",
 		Title:    "Invalid Idempotency Key",
 		Status:   http.StatusBadRequest,
+		Detail:   problem.Detail,
 		Instance: "/archives",
-	}, problemDetails{
-		Type:     problem.Type,
-		Title:    problem.Title,
-		Status:   problem.Status,
-		Instance: problem.Instance,
-	})
+	}, problem)
 	require.NotEmpty(t, problem.Detail)
 }
 
@@ -79,12 +75,8 @@ func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
 		Type:     "urn:distributed-web-archive:problem:idempotency-key",
 		Title:    "Invalid Idempotency Key",
 		Status:   http.StatusBadRequest,
+		Detail:   problem.Detail,
 		Instance: "/archives",
-	}, problemDetails{
-		Type:     problem.Type,
-		Title:    problem.Title,
-		Status:   problem.Status,
-		Instance: problem.Instance,
-	})
+	}, problem)
 	require.NotEmpty(t, problem.Detail)
 }
