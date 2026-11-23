@@ -30,13 +30,14 @@ it("does not repeat indexing work when a PageCaptured event is delivered again",
   expect(first).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
   expect(duplicate).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
 
-  const entries = await dynamodb.ledger.listByArchive(
-    fixture.event.payload.archiveId,
-  );
+  const entry = await dynamodb.getIndexingEntry(snapshotId);
 
-  expect(entries.filter((entry) => entry.snapshotId === snapshotId)).toEqual([
-    { snapshotId, outcome: "INDEXED" },
-  ]);
+  expect(entry).toMatchObject({
+    archiveId: fixture.event.payload.archiveId,
+    snapshotId,
+    state: "INDEXED",
+    attempts: 1,
+  });
 
   await opensearch.client.indices.refresh();
 
@@ -59,13 +60,12 @@ it("releases a failed indexing claim so the same event can be retried", async ()
     application.processPageCaptured(fixture.event),
   ).rejects.toThrow();
 
-  const released = await dynamodb.ledger.listByArchive(
-    fixture.event.payload.archiveId,
-  );
+  const released = await dynamodb.getIndexingEntry(snapshotId);
 
-  expect(
-    released.find((entry) => entry.snapshotId === snapshotId)?.outcome,
-  ).toBe("PENDING");
+  expect(released).toMatchObject({
+    state: "PENDING",
+    attempts: 1,
+  });
 
   await s3.putObject(fixture.bytes, fixture.artifact.key);
 
@@ -73,13 +73,12 @@ it("releases a failed indexing claim so the same event can be retried", async ()
 
   expect(retried).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
 
-  const recovered = await dynamodb.ledger.listByArchive(
-    fixture.event.payload.archiveId,
-  );
+  const recovered = await dynamodb.getIndexingEntry(snapshotId);
 
-  expect(
-    recovered.find((entry) => entry.snapshotId === snapshotId)?.outcome,
-  ).toBe("INDEXED");
+  expect(recovered).toMatchObject({
+    state: "INDEXED",
+    attempts: 2,
+  });
 
   await opensearch.client.indices.refresh();
 
