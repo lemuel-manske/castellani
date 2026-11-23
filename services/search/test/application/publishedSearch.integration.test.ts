@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { createSearchServer } from "../../src/api/server.js";
+import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 import type { SearchDocumentReader } from "../../src/ports/search-reader.js";
 
 import { createSearchDocumentFixture } from "../support/fixtures.js";
@@ -12,13 +12,6 @@ import {
 setupIntegrationEnvironment("dynamodb");
 
 describe("published search behavior", () => {
-  let server: ReturnType<typeof createSearchServer> | undefined;
-
-  afterEach(async () => {
-    await server?.close();
-    server = undefined;
-  });
-
   it("does not expose an indexed snapshot until publication is acknowledged", async () => {
     const document = createSearchDocumentFixture();
     const identity = {
@@ -41,12 +34,6 @@ describe("published search behavior", () => {
       }),
     };
 
-    server = createSearchServer(
-      reader,
-      dynamodb.publicationLedger,
-      dynamodb.manifestLedger,
-    );
-
     await dynamodb.manifestLedger.record({
       archiveId: document.archiveId,
       manifestDigest: "manifest-digest",
@@ -56,29 +43,36 @@ describe("published search behavior", () => {
 
     await dynamodb.publicationLedger.recordPublicationDecision(identity);
 
-    const unpublished = await server.inject({
-      method: "GET",
-      url: "/search?q=integration&collectionId=integration-collection",
-    });
+    const unpublished = await searchPublishedDocuments(
+      { text: "integration", collectionId: "integration-collection" },
+      reader,
+      dynamodb.publicationLedger,
+      dynamodb.manifestLedger,
+    );
 
-    expect(unpublished.statusCode).toBe(200);
-    expect(unpublished.json().results).toEqual([]);
+    expect(unpublished.results).toEqual([]);
+    expect(unpublished.nextCursor).toBeNull();
 
     await dynamodb.publicationLedger.recordReplayPublished(identity);
 
-    const published = await server.inject({
-      method: "GET",
-      url: "/search?q=integration&collectionId=integration-collection",
-    });
+    const published = await searchPublishedDocuments(
+      { text: "integration", collectionId: "integration-collection" },
+      reader,
+      dynamodb.publicationLedger,
+      dynamodb.manifestLedger,
+    );
 
-    expect(published.statusCode).toBe(200);
-    expect(published.json().results).toMatchObject([
+    expect(published.results).toMatchObject([
       {
         archiveId: document.archiveId,
         snapshotId: document.snapshotId,
         url: document.url,
+        capturedAt: document.capturedAt,
         title: document.title,
+        snippet: "Search integration test content",
+        score: 1,
       },
     ]);
+    expect(published.nextCursor).toBeNull();
   });
 });
