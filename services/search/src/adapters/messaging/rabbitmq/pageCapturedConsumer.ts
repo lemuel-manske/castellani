@@ -1,5 +1,6 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
-import { isPageCapturedEvent, type PageCapturedEvent } from "../../../application/types.js";
+import { isPageCapturedEvent } from "../../../application/types.js";
+import type { PageCapturedEvent } from "../../../application/types.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 const RETRY_DELAY_MILLISECONDS = 5_000;
@@ -38,9 +39,7 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
   return event;
 }
 
-function deliveryRetryCount(
-  message: ConsumeMessage,
-): number {
+function deliveryRetryCount(message: ConsumeMessage): number {
   const deaths: unknown = message.properties.headers?.["x-death"];
 
   if (!Array.isArray(deaths)) {
