@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/lemuel-manske/castellani/libs/httpx"
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
@@ -14,12 +13,8 @@ func (a *Application) SubmitArchive(
 	key string,
 	submission domain.Submission,
 ) (AcceptedArchive, error) {
-	if !httpx.ValidIdempotencyKey(key) {
-		return AcceptedArchive{}, ErrInvalidIdempotencyKey
-	}
-
 	if err := submission.Validate(); err != nil {
-		return AcceptedArchive{}, errors.Join(ErrInvalidSubmission, err)
+		return AcceptedArchive{}, SubmissionValidationError{cause: err}
 	}
 
 	fingerprint, err := submission.Fingerprint()
@@ -46,10 +41,6 @@ func (a *Application) SubmitArchive(
 }
 
 func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive, error) {
-	if !httpx.ValidPathSegment(id) {
-		return domain.Archive{}, ErrInvalidArchiveID
-	}
-
 	archive, err := a.repository.Find(ctx, id)
 
 	if errors.Is(err, persistence.ErrArchiveNotFound) {
