@@ -1,12 +1,20 @@
 import { afterAll, beforeAll } from "vitest";
 
-import type { PageCapturedEvent, PageCapturedResult } from "../../src/application/types.js";
+import type {
+  CrawlCompletedEvent,
+  PageCapturedEvent,
+  PageCapturedResult,
+  SearchPublishedDocumentsInput,
+} from "../../src/application/types.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
+import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
+import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 
 import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "../../src/adapters/artifacts/warc.js";
+import { createOpenSearchDocumentReader } from "../../src/adapters/search/opensearch-reader.js";
 import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 
 import { createDynamoDbTestSupport } from "./dynamoDb.js";
@@ -27,6 +35,46 @@ const dynamodb = createDynamoDbTestSupport(() => clock.now);
 const opensearch = createOpenSearchTestSupport();
 const rabbitmq = createRabbitMqTestSupport();
 const s3 = createS3TestSupport();
+
+const artifactReader = createS3ArtifactReader(s3.client);
+const capturedPageReader = createWarcCapturedPageReader(artifactReader);
+const documentReader = createOpenSearchDocumentReader(opensearch.client);
+const documentWriter = createOpenSearchDocumentWriter(opensearch.client);
+
+const application = {
+  processPageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
+    return processPageCaptured(
+      event,
+      dynamodb.ledger,
+      capturedPageReader,
+      documentWriter,
+    );
+  },
+
+  processCrawlCompleted(event: CrawlCompletedEvent): Promise<void> {
+    return processCrawlCompleted(
+      event,
+      artifactReader,
+      dynamodb.manifestLedger,
+      dynamodb.ledger,
+      capturedPageReader,
+      documentWriter,
+    );
+  },
+
+  processPublicationEvent(event: Exclude<PublicationEvent, { type: "CrawlCompleted" }>): Promise<void> {
+    return processPublicationEvent(event, dynamodb.publicationLedger);
+  },
+
+  searchPublishedDocuments(input: SearchPublishedDocumentsInput) {
+    return searchPublishedDocuments(
+      input,
+      documentReader,
+      dynamodb.publicationLedger,
+      dynamodb.manifestLedger,
+    );
+  },
+};
 
 const deliveries: PageCapturedEvent[] = [];
 const publicationDeliveries: PublicationEvent[] = [];
@@ -50,22 +98,11 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<PageCapturedResu
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
   if (publicationLedgerReady && event.type === "CrawlCompleted") {
-    const artifactReader = createS3ArtifactReader(s3.client);
-    const capturedPageReader = createWarcCapturedPageReader(artifactReader);
-    const documentWriter = createOpenSearchDocumentWriter(opensearch.client);
-
-    await processCrawlCompleted(
-      event.payload,
-      artifactReader,
-      dynamodb.manifestLedger,
-      dynamodb.ledger,
-      capturedPageReader,
-      documentWriter,
-    );
+    await application.processCrawlCompleted(event.payload);
   }
 
   if (publicationLedgerReady && event.type !== "CrawlCompleted") {
-    await processPublicationEvent(event, dynamodb.publicationLedger);
+    await application.processPublicationEvent(event);
   }
 
   const waiter = publicationDeliveryWaiters.shift();
@@ -155,6 +192,7 @@ function setupIntegrationEnvironment(
 }
 
 export {
+  application,
   clock,
   dynamodb,
   nextPageCaptured,
