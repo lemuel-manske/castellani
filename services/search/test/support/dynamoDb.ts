@@ -20,7 +20,7 @@ import {
   REGION,
   SEARCH_DYNAMODB_ENDPOINT_URL,
   ACCESS_KEY_ID,
-  SECRECT_ACCESS_KEY,
+  SECRET_ACCESS_KEY,
 } from "./env.js";
 
 function createDynamoDbTestSupport() {
@@ -29,7 +29,7 @@ function createDynamoDbTestSupport() {
     endpoint: SEARCH_DYNAMODB_ENDPOINT_URL,
     credentials: {
       accessKeyId: ACCESS_KEY_ID,
-      secretAccessKey: SECRECT_ACCESS_KEY,
+      secretAccessKey: SECRET_ACCESS_KEY,
     },
   });
 
