@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 
 import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 import type { SearchDocumentReader } from "../../src/ports/search-reader.js";
@@ -11,8 +11,7 @@ import {
 
 setupIntegrationEnvironment("dynamodb");
 
-describe("published search behavior", () => {
-  it("does not expose an indexed snapshot until publication is acknowledged", async () => {
+it("does not expose an indexed snapshot until publication is acknowledged", async () => {
     const document = createSearchDocumentFixture();
     const identity = {
       archiveId: document.archiveId,
@@ -74,5 +73,4 @@ describe("published search behavior", () => {
       },
     ]);
     expect(published.nextCursor).toBeNull();
-  });
 });
