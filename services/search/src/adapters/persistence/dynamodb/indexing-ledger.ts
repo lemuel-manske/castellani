@@ -47,7 +47,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       throw new Error("maximum indexing attempts must be a positive integer");
     }
 
-    const now = clock_provider.now() / 1000;
+    const now = Date.now() / 1000;
     const token = randomUUID();
 
     try {
@@ -166,7 +166,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
         claim,
         outcome,
         ...(reasonCode === undefined ? {} : { reasonCode }),
-        now: this.clock() / 1000,
+        now: Date.now() / 1000,
       });
     } catch (error) {
       if (isConditionalCheckFailure(error)) {
