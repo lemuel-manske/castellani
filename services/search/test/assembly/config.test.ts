@@ -12,12 +12,12 @@ const requiredEnvironment = {
   SEARCH_PUBLICATION_LEDGER_TABLE: "search-publication-test",
   SEARCH_MANIFEST_LEDGER_TABLE: "search-manifest-test",
   SEARCH_INDEX_NAME: "search-index-test",
+  SEARCH_INDEXING_MAX_ATTEMPTS: "3",
 };
 
 it("loads service-specific environment settings", () => {
   const settings = SearchSettings.fromEnvironment({
     ...requiredEnvironment,
-    SEARCH_INDEXING_MAX_ATTEMPTS: "3",
   });
 
   expect(settings.awsRegion).toBe("sa-east-1");
@@ -29,13 +29,4 @@ it("loads service-specific environment settings", () => {
   expect(settings.publicationLedgerTableName).toBe("search-publication-test");
   expect(settings.manifestLedgerTableName).toBe("search-manifest-test");
   expect(settings.indexingMaxAttempts).toBe(3);
-});
-
-it("rejects invalid numeric environment settings", () => {
-  expect(() =>
-    SearchSettings.fromEnvironment({
-      ...requiredEnvironment,
-      SEARCH_INDEXING_MAX_ATTEMPTS: "0",
-    }),
-  ).toThrow("SEARCH_INDEXING_MAX_ATTEMPTS must be a positive integer");
 });

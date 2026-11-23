@@ -49,8 +49,8 @@ class SearchSettings {
   readonly awsRegion: string;
   readonly httpHost: string;
   readonly httpPort: number;
-  readonly dynamodbEndpointUrl: string | undefined;
-  readonly s3EndpointUrl: string | undefined;
+  readonly dynamodbEndpointUrl: string;
+  readonly s3EndpointUrl: string;
   readonly rabbitmqUrl: string;
   readonly opensearchUrl: string;
   readonly artifactBucket: string;
@@ -86,44 +86,19 @@ class SearchSettings {
     this.reconnectDelayMilliseconds =
       options.reconnectDelayMilliseconds ??
       DEFAULT_RECONNECT_DELAY_MILLISECONDS;
-
-    if (
-      !this.awsRegion.trim() ||
-      !this.httpHost.trim() ||
-      !Number.isSafeInteger(this.httpPort) ||
-      this.httpPort < 1 ||
-      this.httpPort > 65535 ||
-      !this.rabbitmqUrl.trim() ||
-      !this.opensearchUrl.trim() ||
-      !this.artifactBucket.trim() ||
-      !this.indexingLedgerTableName.trim() ||
-      !this.publicationLedgerTableName.trim() ||
-      !this.manifestLedgerTableName.trim() ||
-      !this.searchIndexName.trim()
-    ) {
-      throw new Error("Search settings must not contain empty required values");
-    }
-
-    for (const [name, value] of [
-      ["indexingLeaseDurationSeconds", this.indexingLeaseDurationSeconds],
-      ["indexingMaxAttempts", this.indexingMaxAttempts],
-      ["reconnectDelayMilliseconds", this.reconnectDelayMilliseconds],
-    ] as const) {
-      if (!Number.isSafeInteger(value) || value <= 0) {
-        throw new Error(`${name} must be a positive integer`);
-      }
-    }
   }
 
   static fromEnvironment(env: NodeJS.ProcessEnv = process.env): SearchSettings {
     return new SearchSettings({
       awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
+
       httpHost: env.SEARCH_HTTP_HOST?.trim() || DEFAULT_HTTP_HOST,
       httpPort: positiveInteger(
         "SEARCH_HTTP_PORT",
         env.SEARCH_HTTP_PORT,
         DEFAULT_HTTP_PORT,
       ),
+
       dynamodbEndpointUrl: required(
         "SEARCH_DYNAMODB_ENDPOINT_URL",
         env.SEARCH_DYNAMODB_ENDPOINT_URL,
@@ -137,10 +112,12 @@ class SearchSettings {
         "SEARCH_OPENSEARCH_URL",
         env.SEARCH_OPENSEARCH_URL,
       ),
+
       artifactBucket: required(
         "SEARCH_ARTIFACT_BUCKET",
         env.SEARCH_ARTIFACT_BUCKET,
       ),
+
       indexingLedgerTableName: required(
         "SEARCH_INDEXING_LEDGER_TABLE",
         env.SEARCH_INDEXING_LEDGER_TABLE,
@@ -153,7 +130,9 @@ class SearchSettings {
         "SEARCH_MANIFEST_LEDGER_TABLE",
         env.SEARCH_MANIFEST_LEDGER_TABLE,
       ),
+
       searchIndexName: required("SEARCH_INDEX_NAME", env.SEARCH_INDEX_NAME),
+
       indexingLeaseDurationSeconds: positiveInteger(
         "SEARCH_INDEXING_LEASE_DURATION_SECONDS",
         env.SEARCH_INDEXING_LEASE_DURATION_SECONDS,

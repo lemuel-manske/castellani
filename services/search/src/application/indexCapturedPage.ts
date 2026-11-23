@@ -6,21 +6,16 @@ import type {
 } from "../ports/artifacts.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
-type SnapshotIndexingResult =
-  | { outcome: "INDEXED"; snapshotId: string }
-  | {
-      outcome: "UNSUPPORTED";
-      snapshotId: string;
-      reasonCode: "UNSUPPORTED_CONTENT_TYPE" | "EMPTY_CONTENT";
-    };
+import { SnapshotIndexingResult } from "./types.js";
 
 async function indexCapturedPage(
   page: CapturedPageReference,
-  artifacts: readonly ArtifactReference[],
+  artifacts: ArtifactReference[],
   capturedPageReader: CapturedPageReader,
   documentWriter: SearchDocumentWriter,
 ): Promise<SnapshotIndexingResult> {
   const capturedPage = await capturedPageReader.read(page, artifacts);
+
   const extraction = extractSearchableContent(capturedPage);
 
   if (extraction.kind === "UNSUPPORTED") {
@@ -37,4 +32,3 @@ async function indexCapturedPage(
 }
 
 export { indexCapturedPage };
-export type { SnapshotIndexingResult };

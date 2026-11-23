@@ -2,7 +2,6 @@ import type { ManifestReconciliation, ManifestSnapshot } from "../domain.js";
 import { reconcileManifest } from "../domain/indexing.js";
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 
-/** Compares one immutable Capture manifest with Search's durable archive ledger. */
 async function reconcileArchiveManifest(
   archiveId: string,
   snapshots: readonly ManifestSnapshot[],

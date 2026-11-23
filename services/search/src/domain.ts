@@ -25,7 +25,15 @@ interface PublicationFacts {
 type IndexingOutcome =
   "PENDING" | "PROCESSING" | "INDEXED" | "UNSUPPORTED" | "FAILED";
 
-type TerminalIndexingOutcome = Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
+type NonTerminalIndexingOutcome = Extract<
+  IndexingOutcome,
+  "PENDING" | "PROCESSING"
+>;
+
+type TerminalIndexingOutcome = Extract<
+  IndexingOutcome,
+  "INDEXED" | "UNSUPPORTED" | "FAILED"
+>;
 
 interface ManifestSnapshot {
   snapshotId: string;
@@ -49,6 +57,7 @@ export type {
   IndexingOutcome,
   ManifestReconciliation,
   ManifestSnapshot,
+  NonTerminalIndexingOutcome,
   PublicationFacts,
   PublicationIdentity,
   SnapshotLedgerEntry,

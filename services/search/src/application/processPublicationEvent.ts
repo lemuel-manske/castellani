@@ -1,22 +1,13 @@
-import type { CompensationDecision, PublicationIdentity } from "../domain.js";
-import type { ArtifactReference } from "../ports/artifacts.js";
 import type { PublicationLedger } from "../ports/publication-ledger.js";
+import { PublicationEvent } from "./types.js";
 
-type PublicationEvent =
-  | { type: "ArchivePublicationDecided"; payload: PublicationIdentity }
-  | { type: "ArchivePublished"; payload: PublicationIdentity }
-  | { type: "ArchiveCompensationDecided"; payload: CompensationDecision }
-  | {
-      type: "CrawlCompleted";
-      payload: {
-        archiveId: string;
-        manifestDigest: string;
-        manifest: ArtifactReference;
-      };
-    };
+type JustPublicationEvents = Exclude<
+  PublicationEvent,
+  { type: "CrawlCompleted" }
+>;
 
 async function processPublicationEvent(
-  event: Exclude<PublicationEvent, { type: "CrawlCompleted" }>,
+  event: JustPublicationEvents,
   ledger: PublicationLedger,
 ): Promise<void> {
   switch (event.type) {
@@ -31,5 +22,7 @@ async function processPublicationEvent(
       return;
   }
 }
+
 export { processPublicationEvent };
+
 export type { PublicationEvent };

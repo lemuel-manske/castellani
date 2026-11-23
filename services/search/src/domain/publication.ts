@@ -142,8 +142,9 @@ function recordCompensationDecision(
   return { ...facts, compensationDecision: { ...decision } };
 }
 
-function isPublicationAuthorized(facts: PublicationFacts): boolean {
+function isPublicationAuthorized(facts?: PublicationFacts): boolean {
   return (
+    facts !== undefined &&
     facts.compensationDecision === null &&
     facts.publicationDecision !== null &&
     facts.replayPublication !== null &&

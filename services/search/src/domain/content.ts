@@ -125,7 +125,7 @@ function extractSearchableContent(
 ): ContentExtraction {
   const maxTextLength = options.maxTextLength ?? DEFAULT_MAX_TEXT_LENGTH;
 
-  const extracted = extractHtml(page.content)
+  const extracted = extractHtml(page.content);
 
   const text = extracted.text.slice(0, maxTextLength);
 

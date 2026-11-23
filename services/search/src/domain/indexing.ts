@@ -12,7 +12,9 @@ import { isPublicationAuthorized } from "./publication.js";
 function isTerminalIndexingOutcome(
   outcome: IndexingOutcome,
 ): outcome is TerminalIndexingOutcome {
-  return outcome === "INDEXED" || outcome === "UNSUPPORTED" || outcome === "FAILED";
+  return (
+    outcome === "INDEXED" || outcome === "UNSUPPORTED" || outcome === "FAILED"
+  );
 }
 
 /** Reconciles the immutable Capture manifest against Search's snapshot ledger. */

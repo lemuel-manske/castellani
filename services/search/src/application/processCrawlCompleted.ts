@@ -2,77 +2,17 @@ import { createHash } from "node:crypto";
 import type {
   ArtifactObjectReader,
   ArtifactReference,
+  CapturedPageReader,
 } from "../ports/artifacts.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
-import type { ProcessPageCapturedDependencies } from "./processPageCaptured.js";
 import { processPageCaptured } from "./processPageCaptured.js";
-
-interface CrawlCompletedEvent {
-  archiveId: string;
-  manifestDigest: string;
-  manifest: ArtifactReference;
-}
-
-interface ManifestSnapshot {
-  snapshotId: string;
-  urlKey: string;
-  url: string;
-  finalUrl: string;
-  redirectChain?: string[];
-  capturedAt: string;
-  contentType?: string;
-  warcArtifacts: ArtifactReference[];
-}
-
-interface ManifestDocument {
-  schemaVersion: 1;
-  archiveId: string;
-  collectionId?: string;
-  createdAt: string;
-  snapshots: ManifestSnapshot[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
-
-function isArtifactReference(value: unknown): value is ArtifactReference {
-  return (
-    isRecord(value) &&
-    isNonEmptyString(value.bucket) &&
-    isNonEmptyString(value.key) &&
-    isNonEmptyString(value.sha256) &&
-    /^[a-f0-9]{64}$/.test(value.sha256) &&
-    typeof value.sizeBytes === "number" &&
-    Number.isSafeInteger(value.sizeBytes) &&
-    value.sizeBytes >= 0 &&
-    (value.versionId === undefined || isNonEmptyString(value.versionId))
-  );
-}
-
-function isManifestSnapshot(value: unknown): value is ManifestSnapshot {
-  return (
-    isRecord(value) &&
-    isNonEmptyString(value.snapshotId) &&
-    isNonEmptyString(value.urlKey) &&
-    isNonEmptyString(value.url) &&
-    isNonEmptyString(value.finalUrl) &&
-    isNonEmptyString(value.capturedAt) &&
-    Number.isFinite(Date.parse(value.capturedAt)) &&
-    (value.redirectChain === undefined ||
-      (Array.isArray(value.redirectChain) &&
-        value.redirectChain.every(isNonEmptyString))) &&
-    (value.contentType === undefined ||
-      typeof value.contentType === "string") &&
-    Array.isArray(value.warcArtifacts) &&
-    value.warcArtifacts.length > 0 &&
-    value.warcArtifacts.every(isArtifactReference)
-  );
-}
+import {
+  CrawlCompletedEvent,
+  isManifestDocument,
+  ManifestDocument,
+} from "./types.js";
+import { IndexingLedger } from "../ports/indexing-ledger.js";
+import { SearchDocumentWriter } from "../ports/search-index.js";
 
 async function readArtifact(
   reader: ArtifactObjectReader,
@@ -100,6 +40,7 @@ function parseManifest(
   event: CrawlCompletedEvent,
 ): ManifestDocument {
   const digest = createHash("sha256").update(data).digest("hex");
+
   const expectedDigest = event.manifestDigest.replace(/^sha256:/, "");
 
   if (digest !== expectedDigest || digest !== event.manifest.sha256) {
@@ -110,32 +51,25 @@ function parseManifest(
 
   const manifest: unknown = JSON.parse(data.toString("utf8"));
 
-  if (
-    !isRecord(manifest) ||
-    manifest.schemaVersion !== 1 ||
-    manifest.archiveId !== event.archiveId ||
-    !isNonEmptyString(manifest.createdAt) ||
-    !Number.isFinite(Date.parse(manifest.createdAt)) ||
-    !Array.isArray(manifest.snapshots) ||
-    !manifest.snapshots.every(isManifestSnapshot) ||
-    new Set(manifest.snapshots.map(({ snapshotId }) => snapshotId)).size !==
-      manifest.snapshots.length ||
-    (manifest.collectionId !== undefined &&
-      typeof manifest.collectionId !== "string")
-  ) {
+  if (isManifestDocument(manifest)) {
     throw new Error("archive manifest does not match the v1 manifest contract");
   }
 
-  return manifest as unknown as ManifestDocument;
+  return manifest as ManifestDocument;
 }
 
 async function processCrawlCompleted(
   event: CrawlCompletedEvent,
   reader: ArtifactObjectReader,
   manifestLedger: ManifestLedger,
-  indexing: ProcessPageCapturedDependencies,
+  ledger: IndexingLedger,
+  capturedPageReader: CapturedPageReader,
+  documentWriter: SearchDocumentWriter,
+  leaseDurationSeconds?: number,
+  maxAttempts?: number,
 ): Promise<void> {
   const data = await readArtifact(reader, event.manifest);
+
   const manifest = parseManifest(data, event);
 
   await manifestLedger.record({
@@ -162,16 +96,16 @@ async function processCrawlCompleted(
             snapshot.finalUrl,
           ],
           capturedAt: snapshot.capturedAt,
-          ...(snapshot.contentType === undefined
-            ? {}
-            : { contentType: snapshot.contentType }),
           warcArtifacts: snapshot.warcArtifacts,
         },
       },
-      indexing,
+      ledger,
+      capturedPageReader,
+      documentWriter,
+      leaseDurationSeconds,
+      maxAttempts,
     );
   }
 }
 
 export { processCrawlCompleted };
-export type { CrawlCompletedEvent };

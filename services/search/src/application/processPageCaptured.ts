@@ -1,54 +1,23 @@
-import type { IndexingOutcome } from "../domain.js";
-import type { ArtifactReference } from "../ports/artifacts.js";
-import type { IndexingLedger } from "../ports/indexing-ledger.js";
-import type { SearchDocumentWriter } from "../ports/search-index.js";
-import type {
-  CapturedPageReader,
-  CapturedPageReference,
-} from "../ports/artifacts.js";
+import { CapturedPageReader } from "../ports/artifacts.js";
+import { IndexingLedger } from "../ports/indexing-ledger.js";
+import { SearchDocumentWriter } from "../ports/search-index.js";
 import { indexCapturedPage } from "./indexCapturedPage.js";
-
-interface PageCapturedEvent {
-  messageId: string;
-  correlationId: string;
-  occurredAt: string;
-  payload: CapturedPageReference & {
-    finalUrl: string;
-    redirectChain: string[];
-    urlKey: string;
-    warcArtifacts: ArtifactReference[];
-  };
-}
-
-type PageCapturedResult =
-  | {
-      status: "COMPLETED";
-      outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
-    }
-  | { status: "BUSY" }
-  | {
-      status: "DUPLICATE";
-      outcome: Extract<IndexingOutcome, "INDEXED" | "UNSUPPORTED" | "FAILED">;
-    };
-
-interface ProcessPageCapturedDependencies {
-  ledger: IndexingLedger;
-  capturedPageReader: CapturedPageReader;
-  documentWriter: SearchDocumentWriter;
-  leaseDurationSeconds?: number;
-  maxAttempts?: number;
-}
+import { PageCapturedEvent, PageCapturedResult } from "./types.js";
 
 async function processPageCaptured(
   event: PageCapturedEvent,
-  dependencies: ProcessPageCapturedDependencies,
+  ledger: IndexingLedger,
+  capturedPageReader: CapturedPageReader,
+  documentWriter: SearchDocumentWriter,
+  leaseDurationSeconds?: number,
+  maxAttempts?: number,
 ): Promise<PageCapturedResult> {
-  const claimResult = await dependencies.ledger.claim(
+  const claimResult = await ledger.claim(
     event.payload.archiveId,
     event.payload.snapshotId,
     event.messageId,
-    dependencies.leaseDurationSeconds ?? 120,
-    dependencies.maxAttempts ?? 5,
+    leaseDurationSeconds,
+    maxAttempts,
   );
 
   if (claimResult.status === "BUSY") {
@@ -56,18 +25,18 @@ async function processPageCaptured(
   }
 
   if (claimResult.status === "TERMINAL") {
-    return { status: "DUPLICATE", outcome: claimResult.outcome };
+    return { status: "COMPLETED", outcome: claimResult.outcome };
   }
 
   try {
     const result = await indexCapturedPage(
       event.payload,
       event.payload.warcArtifacts,
-      dependencies.capturedPageReader,
-      dependencies.documentWriter,
+      capturedPageReader,
+      documentWriter,
     );
 
-    await dependencies.ledger.complete(
+    await ledger.complete(
       claimResult.claim,
       result.outcome,
       result.outcome === "UNSUPPORTED" ? result.reasonCode : undefined,
@@ -78,23 +47,10 @@ async function processPageCaptured(
     const reason =
       error instanceof Error ? error.message : "unknown indexing error";
 
-    if (claimResult.claim.attempts >= (dependencies.maxAttempts ?? 5)) {
-      await dependencies.ledger.complete(
-        claimResult.claim,
-        "FAILED",
-        "INDEXING_ATTEMPTS_EXHAUSTED",
-      );
-      return { status: "COMPLETED", outcome: "FAILED" };
-    }
+    await ledger.release(claimResult.claim, reason);
 
-    await dependencies.ledger.release(claimResult.claim, reason);
     throw error;
   }
 }
 
 export { processPageCaptured };
-export type {
-  PageCapturedEvent,
-  PageCapturedResult,
-  ProcessPageCapturedDependencies,
-};
