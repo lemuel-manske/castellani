@@ -351,7 +351,7 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 		return nil, failure
 	}
 
-	if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+if !json.Valid(data) || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
 		return nil, ErrInvalidResponse
 	}
 
