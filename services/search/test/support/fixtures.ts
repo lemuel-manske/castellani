@@ -61,6 +61,8 @@ function createCapturedPageFixture(
   };
 
   const event: PageCapturedEvent = {
+    type: "PageCaptured",
+    version: 1,
     messageId: `message-${snapshotId}`,
     correlationId: page.archiveId,
     occurredAt: page.capturedAt,
