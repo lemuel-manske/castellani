@@ -43,16 +43,14 @@ function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
   }
 
   if (isCompletionCrawl(payload)) {
-    return isCompletionCrawl(payload)
-      ? {
-          type: "CrawlCompleted",
-          payload: {
-            archiveId: payload.archiveId,
-            manifestDigest: payload.manifestDigest,
-            manifest: payload.manifest,
-          },
-        }
-      : null;
+    return {
+      type: "CrawlCompleted",
+      payload: {
+        archiveId: payload.archiveId,
+        manifestDigest: payload.manifestDigest,
+        manifest: payload.manifest,
+      },
+    };
   }
 
   return null;
