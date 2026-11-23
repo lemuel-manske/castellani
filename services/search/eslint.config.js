@@ -19,7 +19,6 @@ export default tseslint.config(
       ],
       "padding-line-between-statements": [
         "error",
-
         { blankLine: "always", prev: "const", next: "*" },
         { blankLine: "always", prev: "let", next: "*" },
         { blankLine: "always", prev: "*", next: "const" },

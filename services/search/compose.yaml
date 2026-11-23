@@ -1,5 +1,5 @@
 services:
-  dynamodb-local:
+  dynamodb:
     image: amazon/dynamodb-local:3.3.2
 
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]

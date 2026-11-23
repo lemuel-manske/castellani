@@ -5,7 +5,7 @@ install:
 
 
 test-infra-up:
-	docker compose up -d --wait dynamodb-local minio opensearch rabbitmq
+	docker compose up -d --wait dynamodb minio opensearch rabbitmq
 
 test-infra-down:
 	docker compose down
