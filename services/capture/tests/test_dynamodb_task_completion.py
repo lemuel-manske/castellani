@@ -26,8 +26,6 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
 
     repository = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )

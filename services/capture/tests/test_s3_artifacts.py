@@ -12,7 +12,7 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     tmp_path: Path,
     s3: FakeS3,
 ) -> None:
-    store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
+    store = S3ArtifactStore(s3, tmp_path)
 
     claim = make_claim()
 
@@ -47,7 +47,7 @@ async def test_s3_artifact_store_rejects_files_outside_attempt_directory(
     tmp_path: Path,
     s3: FakeS3,
 ) -> None:
-    store = S3ArtifactStore(s3, "private-artifacts", tmp_path)
+    store = S3ArtifactStore(s3, tmp_path)
 
     claim = make_claim()
 

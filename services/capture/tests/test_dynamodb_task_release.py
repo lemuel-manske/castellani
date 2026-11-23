@@ -25,8 +25,6 @@ async def test_release_requeues_and_records_capture_page(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -71,8 +69,6 @@ async def test_releasing_the_same_claim_twice_is_idempotent(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -100,8 +96,6 @@ async def test_stale_claim_cannot_release_reclaimed_task(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -133,8 +127,6 @@ async def test_release_does_not_requeue_a_task_after_run_admission_closes(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
     )
 

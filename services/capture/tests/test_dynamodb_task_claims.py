@@ -26,8 +26,6 @@ async def test_claim_sets_new_fence_for_pending_task(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -50,8 +48,6 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
     )
 
@@ -75,8 +71,6 @@ async def test_expired_claim_is_reclaimed_with_a_higher_fence(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -104,8 +98,6 @@ async def test_claim_requires_an_open_archive_run(dynamodb: DynamoDBClient) -> N
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
     )
 
@@ -125,8 +117,6 @@ async def test_renewal_extends_lease_preserving_owner_and_fence(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -154,8 +144,6 @@ async def test_renewal_is_rejected_after_the_archive_run_closes(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
     )
 
@@ -178,8 +166,6 @@ async def test_concurrent_claims_have_exactly_one_winner_for_a_page(
 
     claims = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
     )
 

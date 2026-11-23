@@ -101,7 +101,6 @@ async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
 
     allocator = DynamoDBCaptureAllocator(
         client=dynamodb,
-        table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
     )
@@ -158,13 +157,10 @@ def new_worker(
     return ConcreteCaptureWorker(
         task_repository=DynamoDBTaskRepository(
             client=dynamodb,
-            frontier_table_name="capture_frontier",
-            runs_table_name="capture_runs",
             lease_duration=30,
         ),
         capture_allocator=DynamoDBCaptureAllocator(
             client=dynamodb,
-            table_name="capture_browser_slots",
             slot_count=1,
             lease_duration=30,
         ),

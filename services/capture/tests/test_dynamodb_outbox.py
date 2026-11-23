@@ -23,7 +23,6 @@ async def test_claim_returns_due_message_and_acquires_delivery_lease(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: "lease-1",
     )
@@ -58,7 +57,6 @@ async def test_claim_skips_messages_that_are_not_due(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
     )
 
@@ -75,7 +73,6 @@ async def test_confirm_marks_the_message_delivered(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: "lease-1",
     )
@@ -103,7 +100,6 @@ async def test_reschedule_returns_message_to_pending_after_delay(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: next(tokens),
     )
@@ -141,7 +137,6 @@ async def test_expired_claim_is_reclaimed_and_stale_lease_cannot_confirm(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: next(tokens),
     )
@@ -174,7 +169,6 @@ async def test_stale_lease_cannot_reschedule_a_reclaimed_message(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: next(tokens),
     )
@@ -201,7 +195,6 @@ async def test_expired_lease_cannot_confirm_after_expiry(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: "lease-1",
     )
@@ -225,7 +218,6 @@ async def test_expired_lease_cannot_reschedule_after_expiry(
 
     outbox = DynamoDBOutbox(
         client=dynamodb,
-        table_name="capture_outbox",
         clock=clock,
         lease_token_factory=lambda: "lease-1",
     )

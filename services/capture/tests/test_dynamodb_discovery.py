@@ -20,8 +20,6 @@ async def test_discovery_admission_is_atomic_and_idempotent(
 
     repository = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -68,8 +66,6 @@ async def test_discovery_admission_never_exceeds_max_pages(
 
     repository = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )
@@ -100,8 +96,6 @@ async def test_discovery_admission_rejects_a_stale_parent_claim(
 
     repository = DynamoDBTaskRepository(
         client=dynamodb,
-        frontier_table_name="capture_frontier",
-        runs_table_name="capture_runs",
         lease_duration=30,
         clock=clock,
     )

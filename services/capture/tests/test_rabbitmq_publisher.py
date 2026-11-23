@@ -6,9 +6,9 @@ import pytest
 from aio_pika.abc import AbstractRobustConnection
 
 from adapters.messaging.rabbitmq.publisher import (
-    CAPTURE_ROUTING_KEY,
     RabbitMQMessagePublisher,
 )
+from adapters.messaging.rabbitmq.topology import CAPTURE_PAGE_EVENT
 
 
 @pytest.mark.integration
@@ -27,7 +27,7 @@ async def test_publisher_delivers_persistent_message_to_bound_queue(
     try:
         assert publisher.exchange is not None
 
-        await queue.bind(publisher.exchange, routing_key=CAPTURE_ROUTING_KEY)
+        await queue.bind(publisher.exchange, routing_key=CAPTURE_PAGE_EVENT)
 
         await publisher.publish("message-1", b'{"type":"CapturePage"}')
 

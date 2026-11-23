@@ -14,7 +14,6 @@ from adapters.persistence.dynamodb.alloc import (
 async def test_capacity_limits_concurrent_reservations(dynamodb: DynamoDBClient) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
-        table_name="capture_browser_slots",
         slot_count=10,
         lease_duration=30,
     )
@@ -36,7 +35,6 @@ async def test_reservation_renewal_preserves_its_fence(
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
-        table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
         clock=clock,
@@ -61,7 +59,6 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
-        table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
         clock=clock,
@@ -92,7 +89,6 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
-        table_name="capture_browser_slots",
         slot_count=1,
         lease_duration=30,
         clock=clock,
@@ -114,12 +110,12 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
 
 
 @pytest.mark.integration
-def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient) -> None:
+def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient, clock: FakeClock) -> None:
     with pytest.raises(ValueError):
-        DynamoDBCaptureAllocator(dynamodb, "capture_browser_slots", 0, 30)
+        DynamoDBCaptureAllocator(dynamodb,  0, 30, clock)
 
     with pytest.raises(ValueError):
-        DynamoDBCaptureAllocator(dynamodb, "capture_browser_slots", 1, 0)
+        DynamoDBCaptureAllocator(dynamodb, 1, 0, clock)
 
 
 @pytest.mark.integration
@@ -128,7 +124,6 @@ async def test_repeated_reservation_reuses_existing_slot(
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
-        table_name="capture_browser_slots",
         slot_count=2,
         lease_duration=30,
     )

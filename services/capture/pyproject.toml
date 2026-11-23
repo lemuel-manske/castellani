@@ -17,7 +17,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "boto3-stubs[dynamodb,full]==1.37.18",
-    "pyright==1.1.398",
+    "pyright==1.1.414",
     "pytest==8.3.5",
     "pytest-asyncio==0.25.3",
     "ruff==0.11.2",
