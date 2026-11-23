@@ -18,7 +18,10 @@ import {
   RETRY_QUEUE as PUBLICATION_RETRY_QUEUE,
   startPublicationConsumer,
 } from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
-import type { PageCapturedEvent, PublicationEvent } from "../../src/application/types.js";
+import type {
+  PageCapturedEvent,
+  PublicationEvent,
+} from "../../src/application/types.js";
 
 const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
 
@@ -63,8 +66,13 @@ function createRabbitMqTestSupport() {
       publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
       await startPageCapturedConsumer(consumerChannel, handle);
-      await startPublicationConsumer(publicationConsumerChannel, handlePublication);
-      await consumerChannel.consume(PAGE_CAPTURED_DEAD_LETTER_QUEUE, (message) => {
+      await startPublicationConsumer(
+        publicationConsumerChannel,
+        handlePublication,
+      );
+      await consumerChannel.consume(
+        PAGE_CAPTURED_DEAD_LETTER_QUEUE,
+        (message) => {
         if (message === null) {
           return;
         }
@@ -75,7 +83,8 @@ function createRabbitMqTestSupport() {
           deadLetterWaiters,
           consumerChannel,
         );
-      });
+        },
+      );
       await publicationConsumerChannel.consume(
         PUBLICATION_DEAD_LETTER_QUEUE,
         (message) => {
@@ -165,12 +174,10 @@ function createRabbitMqTestSupport() {
           );
           await Promise.all(
             [
-              EVENTS_EXCHANGE,
-              "castellani.search.retry",
-              "castellani.search.dead",
-              EVENTS_EXCHANGE,
-              "castellani.search.publication.retry",
-              "castellani.search.publication.dead",
+              PAGE_CAPTURED_RETRY_EXCHANGE,
+              PAGE_CAPTURED_DEAD_LETTER_EXCHANGE,
+              PUBLICATION_RETRY_EXCHANGE,
+              PUBLICATION_DEAD_LETTER_EXCHANGE,
             ].map((exchange) =>
               cleanup.deleteExchange(exchange).catch(() => undefined),
             ),
