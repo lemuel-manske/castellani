@@ -16,6 +16,7 @@ setupIntegrationEnvironment(["dynamodb", "opensearch", "rabbitmq", "s3"]);
 
 it("keeps indexed snapshots hidden until the matching replay-publication acknowledgement", async () => {
   const token = randomUUID().replaceAll("-", "");
+
   const snapshotId = `publication-visibility-${token}`;
   const archiveId = `publication-archive-${token}`;
   const collectionId = `publication-collection-${token}`;
@@ -105,6 +106,8 @@ it("keeps indexed snapshots hidden until the matching replay-publication acknowl
       title: content,
     },
   ]);
+
   expect(published.results).toHaveLength(1);
+
   expect(published.nextCursor).toBeNull();
 });
