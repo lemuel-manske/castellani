@@ -2,12 +2,15 @@ package infra
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -141,6 +144,7 @@ type Dependencies struct {
 
 // Service is one dependency's observable health endpoint.
 type Service struct {
+	name      string
 	healthURL string
 	username  string
 	password  string
@@ -166,7 +170,9 @@ func Start(t *testing.T) Dependencies {
 		)
 	})
 
+	composeStarted := time.Now()
 	require.NoError(t, stack.Up(ctx))
+	t.Logf("compose startup: %s", time.Since(composeStarted))
 
 	miniStack := newService(
 		t,
@@ -239,41 +245,24 @@ func Start(t *testing.T) Dependencies {
 		"",
 	)
 
-	waitForHealthy(
+	readinessCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
+	defer cancel()
+
+	readinessStarted := time.Now()
+	require.NoError(
 		t,
-		ctx,
-		miniStack,
+		waitForAllHealthy(
+			readinessCtx,
+			miniStack,
+			rabbitMQ,
+			openSearch,
+			gateway,
+			coordinator,
+			capture,
+			search,
+		),
 	)
-	waitForHealthy(
-		t,
-		ctx,
-		rabbitMQ,
-	)
-	waitForHealthy(
-		t,
-		ctx,
-		openSearch,
-	)
-	waitForHealthy(
-		t,
-		ctx,
-		gateway,
-	)
-	waitForHealthy(
-		t,
-		ctx,
-		coordinator,
-	)
-	waitForHealthy(
-		t,
-		ctx,
-		capture,
-	)
-	waitForHealthy(
-		t,
-		ctx,
-		search,
-	)
+	t.Logf("service readiness: %s", time.Since(readinessStarted))
 
 	return Dependencies{
 		MiniStack:   miniStack,
@@ -332,41 +321,68 @@ func newService(
 	require.NoError(t, err)
 
 	return Service{
+		name:      name,
 		healthURL: "http://" + net.JoinHostPort("localhost", mappedPort.Port()) + path,
 		username:  username,
 		password:  password,
 	}
 }
 
-func waitForHealthy(
-	t *testing.T,
-	ctx context.Context,
-	service Service,
-) {
-	t.Helper()
+func waitForAllHealthy(ctx context.Context, services ...Service) error {
+	var (
+		group sync.WaitGroup
+		errs  = make(chan error, len(services))
+	)
 
-	deadline := time.Now().Add(readinessTimeout)
+	for _, service := range services {
+		service := service
+
+		group.Add(1)
+		go func() {
+			defer group.Done()
+
+			if err := waitForHealthy(ctx, service); err != nil {
+				errs <- err
+			}
+		}()
+	}
+
+	group.Wait()
+	close(errs)
+
+	var failures []error
+	for err := range errs {
+		failures = append(failures, err)
+	}
+
+	return errors.Join(failures...)
+}
+
+func waitForHealthy(ctx context.Context, service Service) error {
 	ticker := time.NewTicker(readinessInterval)
 	defer ticker.Stop()
 
+	var (
+		status int
+		lastErr error
+	)
+
 	for {
-		status, err := service.HealthStatus(ctx)
-
-		if err == nil && status == http.StatusOK {
-			return
+		status, lastErr = service.HealthStatus(ctx)
+		if lastErr == nil && status == http.StatusOK {
+			return nil
 		}
 
-		if time.Now().After(deadline) {
-			require.NoError(t, err)
-			require.Equal(
-				t,
-				http.StatusOK,
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf(
+				"%s did not become healthy: %w (last status: %d, last error: %v)",
+				service.name,
+				ctx.Err(),
 				status,
+				lastErr,
 			)
-
-			return
+		case <-ticker.C:
 		}
-
-		<-ticker.C
 	}
 }
