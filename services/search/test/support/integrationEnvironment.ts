@@ -1,6 +1,6 @@
 import { afterAll, beforeAll } from "vitest";
 
-import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
+import type { PageCapturedEvent, PageCapturedResult } from "../../src/application/types.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
@@ -36,7 +36,7 @@ const publicationDeliveryWaiters: ((event: PublicationEvent) => void)[] = [];
 
 let publicationLedgerReady = false;
 
-function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
+function receivePageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
   const waiter = deliveryWaiters.shift();
 
   if (waiter) {
@@ -45,7 +45,7 @@ function receivePageCaptured(event: PageCapturedEvent): Promise<void> {
     deliveries.push(event);
   }
 
-  return Promise.resolve();
+  return Promise.resolve({ status: "COMPLETED", outcome: "INDEXED" });
 }
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
