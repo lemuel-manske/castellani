@@ -78,7 +78,7 @@ services:
       TF_VAR_aws_region: ${AWS_REGION}
 
     volumes:
-      - ./infra/terraform:/workspace
+      - ${TERRAFORM_DIR:-./infra/terraform}:/workspace
 
     depends_on:
       ministack:
