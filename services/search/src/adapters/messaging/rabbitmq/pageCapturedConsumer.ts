@@ -1,17 +1,12 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
 import { isPageCapturedEvent } from "../../../application/types.js";
 import type { PageCapturedEvent } from "../../../application/types.js";
+import {
+  EVENTS_EXCHANGE,
+  PAGE_CAPTURED_TOPOLOGY,
+} from "./topology.js";
 
 const MAX_DELIVERY_RETRIES = 5;
-const RETRY_DELAY_MILLISECONDS = 5_000;
-
-const EVENTS_EXCHANGE = "castellani.events";
-const PAGE_CAPTURED_ROUTING_KEY = "PageCaptured";
-const PAGE_CAPTURED_QUEUE = "castellani.search.page-captured.v2";
-const RETRY_EXCHANGE = "castellani.search.retry";
-const RETRY_QUEUE = "castellani.search.page-captured.retry.v2";
-const DEAD_LETTER_EXCHANGE = "castellani.search.dead";
-const DEAD_LETTER_QUEUE = "castellani.search.page-captured.dead";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -47,7 +42,7 @@ function deliveryRetryCount(message: ConsumeMessage): number {
   }
 
   const retryDeath = (deaths as unknown[]).find(
-    (death: unknown) => isRecord(death) && death.queue === RETRY_QUEUE,
+    (death: unknown) => isRecord(death) && death.queue === PAGE_CAPTURED_TOPOLOGY.retryQueue,
   );
 
   if (!isRecord(retryDeath)) {
@@ -69,7 +64,7 @@ function publishDeadLetter(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     channel.publish(
-      DEAD_LETTER_EXCHANGE,
+      PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
       "",
       message.content,
       {
@@ -144,68 +139,57 @@ async function startPageCapturedConsumer(
     durable: true,
   });
 
-  await channel.assertExchange(RETRY_EXCHANGE, "direct", {
+  await channel.assertExchange(PAGE_CAPTURED_TOPOLOGY.retryExchange, "direct", {
     durable: true,
   });
 
-  await channel.assertExchange(DEAD_LETTER_EXCHANGE, "fanout", {
+  await channel.assertExchange(PAGE_CAPTURED_TOPOLOGY.deadLetterExchange, "fanout", {
     durable: true,
   });
 
-  await channel.assertQueue(DEAD_LETTER_QUEUE, { durable: true });
+  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.deadLetterQueue, { durable: true });
 
   await channel.bindQueue(
-    DEAD_LETTER_QUEUE,
-    DEAD_LETTER_EXCHANGE,
+    PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
+    PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
     "",
   );
 
-  await channel.assertQueue(RETRY_QUEUE, {
+  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.retryQueue, {
     durable: true,
     arguments: {
-      "x-message-ttl": RETRY_DELAY_MILLISECONDS,
+      "x-message-ttl": PAGE_CAPTURED_TOPOLOGY.retryDelayMilliseconds,
       "x-dead-letter-exchange": EVENTS_EXCHANGE,
-      "x-dead-letter-routing-key": PAGE_CAPTURED_ROUTING_KEY,
+      "x-dead-letter-routing-key": PAGE_CAPTURED_TOPOLOGY.routingKey,
     },
   });
 
   await channel.bindQueue(
-    RETRY_QUEUE,
-    RETRY_EXCHANGE,
-    PAGE_CAPTURED_ROUTING_KEY,
+    PAGE_CAPTURED_TOPOLOGY.retryQueue,
+    PAGE_CAPTURED_TOPOLOGY.retryExchange,
+    PAGE_CAPTURED_TOPOLOGY.routingKey,
   );
 
-  await channel.assertQueue(PAGE_CAPTURED_QUEUE, {
+  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.queue, {
     durable: true,
     arguments: {
-      "x-dead-letter-exchange": RETRY_EXCHANGE,
-      "x-dead-letter-routing-key": PAGE_CAPTURED_ROUTING_KEY,
+      "x-dead-letter-exchange": PAGE_CAPTURED_TOPOLOGY.retryExchange,
+      "x-dead-letter-routing-key": PAGE_CAPTURED_TOPOLOGY.routingKey,
     },
   });
 
   await channel.bindQueue(
-    PAGE_CAPTURED_QUEUE,
+    PAGE_CAPTURED_TOPOLOGY.queue,
     EVENTS_EXCHANGE,
-    PAGE_CAPTURED_ROUTING_KEY,
+    PAGE_CAPTURED_TOPOLOGY.routingKey,
   );
 
   await channel.prefetch(1);
 
-  await channel.consume(PAGE_CAPTURED_QUEUE, (message) => {
+  await channel.consume(PAGE_CAPTURED_TOPOLOGY.queue, (message) => {
     void handlePageCapturedMessage(channel, message, handle);
   });
 }
 
-export {
-  DEAD_LETTER_EXCHANGE,
-  DEAD_LETTER_QUEUE,
-  EVENTS_EXCHANGE,
-  MAX_DELIVERY_RETRIES,
-  PAGE_CAPTURED_QUEUE,
-  PAGE_CAPTURED_ROUTING_KEY,
-  RETRY_EXCHANGE,
-  RETRY_QUEUE,
-  parsePageCaptured,
-  startPageCapturedConsumer,
-};
+export { MAX_DELIVERY_RETRIES, parsePageCaptured, startPageCapturedConsumer };
 
