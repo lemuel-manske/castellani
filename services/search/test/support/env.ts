@@ -3,8 +3,8 @@ const SEARCH_OPENSEARCH_URL = process.env.SEARCH_OPENSEARCH_URL;
 const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
 const SEARCH_S3_ENDPOINT_URL = process.env.SEARCH_S3_ENDPOINT_URL;
 
-const ACCESS_KEY_ID = process.env.ACCESS_KEY_ID;
-const SECRECT_ACCESS_KEY = process.env.SECRECT_ACCESS_KEY;
+const ACCESS_KEY_ID = process.env.ACCESS_KEY_ID ?? "minio";
+const SECRET_ACCESS_KEY = process.env.SECRET_ACCESS_KEY ?? "minio-secret";
 
 const REGION = "us-east-1";
 
@@ -15,5 +15,5 @@ export {
   SEARCH_OPENSEARCH_URL,
   SEARCH_RABBITMQ_URL,
   SEARCH_S3_ENDPOINT_URL,
-  SECRECT_ACCESS_KEY,
+  SECRET_ACCESS_KEY,
 };
