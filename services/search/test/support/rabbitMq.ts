@@ -73,16 +73,16 @@ function createRabbitMqTestSupport() {
       await consumerChannel.consume(
         PAGE_CAPTURED_DEAD_LETTER_QUEUE,
         (message) => {
-        if (message === null) {
-          return;
-        }
+          if (message === null) {
+            return;
+          }
 
-        receiveDeadLetter(
-          message,
-          deadLetters,
-          deadLetterWaiters,
-          consumerChannel,
-        );
+          receiveDeadLetter(
+            message,
+            deadLetters,
+            deadLetterWaiters,
+            consumerChannel,
+          );
         },
       );
       await publicationConsumerChannel.consume(
