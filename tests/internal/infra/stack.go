@@ -288,19 +288,31 @@ func Start(t *testing.T) Dependencies {
 
 	readinessStarted := time.Now()
 
-	require.NoError(
-		t,
-		waitForAllHealthy(
-			readinessCtx,
-			miniStack,
-			rabbitMQ,
-			openSearch,
-			gateway,
-			coordinator,
-			capture,
-			search,
-		),
-	)
+	if err := waitForAllHealthy(
+		readinessCtx,
+		miniStack,
+		rabbitMQ,
+		openSearch,
+		gateway,
+		coordinator,
+		capture,
+		search,
+	); err != nil {
+		for _, service := range []string{
+			"provision",
+			"ministack",
+			"rabbitmq",
+			"opensearch",
+			"coordinator",
+			"capture",
+			"search",
+			"gateway",
+		} {
+			logServiceContainer(t, context.Background(), stack, service)
+		}
+
+		require.NoError(t, err, "wait for e2e services to become healthy")
+	}
 
 	t.Logf("service readiness: %s", time.Since(readinessStarted))
 
