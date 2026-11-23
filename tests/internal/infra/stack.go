@@ -187,6 +187,9 @@ func Start(t *testing.T) Dependencies {
 		)
 	})
 
+	// Start the Compose project before looking up its service containers.
+	require.NoError(t, stack.Up(ctx), "start e2e services")
+
 	miniStack := newService(
 		t,
 		ctx,
