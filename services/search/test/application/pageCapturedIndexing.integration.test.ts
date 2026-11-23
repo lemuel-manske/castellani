@@ -1,14 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
-import { createOpenSearchDocumentReader } from "../../src/adapters/search/opensearch-reader.js";
-
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   nextPageCaptured,
   opensearch,
   rabbitmq,
   s3,
+  searchIndex,
   setupIntegrationEnvironment,
 } from "../support/integrationEnvironment.js";
 
@@ -39,9 +38,7 @@ it("indexes a captured page delivered through RabbitMQ from its WARC artifact", 
 
   await opensearch.client.indices.refresh();
 
-  const indexed = await createOpenSearchDocumentReader(
-    opensearch.client,
-  ).search({ text: token }, 10);
+  const indexed = await searchIndex.search({ text: token }, 10);
 
   expect(indexed.candidates).toMatchObject([
     {
