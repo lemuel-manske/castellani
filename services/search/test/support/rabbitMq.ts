@@ -1,45 +1,24 @@
-import { randomUUID } from "node:crypto";
 import * as amqp from "amqplib";
 import type { ConsumeMessage } from "amqplib";
 import {
+  DEAD_LETTER_QUEUE as PAGE_CAPTURED_DEAD_LETTER_QUEUE,
+  EVENTS_EXCHANGE,
+  PAGE_CAPTURED_QUEUE,
+  PAGE_CAPTURED_ROUTING_KEY,
+  RETRY_QUEUE as PAGE_CAPTURED_RETRY_QUEUE,
   startPageCapturedConsumer,
-  type PageCapturedConsumerTopology,
 } from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import {
+  DEAD_LETTER_QUEUE as PUBLICATION_DEAD_LETTER_QUEUE,
+  PUBLICATION_QUEUE,
+  RETRY_QUEUE as PUBLICATION_RETRY_QUEUE,
   startPublicationConsumer,
-  type PublicationConsumerTopology,
 } from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
-import type { PageCapturedEvent } from "../../src/application/processPageCaptured.js";
-import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
+import type { PageCapturedEvent, PublicationEvent } from "../../src/application/types.js";
 
 const SEARCH_RABBITMQ_URL = process.env.SEARCH_RABBITMQ_URL;
 
 function createRabbitMqTestSupport() {
-  const suffix = randomUUID().replaceAll("-", "");
-  const topology: PageCapturedConsumerTopology = {
-    eventsExchange: `search-integration-events-${suffix}`,
-    routingKey: "PageCaptured",
-    queue: `search-integration-queue-${suffix}`,
-    retryExchange: `search-integration-retry-${suffix}`,
-    retryQueue: `search-integration-retry-queue-${suffix}`,
-    deadLetterExchange: `search-integration-dead-${suffix}`,
-    deadLetterQueue: `search-integration-dead-queue-${suffix}`,
-  };
-  const publicationTopology: PublicationConsumerTopology = {
-    eventsExchange: `search-publication-integration-events-${suffix}`,
-    routingKeys: [
-      "ArchivePublicationDecided",
-      "ArchivePublished",
-      "ArchiveCompensationDecided",
-      "CrawlCompleted",
-    ],
-    queue: `search-publication-integration-queue-${suffix}`,
-    retryExchange: `search-publication-integration-retry-${suffix}`,
-    retryQueue: `search-publication-integration-retry-queue-${suffix}`,
-    deadLetterExchange: `search-publication-integration-dead-${suffix}`,
-    deadLetterQueue: `search-publication-integration-dead-queue-${suffix}`,
-  };
-
   let connection: amqp.ChannelModel | undefined;
   let consumerChannel: amqp.ConfirmChannel | undefined;
   let publicationConsumerChannel: amqp.ConfirmChannel | undefined;
@@ -79,13 +58,9 @@ function createRabbitMqTestSupport() {
       consumerChannel = await connection.createConfirmChannel();
       publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
-      await startPageCapturedConsumer(consumerChannel, handle, topology);
-      await startPublicationConsumer(
-        publicationConsumerChannel,
-        handlePublication,
-        publicationTopology,
-      );
-      await consumerChannel.consume(topology.deadLetterQueue, (message) => {
+      await startPageCapturedConsumer(consumerChannel, handle);
+      await startPublicationConsumer(publicationConsumerChannel, handlePublication);
+      await consumerChannel.consume(PAGE_CAPTURED_DEAD_LETTER_QUEUE, (message) => {
         if (message === null) {
           return;
         }
@@ -98,7 +73,7 @@ function createRabbitMqTestSupport() {
         );
       });
       await publicationConsumerChannel.consume(
-        publicationTopology.deadLetterQueue,
+        PUBLICATION_DEAD_LETTER_QUEUE,
         (message) => {
           if (message === null) {
             return;
@@ -120,8 +95,8 @@ function createRabbitMqTestSupport() {
       }
 
       publisherChannel.publish(
-        topology.eventsExchange,
-        topology.routingKey,
+        EVENTS_EXCHANGE,
+        PAGE_CAPTURED_ROUTING_KEY,
         Buffer.from(JSON.stringify(event)),
         { contentType: "application/json", persistent: true },
       );
@@ -137,7 +112,7 @@ function createRabbitMqTestSupport() {
       }
 
       publisherChannel.publish(
-        publicationTopology.eventsExchange,
+        EVENTS_EXCHANGE,
         routingKey,
         Buffer.from(JSON.stringify(event)),
         { contentType: "application/json", persistent: true },
@@ -176,22 +151,22 @@ function createRabbitMqTestSupport() {
         try {
           await Promise.all(
             [
-              topology.queue,
-              topology.retryQueue,
+              PAGE_CAPTURED_QUEUE,
+              PAGE_CAPTURED_RETRY_QUEUE,
               topology.deadLetterQueue,
-              publicationTopology.queue,
-              publicationTopology.retryQueue,
+              PUBLICATION_QUEUE,
+              PUBLICATION_RETRY_QUEUE,
               publicationTopology.deadLetterQueue,
             ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)),
           );
           await Promise.all(
             [
               topology.eventsExchange,
-              topology.retryExchange,
-              topology.deadLetterExchange,
+              "castellani.search.retry",
+              "castellani.search.dead",
               publicationTopology.eventsExchange,
-              publicationTopology.retryExchange,
-              publicationTopology.deadLetterExchange,
+              "castellani.search.publication.retry",
+              "castellani.search.publication.dead",
             ].map((exchange) =>
               cleanup.deleteExchange(exchange).catch(() => undefined),
             ),
