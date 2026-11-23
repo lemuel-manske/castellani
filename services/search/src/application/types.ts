@@ -24,19 +24,17 @@ type Event = {
   occurredAt: string;
 };
 
-type PublicationEvent = Event &
-  (
-    | {
-        type: "ArchivePublicationDecided";
-        payload: PublicationIdentity;
-      }
-    | { type: "ArchivePublished"; payload: PublicationIdentity }
-    | {
-        type: "ArchiveCompensationDecided";
-        payload: CompensationDecision;
-      }
-    | { type: "CrawlCompleted"; payload: CompletionCrawl }
-  );
+type PublicationEvent =
+  | ({
+      type: "ArchivePublicationDecided";
+      payload: PublicationIdentity;
+    } & Event)
+  | ({ type: "ArchivePublished"; payload: PublicationIdentity } & Event)
+  | ({
+      type: "ArchiveCompensationDecided";
+      payload: CompensationDecision;
+    } & Event)
+  | ({ type: "CrawlCompleted"; payload: CompletionCrawl } & Event);
 
 type PageCapturedEvent = Event & {
   type: "PageCaptured";
@@ -186,12 +184,7 @@ const PublicationEventSchema = {
   additionalProperties: false,
 } as const;
 
-type PublicationEnvelope = Event & {
-  type: string;
-  payload: Record<string, unknown>;
-};
-
-const publicationEventValidator = createSchemaValidator<PublicationEnvelope>(
+const publicationEventValidator = createSchemaValidator<PublicationEvent>(
   PublicationEventSchema,
 );
 

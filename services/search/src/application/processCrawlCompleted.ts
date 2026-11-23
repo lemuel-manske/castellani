@@ -86,8 +86,6 @@ async function processCrawlCompleted(
   for (const snapshot of manifest.snapshots) {
     await processPageCaptured(
       {
-        type: "PageCaptured",
-        version: 1,
         messageId: `manifest:${event.manifestDigest}:${snapshot.snapshotId}`,
         correlationId: manifest.archiveId,
         occurredAt: manifest.createdAt,

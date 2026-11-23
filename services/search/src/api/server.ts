@@ -14,16 +14,14 @@ function createSearchServer(
   const server = Fastify({ logger: false });
 
   server.setErrorHandler((error, _request, reply) => {
-    const err = error instanceof Error ? error : new Error(String(error));
-
-    if ("validation" in err && err.validation !== undefined) {
+    if (error.validation !== undefined) {
       return reply
         .code(400)
         .type("application/problem+json")
         .send(problem(400, "Invalid Search", "query parameters are invalid"));
     }
 
-    reply.log.error({ err }, "Unhandled Search API error");
+    reply.log.error({ err: error }, "Unhandled Search API error");
 
     return reply
       .code(500)
@@ -32,8 +30,6 @@ function createSearchServer(
         problem(500, "Internal Server Error", "an unexpected error occurred"),
       );
   });
-
-  server.get("/health/ready", async () => ({ status: "ok" }));
 
   server.register(searchRoutes, {
     reader,
