@@ -1,11 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
 import { createOpenSearchDocumentReader } from "../../src/adapters/search/opensearch-reader.js";
-import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
-  application,
   nextPageCaptured,
   opensearch,
   rabbitmq,
@@ -16,8 +15,12 @@ import {
 setupIntegrationEnvironment(["dynamodb", "opensearch", "rabbitmq", "s3"]);
 
 it("indexes a captured page delivered through RabbitMQ from its WARC artifact", async () => {
-  const fixture = createCapturedPageFixture("rabbitmq-warc-snapshot", {
+  const token = randomUUID().replaceAll("-", "");
+  const snapshotId = `rabbitmq-warc-${token}`;
+  const content = `Integrated content ${token}`;
+  const fixture = createCapturedPageFixture(snapshotId, {
     bucket: s3.bucketName,
+    body: `<html><head><title>${content}</title></head><body><h1>${content}</h1></body></html>`,
   });
 
   await s3.putObject(fixture.bytes, fixture.artifact.key);
@@ -34,18 +37,11 @@ it("indexes a captured page delivered through RabbitMQ from its WARC artifact", 
     },
   });
 
-  const result = await application.processPageCaptured(event);
-
-  expect(result).toEqual({
-    status: "COMPLETED",
-    outcome: "INDEXED",
-  });
-
   await opensearch.client.indices.refresh();
 
   const indexed = await createOpenSearchDocumentReader(
     opensearch.client,
-  ).search({ text: "Integrated content" }, 10);
+  ).search({ text: token }, 10);
 
   expect(indexed.candidates).toMatchObject([
     {
@@ -54,7 +50,7 @@ it("indexes a captured page delivered through RabbitMQ from its WARC artifact", 
         snapshotId: fixture.event.payload.snapshotId,
         url: fixture.event.payload.url,
         finalUrl: fixture.event.payload.finalUrl,
-        title: "Integrated content",
+        title: content,
       },
     },
   ]);
