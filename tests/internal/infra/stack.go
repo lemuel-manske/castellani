@@ -4,6 +4,8 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -23,11 +25,29 @@ const (
 
 var httpClient = &http.Client{Timeout: requestTimeout}
 
+func prepareSearchImage(t *testing.T) {
+	t.Helper()
+
+	searchDir := filepath.Join("..", "services", "search")
+
+	for _, args := range [][]string{{"ci"}, {"run", "build"}} {
+		command := exec.Command("npm", args...)
+		command.Dir = searchDir
+
+		output, err := command.CombinedOutput()
+		require.NoError(t, err, string(output))
+	}
+}
+
 // Dependencies are the local services the end-to-end suite runs against.
 type Dependencies struct {
-	MiniStack  Service
-	RabbitMQ   Service
-	OpenSearch Service
+	MiniStack   Service
+	RabbitMQ    Service
+	OpenSearch  Service
+	Gateway     Service
+	Coordinator Service
+	Capture     Service
+	Search      Service
 }
 
 // Service is one dependency's observable health endpoint.
@@ -37,12 +57,14 @@ type Service struct {
 	password  string
 }
 
-// Start brings up the dependency stack and waits until every service answers
-// its health check. The stack is torn down when the test finishes.
+// Start brings up the full stack and waits until every service answers its
+// health check. The stack is torn down when the test finishes.
 func Start(t *testing.T) Dependencies {
 	t.Helper()
 
 	ctx := context.Background()
+
+	prepareSearchImage(t)
 
 	stack, err := compose.NewDockerComposeWith(compose.WithStackFiles("compose.yaml"))
 	require.NoError(t, err)
@@ -56,15 +78,27 @@ func Start(t *testing.T) Dependencies {
 	miniStack := newService(t, ctx, stack, "ministack", "4566", "/_ministack/health", "", "")
 	rabbitMQ := newService(t, ctx, stack, "rabbitmq", "15672", "/api/overview", rabbitMQUsername, rabbitMQPassword)
 	openSearch := newService(t, ctx, stack, "opensearch", "9200", "/_cluster/health", "", "")
+	gateway := newService(t, ctx, stack, "gateway", "8080", "/health/ready", "", "")
+	coordinator := newService(t, ctx, stack, "coordinator", "8081", "/health/ready", "", "")
+	capture := newService(t, ctx, stack, "capture", "8000", "/health/ready", "", "")
+	search := newService(t, ctx, stack, "search", "8082", "/health/ready", "", "")
 
 	waitForHealthy(t, ctx, miniStack)
 	waitForHealthy(t, ctx, rabbitMQ)
 	waitForHealthy(t, ctx, openSearch)
+	waitForHealthy(t, ctx, gateway)
+	waitForHealthy(t, ctx, coordinator)
+	waitForHealthy(t, ctx, capture)
+	waitForHealthy(t, ctx, search)
 
 	return Dependencies{
-		MiniStack:  miniStack,
-		RabbitMQ:   rabbitMQ,
-		OpenSearch: openSearch,
+		MiniStack:   miniStack,
+		RabbitMQ:    rabbitMQ,
+		OpenSearch:  openSearch,
+		Gateway:     gateway,
+		Coordinator: coordinator,
+		Capture:     capture,
+		Search:      search,
 	}
 }
 
