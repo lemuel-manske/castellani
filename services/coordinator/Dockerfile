@@ -20,9 +20,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/coordin
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates \
-    && addgroup -S -g 10001 coordinator \
-    && adduser -S -D -H -u 10001 -G coordinator coordinator
+RUN apk add --no-cache ca-certificates && \
+    addgroup -S -g 10001 coordinator && \
+    adduser -S -D -H -u 10001 -G coordinator coordinator
 
 COPY --from=build --chown=coordinator:coordinator /out/coordinator /usr/local/bin/coordinator
 

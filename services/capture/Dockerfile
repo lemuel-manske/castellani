@@ -16,29 +16,21 @@ FROM python:3.13.5-slim-bookworm
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
-        ca-certificates \
-        libnss3-tools \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install --yes --no-install-recommends ca-certificates libnss3-tools && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --gid 10001 capture \
-    && useradd --uid 10001 --gid capture --home-dir /home/capture \
-        --create-home --shell /usr/sbin/nologin capture
+RUN groupadd --gid 10001 capture && \
+    useradd --uid 10001 --gid capture --home-dir /home/capture --create-home --shell /usr/sbin/nologin capture
 
 COPY --from=build --chown=capture:capture /app/.venv /app/.venv
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-ARG INSTALL_BROWSER=1
-
-RUN mkdir -p /ms-playwright \
-    && if [ "$INSTALL_BROWSER" = "1" ]; then \
-        /app/.venv/bin/playwright install --with-deps chromium; \
-    fi \
-    && rm -rf /var/lib/apt/lists/* \
-    && chown --recursive capture:capture /ms-playwright \
-    && install --directory --owner=capture --group=capture /tmp/castellani/capture
+RUN /app/.venv/bin/playwright install --with-deps chromium && \
+    rm -rf /var/lib/apt/lists/* && \
+    chown --recursive capture:capture /ms-playwright && \
+    install --directory --owner=capture --group=capture /tmp/castellani/capture
 
 COPY --chown=capture:capture src ./src
 
