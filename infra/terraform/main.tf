@@ -1,8 +1,9 @@
+
 resource "aws_dynamodb_table" "coordinator_archives" {
   name         = "coordinator_archives"
   billing_mode = "PAY_PER_REQUEST"
 
-  hash_key     = "archiveId"
+  hash_key = "archiveId"
 
   attribute {
     name = "archiveId"
@@ -21,9 +22,17 @@ resource "aws_dynamodb_table" "coordinator_archives" {
 
   global_secondary_index {
     name            = "recoveryKey-updatedAt-index"
-    hash_key        = "recoveryKey"
-    range_key       = "updatedAt"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "recoveryKey"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "updatedAt"
+      key_type       = "RANGE"
+    }
   }
 }
 
@@ -31,7 +40,7 @@ resource "aws_dynamodb_table" "coordinator_submissions" {
   name         = "coordinator_submissions"
   billing_mode = "PAY_PER_REQUEST"
 
-  hash_key     = "idempotencyKey"
+  hash_key = "idempotencyKey"
 
   attribute {
     name = "idempotencyKey"
@@ -48,7 +57,7 @@ resource "aws_dynamodb_table" "coordinator_outbox" {
   name         = "coordinator_outbox"
   billing_mode = "PAY_PER_REQUEST"
 
-  hash_key     = "messageId"
+  hash_key = "messageId"
 
   attribute {
     name = "messageId"
@@ -60,7 +69,7 @@ resource "aws_dynamodb_table" "coordinator_inbox" {
   name         = "coordinator_inbox"
   billing_mode = "PAY_PER_REQUEST"
 
-  hash_key     = "messageId"
+  hash_key = "messageId"
 
   attribute {
     name = "messageId"
@@ -72,6 +81,7 @@ resource "aws_s3_bucket" "archive_artifacts" {
   bucket        = "castellani-archive-artifacts"
   force_destroy = true
 }
+
 resource "aws_s3_bucket" "archive_manifests" {
   bucket        = "castellani-archive-manifests"
   force_destroy = true
@@ -84,6 +94,7 @@ resource "aws_s3_bucket_versioning" "archive_artifacts" {
     status = "Enabled"
   }
 }
+
 resource "aws_s3_bucket_versioning" "archive_manifests" {
   bucket = aws_s3_bucket.archive_manifests.id
 
@@ -93,7 +104,7 @@ resource "aws_s3_bucket_versioning" "archive_manifests" {
 }
 
 resource "aws_s3_bucket_public_access_block" "archive_artifacts" {
-  bucket                  = aws_s3_bucket.archive_artifacts.id
+  bucket = aws_s3_bucket.archive_artifacts.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -102,14 +113,13 @@ resource "aws_s3_bucket_public_access_block" "archive_artifacts" {
 }
 
 resource "aws_s3_bucket_public_access_block" "archive_manifests" {
-  bucket                  = aws_s3_bucket.archive_manifests.id
+  bucket = aws_s3_bucket.archive_manifests.id
 
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
-
 
 resource "aws_dynamodb_table" "capture_runs" {
   name         = "capture_runs"
@@ -164,9 +174,17 @@ resource "aws_dynamodb_table" "capture_outbox" {
 
   global_secondary_index {
     name            = "status-nextAttemptAt-index"
-    hash_key        = "status"
-    range_key       = "nextAttemptAt"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "status"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "nextAttemptAt"
+      key_type       = "RANGE"
+    }
   }
 }
 
@@ -205,9 +223,17 @@ resource "aws_dynamodb_table" "capture_snapshots" {
 
   global_secondary_index {
     name            = "archiveId-capturedAt-index"
-    hash_key        = "archiveId"
-    range_key       = "capturedAt"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "archiveId"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "capturedAt"
+      key_type       = "RANGE"
+    }
   }
 }
 
@@ -229,12 +255,19 @@ resource "aws_dynamodb_table" "search_indexing_ledger" {
 
   global_secondary_index {
     name            = "archiveId-snapshotId-index"
-    hash_key        = "archiveId"
-    range_key       = "snapshotId"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "archiveId"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "snapshotId"
+      key_type       = "RANGE"
+    }
   }
 }
-
 
 resource "aws_dynamodb_table" "search_publication_ledger" {
   name         = "search_publication_ledger"

@@ -75,8 +75,12 @@ services:
     user: "${TERRAFORM_UID:-1000}:${TERRAFORM_GID:-1000}"
 
     environment:
-      TF_VAR_ministack_endpoint: http://ministack:4566
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
       TF_VAR_aws_region: ${AWS_REGION}
+
+      TF_VAR_ministack_endpoint: http://ministack:4566
 
     volumes:
       - ${TERRAFORM_DIR:-./infra/terraform}:/workspace
