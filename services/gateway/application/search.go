@@ -1,14 +1,8 @@
 package application
 
-import (
-	"context"
-)
+import "context"
 
 func (a Application) Search(ctx context.Context, query SearchQuery) (SearchResults, error) {
-	if err := query.Validate(); err != nil {
-		return SearchResults{}, err
-	}
-
 	if a.search == nil {
 		return SearchResults{}, ErrDependencyUnavailable
 	}
