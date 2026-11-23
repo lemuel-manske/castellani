@@ -28,7 +28,6 @@ const DEFAULT_MAX_ATTEMPTS = 5;
 class DynamoDBIndexingLedger implements IndexingLedger {
   constructor(
     private readonly client: DynamoDBDocumentClient,
-    private readonly clock: () => number = Date.now,
   ) {}
 
   async claim(
@@ -50,7 +49,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       throw new Error("maximum indexing attempts must be a positive integer");
     }
 
-    const now = this.clock() / 1000;
+    const now = clock_provider.now() / 1000;
     const token = randomUUID();
 
     try {
