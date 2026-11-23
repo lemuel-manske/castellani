@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -188,7 +189,22 @@ func Start(t *testing.T) Dependencies {
 	})
 
 	// Start the Compose project before looking up its service containers.
-	require.NoError(t, stack.Up(ctx), "start e2e services")
+	if err := stack.Up(ctx); err != nil {
+		for _, service := range []string{
+			"provision",
+			"ministack",
+			"rabbitmq",
+			"opensearch",
+			"coordinator",
+			"capture",
+			"search",
+			"gateway",
+		} {
+			logServiceContainer(t, ctx, stack, service)
+		}
+
+		require.NoError(t, err, "start e2e services")
+	}
 
 	miniStack := newService(
 		t,
@@ -297,6 +313,32 @@ func Start(t *testing.T) Dependencies {
 		Capture:     capture,
 		Search:      search,
 	}
+}
+
+// logServiceContainer writes a service's logs when Compose startup fails.
+func logServiceContainer(t *testing.T, ctx context.Context, stack compose.ComposeStack, name string) {
+	t.Helper()
+
+	container, err := stack.ServiceContainer(ctx, name)
+	if err != nil {
+		t.Logf("%s container unavailable: %v", name, err)
+		return
+	}
+
+	logs, err := container.Logs(ctx)
+	if err != nil {
+		t.Logf("%s logs unavailable: %v", name, err)
+		return
+	}
+	defer logs.Close()
+
+	contents, err := io.ReadAll(logs)
+	if err != nil {
+		t.Logf("read %s logs: %v", name, err)
+		return
+	}
+
+	t.Logf("%s container logs:\n%s", name, contents)
 }
 
 // HealthStatus performs the service's health request and reports its result.
