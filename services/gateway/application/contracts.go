@@ -11,15 +11,6 @@ type Pagination struct {
 	Cursor string
 }
 
-type Submission struct {
-	SeedURL        string   `json:"seedUrl"`
-	CollectionID   string   `json:"collectionId,omitempty"`
-	MaxDepth       *int     `json:"maxDepth"`
-	MaxPages       *int     `json:"maxPages"`
-	AllowedOrigins []string `json:"allowedOrigins,omitempty"`
-	AuthGeneration *int     `json:"authGeneration,omitempty"`
-}
-
 type SearchQuery struct {
 	Text, CollectionID, ArchiveID, SnapshotID, CapturedFrom, CapturedTo string
 	Pagination                                                          Pagination
@@ -75,38 +66,12 @@ type ArchiveAccepted struct {
 }
 
 type Capture interface {
-	ListPages(
-		context.Context,
-		string,
-		Pagination,
-	) (Pages, error)
-
-	GetSnapshot(
-		context.Context,
-		string,
-		string,
-	) (Snapshot, error)
-
-	GetWACZ(
-		context.Context,
-		string,
-		WACZOptions,
-	) (WACZ, error)
-
-	CreateSession(
-		context.Context,
-		string,
-		SessionRequest,
-		[]byte,
-	) (Session, error)
-
+	ListPages(context.Context, string, Pagination) (Pages, error)
+	GetSnapshot(context.Context, string, string) (Snapshot, error)
+	GetWACZ(context.Context, string, WACZOptions) (WACZ, error)
+	CreateSession(context.Context, string, SessionRequest, []byte) (Session, error)
 	GetSession(context.Context, string) (Session, error)
-
-	UpdateSession(
-		context.Context,
-		string,
-		[]byte,
-	) (Session, error)
+	UpdateSession(context.Context, string, []byte) (Session, error)
 }
 
 type Search interface {
@@ -114,11 +79,6 @@ type Search interface {
 }
 
 type Coordinator interface {
-	CreateArchive(
-		context.Context,
-		string,
-		[]byte,
-	) (ArchiveAccepted, error)
-
+	CreateArchive(context.Context, string, []byte) (ArchiveAccepted, error)
 	GetArchive(context.Context, string) (json.RawMessage, error)
 }
