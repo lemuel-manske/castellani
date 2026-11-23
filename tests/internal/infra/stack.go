@@ -121,7 +121,15 @@ func stackEnvironment(t *testing.T, terraformDir string) map[string]string {
 	t.Helper()
 
 	return map[string]string{
-		"AWS_REGION": "us-east-1",
+		"AWS_REGION":            "us-east-1",
+		"AWS_ACCESS_KEY_ID":     "test",
+		"AWS_SECRET_ACCESS_KEY": "test",
+		"RABBITMQ_USERNAME":     rabbitMQUsername,
+		"RABBITMQ_USER":         rabbitMQUsername,
+		"RABBITMQ_PASSWORD":     rabbitMQPassword,
+		"COORDINATOR_URL":       "http://coordinator:8081",
+		"CAPTURE_URL":           "http://capture:8000",
+		"SEARCH_URL":            "http://search:8082",
 
 		"TERRAFORM_DIR": terraformDir,
 		"TERRAFORM_UID": strconv.Itoa(os.Getuid()),
