@@ -50,3 +50,20 @@ func logServiceContainer(t *testing.T, ctx context.Context, stack compose.Compos
 
 	t.Logf("%s container logs:\n%s", name, contents)
 }
+
+func logServices(t *testing.T, ctx context.Context, stack compose.ComposeStack) {
+	t.Helper()
+
+	for _, name := range []string{
+		"provision",
+		"ministack",
+		"rabbitmq",
+		"opensearch",
+		"coordinator",
+		"capture",
+		"search",
+		"gateway",
+	} {
+		logServiceContainer(t, ctx, stack, name)
+	}
+}
