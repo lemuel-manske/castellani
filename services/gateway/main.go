@@ -12,7 +12,8 @@ import (
 
 const (
 	serviceName = "gateway"
-	networkType = "tcp"
+
+	addressFormat = ":%s"
 )
 
 func main() {
@@ -35,12 +36,12 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	listener, err := net.Listen(networkType, cfg.address)
+	listener, err := net.Listen("tcp", fmt.Sprintf(addressFormat, cfg.port))
 
 	if err != nil {
 		return fmt.Errorf(
 			"listen on %s: %w",
-			cfg.address,
+			cfg.port,
 			err,
 		)
 	}

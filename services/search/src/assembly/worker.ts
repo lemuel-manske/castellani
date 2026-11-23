@@ -52,7 +52,9 @@ class SearchWorker {
             pageCapturedChannel.close(),
             publicationChannel.close(),
           ]);
+
           await connection.close();
+
           break;
         }
 

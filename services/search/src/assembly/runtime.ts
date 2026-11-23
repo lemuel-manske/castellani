@@ -112,9 +112,11 @@ class SearchRuntime {
     try {
       await ensureSearchIndex(opensearch);
 
+      const port = parseInt(this.settings.httpPort, 10);
+
       await searchServer.listen({
-        host: this.settings.httpHost,
-        port: this.settings.httpPort,
+        host: "0.0.0.0",
+        port: port,
       });
 
       await worker.start(signal);

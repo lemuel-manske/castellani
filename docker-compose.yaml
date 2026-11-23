@@ -3,14 +3,15 @@ services:
     image: ministackorg/ministack:1.5.42
 
     ports:
-      - "127.0.0.1:${MINISTACK_PORT:-4566}:4566"
+      - "127.0.0.1:${MINISTACK_PORT}:4566"
 
     environment:
-      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      AWS_DEFAULT_REGION: ${AWS_REGION}
       PERSIST_STATE: "1"
       STATE_DIR: /var/lib/ministack
       S3_PERSIST: "1"
       S3_DATA_DIR: /var/lib/ministack/s3
+
       MINISTACK_OPENSEARCH_ENDPOINT: opensearch:9200
 
     volumes:
@@ -30,12 +31,12 @@ services:
     image: rabbitmq:4.1.4-management-alpine
 
     ports:
-      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
-      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "127.0.0.1:${RABBITMQ_PORT}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT}:15672"
 
     environment:
-      RABBITMQ_DEFAULT_USER: castellani
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-local-development-only}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
 
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
@@ -52,7 +53,7 @@ services:
     image: opensearchproject/opensearch:2.15.0
 
     ports:
-      - "127.0.0.1:${OPENSEARCH_PORT:-9200}:9200"
+      - "127.0.0.1:${OPENSEARCH_PORT}:9200"
 
     environment:
       discovery.type: single-node
@@ -74,10 +75,10 @@ services:
 
     environment:
       TF_VAR_ministack_endpoint: http://ministack:4566
-      TF_VAR_aws_region: ${AWS_REGION:-us-east-1}
+      TF_VAR_aws_region: ${AWS_REGION}
 
     volumes:
-      - ${TERRAFORM_DIR:-./infra/terraform}:/workspace
+      - ./infra/terraform:/workspace
 
     depends_on:
       ministack:
@@ -93,18 +94,18 @@ services:
       dockerfile: services/coordinator/Dockerfile
 
     ports:
-      - "127.0.0.1:${COORDINATOR_PORT:-8081}:8081"
+      - "127.0.0.1:${COORDINATOR_PORT}:8081"
 
     environment:
-      COORDINATOR_ADDR: ":8081"
-      COORDINATOR_AWS_REGION: ${AWS_REGION:-us-east-1}
-      COORDINATOR_DYNAMODB_ENDPOINT: http://ministack:4566
-      COORDINATOR_RABBITMQ_URL: amqp://castellani:${RABBITMQ_PASSWORD:-local-development-only}@rabbitmq:5672/
-      COORDINATOR_RABBITMQ_EXCHANGE: castellani.events
+      COORDINATOR_PORT: "8081"
 
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_EC2_METADATA_DISABLED: "true"
+      COORDINATOR_AWS_REGION: ${AWS_REGION}
+
+      COORDINATOR_DYNAMODB_ENDPOINT: http://ministack:4566
+      COORDINATOR_RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+
+      COORDINATOR_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      COORDINATOR_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
     depends_on:
       provision:
@@ -136,18 +137,21 @@ services:
       dockerfile: Dockerfile
 
     ports:
-      - "127.0.0.1:${CAPTURE_PORT:-8000}:8000"
+      - "127.0.0.1:${CAPTURE_PORT}:8000"
 
     environment:
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      DYNAMODB_ENDPOINT_URL: http://ministack:4566
-      S3_ENDPOINT_URL: http://ministack:4566
-      RABBITMQ_URL: amqp://castellani:${RABBITMQ_PASSWORD:-local-development-only}@rabbitmq:5672/
-      CAPTURE_BROWSER_SLOT_COUNT: ${CAPTURE_BROWSER_SLOT_COUNT:-10}
+      CAPTURE_PORT: "8000"
 
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_EC2_METADATA_DISABLED: "true"
+      CAPTURE_AWS_REGION: ${AWS_REGION:-us-east-1}
+
+      CAPTURE_DYNAMODB_ENDPOINT_URL: http://ministack:4566
+      CAPTURE_S3_ENDPOINT_URL: http://ministack:4566
+      CAPTURE_RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+
+      CAPTURE_CAPTURE_BROWSER_SLOT_COUNT: ${CAPTURE_BROWSER_SLOT_COUNT:-10}
+
+      CAPTURE_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      CAPTURE_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
     depends_on:
       provision:
@@ -177,15 +181,17 @@ services:
       - "127.0.0.1:${SEARCH_PORT:-8082}:8082"
 
     environment:
-      SEARCH_AWS_REGION: ${AWS_REGION:-us-east-1}
-      SEARCH_AWS_ACCESS_KEY_ID: test
-      SEARCH_AWS_SECRET_ACCESS_KEY: test
-      SEARCH_HTTP_HOST: 0.0.0.0
-      SEARCH_HTTP_PORT: "8082"
+      SEARCH_PORT: "8082"
+
+      SEARCH_AWS_REGION: ${AWS_REGION}
+
       SEARCH_DYNAMODB_ENDPOINT_URL: http://ministack:4566
-      SEARCH_S3_ENDPOINT_URL: http://ministack:4566
-      SEARCH_RABBITMQ_URL: amqp://castellani:${RABBITMQ_PASSWORD:-local-development-only}@rabbitmq:5672/
       SEARCH_OPENSEARCH_URL: http://opensearch:9200
+      SEARCH_RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      SEARCH_S3_ENDPOINT_URL: http://ministack:4566
+
+      SEARCH_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      SEARCH_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
     depends_on:
       provision:
@@ -219,13 +225,15 @@ services:
       dockerfile: services/gateway/Dockerfile
 
     ports:
-      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+      - "127.0.0.1:${GATEWAY_PORT}:8080"
 
     environment:
-      GATEWAY_ADDR: ":8080"
-      COORDINATOR_URL: ${COORDINATOR_URL:-http://coordinator:8081}
-      CAPTURE_URL: ${CAPTURE_URL:-http://capture:8000}
-      SEARCH_URL: ${SEARCH_URL:-http://search:8082}
+      GATEWAY_PORT: "8080"
+
+      GATEWAY_COORDINATOR_URL: ${COORDINATOR_URL}
+      GATEWAY_CAPTURE_URL: ${CAPTURE_URL}
+      GATEWAY_SEARCH_URL: ${SEARCH_URL}
+
       GATEWAY_UPSTREAM_TIMEOUT: ${GATEWAY_UPSTREAM_TIMEOUT:-5s}
       GATEWAY_STREAM_TIMEOUT: ${GATEWAY_STREAM_TIMEOUT:-30m}
       GATEWAY_SHUTDOWN_TIMEOUT: ${GATEWAY_SHUTDOWN_TIMEOUT:-10s}

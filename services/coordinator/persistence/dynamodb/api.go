@@ -13,18 +13,15 @@ const (
 	OutboxPublished = "PUBLISHED"
 
 	StartCrawlType = "StartCrawl"
-)
 
-type Tables struct {
-	Archives    string
-	Submissions string
-	Outbox      string
-	Inbox       string
-}
+	ArchivesTable    = "coordinator_archives"
+	SubmissionsTable = "coordinator_submissions"
+	OutboxTable      = "coordinator_outbox"
+	InboxTable       = "coordinator_inbox"
+)
 
 type DynamoRepository struct {
 	client *dynamodb.Client
-	tables Tables
 }
 
 type AdmissionKey struct {
@@ -51,9 +48,8 @@ type StartCrawlPayload struct {
 	AuthGeneration *int     `json:"authGeneration,omitempty"`
 }
 
-func NewDynamoRepository(client *dynamodb.Client, tables Tables) *DynamoRepository {
+func NewDynamoRepository(client *dynamodb.Client) *DynamoRepository {
 	return &DynamoRepository{
 		client: client,
-		tables: tables,
 	}
 }

@@ -2,78 +2,45 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"time"
 )
 
 const (
-	addressEnvironment            = "COORDINATOR_ADDR"
+	portEnvironment = "COORDINATOR_PORT"
+
+	regionEnvironment = "COORDINATOR_AWS_REGION"
+
 	shutdownEnvironment           = "COORDINATOR_SHUTDOWN_TIMEOUT"
-	regionEnvironment             = "COORDINATOR_AWS_REGION"
-	endpointEnvironment           = "COORDINATOR_DYNAMODB_ENDPOINT"
-	archivesEnvironment           = "COORDINATOR_ARCHIVES_TABLE"
-	submissionsEnvironment        = "COORDINATOR_SUBMISSIONS_TABLE"
-	outboxEnvironment             = "COORDINATOR_OUTBOX_TABLE"
-	inboxEnvironment              = "COORDINATOR_INBOX_TABLE"
-	rabbitURLEnvironment          = "COORDINATOR_RABBITMQ_URL"
-	rabbitExchangeEnvironment     = "COORDINATOR_RABBITMQ_EXCHANGE"
 	reconcileIntervalEnvironment  = "COORDINATOR_RECONCILIATION_INTERVAL"
 	stalledWorkflowAgeEnvironment = "COORDINATOR_STALLED_WORKFLOW_AGE"
 
-	defaultAddress            = ":8081"
+	dynamoEndpointEnvironment = "COORDINATOR_DYNAMODB_ENDPOINT"
+
+	rabbitURLEnvironment = "COORDINATOR_RABBITMQ_URL"
+
 	defaultShutdownTimeout    = 10 * time.Second
-	defaultRegion             = "us-east-1"
-	defaultArchivesTable      = "coordinator_archive_runs"
-	defaultSubmissionsTable   = "coordinator_submission_keys"
-	defaultOutboxTable        = "coordinator_outbox"
-	defaultInboxTable         = "coordinator_inbox"
-	defaultRabbitURL          = "amqp://guest:guest@localhost:5672/"
-	defaultRabbitExchange     = "castellani.events"
 	defaultReconcileInterval  = 30 * time.Second
 	defaultStalledWorkflowAge = 2 * time.Minute
 )
 
 type Config struct {
-	address            string
-	shutdownTimeout    time.Duration
+	port               string
 	region             string
-	endpoint           string
-	archivesTable      string
-	submissionsTable   string
-	outboxTable        string
-	inboxTable         string
-	rabbitURL          string
-	rabbitExchange     string
+	shutdownTimeout    time.Duration
 	reconcileInterval  time.Duration
 	stalledWorkflowAge time.Duration
+	dynamoEndpoint     string
+	rabbitURL          string
 }
 
 func LoadConfig(getenv func(string) string) (Config, error) {
 	config := Config{
-		address:            defaultAddress,
 		shutdownTimeout:    defaultShutdownTimeout,
-		region:             defaultRegion,
-		archivesTable:      defaultArchivesTable,
-		submissionsTable:   defaultSubmissionsTable,
-		outboxTable:        defaultOutboxTable,
-		inboxTable:         defaultInboxTable,
-		rabbitURL:          defaultRabbitURL,
-		rabbitExchange:     defaultRabbitExchange,
 		reconcileInterval:  defaultReconcileInterval,
 		stalledWorkflowAge: defaultStalledWorkflowAge,
 	}
 
-	if address := getenv(addressEnvironment); address != "" {
-		config.address = address
-	}
-
-	if _, _, err := net.SplitHostPort(config.address); err != nil {
-		return Config{}, fmt.Errorf(
-			"invalid %s: %w",
-			addressEnvironment,
-			err,
-		)
-	}
+	config.port = getenv(portEnvironment)
 
 	var err error
 
@@ -107,35 +74,10 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	if region := getenv(regionEnvironment); region != "" {
-		config.region = region
-	}
+	config.region = getenv(regionEnvironment)
 
-	config.endpoint = getenv(endpointEnvironment)
-
-	if name := getenv(archivesEnvironment); name != "" {
-		config.archivesTable = name
-	}
-
-	if name := getenv(submissionsEnvironment); name != "" {
-		config.submissionsTable = name
-	}
-
-	if name := getenv(outboxEnvironment); name != "" {
-		config.outboxTable = name
-	}
-
-	if name := getenv(inboxEnvironment); name != "" {
-		config.inboxTable = name
-	}
-
-	if value := getenv(rabbitURLEnvironment); value != "" {
-		config.rabbitURL = value
-	}
-
-	if value := getenv(rabbitExchangeEnvironment); value != "" {
-		config.rabbitExchange = value
-	}
+	config.dynamoEndpoint = getenv(dynamoEndpointEnvironment)
+	config.rabbitURL = getenv(rabbitURLEnvironment)
 
 	return config, nil
 }

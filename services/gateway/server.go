@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -31,22 +32,45 @@ type GatewayServer struct {
 }
 
 func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
-	coordinatorClient := coordinator.NewClient(*cfg.coordinatorURL, cfg.upstreamTimeout)
+	coordinatorURL, err := url.Parse(cfg.coordinatorURL)
 
-	var captureClient *capture.Client
-	var searchClient *search.Client
-
-	if cfg.captureURL != nil {
-		captureClient = capture.NewClient(
-			*cfg.captureURL,
-			cfg.upstreamTimeout,
-			cfg.streamTimeout,
+	if err != nil {
+		logger.Error(
+			"invalid coordinator URL",
+			"url",
+			cfg.coordinatorURL,
+			"error",
+			err,
 		)
 	}
 
-	if cfg.searchURL != nil {
-		searchClient = search.NewClient(*cfg.searchURL, cfg.upstreamTimeout)
+	captureURL, err := url.Parse(cfg.captureURL)
+
+	if err != nil {
+		logger.Error(
+			"invalid capture URL",
+			"url",
+			cfg.captureURL,
+			"error",
+			err,
+		)
 	}
+
+	searchURL, err := url.Parse(cfg.searchURL)
+
+	if err != nil {
+		logger.Error(
+			"invalid search URL",
+			"url",
+			cfg.searchURL,
+			"error",
+			err,
+		)
+	}
+
+	coordinatorClient := coordinator.NewClient(*coordinatorURL, cfg.upstreamTimeout)
+	captureClient := capture.NewClient(*captureURL, cfg.upstreamTimeout, cfg.streamTimeout)
+	searchClient := search.NewClient(*searchURL, cfg.upstreamTimeout)
 
 	app := assembly.NewApplication(
 		coordinatorClient,
@@ -64,6 +88,7 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 			app,
 			logger,
 		),
+
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 		IdleTimeout:       serverIdleTimeout,

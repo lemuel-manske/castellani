@@ -2,8 +2,7 @@ interface SearchSettingsOptions {
   awsRegion: string;
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
-  httpHost: string;
-  httpPort: number;
+  httpPort: string;
   dynamodbEndpointUrl: string;
   s3EndpointUrl: string;
   rabbitmqUrl: string;
@@ -13,46 +12,23 @@ interface SearchSettingsOptions {
   reconnectDelayMilliseconds?: number;
 }
 
-const DEFAULT_HTTP_HOST = "0.0.0.0";
-const DEFAULT_HTTP_PORT = 8082;
-
 const DEFAULT_INDEXING_LEASE_DURATION_SECONDS = 120;
 const DEFAULT_INDEXING_MAX_ATTEMPTS = 5;
 const DEFAULT_RECONNECT_DELAY_MILLISECONDS = 1000;
-
-function positiveInteger(
-  name: string,
-  value: string | undefined,
-  fallback: number,
-): number {
-  const parsed = value === undefined ? fallback : Number(value);
-
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer`);
-  }
-
-  return parsed;
-}
-
-function required(name: string, value: string | undefined): string {
-  if (!value?.trim()) {
-    throw new Error(`${name} must not be empty`);
-  }
-
-  return value;
-}
 
 /** Runtime configuration for one Search service process. */
 class SearchSettings {
   readonly awsRegion: string;
   readonly awsAccessKeyId: string;
   readonly awsSecretAccessKey: string;
-  readonly httpHost: string;
-  readonly httpPort: number;
+
+  readonly httpPort: string;
+
   readonly dynamodbEndpointUrl: string;
   readonly s3EndpointUrl: string;
   readonly rabbitmqUrl: string;
   readonly opensearchUrl: string;
+
   readonly indexingLeaseDurationSeconds: number;
   readonly indexingMaxAttempts: number;
   readonly reconnectDelayMilliseconds: number;
@@ -62,7 +38,6 @@ class SearchSettings {
     this.awsAccessKeyId = options.awsAccessKeyId;
     this.awsSecretAccessKey = options.awsSecretAccessKey;
 
-    this.httpHost = options.httpHost;
     this.httpPort = options.httpPort;
 
     this.dynamodbEndpointUrl = options.dynamodbEndpointUrl;
@@ -73,8 +48,10 @@ class SearchSettings {
     this.indexingLeaseDurationSeconds =
       options.indexingLeaseDurationSeconds ??
       DEFAULT_INDEXING_LEASE_DURATION_SECONDS;
+
     this.indexingMaxAttempts =
       options.indexingMaxAttempts ?? DEFAULT_INDEXING_MAX_ATTEMPTS;
+
     this.reconnectDelayMilliseconds =
       options.reconnectDelayMilliseconds ??
       DEFAULT_RECONNECT_DELAY_MILLISECONDS;
@@ -92,12 +69,7 @@ class SearchSettings {
         env.SEARCH_AWS_SECRET_ACCESS_KEY,
       ),
 
-      httpHost: env.SEARCH_HTTP_HOST?.trim() || DEFAULT_HTTP_HOST,
-      httpPort: positiveInteger(
-        "SEARCH_HTTP_PORT",
-        env.SEARCH_HTTP_PORT,
-        DEFAULT_HTTP_PORT,
-      ),
+      httpPort: required("SEARCH_HTTP_PORT", env.SEARCH_HTTP_PORT),
 
       dynamodbEndpointUrl: required(
         "SEARCH_DYNAMODB_ENDPOINT_URL",
@@ -113,23 +85,49 @@ class SearchSettings {
         env.SEARCH_OPENSEARCH_URL,
       ),
 
-      indexingLeaseDurationSeconds: positiveInteger(
+      indexingLeaseDurationSeconds: integer(
         "SEARCH_INDEXING_LEASE_DURATION_SECONDS",
         env.SEARCH_INDEXING_LEASE_DURATION_SECONDS,
         DEFAULT_INDEXING_LEASE_DURATION_SECONDS,
       ),
-      indexingMaxAttempts: positiveInteger(
+      indexingMaxAttempts: integer(
         "SEARCH_INDEXING_MAX_ATTEMPTS",
         env.SEARCH_INDEXING_MAX_ATTEMPTS,
         DEFAULT_INDEXING_MAX_ATTEMPTS,
       ),
-      reconnectDelayMilliseconds: positiveInteger(
+      reconnectDelayMilliseconds: integer(
         "SEARCH_RECONNECT_DELAY_MILLISECONDS",
         env.SEARCH_RECONNECT_DELAY_MILLISECONDS,
         DEFAULT_RECONNECT_DELAY_MILLISECONDS,
       ),
     });
   }
+}
+
+function required(name: string, value: string | undefined): string {
+  if (!value?.trim()) {
+    throw new Error(`${name} must not be empty`);
+  }
+
+  return value;
+}
+
+function integer(
+  name: string,
+  value: string | undefined,
+  defaultValue: number,
+): number {
+  if (!value?.trim()) {
+    return defaultValue;
+  }
+
+  const parsed = parseInt(value, 10);
+
+  if (isNaN(parsed)) {
+    throw new Error(`${name} must be an integer`);
+  }
+
+  return parsed;
 }
 
 export { SearchSettings };

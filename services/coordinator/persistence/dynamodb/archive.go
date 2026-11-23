@@ -68,7 +68,7 @@ func (r *DynamoRepository) Admit(ctx context.Context, admission persistence.Admi
 		TransactItems: []types.TransactWriteItem{
 			{
 				Put: &types.Put{
-					TableName:           aws.String(r.tables.Submissions),
+					TableName:           aws.String(SubmissionsTable),
 					ConditionExpression: aws.String("attribute_not_exists(idempotencyKey)"),
 					Item: map[string]types.AttributeValue{
 						"idempotencyKey": &types.AttributeValueMemberS{
@@ -91,7 +91,7 @@ func (r *DynamoRepository) Admit(ctx context.Context, admission persistence.Admi
 			},
 			{
 				Put: &types.Put{
-					TableName:           aws.String(r.tables.Archives),
+					TableName:           aws.String(ArchivesTable),
 					ConditionExpression: aws.String("attribute_not_exists(archiveId)"),
 					Item: map[string]types.AttributeValue{
 						"archiveId": &types.AttributeValueMemberS{
@@ -147,7 +147,7 @@ func (r *DynamoRepository) Admit(ctx context.Context, admission persistence.Admi
 			},
 			{
 				Put: &types.Put{
-					TableName:           aws.String(r.tables.Outbox),
+					TableName:           aws.String(OutboxTable),
 					ConditionExpression: aws.String("attribute_not_exists(messageId)"),
 					Item: map[string]types.AttributeValue{
 						"messageId": &types.AttributeValueMemberS{
@@ -236,7 +236,7 @@ func (r *DynamoRepository) Admit(ctx context.Context, admission persistence.Admi
 
 func (r *DynamoRepository) Find(ctx context.Context, id string) (domain.Archive, error) {
 	response, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(r.tables.Archives),
+		TableName:      aws.String(ArchivesTable),
 		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"archiveId": &types.AttributeValueMemberS{
@@ -258,7 +258,7 @@ func (r *DynamoRepository) Find(ctx context.Context, id string) (domain.Archive,
 
 func (r *DynamoRepository) findKey(ctx context.Context, key string) (AdmissionKey, bool, error) {
 	response, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(r.tables.Submissions),
+		TableName:      aws.String(SubmissionsTable),
 		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"idempotencyKey": &types.AttributeValueMemberS{

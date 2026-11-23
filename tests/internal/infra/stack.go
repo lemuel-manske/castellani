@@ -22,7 +22,7 @@ const (
 	requestTimeout    = 5 * time.Second
 
 	rabbitMQUsername = "castellani"
-	rabbitMQPassword = "local-development-only"
+	rabbitMQPassword = "castellani"
 
 	terraformLockFile = ".terraform.lock.hcl"
 )

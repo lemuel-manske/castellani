@@ -4,8 +4,9 @@ package rabbitmq
 import "github.com/lemuel-manske/castellani/services/coordinator/domain"
 
 const (
-	DeadExchange  = "castellani.dead"
-	RetryExchange = "castellani.retry"
+	DeadExchange   = "castellani.dead"
+	EventsExchange = "castellani.events"
+	RetryExchange  = "castellani.retry"
 
 	CoordinatorQueue = "castellani.coordinator"
 	DeadQueue        = "castellani.coordinator.dead"
@@ -53,17 +54,17 @@ type InboundEnvelope struct {
 	} `json:"payload"`
 }
 
-func NewRabbitConsumer(url, exchange string, publisher *RabbitPublisher) *RabbitConsumer {
+func NewRabbitConsumer(url string, publisher *RabbitPublisher) *RabbitConsumer {
 	return &RabbitConsumer{
 		url:       url,
-		exchange:  exchange,
+		exchange:  EventsExchange,
 		publisher: publisher,
 	}
 }
 
-func NewRabbitPublisher(url, exchange string) *RabbitPublisher {
+func NewRabbitPublisher(url string) *RabbitPublisher {
 	return &RabbitPublisher{
 		url:      url,
-		exchange: exchange,
+		exchange: EventsExchange,
 	}
 }

@@ -16,12 +16,12 @@ Requires Go 1.25.4. From `services/gateway`:
 
 ## Configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `GATEWAY_ADDR` | `:8080` | Listen address |
-| `COORDINATOR_URL` | required | HTTP(S) origin of the Archive Coordinator |
-| `CAPTURE_URL` | required | HTTP(S) origin of the Capture service |
-| `SEARCH_URL` | required | HTTP(S) origin of the Search service |
-| `GATEWAY_UPSTREAM_TIMEOUT` | `5s` | Upstream HTTP request deadline |
-| `GATEWAY_STREAM_TIMEOUT` | `30m` | WACZ transfer deadline |
-| `GATEWAY_SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown deadline |
+| Variable |  Description |
+|---|---|
+| `GATEWAY_PORT` | Listen port |
+| `GATEWAY_COORDINATOR_URL` | HTTP(S) origin of the Archive Coordinator |
+| `GATEWAY_CAPTURE_URL` | HTTP(S) origin of the Capture service |
+| `GATEWAY_SEARCH_URL` | HTTP(S) origin of the Search service |
+| `GATEWAY_GATEWAY_UPSTREAM_TIMEOUT` | Upstream HTTP request deadline. Defaults to 5s |
+| `GATEWAY_GATEWAY_STREAM_TIMEOUT` | WACZ transfer deadlin. Defaults to 30m |
+| `GATEWAY_GATEWAY_SHUTDOWN_TIMEOUT` | Graceful shutdown deadline. Defaults to 10s |

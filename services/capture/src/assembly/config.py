@@ -1,8 +1,6 @@
 import os
 from dataclasses import dataclass
 
-DEFAULT_AWS_REGION = "us-east-1"
-
 DEFAULT_BROWSER_SLOT_COUNT = 10
 
 DEFAULT_LEASE_DURATION = 60.0
@@ -18,11 +16,11 @@ DEFAULT_ARTIFACT_DIRECTORY = "/tmp/castellani/capture"
 class CaptureSettings:
     """Runtime configuration for one Capture service process."""
 
-    aws_region: str = DEFAULT_AWS_REGION
+    aws_region: str
 
-    dynamodb_endpoint_url: str | None = None
-    rabbitmq_url: str | None = None
-    s3_endpoint_url: str | None = None
+    dynamodb_endpoint_url: str
+    rabbitmq_url: str
+    s3_endpoint_url: str
 
     browser_slot_count: int = DEFAULT_BROWSER_SLOT_COUNT
 
@@ -37,18 +35,22 @@ class CaptureSettings:
     @classmethod
     def from_environment(cls) -> "CaptureSettings":
         return cls(
-            aws_region=os.getenv("AWS_REGION", DEFAULT_AWS_REGION),
-            dynamodb_endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL"),
-            rabbitmq_url=os.getenv("RABBITMQ_URL"),
-            s3_endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+            aws_region=required("AWS_REGION"),
+
+            dynamodb_endpoint_url=required("DYNAMODB_ENDPOINT_URL"),
+            rabbitmq_url=required("RABBITMQ_URL"),
+            s3_endpoint_url=required("S3_ENDPOINT_URL"),
+
             browser_slot_count=positive_int(
                 "CAPTURE_BROWSER_SLOT_COUNT",
                 DEFAULT_BROWSER_SLOT_COUNT,
             ),
+
             lease_duration=positive_float(
                 "CAPTURE_LEASE_DURATION_SECONDS",
                 DEFAULT_LEASE_DURATION,
             ),
+
             outbox_lease_duration=positive_float(
                 "CAPTURE_OUTBOX_LEASE_SECONDS",
                 DEFAULT_OUTBOX_LEASE_DURATION,
@@ -61,11 +63,20 @@ class CaptureSettings:
                 "CAPTURE_OUTBOX_RETRY_SECONDS",
                 DEFAULT_OUTBOX_RETRY_DELAY,
             ),
+
             artifact_directory=os.getenv(
                 "CAPTURE_ARTIFACT_DIRECTORY",
                 DEFAULT_ARTIFACT_DIRECTORY,
             ),
         )
+
+def required(name: str) -> str:
+    value = os.getenv(name)
+
+    if value is None:
+        raise ValueError(f"{name} is required")
+
+    return value
 
 
 def positive_int(name: str, default: int) -> int:

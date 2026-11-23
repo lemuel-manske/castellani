@@ -17,16 +17,14 @@ type Components struct {
 func NewComponents(
 	repository *persistence.DynamoRepository,
 	rabbitURL string,
-	rabbitExchange string,
 ) Components {
-	publisher := rabbitmq.NewRabbitPublisher(rabbitURL, rabbitExchange)
+	publisher := rabbitmq.NewRabbitPublisher(rabbitURL)
 
 	return Components{
 		Application: application.NewApplication(repository),
 		Dispatcher:  dispatcher.NewDispatcher(repository, publisher),
 		Consumer: rabbitmq.NewRabbitConsumer(
 			rabbitURL,
-			rabbitExchange,
 			publisher,
 		),
 	}

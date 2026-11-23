@@ -94,7 +94,7 @@ func (r *DynamoRepository) CommitEvent(
 	transaction := []types.TransactWriteItem{
 		{
 			Put: &types.Put{
-				TableName:           aws.String(r.tables.Inbox),
+				TableName:           aws.String(InboxTable),
 				ConditionExpression: aws.String("attribute_not_exists(messageId)"),
 				Item: map[string]types.AttributeValue{
 					"messageId": &types.AttributeValueMemberS{
@@ -132,7 +132,6 @@ func (r *DynamoRepository) CommitEvent(
 		}
 
 		transaction = append(transaction, outboxPut(
-			r.tables.Outbox,
 			messageID,
 			effect.Type,
 			envelope,
@@ -177,7 +176,7 @@ func (r *DynamoRepository) CommitEvent(
 
 	transaction = append(transaction, types.TransactWriteItem{
 		Update: &types.Update{
-			TableName: aws.String(r.tables.Archives),
+			TableName: aws.String(ArchivesTable),
 			Key: map[string]types.AttributeValue{
 				"archiveId": &types.AttributeValueMemberS{
 					Value: before.ID,
@@ -205,7 +204,7 @@ func (r *DynamoRepository) CommitEvent(
 	}
 
 	processed, lookupErr := r.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(r.tables.Inbox),
+		TableName:      aws.String(InboxTable),
 		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"messageId": &types.AttributeValueMemberS{
@@ -248,7 +247,7 @@ func (r *DynamoRepository) ListStalled(
 		for len(archives) < limit {
 			remaining := limit - len(archives)
 			page, err := r.client.Query(ctx, &dynamodb.QueryInput{
-				TableName:              aws.String(r.tables.Archives),
+				TableName:              aws.String(ArchivesTable),
 				IndexName:              aws.String("recoveryKey-updatedAt-index"),
 				ExclusiveStartKey:      cursor,
 				Limit:                  aws.Int32(int32(remaining)),
@@ -318,7 +317,6 @@ func (r *DynamoRepository) ScheduleRecovery(
 	_, err = r.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
 			outboxPut(
-				r.tables.Outbox,
 				messageID,
 				effect.Type,
 				envelope,
@@ -326,7 +324,7 @@ func (r *DynamoRepository) ScheduleRecovery(
 			),
 			{
 				Update: &types.Update{
-					TableName: aws.String(r.tables.Archives),
+					TableName: aws.String(ArchivesTable),
 					Key: map[string]types.AttributeValue{
 						"archiveId": &types.AttributeValueMemberS{
 							Value: archive.ID,
@@ -418,13 +416,13 @@ func encodeEffect(
 }
 
 func outboxPut(
-	table, messageID, messageType string,
+	messageID, messageType string,
 	envelope []byte,
 	now time.Time,
 ) types.TransactWriteItem {
 	return types.TransactWriteItem{
 		Put: &types.Put{
-			TableName:           aws.String(table),
+			TableName:           aws.String(OutboxTable),
 			ConditionExpression: aws.String("attribute_not_exists(messageId)"),
 			Item: map[string]types.AttributeValue{
 				"messageId": &types.AttributeValueMemberS{

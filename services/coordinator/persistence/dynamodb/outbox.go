@@ -28,7 +28,7 @@ func (r *DynamoRepository) Claim(
 	for {
 		page, err := r.client.Scan(ctx, &dynamodb.ScanInput{
 			ExclusiveStartKey: cursor,
-			TableName:         aws.String(r.tables.Outbox),
+			TableName:         aws.String(OutboxTable),
 			Limit:             aws.Int32(outboxClaimLimit),
 			FilterExpression:  aws.String("#state = :pending OR (#state = :claimed AND leaseUntil < :now)"),
 			ExpressionAttributeNames: map[string]string{
@@ -65,7 +65,7 @@ func (r *DynamoRepository) Claim(
 			}
 
 			updated, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-				TableName: aws.String(r.tables.Outbox),
+				TableName: aws.String(OutboxTable),
 				Key: map[string]types.AttributeValue{
 					"messageId": &types.AttributeValueMemberS{
 						Value: id,
@@ -127,7 +127,7 @@ func (r *DynamoRepository) Claim(
 
 func (r *DynamoRepository) Confirm(ctx context.Context, message messaging.Message) error {
 	_, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(r.tables.Outbox),
+		TableName: aws.String(OutboxTable),
 		Key: map[string]types.AttributeValue{
 			"messageId": &types.AttributeValueMemberS{
 				Value: message.ID,

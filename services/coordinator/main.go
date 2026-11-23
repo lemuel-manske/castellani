@@ -18,7 +18,8 @@ import (
 
 const (
 	serviceName = "coordinator"
-	networkType = "tcp"
+
+	addressFormat = ":%s"
 )
 
 func main() {
@@ -41,12 +42,12 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	listener, err := net.Listen(networkType, config.address)
+	listener, err := net.Listen("tcp", fmt.Sprintf(addressFormat, config.port))
 
 	if err != nil {
 		return fmt.Errorf(
 			"listen on %s: %w",
-			config.address,
+			config.port,
 			err,
 		)
 	}
@@ -74,22 +75,16 @@ func run(logger *slog.Logger) error {
 	}
 
 	client := dynamodb.NewFromConfig(awsConfig, func(options *dynamodb.Options) {
-		if config.endpoint != "" {
-			options.BaseEndpoint = aws.String(config.endpoint)
+		if config.dynamoEndpoint != "" {
+			options.BaseEndpoint = aws.String(config.dynamoEndpoint)
 		}
 	})
 
-	repository := persistence.NewDynamoRepository(client, persistence.Tables{
-		Archives:    config.archivesTable,
-		Submissions: config.submissionsTable,
-		Outbox:      config.outboxTable,
-		Inbox:       config.inboxTable,
-	})
+	repository := persistence.NewDynamoRepository(client)
 
 	built := assembly.NewComponents(
 		repository,
 		config.rabbitURL,
-		config.rabbitExchange,
 	)
 
 	StartWorkers(

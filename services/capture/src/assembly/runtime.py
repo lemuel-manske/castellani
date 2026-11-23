@@ -60,55 +60,41 @@ class CaptureRuntime:
         try:
             session = boto3.Session()
 
-            if self.settings.dynamodb_endpoint_url is None:
-                dynamodb_client = session.client(
-                    "dynamodb",
-                    region_name=self.settings.aws_region,
-                )
-            else:
-                dynamodb_client = session.client(
-                    "dynamodb",
-                    region_name=self.settings.aws_region,
-                    endpoint_url=self.settings.dynamodb_endpoint_url,
-                )
+            self.dynamodb_client = session.client(
+                "dynamodb",
+                region_name=self.settings.aws_region,
+                endpoint_url=self.settings.dynamodb_endpoint_url,
+            )
 
-            self.dynamodb_client = dynamodb_client
-
-            if self.settings.s3_endpoint_url is None:
-                s3_client: S3Client = session.client(
-                    "s3",
-                    region_name=self.settings.aws_region,
-                )
-            else:
-                s3_client: S3Client = session.client(
-                    "s3",
-                    region_name=self.settings.aws_region,
-                    endpoint_url=self.settings.s3_endpoint_url,
-                )
-
-            self.s3_client = s3_client
+            self.s3_client = session.client(
+                "s3",
+                region_name=self.settings.aws_region,
+                endpoint_url=self.settings.s3_endpoint_url,
+            )
 
             for table_name in CAPTURE_TABLES:
                 await asyncio.to_thread(
-                    dynamodb_client.describe_table,
+                    self.dynamodb_client.describe_table,
                     TableName=table_name,
                 )
 
             task_repository = DynamoDBTaskRepository(
-                client=dynamodb_client,
+                client=self.dynamodb_client,
                 lease_duration=self.settings.lease_duration,
             )
+
             allocator = DynamoDBCaptureAllocator(
-                client=dynamodb_client,
+                client=self.dynamodb_client,
                 slot_count=self.settings.browser_slot_count,
                 lease_duration=self.settings.lease_duration,
             )
+
             worker = new_worker(
                 task_repository=task_repository,
                 capture_allocator=allocator,
                 executor=BrowserPageExecutor(),
                 artifacts=S3ArtifactStore(
-                    client=s3_client,
+                    client=self.s3_client,
                     staging_root=Path(self.settings.artifact_directory),
                 ),
             )
@@ -137,7 +123,7 @@ class CaptureRuntime:
             )
 
             dispatcher = OutboxDispatcher(
-                outbox=DynamoDBOutbox(client=dynamodb_client),
+                outbox=DynamoDBOutbox(client=self.dynamodb_client),
                 publisher=self.publisher,
                 lease_duration=self.settings.outbox_lease_duration,
                 retry_delay=self.settings.outbox_retry_delay,
