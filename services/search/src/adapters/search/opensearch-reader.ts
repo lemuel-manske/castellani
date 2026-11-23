@@ -6,7 +6,7 @@ import type {
   SearchDocumentReader,
   SearchQuery,
 } from "../../ports/search-reader.js";
-import { readJSON } from "../../utils.js";
+import { bufferJSON, readJSON } from "../../utils.js";
 
 import { SEARCH_INDEX_NAME } from "./topology.js";
 
@@ -66,7 +66,7 @@ function encodeCursor(sort: SearchSortCursor | undefined): string {
     throw new Error("OpenSearch returned a hit without pagination sort values");
   }
 
-  return Buffer.from(JSON.stringify(sort)).toString("base64url");
+  return bufferJSON(sort).toString("base64url");
 }
 
 function snippetFromHit(hit: SearchHit, document: SearchDocument): string {

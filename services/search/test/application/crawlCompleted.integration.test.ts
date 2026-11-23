@@ -11,11 +11,13 @@ import {
   searchIndex,
   setupIntegrationEnvironment,
 } from "../support/integrationEnvironment.js";
+import { bufferJSON } from "../../src/utils.js";
 
 setupIntegrationEnvironment(["dynamodb", "opensearch", "rabbitmq", "s3"]);
 
 it("indexes the snapshots described by a CrawlCompleted manifest delivered through RabbitMQ", async () => {
   const token = randomUUID().replaceAll("-", "");
+
   const archiveId = `crawl-completed-${token}`;
   const snapshotId = `manifest-snapshot-${token}`;
   const collectionId = `collection-${token}`;
@@ -47,10 +49,12 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
     ],
   };
 
-  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  const manifestBytes = bufferJSON(manifest);
+
   const manifestDigest = createHash("sha256")
     .update(manifestBytes)
     .digest("hex");
+
   const manifestKey = `${archiveId}/manifest.json`;
 
   await s3.putObject(manifestBytes, manifestKey);
