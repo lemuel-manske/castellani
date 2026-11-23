@@ -28,13 +28,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	key := r.Header.Get(httpx.IdempotencyHeader)
 
 	if !httpx.ValidIdempotencyKey(key) {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-idempotency-key",
-			"Invalid Idempotency Key",
-			"Idempotency-Key is required and must contain 8 to 200 characters.",
-		))
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-idempotency-key", "Invalid Idempotency Key", "Idempotency-Key is required and must contain 8 to 200 characters."))
 		return
 	}
 
@@ -42,13 +36,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	raw, err := httpx.DecodeJSONBytes(w, r, &input)
 
 	if err != nil {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-session",
-			"Invalid Session",
-			err.Error(),
-		))
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error()))
 		return
 	}
 
@@ -67,13 +55,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-session-id",
-			"Invalid Session ID",
-			"Invalid session ID.",
-		))
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID."))
 		return
 	}
 
@@ -92,30 +74,18 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	raw, err := httpx.DecodeJSONBytes(w, r, &input)
 
 	if err != nil {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-session",
-			"Invalid Session",
-			err.Error(),
-		))
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session", "Invalid Session", err.Error()))
 		return
 	}
 
 	id := chi.URLParam(r, common.SessionIDParameter)
 
 	if !httpx.ValidPathSegment(id) {
-		httpx.WriteProblem(w, httpx.NewProblem(
-			r,
-			http.StatusBadRequest,
-			"invalid-session-id",
-			"Invalid Session ID",
-			"Invalid session ID.",
-		))
+		httpx.WriteProblem(w, httpx.NewProblem(r, http.StatusBadRequest, "invalid-session-id", "Invalid Session ID", "Invalid session ID."))
 		return
 	}
 
-	result, err := h.app.UpdateSession(r.Context(), id, input.Status, raw)
+	result, err := h.app.UpdateSession(r.Context(), id, raw)
 
 	if err != nil {
 		response.WriteDependencyError(w, r, err, "Capture", "Capture returned invalid session metadata.")
