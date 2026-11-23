@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
-
-	"github.com/lemuel-manske/castellani/libs/httpx"
 )
 
 const (
@@ -36,7 +36,20 @@ type Submission struct {
 	AuthGeneration *int
 }
 
+type ValidationError struct {
+	Field   string
+	Message string
+}
+
+func (e ValidationError) Error() string {
+	return e.Field + " " + e.Message
+}
+
 func (s Submission) Fingerprint() (string, error) {
+	if s.MaxDepth == nil || s.MaxPages == nil {
+		return "", errors.New("cannot fingerprint an invalid submission")
+	}
+
 	origins := append([]string(nil), s.AllowedOrigins...)
 
 	sort.Strings(origins)
@@ -104,35 +117,69 @@ type Archive struct {
 }
 
 func (s Submission) Validate() error {
-	if !httpx.ValidHTTPURL(s.SeedURL) {
-		return errors.New("seedUrl must be an absolute HTTP(S) URL without credentials or fragment")
+	if !validHTTPURL(s.SeedURL) {
+		return ValidationError{
+			Field:   "seedUrl",
+			Message: "must be an absolute HTTP(S) URL without credentials or fragment",
+		}
 	}
 
 	if s.MaxDepth == nil || *s.MaxDepth < 0 {
-		return errors.New("maxDepth must be a nonnegative integer")
+		return ValidationError{
+			Field:   "maxDepth",
+			Message: "must be a nonnegative integer",
+		}
 	}
 
 	if s.MaxPages == nil || *s.MaxPages < 1 {
-		return errors.New("maxPages must be a positive integer")
+		return ValidationError{
+			Field:   "maxPages",
+			Message: "must be a positive integer",
+		}
 	}
 
 	if s.AuthGeneration != nil && *s.AuthGeneration < 1 {
-		return errors.New("authGeneration must be a positive integer")
+		return ValidationError{
+			Field:   "authGeneration",
+			Message: "must be a positive integer",
+		}
 	}
 
 	seen := make(map[string]struct{}, len(s.AllowedOrigins))
 
 	for _, origin := range s.AllowedOrigins {
-		if !httpx.ValidHTTPURL(origin) {
-			return errors.New("allowedOrigins entries must be absolute HTTP(S) URLs without credentials or fragment")
+		if !validHTTPURL(origin) {
+			return ValidationError{
+				Field:   "allowedOrigins",
+				Message: "entries must be absolute HTTP(S) URLs without credentials or fragment",
+			}
 		}
 
 		if _, exists := seen[origin]; exists {
-			return errors.New("allowedOrigins entries must be unique")
+			return ValidationError{
+				Field:   "allowedOrigins",
+				Message: "entries must be unique",
+			}
 		}
 
 		seen[origin] = struct{}{}
 	}
 
 	return nil
+}
+
+func validHTTPURL(raw string) bool {
+	target, err := url.Parse(raw)
+
+	if err != nil {
+		return false
+	}
+
+	httpScheme := strings.EqualFold(target.Scheme, "http") ||
+		strings.EqualFold(target.Scheme, "https")
+	hasHostname := target.Hostname() != ""
+	noCredentials := target.User == nil
+	noFragment := target.Fragment == "" && !strings.Contains(raw, "#")
+
+	return httpScheme && hasHostname && noCredentials && noFragment
 }
