@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
