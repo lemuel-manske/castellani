@@ -25,9 +25,9 @@ async def test_publisher_delivers_persistent_message_to_bound_queue(
     queue = await channel.declare_queue(queue_name, exclusive=True, auto_delete=True)
 
     try:
-        assert publisher.exchange is not None
+        assert publisher.capture_exchange is not None
 
-        await queue.bind(publisher.exchange, routing_key=CAPTURE_PAGE_EVENT)
+        await queue.bind(publisher.capture_exchange, routing_key=CAPTURE_PAGE_EVENT)
 
         await publisher.publish("message-1", b'{"type":"CapturePage"}')
 
