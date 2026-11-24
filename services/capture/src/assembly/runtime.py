@@ -14,9 +14,9 @@ from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
-from adapters.persistence.dynamodb.tables import CAPTURE_TABLES
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application import OutboxDispatcher
+from tables import CAPTURE_TABLES
 from worker import new_worker
 
 from .config import CaptureSettings

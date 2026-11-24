@@ -4,6 +4,7 @@ from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.s3 import FakeS3
 
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
+from buckets import AUTH_PROFILE_BUCKET
 from domain import AuthProfileStore
 
 STATE = {"cookies": [{"name": "session", "value": "opaque"}], "origins": []}
@@ -29,7 +30,7 @@ async def test_profile_store_encrypts_state_under_a_generation_key(s3: FakeS3) -
 
     key = await store.save("archive-1", 2, STATE)
     loaded = await store.load(key)
-    raw = s3.objects[("castellani-auth-profiles", key)][0]
+    raw = s3.objects[(AUTH_PROFILE_BUCKET, key)][0]
 
     assert (key, loaded, b"opaque" in raw) == (
         "auth-profiles/archive-1/generation-2.json.enc",
@@ -66,6 +67,5 @@ def new_store(s3: FakeS3, dynamodb: DynamoDBClient | None) -> AuthProfileStore:
     return EncryptedAuthProfileStore(
         s3_client=s3,
         dynamodb_client=dynamodb,
-        bucket="castellani-auth-profiles",
         cipher=new_cipher(),
     )

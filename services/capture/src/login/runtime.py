@@ -8,9 +8,9 @@ import boto3
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.browser.login import LoginBrowserSettings, PlaywrightLoginBrowser
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
-from adapters.persistence.dynamodb.tables import LOGIN_TABLES
 from application import LoginManager
 from assembly import LoginSettings
+from tables import LOGIN_TABLES
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
@@ -77,12 +77,10 @@ class LoginRuntime:
             sessions = DynamoDBSessionStore(
                 client=self.dynamodb_client,
                 session_ttl_seconds=self.settings.session_ttl_seconds,
-                auth_profile_bucket=self.settings.auth_profile_bucket,
             )
             profiles = EncryptedAuthProfileStore(
                 s3_client=self.s3_client,
                 dynamodb_client=self.dynamodb_client,
-                bucket=self.settings.auth_profile_bucket,
                 cipher=AuthProfileCipher(self.settings.auth_profile_key),
             )
 

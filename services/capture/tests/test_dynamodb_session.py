@@ -8,6 +8,7 @@ from support.domain import seed_run
 
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from application import DuplicateSessionRequest, SessionConflict
+from buckets import AUTH_PROFILE_BUCKET
 from domain import AuthSession, SessionStatus
 
 
@@ -102,7 +103,7 @@ async def test_generations_are_reserved_and_profile_references_are_pinned(
         1,
         "1",
         "auth-profiles/archive-1/generation-1",
-        "castellani-auth-profiles",
+        AUTH_PROFILE_BUCKET,
     )
 
 
@@ -145,7 +146,6 @@ def new_store(dynamodb: DynamoDBClient) -> DynamoDBSessionStore:
     return DynamoDBSessionStore(
         client=dynamodb,
         session_ttl_seconds=1800,
-        auth_profile_bucket="castellani-auth-profiles",
     )
 
 

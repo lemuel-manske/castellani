@@ -5,8 +5,6 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Protocol
 
-AUTH_PROFILE_BUCKET = "castellani-auth-profiles"
-
 
 class SessionStatus(StrEnum):
     CREATED = "CREATED"

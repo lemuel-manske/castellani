@@ -17,9 +17,9 @@ from domain import (
     WACZObject,
     WACZRangeNotSatisfiable,
 )
+from tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 from .queries.task import read_run
-from .tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 PAGE_STATUSES = {
     "PENDING": "PENDING",

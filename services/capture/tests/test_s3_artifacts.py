@@ -5,6 +5,7 @@ from support.domain import make_claim
 from support.s3 import FakeS3
 
 from adapters.artifacts.s3 import S3ArtifactStore
+from buckets import ARCHIVE_ARTIFACTS_BUCKET
 
 
 @pytest.mark.asyncio
@@ -33,7 +34,7 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
 
     reference = references[0]
 
-    assert reference.bucket == "castellani-archive-artifacts"
+    assert reference.bucket == ARCHIVE_ARTIFACTS_BUCKET
 
     assert reference.key.startswith("capture-staging/archive%2Fone/url-key/attempt-1/")
     assert reference.key.endswith("records/capture.warc.gz")
@@ -42,7 +43,7 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     assert reference.size_bytes == len(b"warc-content")
     assert reference.version_id == "version-1"
 
-    assert s3.objects[("castellani-archive-artifacts", reference.key)][0] == b"warc-content"
+    assert s3.objects[(ARCHIVE_ARTIFACTS_BUCKET, reference.key)][0] == b"warc-content"
 
 
 @pytest.mark.asyncio

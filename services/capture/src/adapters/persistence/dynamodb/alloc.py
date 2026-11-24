@@ -6,6 +6,7 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from domain import CaptureAllocator, CaptureReservation, new_reservation_id
+from tables import BROWSER_SLOTS_TABLE
 
 from .error_handling import is_conditional_failure
 from .queries.alloc import (
@@ -15,7 +16,6 @@ from .queries.alloc import (
     reservation_from_item,
     reserve_slot,
 )
-from .tables import BROWSER_SLOTS_TABLE
 from .values import number_from_item
 
 DEFAULT_SLOT_COUNT = 10

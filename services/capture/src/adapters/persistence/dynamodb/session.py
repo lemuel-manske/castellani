@@ -5,10 +5,11 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from application import DuplicateSessionRequest, SessionConflict
+from buckets import AUTH_PROFILE_BUCKET
 from domain import AuthSession, SessionStatus, SessionStore
+from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 
 from .queries.task import read_run
-from .tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 
 ACTIVE_SESSION_STATUSES = frozenset(
     {
@@ -22,15 +23,9 @@ GENERATION_ATTEMPTS = 5
 
 
 class DynamoDBSessionStore(SessionStore):
-    def __init__(
-        self,
-        client: Any,
-        session_ttl_seconds: int,
-        auth_profile_bucket: str,
-    ) -> None:
+    def __init__(self, client: Any, session_ttl_seconds: int) -> None:
         self.client = client
         self.session_ttl_seconds = session_ttl_seconds
-        self.auth_profile_bucket = auth_profile_bucket
 
     async def create(self, session: AuthSession, key: str, fingerprint: str) -> None:
         now = datetime.now(UTC)
@@ -209,7 +204,7 @@ class DynamoDBSessionStore(SessionStore):
                 ConditionExpression="authGeneration = :generation",
                 ExpressionAttributeValues={
                     ":key": {"S": key},
-                    ":bucket": {"S": self.auth_profile_bucket},
+                    ":bucket": {"S": AUTH_PROFILE_BUCKET},
                     ":generation": {"N": str(generation)},
                     ":updated": {"S": utc_now()},
                 },

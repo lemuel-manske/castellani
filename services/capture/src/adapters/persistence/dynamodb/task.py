@@ -14,6 +14,7 @@ from domain import (
     identify_discovered_pages,
     new_attempt_id,
 )
+from tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 from .error_handling import (
     extract_cancellation_reasons,
@@ -34,7 +35,6 @@ from .queries.task import (
     release_task_transaction,
     renew_task_transaction,
 )
-from .tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from .values import number_from_item
 
 

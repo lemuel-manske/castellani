@@ -9,6 +9,7 @@ from uuid import uuid4
 from botocore.exceptions import ClientError
 
 from domain import OutboxMessage, OutboxRepository
+from tables import OUTBOX_TABLE
 
 from .queries.outbox import (
     claim_message,
@@ -17,7 +18,6 @@ from .queries.outbox import (
     query_due_messages,
     reschedule_message,
 )
-from .tables import OUTBOX_TABLE
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"

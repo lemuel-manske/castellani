@@ -5,9 +5,9 @@ from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from buckets import AUTH_PROFILE_BUCKET
 from domain import AuthProfileStore
-
-from ..persistence.dynamodb.tables import RUNS_TABLE
+from tables import RUNS_TABLE
 
 NONCE_BYTES = 12
 
@@ -45,12 +45,10 @@ class EncryptedAuthProfileStore(AuthProfileStore):
         self,
         s3_client: Any,
         dynamodb_client: Any,
-        bucket: str,
         cipher: AuthProfileCipher,
     ) -> None:
         self.s3_client = s3_client
         self.dynamodb_client = dynamodb_client
-        self.bucket = bucket
         self.cipher = cipher
 
     async def save(self, archive_id: str, generation: int, state: dict[str, Any]) -> str:
@@ -59,7 +57,7 @@ class EncryptedAuthProfileStore(AuthProfileStore):
 
         def put() -> None:
             self.s3_client.put_object(
-                Bucket=self.bucket,
+                Bucket=AUTH_PROFILE_BUCKET,
                 Key=key,
                 Body=ciphertext,
                 ContentType="application/octet-stream",
@@ -72,7 +70,7 @@ class EncryptedAuthProfileStore(AuthProfileStore):
 
     async def load(self, key: str) -> dict[str, Any]:
         def get() -> bytes:
-            response = self.s3_client.get_object(Bucket=self.bucket, Key=key)
+            response = self.s3_client.get_object(Bucket=AUTH_PROFILE_BUCKET, Key=key)
             body = response["Body"]
 
             try:
