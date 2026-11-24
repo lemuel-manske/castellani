@@ -37,6 +37,7 @@ Statuses: Proposed, Accepted, Superseded, Rejected. An accepted ADR documents a 
 - [0027 — Archive publication, WACZ packaging, and replay visibility](0027-archive-publication-replay.md)
 - [0028 — Interactive authentication execution and profile protection](0028-interactive-auth-infrastructure.md)
 - [0029 — Unified full-text search and historical replay navigation](0029-unified-search-replay.md)
+- [0030 — Capture process layout and route modules](0030-capture-process-layout.md)
 
 See [testing conventions](../testing.md) for behavioral test-writing rules.
 
