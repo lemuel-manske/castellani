@@ -5,7 +5,7 @@ from typing import Any, cast
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
 
-from worker.api import CaptureRunner
+from capture.worker.api import CaptureRunner
 
 from .topology import CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT, CAPTURE_PAGE_QUEUE, MESSAGE_VERSION
 

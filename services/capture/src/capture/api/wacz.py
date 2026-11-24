@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response, StreamingResponse
 
-from domain import WACZObject
+from domain.capture import WACZObject
+from problem import problem
 
-from .problem import problem
 from .routes import ARCHIVE_WACZ_PATH
 
 router = APIRouter()

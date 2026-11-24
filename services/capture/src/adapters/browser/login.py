@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from playwright.async_api import Browser, BrowserContext, Playwright, async_playwright
 
-from domain import BrowserEndpoint
+from domain.login import BrowserEndpoint
 from utils.web import is_safe_request_url, is_valid_url
 
 VIEWPORT_WIDTH = 1365

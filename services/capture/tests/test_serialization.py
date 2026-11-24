@@ -1,10 +1,11 @@
-from assembly import (
+from capture.api.serialization import (
     archive_page_json,
-    auth_session_json,
     page_listing_json,
     snapshot_reference_json,
 )
-from domain import ArchivePage, AuthSession, PageListing, SessionStatus, SnapshotReference
+from domain.capture import ArchivePage, PageListing, SnapshotReference
+from domain.login import AuthSession, SessionStatus
+from login.serialization import auth_session_json
 
 
 def test_archive_page_json_omits_unset_fields() -> None:

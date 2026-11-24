@@ -3,7 +3,7 @@ import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from domain import (
+from domain.capture import (
     CaptureAllocator,
     CaptureOutcome,
     CaptureReservation,

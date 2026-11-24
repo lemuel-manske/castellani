@@ -13,13 +13,15 @@ from adapters.browser.executor import BrowserPageExecutor
 from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
+from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
-from application import OutboxDispatcher
-from tables import CAPTURE_TABLES
-from worker import new_worker
+from application.capture import OutboxDispatcher
+from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
+from topology.tables import CAPTURE_TABLES
 
-from .config import CaptureSettings
+from .settings import CaptureSettings
+from .worker import new_worker
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
@@ -35,6 +37,7 @@ class CaptureRuntime:
 
         self.dynamodb_client: DynamoDBClient | None = None
         self.s3_client: Any | None = None
+        self.archive_retrieval: DynamoDBArchiveRetrieval | None = None
 
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
@@ -81,6 +84,12 @@ class CaptureRuntime:
                     self.dynamodb_client.describe_table,
                     TableName=table_name,
                 )
+
+            self.archive_retrieval = DynamoDBArchiveRetrieval(
+                client=self.dynamodb_client,
+                s3_client=self.s3_client,
+                artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
+            )
 
             task_repository = DynamoDBTaskRepository(
                 client=self.dynamodb_client,
@@ -146,6 +155,7 @@ class CaptureRuntime:
 
     async def stop(self) -> None:
         self._ready = False
+        self.archive_retrieval = None
 
         tasks = [task for task in (self.consumer_task, self.dispatcher_task) if task is not None]
 

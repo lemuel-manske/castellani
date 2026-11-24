@@ -7,7 +7,7 @@ from datetime import datetime
 from email.utils import format_datetime
 from typing import Any, cast
 
-from domain import (
+from domain.capture import (
     ArchivePage,
     ArchiveRetrieval,
     InvalidArchiveCursor,
@@ -17,7 +17,7 @@ from domain import (
     WACZObject,
     WACZRangeNotSatisfiable,
 )
-from tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
+from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 
 from .queries.task import read_run
 

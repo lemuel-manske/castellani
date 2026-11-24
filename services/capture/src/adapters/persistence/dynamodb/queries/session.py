@@ -1,7 +1,7 @@
 from typing import Any
 
-from domain import AuthProfileReference, AuthSession, SessionStatus
-from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
+from domain.login import AuthProfileReference, AuthSession, SessionStatus
+from topology.tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 
 from ..values import optional_number, optional_string
 

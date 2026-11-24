@@ -1,4 +1,4 @@
-from domain import OutboxMessage
+from domain.capture import OutboxMessage
 from utils.fn import noop
 
 

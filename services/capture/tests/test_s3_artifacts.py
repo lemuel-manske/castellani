@@ -5,7 +5,7 @@ from support.domain import make_claim
 from support.s3 import FakeS3
 
 from adapters.artifacts.s3 import S3ArtifactStore
-from buckets import ARCHIVE_ARTIFACTS_BUCKET
+from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,7 @@ from typing import Any
 
 from botocore.exceptions import ClientError
 
-from domain import CaptureAllocator, CaptureReservation, new_reservation_id
+from domain.capture import CaptureAllocator, CaptureReservation, new_reservation_id
 
 from .error_handling import is_conditional_failure
 from .queries.alloc import (

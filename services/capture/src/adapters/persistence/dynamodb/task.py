@@ -6,7 +6,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from botocore.exceptions import ClientError
 
-from domain import (
+from domain.capture import (
     CaptureOutcome,
     DiscoveredPage,
     TaskClaim,

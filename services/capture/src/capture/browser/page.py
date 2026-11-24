@@ -22,9 +22,10 @@ from playwright.async_api import (
 )
 from selectolax.parser import HTMLParser
 
-from capture.recording import PyWBRecorder
 from utils.tasks import complete_before_cancellation
 from utils.web import is_html_content_type, is_pdf_content_type, is_safe_request_url, is_valid_url
+
+from .recording import PyWBRecorder
 
 NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
 NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000

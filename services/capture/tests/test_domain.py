@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from domain import (
+from domain.capture import (
     CaptureReservation,
     InvalidReservationRenewal,
     InvalidTaskClaimRenewal,

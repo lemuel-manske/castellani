@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from buckets import ARCHIVE_ARTIFACTS_BUCKET
-from domain import ArtifactReference, TaskClaim
-from worker import ArtifactStore
+from capture.worker import ArtifactStore
+from domain.capture import ArtifactReference, TaskClaim
+from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 
 DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
 

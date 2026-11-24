@@ -13,7 +13,7 @@ from support.domain import (
 )
 
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
-from domain import ArtifactReference, CaptureOutcome, PageCapture
+from domain.capture import ArtifactReference, CaptureOutcome, PageCapture
 
 
 @pytest.mark.integration

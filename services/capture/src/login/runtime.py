@@ -8,9 +8,10 @@ import boto3
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.browser.login import LoginBrowserSettings, PlaywrightLoginBrowser
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
-from application import LoginManager
-from assembly import LoginSettings
-from tables import LOGIN_TABLES
+from application.login import LoginManager
+from topology.tables import LOGIN_TABLES
+
+from .settings import LoginSettings
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient

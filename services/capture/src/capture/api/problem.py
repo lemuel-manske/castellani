@@ -1,32 +1,8 @@
 from fastapi import Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
-from domain import InvalidArchiveCursor, InvalidWACZRange, WACZRangeNotSatisfiable
-
-PROBLEM_MEDIA_TYPE = "application/problem+json"
-
-
-class ProblemResponse(JSONResponse):
-    media_type = PROBLEM_MEDIA_TYPE
-
-
-def problem(
-    status: int,
-    kind: str,
-    title: str,
-    detail: str,
-    headers: dict[str, str] | None = None,
-) -> ProblemResponse:
-    return ProblemResponse(
-        status_code=status,
-        content={
-            "type": kind,
-            "title": title,
-            "status": status,
-            "detail": detail,
-        },
-        headers=headers,
-    )
+from domain.capture import InvalidArchiveCursor, InvalidWACZRange, WACZRangeNotSatisfiable
+from problem import problem
 
 
 async def handle_archive_error(_: Request, error: Exception) -> Response:

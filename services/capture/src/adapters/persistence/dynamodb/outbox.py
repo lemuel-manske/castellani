@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from botocore.exceptions import ClientError
 
-from domain import OutboxMessage, OutboxRepository
+from domain.capture import OutboxMessage, OutboxRepository
 
 from .queries.outbox import (
     claim_message,

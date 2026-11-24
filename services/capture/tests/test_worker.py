@@ -15,10 +15,10 @@ from support.domain import (
 from adapters.artifacts.local import LocalArtifactStore
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
-from domain import PageCapture
+from capture.worker import CaptureArtifact
+from capture.worker.runner import ConcreteCaptureWorker
+from domain.capture import PageCapture
 from utils.fn import noop
-from worker import CaptureArtifact
-from worker.worker import ConcreteCaptureWorker
 
 
 @pytest.mark.integration

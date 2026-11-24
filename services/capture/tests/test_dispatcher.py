@@ -1,8 +1,8 @@
 import pytest
 from support.application import FailingOutbox, FakeOutbox, FakePublisher
 
-from application import OutboxDispatcher
-from domain import OutboxMessage
+from application.capture import OutboxDispatcher
+from domain.capture import OutboxMessage
 
 
 @pytest.fixture

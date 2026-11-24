@@ -6,7 +6,7 @@ import pytest
 from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
 
 from capture.browser import capture_local_page
-from capture.recording import PyWBReplayServer
+from capture.browser.recording import PyWBReplayServer
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration

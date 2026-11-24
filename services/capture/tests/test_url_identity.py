@@ -1,6 +1,6 @@
 import pytest
 
-from domain import InvalidURLIdentity, identify_url
+from domain.capture import InvalidURLIdentity, identify_url
 
 
 def test_identity_normalizes_scheme_host_default_port_and_dot_segments() -> None:

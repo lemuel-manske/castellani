@@ -12,7 +12,7 @@ from capture.browser import (
     capture_local_page,
     capture_page,
 )
-from capture.recording import PyWBRecorder
+from capture.browser.recording import PyWBRecorder
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration
@@ -35,7 +35,7 @@ async def test_capture_fails_when_navigation_response_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("capture.browser.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr("capture.browser.page.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
 
     with pytest.raises(CaptureNavigationFailed) as error:
         await capture_page(
