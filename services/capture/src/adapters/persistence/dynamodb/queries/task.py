@@ -8,6 +8,7 @@ from domain import (
     PageTask,
     TaskClaim,
 )
+from tables import RUNS_TABLE
 
 
 def claim_from_item(
@@ -33,9 +34,9 @@ def claim_from_item(
         raise RuntimeError("DynamoDB returned an invalid page-task claim") from error
 
 
-def read_run(client: Any, table_name: str, archive_id: str) -> dict[str, Any] | None:
+def read_run(client: Any, archive_id: str) -> dict[str, Any] | None:
     response = client.get_item(
-        TableName=table_name,
+        TableName=RUNS_TABLE,
         Key={"archiveId": {"S": archive_id}},
         ConsistentRead=True,
     )

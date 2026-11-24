@@ -13,7 +13,6 @@ from domain import (
     SessionStatus,
     SessionStore,
 )
-from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 from utils.time import utc_now
 
 from .error_handling import is_conditional_failure
@@ -49,8 +48,6 @@ class DynamoDBSessionStore(SessionStore):
             try:
                 create_session_transaction(
                     self.client,
-                    SESSIONS_TABLE,
-                    SESSION_REQUESTS_TABLE,
                     session,
                     key,
                     fingerprint,
@@ -67,17 +64,12 @@ class DynamoDBSessionStore(SessionStore):
         await asyncio.to_thread(put)
 
     async def get(self, session_id: str) -> AuthSession | None:
-        item = await asyncio.to_thread(read_session, self.client, SESSIONS_TABLE, session_id)
+        item = await asyncio.to_thread(read_session, self.client, session_id)
 
         return session_from_item(item) if item else None
 
     async def find_by_request(self, key: str, fingerprint: str) -> str | None:
-        item = await asyncio.to_thread(
-            read_session_request,
-            self.client,
-            SESSION_REQUESTS_TABLE,
-            key,
-        )
+        item = await asyncio.to_thread(read_session_request, self.client, key)
 
         if not item:
             return None
@@ -95,7 +87,7 @@ class DynamoDBSessionStore(SessionStore):
 
         def update() -> None:
             try:
-                update_session(self.client, SESSIONS_TABLE, session, updated_at)
+                update_session(self.client, session, updated_at)
             except ClientError as error:
                 if is_conditional_failure(error):
                     raise SessionConflict from error
@@ -107,7 +99,7 @@ class DynamoDBSessionStore(SessionStore):
     async def reserve_generation(self, archive_id: str) -> int:
         def reserve() -> int:
             for _ in range(GENERATION_ATTEMPTS):
-                run = read_run(self.client, RUNS_TABLE, archive_id)
+                run = read_run(self.client, archive_id)
 
                 if run is None:
                     raise SessionConflict("archive run does not exist")
@@ -118,7 +110,6 @@ class DynamoDBSessionStore(SessionStore):
                 try:
                     update_generation(
                         self.client,
-                        RUNS_TABLE,
                         archive_id,
                         generation,
                         current,
@@ -140,7 +131,6 @@ class DynamoDBSessionStore(SessionStore):
         def update() -> None:
             update_profile(
                 self.client,
-                RUNS_TABLE,
                 archive_id,
                 generation,
                 key,
@@ -151,7 +141,7 @@ class DynamoDBSessionStore(SessionStore):
         await asyncio.to_thread(update)
 
     async def load_profile_reference(self, archive_id: str) -> AuthProfileReference | None:
-        run = await asyncio.to_thread(read_run, self.client, RUNS_TABLE, archive_id)
+        run = await asyncio.to_thread(read_run, self.client, archive_id)
 
         return profile_reference_from_item(run) if run else None
 
@@ -160,7 +150,7 @@ class DynamoDBSessionStore(SessionStore):
             cursor: dict[str, Any] | None = None
 
             while True:
-                response = scan_sessions(self.client, SESSIONS_TABLE, cursor)
+                response = scan_sessions(self.client, cursor)
 
                 for item in response.get("Items", []):
                     status = SessionStatus(item["status"]["S"])
@@ -188,7 +178,6 @@ class DynamoDBSessionStore(SessionStore):
                     try:
                         fail_session(
                             self.client,
-                            SESSIONS_TABLE,
                             session,
                             new_status,
                             reason,

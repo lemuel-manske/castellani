@@ -93,7 +93,7 @@ class DynamoDBTaskRepository(TaskRepository):
         if not pages:
             return
 
-        run = read_run(self.client, RUNS_TABLE, claim.task.archive_id)
+        run = read_run(self.client, claim.task.archive_id)
 
         if run is None:
             raise RuntimeError("Capture run does not exist")
@@ -172,7 +172,7 @@ class DynamoDBTaskRepository(TaskRepository):
             ):
                 raise TaskClaimLostError("parent page-task claim is no longer owned") from error
 
-            run = read_run(self.client, RUNS_TABLE, archive_id)
+            run = read_run(self.client, archive_id)
 
             if run is None:
                 raise RuntimeError("Capture run disappeared during discovery admission") from error

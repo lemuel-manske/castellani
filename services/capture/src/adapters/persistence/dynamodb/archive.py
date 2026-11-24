@@ -17,7 +17,7 @@ from domain import (
     WACZObject,
     WACZRangeNotSatisfiable,
 )
-from tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
+from tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 
 from .queries.task import read_run
 
@@ -135,7 +135,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         if_range: str | None,
         metadata_only: bool,
     ) -> WACZObject | None:
-        run = read_run(self.client, RUNS_TABLE, archive_id)
+        run = read_run(self.client, archive_id)
 
         if run is None or string_value(run, "decision", default="") != "PUBLISH":
             return None

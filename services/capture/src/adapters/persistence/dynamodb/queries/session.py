@@ -1,6 +1,7 @@
 from typing import Any
 
 from domain import AuthProfileReference, AuthSession, SessionStatus
+from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 
 from ..values import optional_number, optional_string
 
@@ -63,8 +64,6 @@ def profile_reference_from_item(item: dict[str, Any]) -> AuthProfileReference | 
 
 def create_session_transaction(
     client: Any,
-    sessions_table: str,
-    requests_table: str,
     session: AuthSession,
     key: str,
     fingerprint: str,
@@ -76,14 +75,14 @@ def create_session_transaction(
         TransactItems=[
             {
                 "Put": {
-                    "TableName": sessions_table,
+                    "TableName": SESSIONS_TABLE,
                     "Item": session_item(session, expires_at, updated_at),
                     "ConditionExpression": "attribute_not_exists(sessionId)",
                 }
             },
             {
                 "Put": {
-                    "TableName": requests_table,
+                    "TableName": SESSION_REQUESTS_TABLE,
                     "Item": {
                         "idempotencyKey": {"S": key},
                         "sessionId": {"S": session.session_id},
@@ -100,13 +99,9 @@ def create_session_transaction(
     )
 
 
-def read_session(
-    client: Any,
-    table_name: str,
-    session_id: str,
-) -> dict[str, Any] | None:
+def read_session(client: Any, session_id: str) -> dict[str, Any] | None:
     response = client.get_item(
-        TableName=table_name,
+        TableName=SESSIONS_TABLE,
         Key={"sessionId": {"S": session_id}},
         ConsistentRead=True,
     )
@@ -114,13 +109,9 @@ def read_session(
     return response.get("Item")
 
 
-def read_session_request(
-    client: Any,
-    table_name: str,
-    key: str,
-) -> dict[str, Any] | None:
+def read_session_request(client: Any, key: str) -> dict[str, Any] | None:
     response = client.get_item(
-        TableName=table_name,
+        TableName=SESSION_REQUESTS_TABLE,
         Key={"idempotencyKey": {"S": key}},
         ConsistentRead=True,
     )
@@ -128,12 +119,7 @@ def read_session_request(
     return response.get("Item")
 
 
-def update_session(
-    client: Any,
-    table_name: str,
-    session: AuthSession,
-    updated_at: str,
-) -> None:
+def update_session(client: Any, session: AuthSession, updated_at: str) -> None:
     names = {"#status": "status", "#version": "version", "#updated": "updatedAt"}
     values: dict[str, Any] = {
         ":status": {"S": str(session.status)},
@@ -164,7 +150,7 @@ def update_session(
         expression += ", #reason = :reason"
 
     client.update_item(
-        TableName=table_name,
+        TableName=SESSIONS_TABLE,
         Key={"sessionId": {"S": session.session_id}},
         UpdateExpression=expression,
         ConditionExpression="#version = :expected",
@@ -175,14 +161,13 @@ def update_session(
 
 def update_generation(
     client: Any,
-    table_name: str,
     archive_id: str,
     generation: int,
     current: int,
     updated_at: str,
 ) -> None:
     client.update_item(
-        TableName=table_name,
+        TableName=RUNS_TABLE,
         Key={"archiveId": {"S": archive_id}},
         UpdateExpression="SET authGeneration = :generation, authUpdatedAt = :updated",
         ConditionExpression=("attribute_not_exists(authGeneration) OR authGeneration = :current"),
@@ -196,7 +181,6 @@ def update_generation(
 
 def update_profile(
     client: Any,
-    table_name: str,
     archive_id: str,
     generation: int,
     key: str,
@@ -204,7 +188,7 @@ def update_profile(
     updated_at: str,
 ) -> None:
     client.update_item(
-        TableName=table_name,
+        TableName=RUNS_TABLE,
         Key={"archiveId": {"S": archive_id}},
         UpdateExpression=(
             "SET authProfileKey = :key, authProfileBucket = :bucket, authUpdatedAt = :updated"
@@ -219,12 +203,8 @@ def update_profile(
     )
 
 
-def scan_sessions(
-    client: Any,
-    table_name: str,
-    cursor: dict[str, Any] | None,
-) -> dict[str, Any]:
-    request: dict[str, Any] = {"TableName": table_name}
+def scan_sessions(client: Any, cursor: dict[str, Any] | None) -> dict[str, Any]:
+    request: dict[str, Any] = {"TableName": SESSIONS_TABLE}
 
     if cursor:
         request["ExclusiveStartKey"] = cursor
@@ -234,14 +214,13 @@ def scan_sessions(
 
 def fail_session(
     client: Any,
-    table_name: str,
     session: AuthSession,
     status: SessionStatus,
     reason: str,
     updated_at: str,
 ) -> None:
     client.update_item(
-        TableName=table_name,
+        TableName=SESSIONS_TABLE,
         Key={"sessionId": {"S": session.session_id}},
         UpdateExpression=(
             "SET #status = :status, #version = :version, #reason = :reason, #updated = :updated"
