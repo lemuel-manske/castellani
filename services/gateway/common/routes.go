@@ -2,16 +2,18 @@
 package common
 
 const (
-	ArchivePath     = "/archives/{archiveId}"
-	ArchivesPath    = "/archives"
-	HealthLivePath  = "/health/live"
-	HealthReadyPath = "/health/ready"
-	PagesPath       = "/archives/{archiveId}/pages"
-	SearchPath      = "/search"
-	SessionPath     = "/sessions/{sessionId}"
-	SessionsPath    = "/sessions"
-	SnapshotPath    = "/archives/{archiveId}/snapshots/{snapshotId}"
-	WACZPath        = "/archives/{archiveId}/wacz"
+	ArchivePath        = "/archives/{archiveId}"
+	ArchivesPath       = "/archives"
+	HealthLivePath     = "/health/live"
+	HealthReadyPath    = "/health/ready"
+	PagesPath          = "/archives/{archiveId}/pages"
+	SearchPath         = "/search"
+	SessionPath        = "/sessions/{sessionId}"
+	SessionBrowserPath = "/sessions/{sessionId}/browser"
+	SessionVNCPath     = "/sessions/{sessionId}/vnc/{path:path}"
+	SessionsPath       = "/sessions"
+	SnapshotPath       = "/archives/{archiveId}/snapshots/{snapshotId}"
+	WACZPath           = "/archives/{archiveId}/wacz"
 
 	ArchivePathPrefix = "/archives/"
 	SessionPathPrefix = "/sessions/"

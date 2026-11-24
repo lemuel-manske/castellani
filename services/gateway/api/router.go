@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
@@ -24,6 +25,7 @@ const (
 func NewRouter(
 	ready func() bool,
 	app application.Application,
+	loginOrigin url.URL,
 	logger *slog.Logger,
 ) http.Handler {
 	router := chi.NewRouter()
@@ -63,6 +65,7 @@ func NewRouter(
 	metadata := archiveapi.NewMetadataHandler(app)
 	wacz := archiveapi.NewWACZHandler(app)
 	sessions := sessionapi.NewHandler(app)
+	browser := sessionapi.NewBrowserHandler(app, loginOrigin)
 	search := searchapi.NewHandler(app)
 
 	router.Get(common.PagesPath, metadata.Pages)
@@ -74,6 +77,8 @@ func NewRouter(
 	router.Post(common.SessionsPath, sessions.Create)
 	router.Get(common.SessionPath, sessions.Get)
 	router.Put(common.SessionPath, sessions.Update)
+	router.Get(common.SessionBrowserPath, browser.ServeHTTP)
+	router.Get(common.SessionVNCPath, browser.ServeHTTP)
 	router.Get(common.SearchPath, search.Search)
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {

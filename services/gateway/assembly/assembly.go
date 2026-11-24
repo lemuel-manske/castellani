@@ -13,10 +13,12 @@ import (
 func NewApplication(
 	coordinatorClient *coordinator.Client,
 	captureClient *capture.Client,
+	loginClient *capture.Client,
 	searchClient *search.Client,
 ) application.Application {
 	var coordinatorPort application.Coordinator
 	var capturePort application.Capture
+	var loginPort application.Login
 	var searchPort application.Search
 
 	if coordinatorClient != nil {
@@ -31,6 +33,12 @@ func NewApplication(
 		}
 	}
 
+	if loginClient != nil {
+		loginPort = loginAdapter{
+			client: loginClient,
+		}
+	}
+
 	if searchClient != nil {
 		searchPort = searchAdapter{
 			client: searchClient,
@@ -40,6 +48,7 @@ func NewApplication(
 	return application.NewApplication(
 		coordinatorPort,
 		capturePort,
+		loginPort,
 		searchPort,
 	)
 }

@@ -72,8 +72,8 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 			w,
 			r,
 			err,
-			"Capture",
-			"Capture returned invalid session metadata.",
+			"Capture login manager",
+			"Capture login manager returned invalid session metadata.",
 		)
 
 		return
@@ -83,7 +83,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(
 		w,
 		http.StatusCreated,
-		result,
+		withBrowserURL(result),
 	)
 }
 
@@ -109,8 +109,8 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 			w,
 			r,
 			err,
-			"Capture",
-			"Capture returned invalid session metadata.",
+			"Capture login manager",
+			"Capture login manager returned invalid session metadata.",
 		)
 
 		return
@@ -119,7 +119,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(
 		w,
 		http.StatusOK,
-		result,
+		withBrowserURL(result),
 	)
 }
 
@@ -168,8 +168,8 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 			w,
 			r,
 			err,
-			"Capture",
-			"Capture returned invalid session metadata.",
+			"Capture login manager",
+			"Capture login manager returned invalid session metadata.",
 		)
 
 		return
@@ -178,6 +178,14 @@ func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(
 		w,
 		http.StatusOK,
-		result,
+		withBrowserURL(result),
 	)
+}
+
+func withBrowserURL(session application.Session) application.Session {
+	session.BrowserURL = common.SessionPathPrefix +
+		url.PathEscape(session.SessionID) +
+		"/browser"
+
+	return session
 }

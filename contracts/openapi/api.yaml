@@ -370,3 +370,6 @@ components:
         status: {type: string, enum: [CREATED, ACTIVE, FINALIZING, COMPLETED, CANCELLED, FAILED, EXPIRED]}
         expiresAt: {type: string, format: date-time}
         authGeneration: {type: integer, minimum: 1}
+        browserUrl:
+          type: string
+          description: Opaque Gateway path serving the session's interactive browser UI.

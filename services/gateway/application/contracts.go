@@ -61,6 +61,7 @@ type Session struct {
 	Status         string `json:"status"`
 	ExpiresAt      string `json:"expiresAt"`
 	AuthGeneration *int   `json:"authGeneration,omitempty"`
+	BrowserURL     string `json:"browserUrl,omitempty"`
 }
 
 type SearchResults struct {
@@ -101,7 +102,9 @@ type Capture interface {
 		string,
 		WACZOptions,
 	) (WACZ, error)
+}
 
+type Login interface {
 	CreateSession(
 		context.Context,
 		string,
