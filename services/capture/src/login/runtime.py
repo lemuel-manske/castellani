@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import boto3
 
@@ -14,6 +14,7 @@ from tables import LOGIN_TABLES
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
+    from mypy_boto3_s3.client import S3Client
 
 
 class LoginRuntime:
@@ -32,8 +33,9 @@ class LoginRuntime:
         )
 
         self.dynamodb_client: DynamoDBClient | None = None
-        self.s3_client: Any | None = None
+        self.s3_client: S3Client | None = None
         self.manager: LoginManager | None = None
+
         self._ready = False
 
     @property
@@ -62,6 +64,7 @@ class LoginRuntime:
                 region_name=self.settings.aws_region,
                 endpoint_url=self.settings.dynamodb_endpoint_url,
             )
+
             self.s3_client = session.client(
                 "s3",
                 region_name=self.settings.aws_region,
@@ -78,6 +81,7 @@ class LoginRuntime:
                 client=self.dynamodb_client,
                 session_ttl_seconds=self.settings.session_ttl_seconds,
             )
+
             profiles = EncryptedAuthProfileStore(
                 s3_client=self.s3_client,
                 cipher=AuthProfileCipher(self.settings.auth_profile_key),
