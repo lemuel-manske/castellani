@@ -176,6 +176,48 @@ services:
     stop_grace_period: 15s
     restart: unless-stopped
 
+  capture-login:
+    build:
+      context: ./services/capture
+      dockerfile: Dockerfile
+
+    command: ["/app/.venv/bin/uvicorn", "login.api:app", "--factory", "--host", "0.0.0.0", "--port", "8010"]
+
+    environment:
+      CAPTURE_LOGIN_PORT: "8010"
+
+      CAPTURE_AWS_REGION: ${AWS_REGION:-us-east-1}
+
+      CAPTURE_DYNAMODB_ENDPOINT_URL: http://ministack:4566
+      CAPTURE_S3_ENDPOINT_URL: http://ministack:4566
+
+      CAPTURE_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      CAPTURE_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      CAPTURE_AUTH_PROFILE_KEY: ${CAPTURE_AUTH_PROFILE_KEY:?CAPTURE_AUTH_PROFILE_KEY must be a base64-encoded 32-byte key}
+      CAPTURE_AUTH_PROFILE_BUCKET: castellani-auth-profiles
+
+      CAPTURE_SESSION_TTL_SECONDS: ${CAPTURE_SESSION_TTL_SECONDS:-1800}
+      CAPTURE_LOGIN_MAX_SESSIONS: ${CAPTURE_LOGIN_MAX_SESSIONS:-4}
+      CAPTURE_LOGIN_NOVNC_ROOT: /usr/share/novnc
+
+    depends_on:
+      provision:
+        condition: service_completed_successfully
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health/ready')"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+    shm_size: "1gb"
+
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
   search:
     build:
       context: ./services/search
@@ -236,6 +278,7 @@ services:
 
       GATEWAY_COORDINATOR_URL: ${COORDINATOR_URL}
       GATEWAY_CAPTURE_URL: ${CAPTURE_URL}
+      GATEWAY_CAPTURE_LOGIN_URL: ${CAPTURE_LOGIN_URL}
       GATEWAY_SEARCH_URL: ${SEARCH_URL}
 
       GATEWAY_UPSTREAM_TIMEOUT: ${GATEWAY_UPSTREAM_TIMEOUT:-5s}
@@ -246,6 +289,8 @@ services:
       coordinator:
         condition: service_healthy
       capture:
+        condition: service_healthy
+      capture-login:
         condition: service_healthy
       search:
         condition: service_healthy

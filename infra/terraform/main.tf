@@ -121,6 +121,38 @@ resource "aws_s3_bucket_public_access_block" "archive_manifests" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket" "auth_profiles" {
+  bucket        = "castellani-auth-profiles"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_versioning" "auth_profiles" {
+  bucket = aws_s3_bucket.auth_profiles.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "auth_profiles" {
+  bucket = aws_s3_bucket.auth_profiles.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "auth_profiles" {
+  bucket = aws_s3_bucket.auth_profiles.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_dynamodb_table" "capture_runs" {
   name         = "capture_runs"
   billing_mode = "PAY_PER_REQUEST"
@@ -234,6 +266,40 @@ resource "aws_dynamodb_table" "capture_snapshots" {
       attribute_name = "capturedAt"
       key_type       = "RANGE"
     }
+  }
+}
+
+resource "aws_dynamodb_table" "capture_sessions" {
+  name         = "capture_sessions"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "sessionId"
+
+  attribute {
+    name = "sessionId"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAtEpoch"
+    enabled        = true
+  }
+}
+
+resource "aws_dynamodb_table" "capture_session_requests" {
+  name         = "capture_session_requests"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "idempotencyKey"
+
+  attribute {
+    name = "idempotencyKey"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAtEpoch"
+    enabled        = true
   }
 }
 
