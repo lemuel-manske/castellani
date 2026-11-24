@@ -6,18 +6,30 @@ from botocore.exceptions import ClientError
 
 from application import DuplicateSessionRequest, SessionConflict
 from buckets import AUTH_PROFILE_BUCKET
-from domain import AuthProfileReference, AuthSession, SessionStatus, SessionStore
-from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
-
-from .queries.task import read_run
-
-ACTIVE_SESSION_STATUSES = frozenset(
-    {
-        SessionStatus.CREATED,
-        SessionStatus.ACTIVE,
-        SessionStatus.FINALIZING,
-    }
+from domain import (
+    ACTIVE_SESSION_STATUSES,
+    AuthProfileReference,
+    AuthSession,
+    SessionStatus,
+    SessionStore,
 )
+from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
+from utils.time import utc_now
+
+from .error_handling import is_conditional_failure
+from .queries.session import (
+    create_session_transaction,
+    fail_session,
+    profile_reference_from_item,
+    read_session,
+    read_session_request,
+    scan_sessions,
+    session_from_item,
+    update_generation,
+    update_profile,
+    update_session,
+)
+from .queries.task import read_run
 
 GENERATION_ATTEMPTS = 5
 
@@ -31,37 +43,23 @@ class DynamoDBSessionStore(SessionStore):
         now = datetime.now(UTC)
         now_epoch = int(now.timestamp())
         expires_at = now.timestamp() + self.session_ttl_seconds
+        updated_at = utc_now()
 
         def put() -> None:
             try:
-                self.client.transact_write_items(
-                    TransactItems=[
-                        {
-                            "Put": {
-                                "TableName": SESSIONS_TABLE,
-                                "Item": session_item(session, expires_at),
-                                "ConditionExpression": "attribute_not_exists(sessionId)",
-                            }
-                        },
-                        {
-                            "Put": {
-                                "TableName": SESSION_REQUESTS_TABLE,
-                                "Item": {
-                                    "idempotencyKey": {"S": key},
-                                    "sessionId": {"S": session.session_id},
-                                    "fingerprint": {"S": fingerprint},
-                                    "expiresAtEpoch": {"N": str(int(expires_at))},
-                                },
-                                "ConditionExpression": (
-                                    "attribute_not_exists(idempotencyKey) OR expiresAtEpoch <= :now"
-                                ),
-                                "ExpressionAttributeValues": {":now": {"N": str(now_epoch)}},
-                            }
-                        },
-                    ]
+                create_session_transaction(
+                    self.client,
+                    SESSIONS_TABLE,
+                    SESSION_REQUESTS_TABLE,
+                    session,
+                    key,
+                    fingerprint,
+                    expires_at,
+                    now_epoch,
+                    updated_at,
                 )
             except ClientError as error:
-                if conditional_check_failed(error):
+                if is_conditional_failure(error):
                     raise DuplicateSessionRequest from error
 
                 raise
@@ -69,30 +67,17 @@ class DynamoDBSessionStore(SessionStore):
         await asyncio.to_thread(put)
 
     async def get(self, session_id: str) -> AuthSession | None:
-        def read() -> dict[str, Any] | None:
-            response = self.client.get_item(
-                TableName=SESSIONS_TABLE,
-                Key={"sessionId": {"S": session_id}},
-                ConsistentRead=True,
-            )
-
-            return response.get("Item")
-
-        item = await asyncio.to_thread(read)
+        item = await asyncio.to_thread(read_session, self.client, SESSIONS_TABLE, session_id)
 
         return session_from_item(item) if item else None
 
     async def find_by_request(self, key: str, fingerprint: str) -> str | None:
-        def read() -> dict[str, Any] | None:
-            response = self.client.get_item(
-                TableName=SESSION_REQUESTS_TABLE,
-                Key={"idempotencyKey": {"S": key}},
-                ConsistentRead=True,
-            )
-
-            return response.get("Item")
-
-        item = await asyncio.to_thread(read)
+        item = await asyncio.to_thread(
+            read_session_request,
+            self.client,
+            SESSION_REQUESTS_TABLE,
+            key,
+        )
 
         if not item:
             return None
@@ -106,47 +91,13 @@ class DynamoDBSessionStore(SessionStore):
         return item["sessionId"]["S"]
 
     async def save(self, session: AuthSession) -> None:
-        names = {"#status": "status", "#version": "version", "#updated": "updatedAt"}
-        values: dict[str, Any] = {
-            ":status": {"S": str(session.status)},
-            ":version": {"N": str(session.version)},
-            ":expected": {"N": str(session.version - 1)},
-            ":updated": {"S": utc_now()},
-        }
-        expression = "SET #status = :status, #version = :version, #updated = :updated"
-
-        if session.auth_generation is not None:
-            names["#generation"] = "authGeneration"
-            values[":generation"] = {"N": str(session.auth_generation)}
-            expression += ", #generation = :generation"
-
-        if session.profile_key is not None:
-            names["#profile"] = "profileKey"
-            values[":profile"] = {"S": session.profile_key}
-            expression += ", #profile = :profile"
-
-        if session.vnc_origin is not None:
-            names["#origin"] = "vncOrigin"
-            values[":origin"] = {"S": session.vnc_origin}
-            expression += ", #origin = :origin"
-
-        if session.failure_reason is not None:
-            names["#reason"] = "failureReason"
-            values[":reason"] = {"S": session.failure_reason}
-            expression += ", #reason = :reason"
+        updated_at = utc_now()
 
         def update() -> None:
             try:
-                self.client.update_item(
-                    TableName=SESSIONS_TABLE,
-                    Key={"sessionId": {"S": session.session_id}},
-                    UpdateExpression=expression,
-                    ConditionExpression="#version = :expected",
-                    ExpressionAttributeNames=names,
-                    ExpressionAttributeValues=values,
-                )
+                update_session(self.client, SESSIONS_TABLE, session, updated_at)
             except ClientError as error:
-                if conditional_check_failed(error):
+                if is_conditional_failure(error):
                     raise SessionConflict from error
 
                 raise
@@ -165,23 +116,16 @@ class DynamoDBSessionStore(SessionStore):
                 generation = current + 1
 
                 try:
-                    self.client.update_item(
-                        TableName=RUNS_TABLE,
-                        Key={"archiveId": {"S": archive_id}},
-                        UpdateExpression=(
-                            "SET authGeneration = :generation, authUpdatedAt = :updated"
-                        ),
-                        ConditionExpression=(
-                            "attribute_not_exists(authGeneration) OR authGeneration = :current"
-                        ),
-                        ExpressionAttributeValues={
-                            ":generation": {"N": str(generation)},
-                            ":current": {"N": str(current)},
-                            ":updated": {"S": utc_now()},
-                        },
+                    update_generation(
+                        self.client,
+                        RUNS_TABLE,
+                        archive_id,
+                        generation,
+                        current,
+                        utc_now(),
                     )
                 except ClientError as error:
-                    if conditional_check_failed(error):
+                    if is_conditional_failure(error):
                         continue
 
                     raise
@@ -194,52 +138,29 @@ class DynamoDBSessionStore(SessionStore):
 
     async def set_profile(self, archive_id: str, generation: int, key: str) -> None:
         def update() -> None:
-            self.client.update_item(
-                TableName=RUNS_TABLE,
-                Key={"archiveId": {"S": archive_id}},
-                UpdateExpression=(
-                    "SET authProfileKey = :key, authProfileBucket = :bucket, "
-                    "authUpdatedAt = :updated"
-                ),
-                ConditionExpression="authGeneration = :generation",
-                ExpressionAttributeValues={
-                    ":key": {"S": key},
-                    ":bucket": {"S": AUTH_PROFILE_BUCKET},
-                    ":generation": {"N": str(generation)},
-                    ":updated": {"S": utc_now()},
-                },
+            update_profile(
+                self.client,
+                RUNS_TABLE,
+                archive_id,
+                generation,
+                key,
+                AUTH_PROFILE_BUCKET,
+                utc_now(),
             )
 
         await asyncio.to_thread(update)
 
     async def load_profile_reference(self, archive_id: str) -> AuthProfileReference | None:
-        def read() -> AuthProfileReference | None:
-            run = read_run(self.client, RUNS_TABLE, archive_id)
+        run = await asyncio.to_thread(read_run, self.client, RUNS_TABLE, archive_id)
 
-            if run is None:
-                return None
-
-            generation = optional_number(run, "authGeneration")
-            key = optional_string(run, "authProfileKey")
-
-            if generation is None or key is None:
-                return None
-
-            return AuthProfileReference(generation=generation, key=key)
-
-        return await asyncio.to_thread(read)
+        return profile_reference_from_item(run) if run else None
 
     async def reconcile_abandoned(self, manager_id: str) -> None:
         def reconcile() -> None:
             cursor: dict[str, Any] | None = None
 
             while True:
-                scan_args: dict[str, Any] = {"TableName": SESSIONS_TABLE}
-
-                if cursor:
-                    scan_args["ExclusiveStartKey"] = cursor
-
-                response = self.client.scan(**scan_args)
+                response = scan_sessions(self.client, SESSIONS_TABLE, cursor)
 
                 for item in response.get("Items", []):
                     status = SessionStatus(item["status"]["S"])
@@ -265,30 +186,16 @@ class DynamoDBSessionStore(SessionStore):
                     )
 
                     try:
-                        self.client.update_item(
-                            TableName=SESSIONS_TABLE,
-                            Key={"sessionId": {"S": session.session_id}},
-                            UpdateExpression=(
-                                "SET #status = :status, #version = :version, "
-                                "#reason = :reason, #updated = :updated"
-                            ),
-                            ConditionExpression="#version = :expected",
-                            ExpressionAttributeNames={
-                                "#status": "status",
-                                "#version": "version",
-                                "#reason": "failureReason",
-                                "#updated": "updatedAt",
-                            },
-                            ExpressionAttributeValues={
-                                ":status": {"S": str(new_status)},
-                                ":version": {"N": str(session.version + 1)},
-                                ":expected": {"N": str(session.version)},
-                                ":reason": {"S": reason},
-                                ":updated": {"S": utc_now()},
-                            },
+                        fail_session(
+                            self.client,
+                            SESSIONS_TABLE,
+                            session,
+                            new_status,
+                            reason,
+                            utc_now(),
                         )
                     except ClientError as error:
-                        if not conditional_check_failed(error):
+                        if not is_conditional_failure(error):
                             raise
 
                 cursor = response.get("LastEvaluatedKey")
@@ -297,68 +204,3 @@ class DynamoDBSessionStore(SessionStore):
                     return
 
         await asyncio.to_thread(reconcile)
-
-
-def session_item(session: AuthSession, expires_at: float) -> dict[str, Any]:
-    now = utc_now()
-    item: dict[str, Any] = {
-        "sessionId": {"S": session.session_id},
-        "archiveId": {"S": session.archive_id},
-        "targetUrl": {"S": session.target_url},
-        "status": {"S": str(session.status)},
-        "expiresAt": {"S": session.expires_at},
-        "expiresAtEpoch": {"N": str(int(expires_at))},
-        "managerId": {"S": session.manager_id},
-        "version": {"N": str(session.version)},
-        "createdAt": {"S": now},
-        "updatedAt": {"S": now},
-    }
-
-    if session.auth_generation is not None:
-        item["authGeneration"] = {"N": str(session.auth_generation)}
-
-    if session.profile_key is not None:
-        item["profileKey"] = {"S": session.profile_key}
-
-    if session.vnc_origin is not None:
-        item["vncOrigin"] = {"S": session.vnc_origin}
-
-    return item
-
-
-def session_from_item(item: dict[str, Any]) -> AuthSession:
-    return AuthSession(
-        session_id=item["sessionId"]["S"],
-        archive_id=item["archiveId"]["S"],
-        target_url=item["targetUrl"]["S"],
-        status=SessionStatus(item["status"]["S"]),
-        expires_at=item["expiresAt"]["S"],
-        manager_id=item["managerId"]["S"],
-        version=int(item["version"]["N"]),
-        auth_generation=optional_number(item, "authGeneration"),
-        profile_key=optional_string(item, "profileKey"),
-        vnc_origin=optional_string(item, "vncOrigin"),
-        failure_reason=optional_string(item, "failureReason"),
-    )
-
-
-def optional_number(item: dict[str, Any], name: str) -> int | None:
-    value = item.get(name)
-
-    return int(value["N"]) if value else None
-
-
-def optional_string(item: dict[str, Any], name: str) -> str | None:
-    value = item.get(name)
-
-    return value["S"] if value else None
-
-
-def conditional_check_failed(error: ClientError) -> bool:
-    details = error.response.get("Error", {})
-
-    return details.get("Code") == "ConditionalCheckFailedException"
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")

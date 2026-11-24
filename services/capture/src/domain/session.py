@@ -25,6 +25,14 @@ TERMINAL_SESSION_STATUSES = frozenset(
     }
 )
 
+ACTIVE_SESSION_STATUSES = frozenset(
+    {
+        SessionStatus.CREATED,
+        SessionStatus.ACTIVE,
+        SessionStatus.FINALIZING,
+    }
+)
+
 
 @dataclass(frozen=True)
 class AuthSession:

@@ -29,6 +29,18 @@ def number_from_item(
     return int(number) if number.is_integer() else number
 
 
+def optional_number(item: dict[str, Any], key: str) -> int | None:
+    value = item.get(key)
+
+    return int(value["N"]) if value else None
+
+
+def optional_string(item: dict[str, Any], key: str) -> str | None:
+    value = item.get(key)
+
+    return value["S"] if value else None
+
+
 def deserialize_attribute(attribute: dict[str, Any]) -> Any:
     if "S" in attribute:
         return attribute["S"]

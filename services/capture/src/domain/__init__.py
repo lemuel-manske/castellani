@@ -18,6 +18,7 @@ from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapsho
 from .discovery import DiscoveredPage, identify_discovered_pages
 from .outbox import OutboxMessage, OutboxRepository
 from .session import (
+    ACTIVE_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
     AuthProfileReference,
     AuthProfileStore,
@@ -39,6 +40,7 @@ from .task import (
 from .url_identity import InvalidURLIdentity, URLIdentity, identify_url
 
 __all__ = [
+    "ACTIVE_SESSION_STATUSES",
     "ArchivePage",
     "ArchiveRetrieval",
     "ArtifactReference",
