@@ -310,6 +310,7 @@ components:
       properties:
         archiveId: {type: string}
         status: {type: string, enum: [ACCEPTED, RUNNING, WAITING_FOR_AUTH, FINALIZING, COMPENSATING, COMPLETED, COMPLETED_WITH_ERRORS, FAILED]}
+        decision: {type: string, enum: [NONE, PUBLISH, COMPENSATE]}
         capture:
           type: object
           required: [captured, failed, pending]
