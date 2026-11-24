@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import cast
 
 import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
@@ -58,18 +58,17 @@ class RabbitMQMessagePublisher:
     def route(self, envelope: bytes) -> tuple[AbstractExchange, str]:
         """Commands go to the Capture work exchange; events fan out."""
 
-        message_type: Any = None
-
         try:
-            decoded = json.loads(envelope)
+            decoded: object = json.loads(envelope)
         except (UnicodeDecodeError, json.JSONDecodeError):
             decoded = None
 
-        if isinstance(decoded, dict):
-            message_type = decoded.get("type")
+        payload = cast(dict[str, object], decoded)
+
+        message_type = str(payload.get("type"))
 
         if message_type in PUBLISHED_EVENTS and self.events_exchange is not None:
-            return self.events_exchange, str(message_type)
+            return self.events_exchange, message_type
 
         assert self.capture_exchange is not None
 
