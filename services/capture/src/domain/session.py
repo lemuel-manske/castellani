@@ -40,19 +40,6 @@ class AuthSession:
     vnc_origin: str | None = None
     failure_reason: str | None = None
 
-    def as_dict(self) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "sessionId": self.session_id,
-            "archiveId": self.archive_id,
-            "status": str(self.status),
-            "expiresAt": self.expires_at,
-        }
-
-        if self.auth_generation is not None:
-            result["authGeneration"] = self.auth_generation
-
-        return result
-
     @property
     def terminal(self) -> bool:
         return self.status in TERMINAL_SESSION_STATUSES

@@ -9,6 +9,7 @@ from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 
 from application import SessionConflict
+from assembly import auth_session_json
 from domain import AuthSession, SessionStatus
 from login.api import create_app
 
@@ -28,7 +29,7 @@ def test_create_session_returns_only_public_session_metadata() -> None:
             headers={"Idempotency-Key": "idempotency-1"},
         )
 
-    assert (response.status_code, response.json()) == (201, manager.session.as_dict())
+    assert (response.status_code, response.json()) == (201, auth_session_json(manager.session))
 
 
 def test_create_session_rejects_a_missing_idempotency_key() -> None:
@@ -51,7 +52,7 @@ def test_get_session_returns_the_current_state() -> None:
     with TestClient(create_app(FakeRuntime(manager))) as client:
         response = client.get(f"/sessions/{SESSION_ID}")
 
-    assert (response.status_code, response.json()) == (200, session.as_dict())
+    assert (response.status_code, response.json()) == (200, auth_session_json(session))
 
 
 def test_get_session_rejects_an_invalid_session_id() -> None:

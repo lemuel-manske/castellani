@@ -15,7 +15,7 @@ from websockets.asyncio.client import connect as connect_upstream
 from websockets.exceptions import ConnectionClosed, InvalidHandshake
 
 from application import LoginManager, LoginUnavailable, SessionConflict, SessionNotFound
-from assembly import LoginSettings
+from assembly import LoginSettings, auth_session_json
 from domain import SessionRequest, SessionStatus
 
 from .runtime import LoginRuntime as ConcreteLoginRuntime
@@ -149,7 +149,7 @@ def create_app(runtime: Runtime) -> FastAPI:
             key,
         )
 
-        return session.as_dict()
+        return auth_session_json(session)
 
     @application.get("/sessions/{session_id}")
     async def get_session(session_id: str, request: Request) -> dict[str, object]:
@@ -157,7 +157,7 @@ def create_app(runtime: Runtime) -> FastAPI:
 
         session = await manager(request).get(session_id)
 
-        return session.as_dict()
+        return auth_session_json(session)
 
     @application.put("/sessions/{session_id}")
     async def update_session(
@@ -172,7 +172,7 @@ def create_app(runtime: Runtime) -> FastAPI:
             SessionStatus(body.status),
         )
 
-        return session.as_dict()
+        return auth_session_json(session)
 
     @application.get("/sessions/{session_id}/browser", response_class=HTMLResponse)
     async def browser(session_id: str, request: Request) -> str:
