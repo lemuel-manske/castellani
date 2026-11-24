@@ -9,7 +9,7 @@ The assignment permits local AWS emulation with MiniStack and requires reproduci
 
 ## Decision
 
-Use MiniStack as the local AWS-compatible infrastructure target. AWS resources will be created using Terraform from the beginning where supported (ADR-0024), with version-controlled provisioning fallbacks for emulator/provider gaps, never by undocumented manual setup. Docker Compose will start the complete local environment. Service endpoints, resource names, and credentials will come from configuration rather than hard-coded values.
+Use MiniStack as the local AWS-compatible infrastructure target. AWS resources will be created using Terraform from the beginning where supported (ADR-0024), with version-controlled provisioning fallbacks for emulator/provider gaps, never by undocumented manual setup. Docker Compose will start the complete local environment. The resource topology — DynamoDB table names and keys, S3 bucket names, and broker exchange/queue names — is fixed by versioned Terraform and the owning services' adapters; it is deployment structure, not a configurable setting. Environment-specific values such as AWS region, endpoints, credentials, exposed ports, and broker credentials are supplied through configuration.
 
 RabbitMQ will run as a separate container because it is not an AWS service.
 

@@ -13,8 +13,8 @@ These rules are mandatory for every task, regardless of language or service. Fol
 
 ## 2. Understand the project before changing it
 
-- Read the relevant [ADRs](docs/adr/README.md), [engineering conventions](docs/conventions.md), and [testing conventions](docs/testing.md) **before writing or modifying code**.
-- Read the applicable specifications and contracts, including [backend invariants](docs/backend/README.md), [OpenAPI](contracts/openapi/api.yaml), and [message contracts](contracts/messages/README.md), as appropriate to the task.
+- Read the relevant [ADRs](docs/adr/README.md) and [testing conventions](docs/testing.md) **before writing or modifying code**.
+- Read the applicable contracts, including [OpenAPI](contracts/openapi/api.yaml) and [message contracts](contracts/messages/README.md), as appropriate to the task.
 - Inspect the affected implementation and its tests. Reuse established patterns where they fit; do not assume existing behavior or infer requirements from filenames alone.
 - Treat accepted ADRs and specifications as authoritative. If a requested change conflicts with them, explain the conflict and obtain approval before proceeding.
 

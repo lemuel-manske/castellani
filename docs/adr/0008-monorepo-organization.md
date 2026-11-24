@@ -13,12 +13,13 @@ Use a monorepo with the following directory conventions:
 
 - `services/<name>/`: each uniquely named service owns its source code, tests, dependency manifests and lockfiles, and Dockerfile.
 - `contracts/`: language-neutral cross-service message and API contracts, not executable shared implementation.
-- `docker/`: Docker Compose files and deployment-specific Docker configuration.
+- `docker-compose.yaml` at the repository root: the reference single-command deployment for the complete stack, including infrastructure, provisioning, and all application services. Service Dockerfiles stay in `services/<name>/`; no separate `docker/` directory is needed.
 - `infra/`: cloud infrastructure provisioning, including the selected Terraform configuration (ADR-0024).
 - `docs/`: documentation and ADRs.
-- `scripts/`: repository-level development and automation commands.
 - `tests/`: cross-service integration and end-to-end tests; service-local tests remain in their services.
 - `libs/`: optional, purpose-specific libraries introduced only when concrete, worthwhile code reuse is identified.
+
+Versioned automation lives with its subject rather than in a repository-wide `scripts/` directory or a single root entry point: `infra/Makefile` drives Terraform, `tests/Makefile` drives cross-service verification, each `services/<name>/Makefile` drives service-local work, and `.github/workflows/` holds CI definitions. A root build framework is not required.
 
 Services must not import code from sibling service directories, access sibling services' internals, or use a generic repository-wide `common` or `utils` package. Similar code or data representations may remain duplicated when extracting a library would increase coupling. Any extracted library must have a clear responsibility and explicit consumers.
 
