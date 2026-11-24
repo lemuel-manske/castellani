@@ -5,14 +5,46 @@
     "maxAttempts": 5
   },
   "exchanges": [
-    { "name": "castellani.events", "type": "topic", "owner": "platform" },
-    { "name": "castellani.capture", "type": "direct", "owner": "capture" },
-    { "name": "castellani.capture.retry", "type": "direct", "owner": "capture" },
-    { "name": "castellani.capture.dead", "type": "fanout", "owner": "capture" },
-    { "name": "castellani.retry", "type": "topic", "owner": "coordinator" },
-    { "name": "castellani.dead", "type": "topic", "owner": "coordinator" },
-    { "name": "castellani.search.retry", "type": "direct", "owner": "search" },
-    { "name": "castellani.search.dead", "type": "fanout", "owner": "search" },
+    {
+      "name": "castellani.events",
+      "type": "topic",
+      "owner": "platform"
+    },
+    {
+      "name": "castellani.capture",
+      "type": "direct",
+      "owner": "capture"
+    },
+    {
+      "name": "castellani.capture.retry",
+      "type": "direct",
+      "owner": "capture"
+    },
+    {
+      "name": "castellani.capture.dead",
+      "type": "fanout",
+      "owner": "capture"
+    },
+    {
+      "name": "castellani.retry",
+      "type": "topic",
+      "owner": "coordinator"
+    },
+    {
+      "name": "castellani.dead",
+      "type": "topic",
+      "owner": "coordinator"
+    },
+    {
+      "name": "castellani.search.retry",
+      "type": "direct",
+      "owner": "search"
+    },
+    {
+      "name": "castellani.search.dead",
+      "type": "fanout",
+      "owner": "search"
+    },
     {
       "name": "castellani.search.publication.retry",
       "type": "direct",
@@ -28,7 +60,9 @@
     {
       "name": "castellani.coordinator",
       "owner": "coordinator",
-      "arguments": { "x-dead-letter-exchange": "castellani.dead" }
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.dead"
+      }
     },
     {
       "name": "castellani.coordinator.retry",
@@ -38,7 +72,10 @@
         "x-dead-letter-exchange": "castellani.events"
       }
     },
-    { "name": "castellani.coordinator.dead", "owner": "coordinator" },
+    {
+      "name": "castellani.coordinator.dead",
+      "owner": "coordinator"
+    },
     {
       "name": "castellani.capture.page",
       "owner": "capture",
@@ -73,7 +110,10 @@
         "x-dead-letter-routing-key": "StartCrawl"
       }
     },
-    { "name": "castellani.capture.dead", "owner": "capture" },
+    {
+      "name": "castellani.capture.dead",
+      "owner": "capture"
+    },
     {
       "name": "castellani.search.page-captured",
       "owner": "search",
@@ -91,11 +131,16 @@
         "x-dead-letter-routing-key": "PageCaptured"
       }
     },
-    { "name": "castellani.search.page-captured.dead", "owner": "search" },
+    {
+      "name": "castellani.search.page-captured.dead",
+      "owner": "search"
+    },
     {
       "name": "castellani.search.publication",
       "owner": "search",
-      "arguments": { "x-dead-letter-exchange": "castellani.search.publication.retry" }
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.search.publication.retry"
+      }
     },
     {
       "name": "castellani.search.publication.retry.queue",
@@ -105,33 +150,46 @@
         "x-dead-letter-exchange": "castellani.events"
       }
     },
-    { "name": "castellani.search.publication.dead.queue", "owner": "search" }
+    {
+      "name": "castellani.search.publication.dead.queue",
+      "owner": "search"
+    }
   ],
   "bindings": [
     {
       "exchange": "castellani.events",
       "queue": "castellani.capture.start",
-      "routingKeys": ["StartCrawl"]
+      "routingKeys": [
+        "StartCrawl"
+      ]
     },
     {
       "exchange": "castellani.capture",
       "queue": "castellani.capture.page",
-      "routingKeys": ["CapturePage"]
+      "routingKeys": [
+        "CapturePage"
+      ]
     },
     {
       "exchange": "castellani.capture.retry",
       "queue": "castellani.capture.page.retry",
-      "routingKeys": ["CapturePage"]
+      "routingKeys": [
+        "CapturePage"
+      ]
     },
     {
       "exchange": "castellani.capture.retry",
       "queue": "castellani.capture.start.retry",
-      "routingKeys": ["StartCrawl"]
+      "routingKeys": [
+        "StartCrawl"
+      ]
     },
     {
       "exchange": "castellani.capture.dead",
       "queue": "castellani.capture.dead",
-      "routingKeys": [""]
+      "routingKeys": [
+        ""
+      ]
     },
     {
       "exchange": "castellani.events",
@@ -162,22 +220,30 @@
     {
       "exchange": "castellani.dead",
       "queue": "castellani.coordinator.dead",
-      "routingKeys": ["#"]
+      "routingKeys": [
+        "#"
+      ]
     },
     {
       "exchange": "castellani.events",
       "queue": "castellani.search.page-captured",
-      "routingKeys": ["PageCaptured"]
+      "routingKeys": [
+        "PageCaptured"
+      ]
     },
     {
       "exchange": "castellani.search.retry",
       "queue": "castellani.search.page-captured.retry",
-      "routingKeys": ["PageCaptured"]
+      "routingKeys": [
+        "PageCaptured"
+      ]
     },
     {
       "exchange": "castellani.search.dead",
       "queue": "castellani.search.page-captured.dead",
-      "routingKeys": [""]
+      "routingKeys": [
+        ""
+      ]
     },
     {
       "exchange": "castellani.events",
@@ -202,7 +268,9 @@
     {
       "exchange": "castellani.search.publication.dead",
       "queue": "castellani.search.publication.dead.queue",
-      "routingKeys": [""]
+      "routingKeys": [
+        ""
+      ]
     }
   ]
 }
