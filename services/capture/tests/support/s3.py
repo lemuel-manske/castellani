@@ -25,8 +25,9 @@ class FakeS3:
         Bucket: str,
         Key: str,
         Body: bytes,
-        ETag: str,
-        LastModified: datetime,
+        ETag: str = "",
+        LastModified: datetime | None = None,
+        **_: object,
     ) -> None:
         self.objects[(Bucket, Key)] = (Body, {})
         self.responses[(Bucket, Key)] = {
@@ -68,8 +69,9 @@ class FakeBody:
         self.data = data
         self.offset = 0
 
-    def read(self, size: int) -> bytes:
-        chunk = self.data[self.offset : self.offset + size]
+    def read(self, size: int | None = None) -> bytes:
+        end = len(self.data) if size is None else self.offset + size
+        chunk = self.data[self.offset : end]
         self.offset += len(chunk)
 
         return chunk

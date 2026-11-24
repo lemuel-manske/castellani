@@ -17,6 +17,18 @@ from .archive import (
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
 from .discovery import DiscoveredPage, identify_discovered_pages
 from .outbox import OutboxMessage, OutboxRepository
+from .session import (
+    AUTH_PROFILE_BUCKET,
+    TERMINAL_SESSION_STATUSES,
+    AuthProfileStore,
+    AuthSession,
+    BrowserEndpoint,
+    InteractiveBrowser,
+    SessionRequest,
+    SessionStatus,
+    SessionStore,
+    request_fingerprint,
+)
 from .task import (
     InvalidTaskClaimRenewal,
     PageTask,
@@ -29,7 +41,11 @@ from .url_identity import InvalidURLIdentity, URLIdentity, identify_url
 __all__ = [
     "ArchivePage",
     "ArchiveRetrieval",
+    "AUTH_PROFILE_BUCKET",
     "ArtifactReference",
+    "AuthProfileStore",
+    "AuthSession",
+    "BrowserEndpoint",
     "CaptureAllocator",
     "CaptureOutcome",
     "CaptureReservation",
@@ -39,12 +55,17 @@ __all__ = [
     "InvalidTaskClaimRenewal",
     "InvalidURLIdentity",
     "InvalidWACZRange",
+    "InteractiveBrowser",
     "OutboxMessage",
     "OutboxRepository",
     "PageCapture",
     "PageListing",
     "PageTask",
+    "SessionRequest",
+    "SessionStatus",
+    "SessionStore",
     "SnapshotReference",
+    "TERMINAL_SESSION_STATUSES",
     "TaskClaim",
     "TaskRepository",
     "URLIdentity",
@@ -55,4 +76,5 @@ __all__ = [
     "new_attempt_id",
     "new_reservation_id",
     "new_snapshot_id",
+    "request_fingerprint",
 ]

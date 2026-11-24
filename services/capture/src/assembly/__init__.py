@@ -1,4 +1,4 @@
-from .config import CaptureSettings
+from .config import CaptureSettings, LoginSettings
 from .runtime import CaptureRuntime
 
-__all__ = ["CaptureRuntime", "CaptureSettings"]
+__all__ = ["CaptureRuntime", "CaptureSettings", "LoginSettings"]
