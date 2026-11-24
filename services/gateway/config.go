@@ -10,6 +10,7 @@ const (
 
 	coordinatorEnvironment = "GATEWAY_COORDINATOR_URL"
 	captureEnvironment     = "GATEWAY_CAPTURE_URL"
+	loginEnvironment       = "GATEWAY_CAPTURE_LOGIN_URL"
 	searchEnvironment      = "GATEWAY_SEARCH_URL"
 
 	shutdownEnvironment      = "GATEWAY_SHUTDOWN_TIMEOUT"
@@ -28,6 +29,7 @@ type Config struct {
 	streamTimeout   time.Duration
 	coordinatorURL  string
 	captureURL      string
+	loginURL        string
 	searchURL       string
 }
 
@@ -74,6 +76,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 
 	cfg.coordinatorURL = getenv(coordinatorEnvironment)
 	cfg.captureURL = getenv(captureEnvironment)
+	cfg.loginURL = getenv(loginEnvironment)
 	cfg.searchURL = getenv(searchEnvironment)
 
 	return cfg, nil

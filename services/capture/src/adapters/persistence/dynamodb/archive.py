@@ -17,9 +17,9 @@ from domain import (
     WACZObject,
     WACZRangeNotSatisfiable,
 )
+from tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 
 from .queries.task import read_run
-from .tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 PAGE_STATUSES = {
     "PENDING": "PENDING",
@@ -68,7 +68,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
             "TableName": FRONTIER_TABLE,
             "KeyConditionExpression": "archiveId = :archive_id",
             "ExpressionAttributeValues": {":archive_id": {"S": archive_id}},
-            "Limit": limit,
+            "Limit": limit + 1,
         }
 
         if cursor is not None:
@@ -76,14 +76,21 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
 
         response = self.client.query(**request)
 
-        items = tuple(page_from_item(item) for item in response.get("Items", ()))
+        rows = tuple(response.get("Items", ()))
+        items = tuple(page_from_item(item) for item in rows[:limit])
 
-        last_key = response.get("LastEvaluatedKey")
+        next_cursor = None
 
-        return PageListing(
-            items=items,
-            next_cursor=encode_cursor(last_key) if last_key else None,
-        )
+        if len(rows) > limit:
+            last_item = rows[limit - 1]
+            next_cursor = encode_cursor(
+                {
+                    "archiveId": last_item["archiveId"],
+                    "urlKey": last_item["urlKey"],
+                }
+            )
+
+        return PageListing(items=items, next_cursor=next_cursor)
 
     async def read_snapshot(
         self,
@@ -135,7 +142,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         if_range: str | None,
         metadata_only: bool,
     ) -> WACZObject | None:
-        run = read_run(self.client, RUNS_TABLE, archive_id)
+        run = read_run(self.client, archive_id)
 
         if run is None or string_value(run, "decision", default="") != "PUBLISH":
             return None

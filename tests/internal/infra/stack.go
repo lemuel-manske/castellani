@@ -38,7 +38,7 @@ func Start(t *testing.T) Dependencies {
 		OpenSearch:  newService(t, ctx, stack, "opensearch", "9200", "/_cluster/health", "", ""),
 		Gateway:     newService(t, ctx, stack, "gateway", "8080", "/health/ready", "", ""),
 		Coordinator: newService(t, ctx, stack, "coordinator", "8081", "/health/ready", "", ""),
-		Capture:     newService(t, ctx, stack, "capture", "8000", "/health/ready", "", ""),
+		Capture:     newService(t, ctx, stack, "capture-worker", "8000", "/health/ready", "", ""),
 		Search:      newService(t, ctx, stack, "search", "8082", "/health/ready", "", ""),
 	}
 

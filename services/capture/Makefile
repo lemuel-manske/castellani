@@ -1,4 +1,4 @@
-.PHONY: install run fmt test test-unit test-integration check test-infra-up test-infra-down
+.PHONY: install run-worker run-login fmt test test-unit test-integration check test-infra-up test-infra-down
 
 install:
 	uv sync --all-groups
@@ -31,5 +31,9 @@ check:
 	uv run pyright
 
 
-run:
+run-worker:
 	PYTHONPATH=src uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+
+
+run-login:
+	PYTHONPATH=src uv run uvicorn login.api:app --factory --host 0.0.0.0 --port 8010

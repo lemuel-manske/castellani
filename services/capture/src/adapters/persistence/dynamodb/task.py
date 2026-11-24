@@ -34,7 +34,6 @@ from .queries.task import (
     release_task_transaction,
     renew_task_transaction,
 )
-from .tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from .values import number_from_item
 
 
@@ -93,7 +92,7 @@ class DynamoDBTaskRepository(TaskRepository):
         if not pages:
             return
 
-        run = read_run(self.client, RUNS_TABLE, claim.task.archive_id)
+        run = read_run(self.client, claim.task.archive_id)
 
         if run is None:
             raise RuntimeError("Capture run does not exist")
@@ -126,9 +125,6 @@ class DynamoDBTaskRepository(TaskRepository):
         url_key = page.identity.url_key
 
         transaction = admit_page_transaction(
-            FRONTIER_TABLE,
-            RUNS_TABLE,
-            OUTBOX_TABLE,
             claim,
             page,
             message_id,
@@ -141,7 +137,6 @@ class DynamoDBTaskRepository(TaskRepository):
         except ConditionalWriteRejected as error:
             existing = read_frontier(
                 self.client,
-                FRONTIER_TABLE,
                 archive_id,
                 url_key,
             )
@@ -158,7 +153,6 @@ class DynamoDBTaskRepository(TaskRepository):
 
             parent = read_frontier(
                 self.client,
-                FRONTIER_TABLE,
                 archive_id,
                 claim.task.url_key,
             )
@@ -172,7 +166,7 @@ class DynamoDBTaskRepository(TaskRepository):
             ):
                 raise TaskClaimLostError("parent page-task claim is no longer owned") from error
 
-            run = read_run(self.client, RUNS_TABLE, archive_id)
+            run = read_run(self.client, archive_id)
 
             if run is None:
                 raise RuntimeError("Capture run disappeared during discovery admission") from error
@@ -199,10 +193,6 @@ class DynamoDBTaskRepository(TaskRepository):
         depth = self._task_depth(outcome.archive_id, outcome.url_key)
 
         transaction = complete_task_transaction(
-            FRONTIER_TABLE,
-            RUNS_TABLE,
-            SNAPSHOTS_TABLE,
-            OUTBOX_TABLE,
             outcome,
             depth,
             message_id,
@@ -214,7 +204,6 @@ class DynamoDBTaskRepository(TaskRepository):
         except ConditionalWriteRejected as error:
             existing = read_frontier(
                 self.client,
-                FRONTIER_TABLE,
                 outcome.archive_id,
                 outcome.url_key,
             )
@@ -226,7 +215,6 @@ class DynamoDBTaskRepository(TaskRepository):
             ):
                 event = read_outbox(
                     self.client,
-                    OUTBOX_TABLE,
                     message_id,
                 )
 
@@ -240,7 +228,6 @@ class DynamoDBTaskRepository(TaskRepository):
     def _task_depth(self, archive_id: str, url_key: str) -> int:
         item = read_frontier(
             self.client,
-            FRONTIER_TABLE,
             archive_id,
             url_key,
         )
@@ -274,7 +261,6 @@ class DynamoDBTaskRepository(TaskRepository):
         try:
             finish_task(
                 self.client,
-                FRONTIER_TABLE,
                 archive_id,
                 url_key,
                 attempt_id,
@@ -303,9 +289,6 @@ class DynamoDBTaskRepository(TaskRepository):
         )
 
         transaction = release_task_transaction(
-            RUNS_TABLE,
-            FRONTIER_TABLE,
-            OUTBOX_TABLE,
             claim,
             message_id,
             now,
@@ -316,7 +299,6 @@ class DynamoDBTaskRepository(TaskRepository):
         except ConditionalWriteRejected as error:
             existing = read_outbox(
                 self.client,
-                OUTBOX_TABLE,
                 message_id,
             )
 
@@ -331,8 +313,6 @@ class DynamoDBTaskRepository(TaskRepository):
         lease_until = now + self.lease_duration
 
         transaction = claim_task_transaction(
-            RUNS_TABLE,
-            FRONTIER_TABLE,
             archive_id,
             url_key,
             attempt_id,
@@ -347,7 +327,6 @@ class DynamoDBTaskRepository(TaskRepository):
 
         item = read_frontier(
             self.client,
-            FRONTIER_TABLE,
             archive_id,
             url_key,
         )
@@ -363,8 +342,6 @@ class DynamoDBTaskRepository(TaskRepository):
         request_token = str(uuid4())
 
         transaction = renew_task_transaction(
-            RUNS_TABLE,
-            FRONTIER_TABLE,
             claim.task.archive_id,
             claim.task.url_key,
             claim.attempt_id,
@@ -380,7 +357,6 @@ class DynamoDBTaskRepository(TaskRepository):
 
         item = read_frontier(
             self.client,
-            FRONTIER_TABLE,
             claim.task.archive_id,
             claim.task.url_key,
         )

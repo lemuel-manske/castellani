@@ -56,6 +56,18 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		)
 	}
 
+	loginURL, err := url.Parse(cfg.loginURL)
+
+	if err != nil {
+		logger.Error(
+			"invalid capture login URL",
+			"url",
+			cfg.loginURL,
+			"error",
+			err,
+		)
+	}
+
 	searchURL, err := url.Parse(cfg.searchURL)
 
 	if err != nil {
@@ -74,11 +86,17 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		cfg.upstreamTimeout,
 		cfg.streamTimeout,
 	)
+	loginClient := capture.NewClient(
+		*loginURL,
+		cfg.upstreamTimeout,
+		cfg.streamTimeout,
+	)
 	searchClient := search.NewClient(*searchURL, cfg.upstreamTimeout)
 
 	app := assembly.NewApplication(
 		coordinatorClient,
 		captureClient,
+		loginClient,
 		searchClient,
 	)
 
@@ -86,11 +104,16 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		shutdownTimeout: cfg.shutdownTimeout,
 	}
 
+	origins := map[string]api.Proxy{
+		api.LoginProxyKey: {Origin: *loginURL},
+	}
+
 	gateway.http = &http.Server{
 		Handler: api.NewRouter(
 			gateway.ready.Load,
 			app,
 			logger,
+			origins,
 		),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,

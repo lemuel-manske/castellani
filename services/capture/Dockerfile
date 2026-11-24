@@ -17,7 +17,8 @@ FROM python:3.13.5-slim-bookworm
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends ca-certificates libnss3-tools && \
+    apt-get install --yes --no-install-recommends \
+        ca-certificates libnss3-tools novnc websockify x11vnc xvfb && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 capture && \
@@ -30,7 +31,8 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN /app/.venv/bin/playwright install --with-deps chromium && \
     rm -rf /var/lib/apt/lists/* && \
     chown --recursive capture:capture /ms-playwright && \
-    install --directory --owner=capture --group=capture /tmp/castellani/capture
+    install --directory --owner=capture --group=capture /tmp/castellani/capture && \
+    install --directory --mode=1777 /tmp/.X11-unix
 
 COPY --chown=capture:capture src ./src
 
@@ -41,6 +43,4 @@ ENV HOME=/home/capture \
 
 USER capture
 
-EXPOSE 8000
-
-CMD ["/app/.venv/bin/uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8000 8010

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
+from assembly import page_listing_json, snapshot_reference_json
+
 from .problem import problem
 from .routes import ARCHIVE_PAGES_PATH, ARCHIVE_SNAPSHOT_PATH
 from .types import JSON
@@ -42,7 +44,7 @@ async def list_pages(archive_id: str, request: Request) -> JSON | Response:
         request.query_params.get("cursor"),
     )
 
-    return listing.as_dict()
+    return page_listing_json(listing)
 
 
 @router.get(ARCHIVE_SNAPSHOT_PATH, response_model=None)
@@ -63,4 +65,4 @@ async def get_snapshot(
             "The requested snapshot does not exist for this archive.",
         )
 
-    return snapshot.as_dict()
+    return snapshot_reference_json(snapshot)

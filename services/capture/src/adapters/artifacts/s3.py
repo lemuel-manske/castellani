@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from buckets import ARCHIVE_ARTIFACTS_BUCKET
 from domain import ArtifactReference, TaskClaim
 from worker import ArtifactStore
-
-ARTIFACT_BUCKET = "castellani-archive-artifacts"
 
 DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
 
@@ -87,12 +86,12 @@ class S3ArtifactStore(ArtifactStore):
 
                 self.client.upload_file(
                     str(resolved),
-                    ARTIFACT_BUCKET,
+                    ARCHIVE_ARTIFACTS_BUCKET,
                     key,
                     ExtraArgs={"Metadata": {"sha256": sha256}},
                 )
 
-                metadata = self.client.head_object(Bucket=ARTIFACT_BUCKET, Key=key)
+                metadata = self.client.head_object(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Key=key)
 
                 if metadata.get("Metadata", {}).get("sha256") != sha256:
                     raise RuntimeError(f"S3 artifact checksum metadata mismatch for {key}")
@@ -102,7 +101,7 @@ class S3ArtifactStore(ArtifactStore):
 
                 references.append(
                     ArtifactReference(
-                        bucket=ARTIFACT_BUCKET,
+                        bucket=ARCHIVE_ARTIFACTS_BUCKET,
                         key=key,
                         sha256=sha256,
                         size_bytes=size_bytes,

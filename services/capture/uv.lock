@@ -144,12 +144,14 @@ source = { virtual = "." }
 dependencies = [
     { name = "aio-pika" },
     { name = "boto3" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "playwright" },
     { name = "pywb" },
     { name = "selectolax" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets" },
 ]
 
 [package.dev-dependencies]
@@ -165,12 +167,14 @@ dev = [
 requires-dist = [
     { name = "aio-pika", specifier = "==9.5.5" },
     { name = "boto3", specifier = "==1.37.18" },
+    { name = "cryptography", specifier = "==47.0.0" },
     { name = "fastapi", specifier = "==0.115.12" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "playwright", specifier = "==1.51.0" },
     { name = "pywb", specifier = "==2.11.1" },
     { name = "selectolax", specifier = "==0.3.28" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.34.0" },
+    { name = "websockets", specifier = "==17.4" },
 ]
 
 [package.metadata.requires-dev]

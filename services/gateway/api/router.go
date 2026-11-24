@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
@@ -19,12 +20,19 @@ import (
 const (
 	healthMediaType = "text/plain; charset=utf-8"
 	healthResponse  = "ok\n"
+
+	LoginProxyKey = "login"
 )
+
+type Proxy struct {
+	Origin url.URL
+}
 
 func NewRouter(
 	ready func() bool,
 	app application.Application,
 	logger *slog.Logger,
+	proxies map[string]Proxy,
 ) http.Handler {
 	router := chi.NewRouter()
 
@@ -56,13 +64,20 @@ func NewRouter(
 		_, _ = w.Write([]byte(healthResponse))
 	})
 
+	loginOrigin, ok := proxies[LoginProxyKey]
+
+	if !ok {
+		panic("login proxy not configured")
+	}
+
 	archives := archiveapi.NewHandler(app)
 	router.Post(common.ArchivesPath, archives.Create)
 	router.Get(common.ArchivePath, archives.Status)
 
 	metadata := archiveapi.NewMetadataHandler(app)
 	wacz := archiveapi.NewWACZHandler(app)
-	sessions := sessionapi.NewHandler(app)
+	sessions := sessionapi.NewSessionsHandler(app)
+	browser := sessionapi.NewBrowserHandler(app, loginOrigin.Origin)
 	search := searchapi.NewHandler(app)
 
 	router.Get(common.PagesPath, metadata.Pages)
@@ -74,6 +89,8 @@ func NewRouter(
 	router.Post(common.SessionsPath, sessions.Create)
 	router.Get(common.SessionPath, sessions.Get)
 	router.Put(common.SessionPath, sessions.Update)
+	router.Get(common.SessionBrowserPath, browser.ServeHTTP)
+	router.Get(common.SessionVNCPath, browser.ServeHTTP)
 	router.Get(common.SearchPath, search.Search)
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {

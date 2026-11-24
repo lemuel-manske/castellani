@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -11,35 +11,11 @@ class ArchivePage:
     error_code: str | None = None
     captured_at: str | None = None
 
-    def as_dict(self) -> dict[str, Any]:
-        result: dict[str, Any] = {"url": self.url, "status": self.status}
-
-        if self.snapshot_id is not None:
-            result["snapshotId"] = self.snapshot_id
-
-        if self.error_code is not None:
-            result["errorCode"] = self.error_code
-
-        if self.captured_at is not None:
-            result["capturedAt"] = self.captured_at
-
-        return result
-
 
 @dataclass(frozen=True)
 class PageListing:
     items: tuple[ArchivePage, ...]
     next_cursor: str | None = None
-
-    def as_dict(self) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "items": [item.as_dict() for item in self.items],
-        }
-
-        if self.next_cursor is not None:
-            result["nextCursor"] = self.next_cursor
-
-        return result
 
 
 @dataclass(frozen=True)
@@ -50,22 +26,6 @@ class SnapshotReference:
     final_url: str
     captured_at: str
     content_type: str | None = None
-
-    def as_dict(self) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "archiveId": self.archive_id,
-            "snapshotId": self.snapshot_id,
-            "url": self.url,
-            "capturedAt": self.captured_at,
-        }
-
-        if self.final_url:
-            result["finalUrl"] = self.final_url
-
-        if self.content_type is not None:
-            result["contentType"] = self.content_type
-
-        return result
 
 
 @dataclass(frozen=True)

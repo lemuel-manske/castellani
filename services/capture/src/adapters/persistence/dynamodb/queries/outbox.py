@@ -1,5 +1,7 @@
 from typing import Any
 
+from tables import OUTBOX_TABLE
+
 from ..values import (
     deserialize_attribute,
     number_from_item,
@@ -12,13 +14,12 @@ _CLAIM_LIMIT = 50
 
 def query_due_messages(
     client: Any,
-    table_name: str,
     status: str,
     now: float,
     cursor: dict[str, Any] | None,
 ) -> dict[str, Any]:
     request: dict[str, Any] = {
-        "TableName": table_name,
+        "TableName": OUTBOX_TABLE,
         "IndexName": _OUTBOX_INDEX,
         "KeyConditionExpression": "#status = :status AND #next_attempt <= :now",
         "ExpressionAttributeNames": {
@@ -40,7 +41,6 @@ def query_due_messages(
 
 def claim_message(
     client: Any,
-    table_name: str,
     message_id: str,
     status: str,
     claimed_status: str,
@@ -49,7 +49,7 @@ def claim_message(
     lease_until: float,
 ) -> dict[str, Any]:
     return client.update_item(
-        TableName=table_name,
+        TableName=OUTBOX_TABLE,
         Key={"messageId": {"S": message_id}},
         ConditionExpression="#status = :status AND #next_attempt = :due_at",
         UpdateExpression=(
@@ -76,7 +76,6 @@ def claim_message(
 
 def confirm_message(
     client: Any,
-    table_name: str,
     message_id: str,
     lease_token: str,
     claimed_status: str,
@@ -85,7 +84,7 @@ def confirm_message(
     now: float,
 ) -> None:
     client.update_item(
-        TableName=table_name,
+        TableName=OUTBOX_TABLE,
         Key={"messageId": {"S": message_id}},
         ConditionExpression=(
             "#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :lease_now"
@@ -109,7 +108,6 @@ def confirm_message(
 
 def reschedule_message(
     client: Any,
-    table_name: str,
     message_id: str,
     lease_token: str,
     claimed_status: str,
@@ -118,7 +116,7 @@ def reschedule_message(
     now: float,
 ) -> None:
     client.update_item(
-        TableName=table_name,
+        TableName=OUTBOX_TABLE,
         Key={"messageId": {"S": message_id}},
         ConditionExpression=(
             "#status = :claimed AND #lease_token = :lease_token AND #next_attempt > :now"

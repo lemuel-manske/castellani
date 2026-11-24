@@ -6,12 +6,14 @@ requires-python = "==3.13.5"
 dependencies = [
     "aio-pika==9.5.5",
     "boto3==1.37.18",
+    "cryptography==47.0.0",
     "fastapi==0.115.12",
     "httpx==0.28.1",
     "playwright==1.51.0",
     "pywb==2.11.1",
     "selectolax==0.3.28",
     "uvicorn[standard]==0.34.0",
+    "websockets==17.4",
 ]
 
 [dependency-groups]

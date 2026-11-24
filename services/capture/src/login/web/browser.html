@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Castellani · Authenticate</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #0b1120;
+        color: #e2e8f0;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 16px;
+        padding: 20px;
+        background: radial-gradient(circle at top, #1e293b 0, #0b1120 60%);
+      }
+
+      header, footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        letter-spacing: -0.01em;
+      }
+
+      .eyebrow {
+        color: #94a3b8;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .meta {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        overflow-wrap: anywhere;
+      }
+
+      .badge {
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #0f766e33;
+        color: #5eead4;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+
+      main {
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        background: #020617;
+        box-shadow: 0 24px 60px #0008;
+      }
+
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+
+      button {
+        padding: 10px 18px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      button:disabled { cursor: wait; opacity: 0.6; }
+
+      .primary { background: #0f766e; color: #ecfeff; }
+      .primary:hover { background: #0d9488; }
+      .secondary { background: transparent; border-color: #475569; color: #cbd5e1; }
+      .secondary:hover { border-color: #94a3b8; }
+
+      .error { color: #fca5a5; font-size: 0.875rem; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="eyebrow">Castellani authentication</div>
+        <h1>Sign in to the target site</h1>
+      </div>
+      <div class="badge" id="status">CONNECTING</div>
+    </header>
+
+    <main>
+      <iframe id="browser" title="Interactive target-site browser"></iframe>
+    </main>
+
+    <footer>
+      <div class="meta" id="meta">Preparing your isolated browser…</div>
+      <div>
+        <button class="secondary" id="cancel" type="button">Cancel</button>
+        <button class="primary" id="finish" type="button">Finish login</button>
+      </div>
+      <div class="error" id="error" role="alert"></div>
+    </footer>
+
+    <script>
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const sessionId = pathParts[1];
+      const vncBase = `/sessions/${sessionId}/vnc`;
+      const status = document.getElementById('status');
+      const meta = document.getElementById('meta');
+      const error = document.getElementById('error');
+      const finish = document.getElementById('finish');
+      const cancel = document.getElementById('cancel');
+
+      document.getElementById('browser').src =
+        `${vncBase}/vnc.html?autoconnect=1&resize=scale&reconnect=1` +
+        `&path=${encodeURIComponent(`${vncBase}/websockify`)}`;
+
+      async function loadSession() {
+        const response = await fetch(`/sessions/${sessionId}`, { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error('This session is no longer available.');
+        const session = await response.json();
+        status.textContent = session.status;
+        meta.textContent = `Archive ${session.archiveId} · session ${session.sessionId}`;
+        return session;
+      }
+
+      async function closeSession(nextStatus) {
+        finish.disabled = true;
+        cancel.disabled = true;
+        error.textContent = '';
+        const response = await fetch(`/sessions/${sessionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ status: nextStatus }),
+        });
+        if (!response.ok) {
+          const problem = await response.json().catch(() => ({}));
+          throw new Error(problem.detail || 'Could not close this session.');
+        }
+        status.textContent = nextStatus;
+        window.close();
+      }
+
+      finish.addEventListener('click', () => {
+        closeSession('COMPLETED').catch((reason) => { error.textContent = reason.message; });
+      });
+
+      cancel.addEventListener('click', () => {
+        closeSession('CANCELLED').catch((reason) => { error.textContent = reason.message; });
+      });
+
+      loadSession().catch((reason) => {
+        error.textContent = reason.message;
+        finish.disabled = true;
+        cancel.disabled = true;
+      });
+    </script>
+  </body>
+</html>

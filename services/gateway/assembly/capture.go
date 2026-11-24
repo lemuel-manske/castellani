@@ -87,67 +87,6 @@ func (a captureAdapter) GetWACZ(
 	}, nil
 }
 
-func (a captureAdapter) CreateSession(
-	ctx context.Context,
-	key string,
-	input application.SessionRequest,
-	raw []byte,
-) (application.Session, error) {
-	result, err := a.client.CreateSession(
-		ctx,
-		key,
-		capture.SessionRequest{
-			ArchiveID: input.ArchiveID,
-			TargetURL: input.TargetURL,
-		},
-		raw,
-	)
-
-	if err != nil {
-		return application.Session{}, captureError(err)
-	}
-
-	return mapSession(result), nil
-}
-
-func (a captureAdapter) GetSession(ctx context.Context, sessionID string) (application.Session, error) {
-	result, err := a.client.GetSession(ctx, sessionID)
-
-	if err != nil {
-		return application.Session{}, captureError(err)
-	}
-
-	return mapSession(result), nil
-}
-
-func (a captureAdapter) UpdateSession(
-	ctx context.Context,
-	sessionID string,
-	raw []byte,
-) (application.Session, error) {
-	result, err := a.client.UpdateSession(
-		ctx,
-		sessionID,
-		raw,
-	)
-
-	if err != nil {
-		return application.Session{}, captureError(err)
-	}
-
-	return mapSession(result), nil
-}
-
-func mapSession(result capture.Session) application.Session {
-	return application.Session{
-		SessionID:      result.SessionID,
-		ArchiveID:      result.ArchiveID,
-		Status:         result.Status,
-		ExpiresAt:      result.ExpiresAt,
-		AuthGeneration: result.AuthGeneration,
-	}
-}
-
 func captureError(err error) error {
 	var failure *capture.Failure
 	switch {

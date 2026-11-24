@@ -8,11 +8,11 @@ func (a Application) CreateSession(
 	input SessionRequest,
 	raw []byte,
 ) (Session, error) {
-	if a.capture == nil {
+	if a.login == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.CreateSession(
+	return a.login.CreateSession(
 		ctx,
 		key,
 		input,
@@ -21,11 +21,11 @@ func (a Application) CreateSession(
 }
 
 func (a Application) GetSession(ctx context.Context, sessionID string) (Session, error) {
-	if a.capture == nil {
+	if a.login == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.GetSession(ctx, sessionID)
+	return a.login.GetSession(ctx, sessionID)
 }
 
 func (a Application) UpdateSession(
@@ -33,11 +33,11 @@ func (a Application) UpdateSession(
 	sessionID string,
 	raw []byte,
 ) (Session, error) {
-	if a.capture == nil {
+	if a.login == nil {
 		return Session{}, ErrDependencyUnavailable
 	}
 
-	return a.capture.UpdateSession(
+	return a.login.UpdateSession(
 		ctx,
 		sessionID,
 		raw,

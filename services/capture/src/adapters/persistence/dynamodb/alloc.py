@@ -15,7 +15,6 @@ from .queries.alloc import (
     reservation_from_item,
     reserve_slot,
 )
-from .tables import BROWSER_SLOTS_TABLE
 from .values import number_from_item
 
 DEFAULT_SLOT_COUNT = 10
@@ -87,7 +86,6 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
             try:
                 response = reserve_slot(
                     self.client,
-                    BROWSER_SLOTS_TABLE,
                     slot_id,
                     attempt_id,
                     reservation_id,
@@ -98,7 +96,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                 if not is_conditional_failure(error):
                     raise
 
-                existing = read_slot(self.client, BROWSER_SLOTS_TABLE, slot_id)
+                existing = read_slot(self.client, slot_id)
 
                 if (
                     existing is not None
@@ -121,7 +119,6 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         try:
             response = renew_slot(
                 self.client,
-                BROWSER_SLOTS_TABLE,
                 reservation.slot_id,
                 reservation.attempt_id,
                 reservation.reservation_id,
@@ -143,7 +140,6 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         try:
             release_slot(
                 self.client,
-                BROWSER_SLOTS_TABLE,
                 reservation.slot_id,
                 reservation.attempt_id,
                 reservation.reservation_id,
@@ -161,7 +157,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         for slot_number in range(self.slot_count):
             slot_id = str(slot_number)
 
-            item = read_slot(self.client, BROWSER_SLOTS_TABLE, slot_id)
+            item = read_slot(self.client, slot_id)
 
             if (
                 item is not None

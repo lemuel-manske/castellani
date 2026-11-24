@@ -50,6 +50,22 @@ TABLES: tuple[CreateTableInputTypeDef, ...] = (
         ],
     },
     {
+        "TableName": "capture_sessions",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [{"AttributeName": "sessionId", "KeyType": "HASH"}],
+        "AttributeDefinitions": [
+            {"AttributeName": "sessionId", "AttributeType": "S"},
+        ],
+    },
+    {
+        "TableName": "capture_session_requests",
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [{"AttributeName": "idempotencyKey", "KeyType": "HASH"}],
+        "AttributeDefinitions": [
+            {"AttributeName": "idempotencyKey", "AttributeType": "S"},
+        ],
+    },
+    {
         "TableName": "capture_outbox",
         "BillingMode": "PAY_PER_REQUEST",
         "KeySchema": [{"AttributeName": "messageId", "KeyType": "HASH"}],
