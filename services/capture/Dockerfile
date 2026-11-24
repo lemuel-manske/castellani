@@ -44,5 +44,3 @@ ENV HOME=/home/capture \
 USER capture
 
 EXPOSE 8000 8010
-
-CMD ["/app/.venv/bin/uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

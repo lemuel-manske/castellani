@@ -67,7 +67,7 @@ func stackEnvironment(terraformDir string) map[string]string {
 		"RABBITMQ_PASSWORD": rabbitMQPassword,
 
 		"COORDINATOR_URL":          "http://coordinator:8081",
-		"CAPTURE_URL":              "http://capture:8000",
+		"CAPTURE_URL":              "http://capture-worker:8000",
 		"CAPTURE_LOGIN_URL":        "http://capture-login:8010",
 		"SEARCH_URL":               "http://search:8082",
 		"CAPTURE_AUTH_PROFILE_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

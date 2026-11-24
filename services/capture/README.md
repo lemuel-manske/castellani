@@ -12,7 +12,7 @@ Install the matching Playwright browser with `uv run playwright install chromium
 - `make install`: download dependencies.
 - `make test-infra-up`: start isolated DynamoDB Local and RabbitMQ.
 - `make test-infra-down`: stop local dependencies.
-- `make run`: start the Capture API and background worker runtime.
+- `make run-worker`: start the Capture worker API and background worker runtime.
 - `make run-login`: start the dedicated interactive-login manager.
 - `make fmt`: format and lint the Python service.
 - `make test-unit`: run unit tests.
