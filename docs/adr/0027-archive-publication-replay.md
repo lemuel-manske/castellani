@@ -65,4 +65,4 @@ The archive's authoritative deliverable is the preserved, validated WACZ; full-t
 
 The Coordinator must durably enforce the publish-versus-compensate boundary, while Capture must reconcile packaged artifacts and replay activation. Search's own completion and repair lifecycle remain independent. This protocol is not a two-phase commit and provides no cross-service instantaneous visibility guarantee.
 
-The selected HTTP paths, message schemas and precise state/recovery protocol are documented in [OpenAPI 3.1](../../contracts/openapi/api.yaml) and the [message catalog](../../contracts/messages/README.md). Exact staging object keys, browser replay URL layout, WACZ packager implementation, and retry deadlines remain implementation details.
+The selected HTTP paths, message schemas and precise state/recovery protocol are documented in [OpenAPI 3.1](../../contracts/openapi/api.yaml) and the [message catalog](../../contracts/README.md). Exact staging object keys, browser replay URL layout, WACZ packager implementation, and retry deadlines remain implementation details.

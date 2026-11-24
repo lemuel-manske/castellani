@@ -1,6 +1,8 @@
 # RabbitMQ message catalog (v1)
 
-All broker messages validate against `envelope.v1.schema.json` and their more specific `*.v1.schema.json` payload schema. This is a **logical** routing catalog; broker declaration/configuration will assign durable exchanges, bindings, queues, backoff and DLQ names. Producers write the envelope to a service-owned transactional outbox before publishing. A consumer acknowledges only when its recoverable business obligation is durable.
+Shared definitions live in `shared/` (the envelope and reusable schema fragments). Message contracts live in `messages/`, grouped by bounded context: `crawl/`, `archive/`, and `search/`. Public HTTP contracts live in `openapi/`.
+
+All broker messages validate against `shared/envelope.v1.schema.json` and their more specific `messages/**/*.v1.schema.json` payload schema. This is a **logical** routing catalog; the broker topology is declared in `infra/rabbitmq/topology.json`. Producers write the envelope to a service-owned transactional outbox before publishing. A consumer acknowledges only when its recoverable business obligation is durable.
 
 | Type | Producer | Consumers | Meaning and deduplication identity |
 |---|---|---|---|
@@ -36,4 +38,4 @@ Retries use bounded attempts and backoff, with failed poison messages routed to 
 
 ## Manifest and compatibility
 
-Final capture-set manifest uses `../archive-manifest.v1.schema.json`. Its `snapshots` array enumerates the **authorized successful** snapshots only; `failedPages` reports failed logical navigations. A manifest is immutable once emitted. WACZ contents are selected from the same committed manifest, and package digest identifies the prepared immutable artifact. Artifact refs are readable through authorized service-to-service S3 access without granting read access to Capture-private DynamoDB tables.
+Final capture-set manifest uses `shared/archive-manifest.v1.schema.json`. Its `snapshots` array enumerates the **authorized successful** snapshots only; `failedPages` reports failed logical navigations. A manifest is immutable once emitted. WACZ contents are selected from the same committed manifest, and package digest identifies the prepared immutable artifact. Artifact refs are readable through authorized service-to-service S3 access without granting read access to Capture-private DynamoDB tables.

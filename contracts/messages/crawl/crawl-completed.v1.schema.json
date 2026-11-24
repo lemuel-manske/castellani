@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "archive-prepared.v1.schema.json",
-  "title": "ArchivePrepared",
+  "$id": "crawl-completed.v1.schema.json",
+  "title": "CrawlCompleted",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,7 +22,7 @@
       "minLength": 1
     },
     "type": {
-      "const": "ArchivePrepared"
+      "const": "CrawlCompleted"
     },
     "version": {
       "const": 1
@@ -36,25 +36,34 @@
       "additionalProperties": false,
       "required": [
         "archiveId",
-        "package",
-        "packageDigest",
-        "manifestDigest"
+        "manifest",
+        "manifestDigest",
+        "seedSucceeded",
+        "capturedCount",
+        "failedCount"
       ],
       "properties": {
         "archiveId": {
           "type": "string",
           "minLength": 1
         },
-        "package": {
-          "$ref": "../archive-manifest.v1.schema.json#/$defs/ArtifactRef"
-        },
-        "packageDigest": {
-          "type": "string",
-          "minLength": 1
+        "manifest": {
+          "$ref": "../../shared/archive-manifest.v1.schema.json#/$defs/ArtifactRef"
         },
         "manifestDigest": {
           "type": "string",
           "minLength": 1
+        },
+        "seedSucceeded": {
+          "type": "boolean"
+        },
+        "capturedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failedCount": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

@@ -81,7 +81,7 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "$ref": "../archive-manifest.v1.schema.json#/$defs/ArtifactRef"
+            "$ref": "../../shared/archive-manifest.v1.schema.json#/$defs/ArtifactRef"
           }
         }
       }
