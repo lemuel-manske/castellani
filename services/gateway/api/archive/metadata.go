@@ -36,6 +36,26 @@ func (h MetadataHandler) Pages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.app.RequirePublishedArchive(r.Context(), id); err != nil {
+		if response.WritePublicationError(
+			w,
+			r,
+			err,
+		) {
+			return
+		}
+
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Coordinator",
+			"Coordinator returned invalid archive status.",
+		)
+
+		return
+	}
+
 	pagination, err := params.Pagination(r.URL.Query())
 
 	if err != nil {
@@ -87,6 +107,26 @@ func (h MetadataHandler) Snapshot(w http.ResponseWriter, r *http.Request) {
 			"Invalid Snapshot ID",
 			"Invalid archive or snapshot ID.",
 		))
+
+		return
+	}
+
+	if err := h.app.RequirePublishedArchive(r.Context(), archiveID); err != nil {
+		if response.WritePublicationError(
+			w,
+			r,
+			err,
+		) {
+			return
+		}
+
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Coordinator",
+			"Coordinator returned invalid archive status.",
+		)
 
 		return
 	}

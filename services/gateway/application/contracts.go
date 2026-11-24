@@ -74,6 +74,15 @@ type ArchiveAccepted struct {
 	StatusURL string `json:"statusUrl"`
 }
 
+type ArchiveStatus struct {
+	ArchiveID string `json:"archiveId"`
+	Status    string `json:"status"`
+	Decision  string `json:"decision"`
+	Replay    struct {
+		Status string `json:"status"`
+	} `json:"replay"`
+}
+
 type Capture interface {
 	ListPages(
 		context.Context,

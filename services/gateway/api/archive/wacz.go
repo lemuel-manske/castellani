@@ -47,6 +47,26 @@ func (h WACZHandler) deliver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.app.RequirePublishedArchive(r.Context(), id); err != nil {
+		if response.WritePublicationError(
+			w,
+			r,
+			err,
+		) {
+			return
+		}
+
+		response.WriteDependencyError(
+			w,
+			r,
+			err,
+			"Coordinator",
+			"Coordinator returned invalid archive status.",
+		)
+
+		return
+	}
+
 	rangeHeader := r.Header.Get("Range")
 	ifRange := r.Header.Get("If-Range")
 

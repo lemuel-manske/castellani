@@ -299,10 +299,11 @@ func (c *Client) GetWACZ(
 		}
 
 		return WACZ{}, &Failure{
-			Status: response.StatusCode,
-			Type:   problem.Type,
-			Title:  problem.Title,
-			Detail: problem.Detail,
+			Status:       response.StatusCode,
+			Type:         problem.Type,
+			Title:        problem.Title,
+			Detail:       problem.Detail,
+			ContentRange: response.Header.Get("Content-Range"),
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 )
 
 var (
+	ErrArchiveNotPublished   = errors.New("archive is not published")
 	ErrDependencyUnavailable = errors.New("dependency unavailable")
 	ErrInvalidUpstream       = errors.New("invalid upstream response")
 )

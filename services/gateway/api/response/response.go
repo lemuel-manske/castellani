@@ -9,6 +9,26 @@ import (
 	"github.com/lemuel-manske/castellani/services/gateway/application"
 )
 
+func WritePublicationError(
+	w http.ResponseWriter,
+	r *http.Request,
+	err error,
+) bool {
+	if !errors.Is(err, application.ErrArchiveNotPublished) {
+		return false
+	}
+
+	httpx.WriteProblem(w, httpx.NewProblem(
+		r,
+		http.StatusNotFound,
+		"archive-not-published",
+		"Archive Not Published",
+		"The requested archive content is not available.",
+	))
+
+	return true
+}
+
 func WriteDependencyError(
 	w http.ResponseWriter,
 	r *http.Request,
