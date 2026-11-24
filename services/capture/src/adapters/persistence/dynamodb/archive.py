@@ -68,7 +68,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
             "TableName": FRONTIER_TABLE,
             "KeyConditionExpression": "archiveId = :archive_id",
             "ExpressionAttributeValues": {":archive_id": {"S": archive_id}},
-            "Limit": limit,
+            "Limit": limit + 1,
         }
 
         if cursor is not None:
@@ -76,14 +76,21 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
 
         response = self.client.query(**request)
 
-        items = tuple(page_from_item(item) for item in response.get("Items", ()))
+        rows = tuple(response.get("Items", ()))
+        items = tuple(page_from_item(item) for item in rows[:limit])
 
-        last_key = response.get("LastEvaluatedKey")
+        next_cursor = None
 
-        return PageListing(
-            items=items,
-            next_cursor=encode_cursor(last_key) if last_key else None,
-        )
+        if len(rows) > limit:
+            last_item = rows[limit - 1]
+            next_cursor = encode_cursor(
+                {
+                    "archiveId": last_item["archiveId"],
+                    "urlKey": last_item["urlKey"],
+                }
+            )
+
+        return PageListing(items=items, next_cursor=next_cursor)
 
     async def read_snapshot(
         self,
