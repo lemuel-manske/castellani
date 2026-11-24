@@ -1,0 +1,43 @@
+# ADR implementation gaps
+
+Status of the implementation against the accepted ADRs (29 ADRs, audited 2026-11-24).
+Only observable gaps and contradictions are listed. Paths are relative to the repository root.
+
+## 1. Missing implementation
+
+| ADR | Gap | Evidence |
+|---|---|---|
+| 0015 | Workers still create fresh attempt-local browser contexts instead of consuming stored authentication generations. There is no auth-rejection detection, durable `WAITING_FOR_AUTH` state, renewal/continue choice, or reactivation and fencing after a new generation. | `services/capture/src/adapters/browser/executor.py`; `services/capture/src/capture/worker/runner.py`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py`; `services/capture/src/domain/capture/capture.py` |
+| 0012, 0013 | `StartCrawl` is published to `castellani.events`, but Capture's only queue binds `castellani.capture`/`CapturePage`; no consumer or binding handles `StartCrawl`, so no run ever seeds the frontier. | `services/coordinator/adapters/messaging/rabbitmq/publisher.go`; `services/capture/src/adapters/messaging/rabbitmq/topology.py`; `consumer.py` |
+| 0013 | No crawl closure: nothing closes run admission, derives a terminal crawl decision from frontier accounting, emits `CrawlCompleted`, or writes a final manifest. | `services/capture/src/adapters/persistence/dynamodb/queries/task.py`; `services/capture/src/adapters/messaging/rabbitmq/consumer.py` |
+| 0022, 0025 | `allowedOrigins` and `normalizerVersion` are validated and forwarded by Gateway/Coordinator but never consumed by Capture; there is no seed-origin scope enforcement, redirect scope check, or per-host politeness/rate limiting. | `services/gateway/api/archive/archive.go`; `services/coordinator/adapters/persistence/dynamodb/api.go`; `services/capture/src/`; `docs/adr/0022-custom-distributed-crawler.md` |
+| 0022 | Persisted outcomes do not distinguish blocked authentication, unsupported content, or partial capture with missing dependencies; only success/failure codes exist. | `services/capture/src/domain/capture/capture.py`; `docs/adr/0022-custom-distributed-crawler.md` |
+| 0014, 0023, 0027 | No WACZ packaging or validation. Capture persists only attempt-scoped WARC segments; `ArchivePrepared`, `ArchivePublished`, and `ArchiveCompensated` are never produced and publication/compensation decisions are never consumed, so the SAGA cannot reach `COMPLETED`/`COMPENSATED`. | `services/capture/src/capture/browser/recording.py`; `services/capture/src/adapters/messaging/rabbitmq/consumer.py`; `services/coordinator/domain/saga.go` |
+| 0014, 0019, 0020 | Search has no transactional outbox and never emits `SearchIndexingCompleted`, `SearchReady`, or `SearchCompensated`; Coordinator cannot observe search progress or confirm staged-search cleanup. | `services/search/src/application/processPublicationEvent.ts`; `services/search/src/adapters/messaging/rabbitmq/topology.ts`; no outbox under `services/search/src` |
+| 0019 | Publication handling only records ledger facts; no search activation or index refresh occurs, so authorized documents can remain outside the query-visible index. No client-facing indexing failure reason is exposed separately from capture failures. | `services/search/src/application/processPublicationEvent.ts`; `services/search/src/adapters/search/opensearch.ts`; `contracts/openapi/api.yaml` |
+| 0018 | Structured fault/correlation logging is absent: Search disables its logger and Capture logs only outbox exceptions; no recovery metrics exist. | `services/search/src/api/server.ts`; `services/capture/src/application/capture/outbox.py`; `services/gateway/main.go`; `services/coordinator/main.go` |
+| 0006 | No S3 cleanup path: Capture's S3 adapter has no delete operation and no compensation consumer, so run-wide rollback cannot remove staged artifacts. | `services/capture/src/adapters/artifacts/s3.py`; `docs/adr/0006-s3-artifact-storage.md` |
+| 0018 | No configurable fault injection (latency/failure rates, fault points, correlation logging), no F1–F8 scenario scripts, and no queue/outbox/crawl/SAGA/retry/compensation metrics. `tests/` contains six Gateway HTTP-validation tests only. | `tests/tests/`; no fault/metric symbols in `services/`; `docs/adr/0018-fault-injection-verification.md` |
+| 0023, 0027, 0029 | Self-hosted ReplayWeb.page, replay URL resolution, byte-range delivery, and snapshot navigation are not deployed or implemented. ReplayWeb.page appears only in ADR text. | `docker-compose.yaml`; grep for `replayweb` finds only ADR documents |
+| 0017 | Optional queue-based autoscaler and its backlog-driven demonstration are absent. ADR calls it optional, so correctness is unaffected, but no controller, docs, or F8-with-autoscaling evidence exists. | no autoscale source or Compose service; `docs/adr/0017-queue-based-autoscaling.md` |
+| 0025 | Minimum-depth correction is not implemented: depth is fixed at first admission and there is no link-edge retention or descendant re-evaluation for later shorter paths. | `services/capture/src/domain/capture/discovery.py`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py` |
+| 0026 | Acceptance gate is only partly met: local WARC recording/replay tests exist, but no authenticated, JS-rendered page through a recorder, no WACZ packaging/replay-from-WACZ check, no interrupted-write test, and no Browsertrix comparison. | `services/capture/tests/test_recording.py`; `services/capture/tests/test_replay.py`; `docs/adr/0026-capture-local-warc-recording.md` |
+| 0009 | Cross-service suite covers only Gateway request validation; no async processing, container-failure, competing-consumer, broker-outage, or recovery scenarios. Gateway and Coordinator have zero service-local Go tests. | `tests/tests/*.go`; `services/gateway/Makefile`; `services/coordinator/Makefile` |
+| 0016 | Capture shutdown cancels consumer/dispatcher tasks instead of draining bounded in-flight work. | `services/capture/src/capture/runtime.py`; `docs/adr/0016-containerized-deployment-scaling.md` |
+
+## 2. Contradictions with accepted ADRs
+
+| ADR | Conflict | Evidence |
+|---|---|---|
+| 0012 | `contracts/` must be authoritative. Search duplicates a `PageCaptured` schema inline requiring `finalUrl` and `redirectChain`, which the published contract marks optional, so contract-valid messages are rejected. | `contracts/messages/page-captured.v1.schema.json`; `services/search/src/application/types.ts` |
+| 0013 | `outstandingPages` is decremented on capture completion but not on terminal failure, so a run with any failed page can never reach crawl termination. | `services/capture/src/adapters/persistence/dynamodb/task.py`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py` |
+| 0020 | Capture page deliveries requeue indefinitely and malformed envelopes are silently rejected with no DLQ; consumers do not atomically register processed `messageId` values with their effects (Search overwrites `lastMessageId` only). | `services/capture/src/adapters/messaging/rabbitmq/consumer.py`; `services/search/src/adapters/persistence/dynamodb/indexing-ledger-queries.ts`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py` |
+| 0026 | pywb is pinned in production dependencies and wired into the runtime while ADR-0026 explicitly defers recorder selection until the acceptance gate passes; no gate result is recorded. | `services/capture/pyproject.toml`; `services/capture/src/adapters/browser/executor.py`; `docs/adr/0026-capture-local-warc-recording.md` |
+| 0021, 0018 | F5's 100-contender invariant is covered only by a service-local integration test; no versioned stack-level F5 scenario asserts it against three replicas as ADR-0018 requires. | `services/capture/tests/test_dynamodb_browser_capacity.py`; `tests/tests/` |
+
+## 3. Priority
+
+1. Close the end-to-end path: route/consume `StartCrawl` → crawl termination + manifest → WACZ packaging/publication → `ArchivePrepared`/`ArchivePublished` → SAGA completion (0012/0013/0014/0023/0027).
+2. Consume stored authentication generations in page workers: detect auth rejection, block only affected tasks in `WAITING_FOR_AUTH`, support renewal/continue and fence stale workers (0015). The dedicated manager and protected profile storage already exist (0028).
+3. Add fault injection, F1–F8 scenarios and metrics (0018); add the missing Search outbox and compensation events (0014/0020).
+4. Resolve remaining contradictions in 0012, 0013, 0020, 0021/0018 and 0026.
