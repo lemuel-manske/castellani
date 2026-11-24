@@ -1,14 +1,14 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from domain import (
+from domain.capture import (
     ArtifactReference,
     CaptureOutcome,
     DiscoveredPage,
     PageTask,
     TaskClaim,
 )
-from tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
+from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 
 def claim_from_item(

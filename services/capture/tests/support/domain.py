@@ -2,7 +2,7 @@ from typing import Any
 
 from mypy_boto3_dynamodb.client import DynamoDBClient
 
-from domain import PageTask, TaskClaim
+from domain.capture import PageTask, TaskClaim
 
 
 def seed_run(

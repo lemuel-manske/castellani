@@ -16,7 +16,7 @@ from adapters.persistence.dynamodb.archive import (
     DynamoDBArchiveRetrieval,
     encode_cursor,
 )
-from domain import (
+from domain.capture import (
     ArchivePage,
     InvalidArchiveCursor,
     InvalidWACZRange,

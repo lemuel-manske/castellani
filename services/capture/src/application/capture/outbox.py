@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Protocol
 
-from domain import OutboxRepository
+from domain.capture import OutboxRepository
 
 logger = logging.getLogger(__name__)
 

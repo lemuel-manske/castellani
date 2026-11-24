@@ -4,15 +4,16 @@ from typing import Any
 
 from botocore.exceptions import ClientError
 
-from application import DuplicateSessionRequest, SessionConflict
-from buckets import AUTH_PROFILE_BUCKET
-from domain import (
+from domain.login import (
     ACTIVE_SESSION_STATUSES,
     AuthProfileReference,
     AuthSession,
+    DuplicateSessionRequest,
+    SessionConflict,
     SessionStatus,
     SessionStore,
 )
+from topology.buckets import AUTH_PROFILE_BUCKET
 from utils.time import utc_now
 
 from .error_handling import is_conditional_failure

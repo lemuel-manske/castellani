@@ -140,7 +140,7 @@ services:
       context: ./services/capture
       dockerfile: Dockerfile
 
-    command: ["/app/.venv/bin/uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["/app/.venv/bin/uvicorn", "capture.api:app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
 
     ports:
       - "127.0.0.1:${CAPTURE_PORT}:8000"

@@ -7,7 +7,7 @@ from adapters.persistence.dynamodb.task import (
     DynamoDBTaskRepository,
     TaskClaimLostError,
 )
-from domain import identify_url
+from domain.capture import identify_url
 
 
 @pytest.mark.integration

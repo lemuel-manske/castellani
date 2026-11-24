@@ -12,7 +12,7 @@ from capture.browser import (
     capture_local_page,
     capture_page,
 )
-from capture.recording import PyWBRecorder
+from capture.browser.recording import PyWBRecorder
 from utils.io import read_gzip_files
 
 pytestmark = pytest.mark.integration

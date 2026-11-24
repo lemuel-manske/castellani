@@ -2,10 +2,14 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from domain import (
+from domain.login import (
     AuthProfileStore,
     AuthSession,
+    DuplicateSessionRequest,
     InteractiveBrowser,
+    LoginUnavailable,
+    SessionConflict,
+    SessionNotFound,
     SessionRequest,
     SessionStatus,
     SessionStore,
@@ -13,22 +17,6 @@ from domain import (
 )
 
 SESSION_ID_BYTES = 24
-
-
-class DuplicateSessionRequest(ValueError):
-    pass
-
-
-class SessionNotFound(KeyError):
-    pass
-
-
-class SessionConflict(ValueError):
-    pass
-
-
-class LoginUnavailable(RuntimeError):
-    pass
 
 
 class LoginManager:

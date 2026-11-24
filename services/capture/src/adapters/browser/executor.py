@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from capture.browser import CaptureLimits, capture_page
-from domain import PageCapture
-from worker import CaptureArtifact
+from capture.worker import CaptureArtifact
+from domain.capture import PageCapture
 
 
 class BrowserPageExecutor:

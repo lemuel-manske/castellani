@@ -1,6 +1,6 @@
 from typing import Any
 
-from tables import OUTBOX_TABLE
+from topology.tables import OUTBOX_TABLE
 
 from ..values import (
     deserialize_attribute,

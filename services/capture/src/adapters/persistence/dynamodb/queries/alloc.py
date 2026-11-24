@@ -1,7 +1,7 @@
 from typing import Any
 
-from domain import CaptureReservation
-from tables import BROWSER_SLOTS_TABLE
+from domain.capture import CaptureReservation
+from topology.tables import BROWSER_SLOTS_TABLE
 
 from ..values import number_from_item
 

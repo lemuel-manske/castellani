@@ -32,7 +32,7 @@ check:
 
 
 run-worker:
-	PYTHONPATH=src uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+	PYTHONPATH=src uv run uvicorn capture.api:app --factory --host 0.0.0.0 --port 8000
 
 
 run-login:

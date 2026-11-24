@@ -6,7 +6,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-from capture.recording import PyWBReplayServer
+from capture.browser.recording import PyWBReplayServer
 
 HOST = "127.0.0.1"
 

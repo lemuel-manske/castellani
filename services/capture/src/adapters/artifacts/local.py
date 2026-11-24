@@ -3,8 +3,8 @@ import hashlib
 import shutil
 from pathlib import Path
 
-from domain import ArtifactReference, TaskClaim
-from worker import ArtifactStore
+from capture.worker import ArtifactStore
+from domain.capture import ArtifactReference, TaskClaim
 
 
 def references(

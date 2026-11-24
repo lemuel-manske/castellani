@@ -1,5 +1,4 @@
-from domain import TaskRepository
-from domain.alloc import CaptureAllocator
+from domain.capture import CaptureAllocator, TaskRepository
 
 from .api import (
     ArtifactStore,
@@ -8,7 +7,7 @@ from .api import (
     CaptureRunner,
     LeaseLostError,
 )
-from .worker import ConcreteCaptureWorker
+from .runner import ConcreteCaptureWorker
 
 
 def new_worker(

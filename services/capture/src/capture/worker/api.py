@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from domain import ArtifactReference, PageCapture, TaskClaim
+from domain.capture import ArtifactReference, PageCapture, TaskClaim
 
 
 @dataclass(frozen=True)

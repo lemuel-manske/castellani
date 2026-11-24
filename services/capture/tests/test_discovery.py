@@ -1,4 +1,4 @@
-from domain import PageTask, identify_discovered_pages
+from domain.capture import PageTask, identify_discovered_pages
 
 
 def test_discovery_normalizes_and_deduplicates_navigation_identity() -> None:
