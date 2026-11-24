@@ -5,6 +5,7 @@ go 1.25.0
 toolchain go1.25.4
 
 require (
+	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/compose v0.41.0
@@ -37,7 +38,6 @@ require (
 	github.com/docker/buildx v0.31.1 // indirect
 	github.com/docker/cli v29.2.1+incompatible // indirect
 	github.com/docker/compose/v5 v5.1.0 // indirect
-	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
