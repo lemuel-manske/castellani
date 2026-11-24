@@ -1,6 +1,13 @@
 import gzip
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
+
+
+async def collect(body: AsyncIterator[bytes] | None) -> bytes:
+    """Collects an async byte stream into bytes."""
+    assert body is not None
+
+    return b"".join([chunk async for chunk in body])
 
 
 def read_gzip_files(files: Sequence[Path]) -> bytes:
