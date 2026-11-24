@@ -2,10 +2,12 @@
 package dynamodb
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
-
-const archiveTimestampLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
 const (
 	OutboxClaimed   = "CLAIMED"
@@ -14,15 +16,8 @@ const (
 
 	StartCrawlType = "StartCrawl"
 
-	ArchivesTable    = "coordinator_archives"
-	SubmissionsTable = "coordinator_submissions"
-	OutboxTable      = "coordinator_outbox"
-	InboxTable       = "coordinator_inbox"
+	messageVersion = 1
 )
-
-type DynamoRepository struct {
-	client *dynamodb.Client
-}
 
 type AdmissionKey struct {
 	archiveID   string
@@ -48,8 +43,48 @@ type StartCrawlPayload struct {
 	AuthGeneration *int     `json:"authGeneration,omitempty"`
 }
 
-func NewDynamoRepository(client *dynamodb.Client) *DynamoRepository {
-	return &DynamoRepository{
+type DynamoArchiveRepository struct {
+	client *dynamodb.Client
+}
+
+type DynamoOutbox struct {
+	client *dynamodb.Client
+}
+
+func NewDynamoArchiveRepository(client *dynamodb.Client) *DynamoArchiveRepository {
+	return &DynamoArchiveRepository{
 		client: client,
 	}
+}
+
+func NewDynamoOutbox(client *dynamodb.Client) *DynamoOutbox {
+	return &DynamoOutbox{
+		client: client,
+	}
+}
+
+func generateArchiveID() (string, error) {
+	return generateID("run-")
+}
+
+func generateMessageID() (string, error) {
+	return generateID("msg-")
+}
+
+func generateRecoveryID() (string, error) {
+	return generateID("recovery-")
+}
+
+func generateLeaseToken() (string, error) {
+	return generateID("lease-")
+}
+
+func generateID(prefix string) (string, error) {
+	var data [16]byte
+
+	if _, err := rand.Read(data[:]); err != nil {
+		return "", fmt.Errorf("generate identifier: %w", err)
+	}
+
+	return prefix + hex.EncodeToString(data[:]), nil
 }

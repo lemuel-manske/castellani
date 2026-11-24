@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
-	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
 
 func (a *Application) SubmitArchive(
@@ -14,7 +13,9 @@ func (a *Application) SubmitArchive(
 	submission domain.Submission,
 ) (AcceptedArchive, error) {
 	if err := submission.Validate(); err != nil {
-		return AcceptedArchive{}, SubmissionValidationError{cause: err}
+		return AcceptedArchive{}, SubmissionValidationError{
+			cause: err,
+		}
 	}
 
 	fingerprint, err := submission.Fingerprint()
@@ -23,7 +24,7 @@ func (a *Application) SubmitArchive(
 		return AcceptedArchive{}, err
 	}
 
-	admission := persistence.Admission{
+	admission := Admission{
 		Key:         key,
 		Fingerprint: fingerprint,
 		Submission:  submission,
@@ -31,7 +32,7 @@ func (a *Application) SubmitArchive(
 
 	accepted, err := a.repository.Admit(ctx, admission)
 
-	if errors.Is(err, persistence.ErrIdempotencyConflict) {
+	if errors.Is(err, ErrIdempotencyConflict) {
 		return AcceptedArchive{}, ErrIdempotencyConflict
 	}
 
@@ -43,7 +44,7 @@ func (a *Application) SubmitArchive(
 func (a *Application) GetArchive(ctx context.Context, id string) (domain.Archive, error) {
 	archive, err := a.repository.Find(ctx, id)
 
-	if errors.Is(err, persistence.ErrArchiveNotFound) {
+	if errors.Is(err, ErrArchiveNotFound) {
 		return domain.Archive{}, ErrArchiveNotFound
 	}
 

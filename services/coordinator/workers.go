@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/lemuel-manske/castellani/services/coordinator/adapters/messaging/dispatcher"
+	"github.com/lemuel-manske/castellani/services/coordinator/adapters/messaging/rabbitmq"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
-	"github.com/lemuel-manske/castellani/services/coordinator/messaging/dispatcher"
-	"github.com/lemuel-manske/castellani/services/coordinator/messaging/rabbitmq"
 )
 
 const (

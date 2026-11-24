@@ -9,12 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/lemuel-manske/castellani/services/coordinator/assembly"
-	persistence "github.com/lemuel-manske/castellani/services/coordinator/persistence/dynamodb"
 )
 
 const (
@@ -66,34 +61,18 @@ func run(logger *slog.Logger) error {
 		listener.Addr().String(),
 	)
 
-	awsConfig, err := awsconfig.LoadDefaultConfig(
+	built, err := assembly.NewComponents(
 		ctx,
-		awsconfig.WithRegion(config.region),
-		awsconfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(
-				config.awsAccessKeyID,
-				config.awsSecretAccessKey,
-				"",
-			),
-		),
+		config.region,
+		config.awsAccessKeyID,
+		config.awsSecretAccessKey,
+		config.dynamoEndpoint,
+		config.rabbitURL,
 	)
 
 	if err != nil {
-		return fmt.Errorf("load persistence configuration: %w", err)
+		return err
 	}
-
-	client := dynamodb.NewFromConfig(awsConfig, func(options *dynamodb.Options) {
-		if config.dynamoEndpoint != "" {
-			options.BaseEndpoint = aws.String(config.dynamoEndpoint)
-		}
-	})
-
-	repository := persistence.NewDynamoRepository(client)
-
-	built := assembly.NewComponents(
-		repository,
-		config.rabbitURL,
-	)
 
 	StartWorkers(
 		ctx,

@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
-	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
 
 const eventCommitAttempts = 8
@@ -37,14 +36,14 @@ func (a *Application) HandleEvent(ctx context.Context, event domain.Event) error
 		)
 
 		switch {
-		case err == nil, errors.Is(err, persistence.ErrAlreadyProcessed):
+		case err == nil, errors.Is(err, ErrAlreadyProcessed):
 			return nil
-		case errors.Is(err, persistence.ErrRevisionConflict):
+		case errors.Is(err, ErrRevisionConflict):
 			continue
 		default:
 			return err
 		}
 	}
 
-	return persistence.ErrRevisionConflict
+	return ErrRevisionConflict
 }

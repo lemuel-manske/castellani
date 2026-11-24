@@ -11,13 +11,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/lemuel-manske/castellani/libs/httpx"
 	archiveapi "github.com/lemuel-manske/castellani/services/coordinator/api/archive"
+	healthapi "github.com/lemuel-manske/castellani/services/coordinator/api/health"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 	"github.com/lemuel-manske/castellani/services/coordinator/common"
-)
-
-const (
-	healthMediaType = "text/plain; charset=utf-8"
-	healthResponse  = "ok\n"
 )
 
 func NewRouter(
@@ -50,32 +46,13 @@ func NewRouter(
 		})
 	})
 
-	router.Get(common.HealthLivePath, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", healthMediaType)
-		w.WriteHeader(http.StatusOK)
+	health := healthapi.NewHandler(ready)
 
-		_, _ = w.Write([]byte(healthResponse))
-	})
-
-	router.Get(common.HealthReadyPath, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", healthMediaType)
-
-		if !ready() {
-			http.Error(
-				w,
-				"unavailable",
-				http.StatusServiceUnavailable,
-			)
-
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-
-		_, _ = w.Write([]byte(healthResponse))
-	})
+	router.Get(common.HealthLivePath, health.Live)
+	router.Get(common.HealthReadyPath, health.Ready)
 
 	archives := archiveapi.NewHandler(app)
+
 	router.Post(common.ArchivesPath, archives.Create)
 	router.Get(common.ArchivePath, archives.Status)
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
-	"github.com/lemuel-manske/castellani/services/coordinator/persistence"
 )
 
 const stalledArchiveLimit = 100
@@ -41,7 +40,7 @@ func (a *Application) ReconcileStalled(ctx context.Context, age time.Duration) (
 			effect,
 		)
 
-		if errors.Is(err, persistence.ErrRevisionConflict) {
+		if errors.Is(err, ErrRevisionConflict) {
 			continue
 		}
 
