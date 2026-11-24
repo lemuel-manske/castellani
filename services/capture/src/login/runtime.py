@@ -80,7 +80,6 @@ class LoginRuntime:
             )
             profiles = EncryptedAuthProfileStore(
                 s3_client=self.s3_client,
-                dynamodb_client=self.dynamodb_client,
                 cipher=AuthProfileCipher(self.settings.auth_profile_key),
             )
 

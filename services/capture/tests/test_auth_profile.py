@@ -1,6 +1,5 @@
 import pytest
 from cryptography.exceptions import InvalidTag
-from mypy_boto3_dynamodb.client import DynamoDBClient
 from support.s3 import FakeS3
 
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
@@ -26,7 +25,7 @@ def test_profile_cipher_rejects_a_tampered_ciphertext() -> None:
 
 
 async def test_profile_store_encrypts_state_under_a_generation_key(s3: FakeS3) -> None:
-    store = new_store(s3, None)
+    store = new_store(s3)
 
     key = await store.save("archive-1", 2, STATE)
     loaded = await store.load(key)
@@ -39,33 +38,12 @@ async def test_profile_store_encrypts_state_under_a_generation_key(s3: FakeS3) -
     )
 
 
-@pytest.mark.integration
-async def test_profile_store_loads_the_latest_generation(
-    dynamodb: DynamoDBClient,
-    s3: FakeS3,
-) -> None:
-    store = new_store(s3, dynamodb)
-    key = await store.save("archive-1", 1, STATE)
-    dynamodb.update_item(
-        TableName="capture_runs",
-        Key={"archiveId": {"S": "archive-1"}},
-        UpdateExpression="SET authGeneration = :generation, authProfileKey = :key",
-        ExpressionAttributeValues={
-            ":generation": {"N": "1"},
-            ":key": {"S": key},
-        },
-    )
-
-    assert await store.load_latest("archive-1") == STATE
-
-
 def new_cipher() -> AuthProfileCipher:
     return AuthProfileCipher(b"0" * 32)
 
 
-def new_store(s3: FakeS3, dynamodb: DynamoDBClient | None) -> AuthProfileStore:
+def new_store(s3: FakeS3) -> AuthProfileStore:
     return EncryptedAuthProfileStore(
         s3_client=s3,
-        dynamodb_client=dynamodb,
         cipher=new_cipher(),
     )

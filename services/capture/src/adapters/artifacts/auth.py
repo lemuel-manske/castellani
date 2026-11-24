@@ -7,7 +7,6 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from buckets import AUTH_PROFILE_BUCKET
 from domain import AuthProfileStore
-from tables import RUNS_TABLE
 
 NONCE_BYTES = 12
 
@@ -41,14 +40,8 @@ class AuthProfileCipher:
 
 
 class EncryptedAuthProfileStore(AuthProfileStore):
-    def __init__(
-        self,
-        s3_client: Any,
-        dynamodb_client: Any,
-        cipher: AuthProfileCipher,
-    ) -> None:
+    def __init__(self, s3_client: Any, cipher: AuthProfileCipher) -> None:
         self.s3_client = s3_client
-        self.dynamodb_client = dynamodb_client
         self.cipher = cipher
 
     async def save(self, archive_id: str, generation: int, state: dict[str, Any]) -> str:
@@ -81,27 +74,3 @@ class EncryptedAuthProfileStore(AuthProfileStore):
         ciphertext = await asyncio.to_thread(get)
 
         return self.cipher.decrypt(ciphertext)
-
-    async def load_latest(self, archive_id: str) -> dict[str, Any] | None:
-        def read_index() -> tuple[int, str] | None:
-            response = self.dynamodb_client.get_item(
-                TableName=RUNS_TABLE,
-                Key={"archiveId": {"S": archive_id}},
-                ConsistentRead=True,
-            )
-            item = response.get("Item")
-
-            if not item or "authGeneration" not in item or "authProfileKey" not in item:
-                return None
-
-            return (
-                int(item["authGeneration"]["N"]),
-                item["authProfileKey"]["S"],
-            )
-
-        index = await asyncio.to_thread(read_index)
-
-        if index is None:
-            return None
-
-        return await self.load(index[1])

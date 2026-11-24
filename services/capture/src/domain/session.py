@@ -70,6 +70,12 @@ class SessionRequest:
 
 
 @dataclass(frozen=True)
+class AuthProfileReference:
+    generation: int
+    key: str
+
+
+@dataclass(frozen=True)
 class BrowserEndpoint:
     session_id: str
     vnc_origin: str
@@ -96,6 +102,8 @@ class SessionStore(Protocol):
 
     async def set_profile(self, archive_id: str, generation: int, key: str) -> None: ...
 
+    async def load_profile_reference(self, archive_id: str) -> AuthProfileReference | None: ...
+
     async def reconcile_abandoned(self, manager_id: str) -> None: ...
 
 
@@ -103,8 +111,6 @@ class AuthProfileStore(Protocol):
     async def save(self, archive_id: str, generation: int, state: dict[str, Any]) -> str: ...
 
     async def load(self, key: str) -> dict[str, Any]: ...
-
-    async def load_latest(self, archive_id: str) -> dict[str, Any] | None: ...
 
 
 def request_fingerprint(request: SessionRequest) -> str:

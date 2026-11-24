@@ -9,7 +9,7 @@ from support.domain import seed_run
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from application import DuplicateSessionRequest, SessionConflict
 from buckets import AUTH_PROFILE_BUCKET
-from domain import AuthSession, SessionStatus
+from domain import AuthProfileReference, AuthSession, SessionStatus
 
 
 @pytest.mark.integration
@@ -119,6 +119,30 @@ async def test_stale_generation_cannot_replace_the_current_profile_reference(
 
     with pytest.raises(ClientError):
         await store.set_profile("archive-1", 1, "auth-profiles/archive-1/generation-1")
+
+
+@pytest.mark.integration
+async def test_profile_reference_is_absent_without_a_saved_profile(
+    dynamodb: DynamoDBClient,
+) -> None:
+    seed_run(dynamodb)
+
+    assert await new_store(dynamodb).load_profile_reference("archive-1") is None
+
+
+@pytest.mark.integration
+async def test_profile_reference_reads_the_current_generation(
+    dynamodb: DynamoDBClient,
+) -> None:
+    seed_run(dynamodb)
+    store = new_store(dynamodb)
+    generation = await store.reserve_generation("archive-1")
+    await store.set_profile("archive-1", generation, "auth-profiles/archive-1/generation-1")
+
+    assert await store.load_profile_reference("archive-1") == AuthProfileReference(
+        generation=1,
+        key="auth-profiles/archive-1/generation-1",
+    )
 
 
 @pytest.mark.integration

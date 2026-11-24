@@ -12,6 +12,7 @@ from application import (
     SessionNotFound,
 )
 from domain import (
+    AuthProfileReference,
     AuthProfileStore,
     AuthSession,
     BrowserEndpoint,
@@ -275,6 +276,12 @@ class MemorySessionStore(SessionStore):
     async def set_profile(self, archive_id: str, generation: int, key: str) -> None:
         self.profile = (archive_id, generation, key)
 
+    async def load_profile_reference(self, archive_id: str) -> AuthProfileReference | None:
+        if self.profile is None or self.profile[0] != archive_id:
+            return None
+
+        return AuthProfileReference(generation=self.profile[1], key=self.profile[2])
+
     async def reconcile_abandoned(self, manager_id: str) -> None:
         for session_id, session in tuple(self.sessions.items()):
             if session.terminal or session.manager_id == manager_id:
@@ -330,6 +337,3 @@ class MemoryProfiles(AuthProfileStore):
 
     async def load(self, key: str) -> dict[str, Any]:
         return self.saved[1]
-
-    async def load_latest(self, archive_id: str) -> dict[str, Any] | None:
-        return self.saved.get(1)

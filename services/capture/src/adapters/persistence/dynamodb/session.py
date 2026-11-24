@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 
 from application import DuplicateSessionRequest, SessionConflict
 from buckets import AUTH_PROFILE_BUCKET
-from domain import AuthSession, SessionStatus, SessionStore
+from domain import AuthProfileReference, AuthSession, SessionStatus, SessionStore
 from tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 
 from .queries.task import read_run
@@ -211,6 +211,23 @@ class DynamoDBSessionStore(SessionStore):
             )
 
         await asyncio.to_thread(update)
+
+    async def load_profile_reference(self, archive_id: str) -> AuthProfileReference | None:
+        def read() -> AuthProfileReference | None:
+            run = read_run(self.client, RUNS_TABLE, archive_id)
+
+            if run is None:
+                return None
+
+            generation = optional_number(run, "authGeneration")
+            key = optional_string(run, "authProfileKey")
+
+            if generation is None or key is None:
+                return None
+
+            return AuthProfileReference(generation=generation, key=key)
+
+        return await asyncio.to_thread(read)
 
     async def reconcile_abandoned(self, manager_id: str) -> None:
         def reconcile() -> None:

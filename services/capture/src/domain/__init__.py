@@ -19,6 +19,7 @@ from .discovery import DiscoveredPage, identify_discovered_pages
 from .outbox import OutboxMessage, OutboxRepository
 from .session import (
     TERMINAL_SESSION_STATUSES,
+    AuthProfileReference,
     AuthProfileStore,
     AuthSession,
     BrowserEndpoint,
@@ -41,6 +42,7 @@ __all__ = [
     "ArchivePage",
     "ArchiveRetrieval",
     "ArtifactReference",
+    "AuthProfileReference",
     "AuthProfileStore",
     "AuthSession",
     "BrowserEndpoint",
