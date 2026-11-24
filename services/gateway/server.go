@@ -104,12 +104,16 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		shutdownTimeout: cfg.shutdownTimeout,
 	}
 
+	origins := map[string]api.Proxy{
+		api.LoginProxyKey: {Origin: *loginURL},
+	}
+
 	gateway.http = &http.Server{
 		Handler: api.NewRouter(
 			gateway.ready.Load,
 			app,
-			*loginURL,
 			logger,
+			origins,
 		),
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,

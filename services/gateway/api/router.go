@@ -20,13 +20,19 @@ import (
 const (
 	healthMediaType = "text/plain; charset=utf-8"
 	healthResponse  = "ok\n"
+
+	LoginProxyKey = "login"
 )
+
+type Proxy struct {
+	Origin url.URL
+}
 
 func NewRouter(
 	ready func() bool,
 	app application.Application,
-	loginOrigin url.URL,
 	logger *slog.Logger,
+	proxies map[string]Proxy,
 ) http.Handler {
 	router := chi.NewRouter()
 
@@ -58,14 +64,20 @@ func NewRouter(
 		_, _ = w.Write([]byte(healthResponse))
 	})
 
+	loginOrigin, ok := proxies[LoginProxyKey]
+
+	if !ok {
+		panic("login proxy not configured")
+	}
+
 	archives := archiveapi.NewHandler(app)
 	router.Post(common.ArchivesPath, archives.Create)
 	router.Get(common.ArchivePath, archives.Status)
 
 	metadata := archiveapi.NewMetadataHandler(app)
 	wacz := archiveapi.NewWACZHandler(app)
-	sessions := sessionapi.NewHandler(app)
-	browser := sessionapi.NewBrowserHandler(app, loginOrigin)
+	sessions := sessionapi.NewSessionsHandler(app)
+	browser := sessionapi.NewBrowserHandler(app, loginOrigin.Origin)
 	search := searchapi.NewHandler(app)
 
 	router.Get(common.PagesPath, metadata.Pages)
