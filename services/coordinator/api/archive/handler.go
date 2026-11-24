@@ -35,6 +35,7 @@ type AcceptedResponse struct {
 type ArchiveResponse struct {
 	ArchiveID string `json:"archiveId"`
 	Status    string `json:"status"`
+	Decision  string `json:"decision,omitempty"`
 
 	Capture struct {
 		Captured int `json:"captured"`
@@ -182,6 +183,7 @@ func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
 	response := ArchiveResponse{
 		ArchiveID: archive.ID,
 		Status:    archive.Status,
+		Decision:  archive.Decision,
 	}
 
 	response.Capture.Captured = archive.Capture.Captured
