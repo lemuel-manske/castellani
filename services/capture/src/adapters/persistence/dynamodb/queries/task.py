@@ -8,7 +8,7 @@ from domain import (
     PageTask,
     TaskClaim,
 )
-from tables import RUNS_TABLE
+from tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 
 def claim_from_item(
@@ -48,12 +48,11 @@ def read_run(client: Any, archive_id: str) -> dict[str, Any] | None:
 
 def read_frontier(
     client: Any,
-    table_name: str,
     archive_id: str,
     url_key: str,
 ) -> dict[str, Any] | None:
     response = client.get_item(
-        TableName=table_name,
+        TableName=FRONTIER_TABLE,
         Key={
             "archiveId": {"S": archive_id},
             "urlKey": {"S": url_key},
@@ -66,9 +65,9 @@ def read_frontier(
     return item if item else None
 
 
-def read_outbox(client: Any, table_name: str, message_id: str) -> dict[str, Any] | None:
+def read_outbox(client: Any, message_id: str) -> dict[str, Any] | None:
     response = client.get_item(
-        TableName=table_name,
+        TableName=OUTBOX_TABLE,
         Key={"messageId": {"S": message_id}},
         ConsistentRead=True,
     )
@@ -79,8 +78,6 @@ def read_outbox(client: Any, table_name: str, message_id: str) -> dict[str, Any]
 
 
 def claim_task_transaction(
-    runs_table_name: str,
-    frontier_table_name: str,
     archive_id: str,
     url_key: str,
     attempt_id: str,
@@ -90,7 +87,7 @@ def claim_task_transaction(
     return [
         {
             "ConditionCheck": {
-                "TableName": runs_table_name,
+                "TableName": RUNS_TABLE,
                 "Key": {"archiveId": {"S": archive_id}},
                 "ConditionExpression": "#admission = :open",
                 "ExpressionAttributeNames": {"#admission": "admission"},
@@ -99,7 +96,7 @@ def claim_task_transaction(
         },
         {
             "Update": {
-                "TableName": frontier_table_name,
+                "TableName": FRONTIER_TABLE,
                 "Key": {
                     "archiveId": {"S": archive_id},
                     "urlKey": {"S": url_key},
@@ -132,8 +129,6 @@ def claim_task_transaction(
 
 
 def renew_task_transaction(
-    runs_table_name: str,
-    frontier_table_name: str,
     archive_id: str,
     url_key: str,
     attempt_id: str,
@@ -144,7 +139,7 @@ def renew_task_transaction(
     return [
         {
             "ConditionCheck": {
-                "TableName": runs_table_name,
+                "TableName": RUNS_TABLE,
                 "Key": {"archiveId": {"S": archive_id}},
                 "ConditionExpression": "#admission = :open",
                 "ExpressionAttributeNames": {"#admission": "admission"},
@@ -153,7 +148,7 @@ def renew_task_transaction(
         },
         {
             "Update": {
-                "TableName": frontier_table_name,
+                "TableName": FRONTIER_TABLE,
                 "Key": {
                     "archiveId": {"S": archive_id},
                     "urlKey": {"S": url_key},
@@ -182,10 +177,6 @@ def renew_task_transaction(
 
 
 def complete_task_transaction(
-    frontier_table_name: str,
-    runs_table_name: str,
-    snapshots_table_name: str,
-    outbox_table_name: str,
     outcome: CaptureOutcome,
     depth: int,
     message_id: str,
@@ -238,7 +229,7 @@ def complete_task_transaction(
     return [
         {
             "Update": {
-                "TableName": frontier_table_name,
+                "TableName": FRONTIER_TABLE,
                 "Key": {
                     "archiveId": {"S": outcome.archive_id},
                     "urlKey": {"S": outcome.url_key},
@@ -285,7 +276,7 @@ def complete_task_transaction(
         },
         {
             "Update": {
-                "TableName": runs_table_name,
+                "TableName": RUNS_TABLE,
                 "Key": {"archiveId": {"S": outcome.archive_id}},
                 "UpdateExpression": "ADD #outstanding :minus_one, #completed :one",
                 "ConditionExpression": ("#admission = :open AND #outstanding >= :one"),
@@ -303,7 +294,7 @@ def complete_task_transaction(
         },
         {
             "Put": {
-                "TableName": snapshots_table_name,
+                "TableName": SNAPSHOTS_TABLE,
                 "Item": snapshot_item,
                 "ConditionExpression": "attribute_not_exists(#snapshot_id)",
                 "ExpressionAttributeNames": {"#snapshot_id": "snapshotId"},
@@ -311,7 +302,7 @@ def complete_task_transaction(
         },
         {
             "Put": {
-                "TableName": outbox_table_name,
+                "TableName": OUTBOX_TABLE,
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": outcome.archive_id},
@@ -331,9 +322,6 @@ def complete_task_transaction(
 
 
 def admit_page_transaction(
-    frontier_table_name: str,
-    runs_table_name: str,
-    outbox_table_name: str,
     claim: TaskClaim,
     page: DiscoveredPage,
     message_id: str,
@@ -346,7 +334,7 @@ def admit_page_transaction(
     return [
         {
             "ConditionCheck": {
-                "TableName": frontier_table_name,
+                "TableName": FRONTIER_TABLE,
                 "Key": {
                     "archiveId": {"S": archive_id},
                     "urlKey": {"S": claim.task.url_key},
@@ -371,7 +359,7 @@ def admit_page_transaction(
         },
         {
             "Update": {
-                "TableName": runs_table_name,
+                "TableName": RUNS_TABLE,
                 "Key": {"archiveId": {"S": archive_id}},
                 "UpdateExpression": (
                     "SET #admitted = if_not_exists(#admitted, :zero) + :one, "
@@ -397,7 +385,7 @@ def admit_page_transaction(
         },
         {
             "Put": {
-                "TableName": frontier_table_name,
+                "TableName": FRONTIER_TABLE,
                 "Item": {
                     "archiveId": {"S": archive_id},
                     "urlKey": {"S": url_key},
@@ -415,7 +403,7 @@ def admit_page_transaction(
         },
         {
             "Put": {
-                "TableName": outbox_table_name,
+                "TableName": OUTBOX_TABLE,
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": archive_id},
@@ -440,9 +428,6 @@ def admit_page_transaction(
 
 
 def release_task_transaction(
-    runs_table_name: str,
-    frontier_table_name: str,
-    outbox_table_name: str,
     claim: TaskClaim,
     message_id: str,
     now: float,
@@ -452,7 +437,7 @@ def release_task_transaction(
     return [
         {
             "ConditionCheck": {
-                "TableName": runs_table_name,
+                "TableName": RUNS_TABLE,
                 "Key": {"archiveId": {"S": claim.task.archive_id}},
                 "ConditionExpression": "#admission = :open",
                 "ExpressionAttributeNames": {"#admission": "admission"},
@@ -461,7 +446,7 @@ def release_task_transaction(
         },
         {
             "Update": {
-                "TableName": frontier_table_name,
+                "TableName": FRONTIER_TABLE,
                 "Key": {
                     "archiveId": {"S": claim.task.archive_id},
                     "urlKey": {"S": claim.task.url_key},
@@ -488,7 +473,7 @@ def release_task_transaction(
         },
         {
             "Put": {
-                "TableName": outbox_table_name,
+                "TableName": OUTBOX_TABLE,
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": claim.task.archive_id},
@@ -514,7 +499,6 @@ def release_task_transaction(
 
 def finish_task(
     client: Any,
-    table_name: str,
     archive_id: str,
     url_key: str,
     attempt_id: str,
@@ -552,7 +536,7 @@ def finish_task(
         )
 
     client.update_item(
-        TableName=table_name,
+        TableName=FRONTIER_TABLE,
         Key={"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
         UpdateExpression=update,
         ConditionExpression=(

@@ -1,13 +1,14 @@
 from typing import Any
 
 from domain import CaptureReservation
+from tables import BROWSER_SLOTS_TABLE
 
 from ..values import number_from_item
 
 
-def read_slot(client: Any, table_name: str, slot_id: str) -> dict[str, Any] | None:
+def read_slot(client: Any, slot_id: str) -> dict[str, Any] | None:
     response = client.get_item(
-        TableName=table_name,
+        TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
         ConsistentRead=True,
     )
@@ -37,7 +38,6 @@ def reservation_from_item(slot_id: str, item: dict[str, Any]) -> CaptureReservat
 
 def reserve_slot(
     client: Any,
-    table_name: str,
     slot_id: str,
     attempt_id: str,
     reservation_id: str,
@@ -45,7 +45,7 @@ def reserve_slot(
     now: float,
 ) -> dict[str, Any]:
     return client.update_item(
-        TableName=table_name,
+        TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
         UpdateExpression=(
             "SET #owner = :attempt, #reservation = :reservation, "
@@ -72,7 +72,6 @@ def reserve_slot(
 
 def renew_slot(
     client: Any,
-    table_name: str,
     slot_id: str,
     attempt_id: str,
     reservation_id: str,
@@ -81,7 +80,7 @@ def renew_slot(
     now: float,
 ) -> dict[str, Any]:
     return client.update_item(
-        TableName=table_name,
+        TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
         UpdateExpression="SET #lease = :lease",
         ConditionExpression=(
@@ -107,14 +106,13 @@ def renew_slot(
 
 def release_slot(
     client: Any,
-    table_name: str,
     slot_id: str,
     attempt_id: str,
     reservation_id: str,
     fence: int,
 ) -> None:
     client.update_item(
-        TableName=table_name,
+        TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
         UpdateExpression="REMOVE #owner, #reservation, #lease",
         ConditionExpression=(

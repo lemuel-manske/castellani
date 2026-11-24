@@ -9,7 +9,6 @@ from uuid import uuid4
 from botocore.exceptions import ClientError
 
 from domain import OutboxMessage, OutboxRepository
-from tables import OUTBOX_TABLE
 
 from .queries.outbox import (
     claim_message,
@@ -71,7 +70,6 @@ class DynamoDBOutbox(OutboxRepository):
             while True:
                 page = query_due_messages(
                     self.client,
-                    OUTBOX_TABLE,
                     status,
                     now,
                     cursor,
@@ -109,7 +107,6 @@ class DynamoDBOutbox(OutboxRepository):
         try:
             updated = claim_message(
                 self.client,
-                OUTBOX_TABLE,
                 message_id,
                 status,
                 OUTBOX_CLAIMED,
@@ -142,7 +139,6 @@ class DynamoDBOutbox(OutboxRepository):
         try:
             confirm_message(
                 self.client,
-                OUTBOX_TABLE,
                 message.message_id,
                 message.lease_token,
                 OUTBOX_CLAIMED,
@@ -162,7 +158,6 @@ class DynamoDBOutbox(OutboxRepository):
         try:
             reschedule_message(
                 self.client,
-                OUTBOX_TABLE,
                 message.message_id,
                 message.lease_token,
                 OUTBOX_CLAIMED,
