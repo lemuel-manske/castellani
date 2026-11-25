@@ -11,15 +11,20 @@ from aio_pika.abc import AbstractRobustConnection
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
-from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
+from adapters.messaging.rabbitmq.consumer import (
+    RabbitMQPageTaskConsumer,
+    RabbitMQStartCrawlConsumer,
+)
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
+from adapters.persistence.dynamodb.run import DynamoDBRunStarter
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application.capture import OutboxDispatcher, StoredAuthContexts
 from application.capture.page_tasks import PageTaskProcessor
+from application.capture.start_crawls import StartCrawlProcessor
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from topology.tables import CAPTURE_TABLES
 
@@ -47,9 +52,11 @@ class CaptureRuntime:
 
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
-        self.consumer: RabbitMQPageTaskConsumer | None = None
+        self.page_consumer: RabbitMQPageTaskConsumer | None = None
+        self.start_consumer: RabbitMQStartCrawlConsumer | None = None
 
         self.consumer_task: asyncio.Task[None] | None = None
+        self.start_consumer_task: asyncio.Task[None] | None = None
         self.dispatcher_task: asyncio.Task[None] | None = None
 
         self._ready = False
@@ -60,6 +67,8 @@ class CaptureRuntime:
             self._ready
             and self.consumer_task is not None
             and not self.consumer_task.done()
+            and self.start_consumer_task is not None
+            and not self.start_consumer_task.done()
             and self.dispatcher_task is not None
             and not self.dispatcher_task.done()
         )
@@ -139,9 +148,9 @@ class CaptureRuntime:
 
             consumer_ready = asyncio.Event()
 
-            self.consumer = RabbitMQPageTaskConsumer(self.connection)
+            self.page_consumer = RabbitMQPageTaskConsumer(self.connection)
 
-            processor = PageTaskProcessor(consumer=self.consumer, worker=worker)
+            processor = PageTaskProcessor(consumer=self.page_consumer, worker=worker)
 
             self.consumer_task = asyncio.create_task(
                 processor.run(ready=consumer_ready),
@@ -150,6 +159,25 @@ class CaptureRuntime:
 
             await asyncio.wait_for(
                 consumer_ready.wait(),
+                timeout=CONSUMER_START_TIMEOUT_SECONDS,
+            )
+
+            start_ready = asyncio.Event()
+
+            self.start_consumer = RabbitMQStartCrawlConsumer(self.connection)
+
+            start_processor = StartCrawlProcessor(
+                consumer=self.start_consumer,
+                starter=DynamoDBRunStarter(client=self.dynamodb_client),
+            )
+
+            self.start_consumer_task = asyncio.create_task(
+                start_processor.run(ready=start_ready),
+                name="capture-start-crawl-consumer",
+            )
+
+            await asyncio.wait_for(
+                start_ready.wait(),
                 timeout=CONSUMER_START_TIMEOUT_SECONDS,
             )
 
@@ -176,15 +204,22 @@ class CaptureRuntime:
 
         self.archive_retrieval = None
 
-        if self.consumer is not None:
-            self.consumer.stop()
+        if self.page_consumer is not None:
+            self.page_consumer.stop()
+
+        if self.start_consumer is not None:
+            self.start_consumer.stop()
 
         if self.dispatcher_task is not None and not self.dispatcher_task.done():
             self.dispatcher_task.cancel()
 
         tasks = [
             task
-            for task in (self.consumer_task, self.dispatcher_task)
+            for task in (
+                self.consumer_task,
+                self.start_consumer_task,
+                self.dispatcher_task,
+            )
             if task is not None and not task.done()
         ]
 
@@ -197,8 +232,10 @@ class CaptureRuntime:
             if pending:
                 await asyncio.gather(*pending, return_exceptions=True)
 
-        self.consumer = None
+        self.page_consumer = None
+        self.start_consumer = None
         self.consumer_task = None
+        self.start_consumer_task = None
         self.dispatcher_task = None
 
         try:

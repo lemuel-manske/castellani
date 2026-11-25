@@ -95,18 +95,19 @@ def seed_snapshot(client: DynamoDBClient, archive_id: str = "archive-1") -> None
 def frontier_item(
     client: DynamoDBClient,
     url_key: str = "url-1",
+    archive_id: str = "archive-1",
 ) -> dict[str, Any]:
     return client.get_item(
         TableName="capture_frontier",
-        Key={"archiveId": {"S": "archive-1"}, "urlKey": {"S": url_key}},
+        Key={"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
         ConsistentRead=True,
     ).get("Item", {})
 
 
-def outbox_item(client: DynamoDBClient) -> dict[str, Any]:
+def outbox_item(client: DynamoDBClient, message_id: str = "message-1") -> dict[str, Any]:
     return client.get_item(
         TableName="capture_outbox",
-        Key={"messageId": {"S": "message-1"}},
+        Key={"messageId": {"S": message_id}},
         ConsistentRead=True,
     ).get("Item", {})
 
@@ -131,10 +132,10 @@ def specific_snapshot_item(client: DynamoDBClient, snapshot_id: str) -> dict[str
     ).get("Item", {})
 
 
-def run_item(client: DynamoDBClient) -> dict[str, Any]:
+def run_item(client: DynamoDBClient, archive_id: str = "archive-1") -> dict[str, Any]:
     return client.get_item(
         TableName="capture_runs",
-        Key={"archiveId": {"S": "archive-1"}},
+        Key={"archiveId": {"S": archive_id}},
         ConsistentRead=True,
     ).get("Item", {})
 

@@ -21,6 +21,7 @@ from .auth import (
     AuthGenerationChanged,
 )
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
+from .crawl import CrawlStarter, StartCrawl
 from .discovery import DiscoveredPage, identify_discovered_pages
 from .outbox import OutboxMessage, OutboxRepository
 from .task import (
@@ -43,6 +44,7 @@ __all__ = [
     "CaptureAllocator",
     "CaptureOutcome",
     "CaptureReservation",
+    "CrawlStarter",
     "DiscoveredPage",
     "InvalidArchiveCursor",
     "InvalidReservationRenewal",
@@ -55,6 +57,7 @@ __all__ = [
     "PageListing",
     "PageTask",
     "SnapshotReference",
+    "StartCrawl",
     "TaskClaim",
     "TaskRepository",
     "URLIdentity",

@@ -27,3 +27,23 @@ def test_message_contracts_reject_boolean_version() -> None:
     }
 
     assert validate_message(json.dumps(envelope).encode(), "CapturePage") is None
+
+
+def test_message_contracts_validate_start_crawl_from_contract() -> None:
+    envelope = {
+        "messageId": "message-start",
+        "correlationId": "archive-start",
+        "type": "StartCrawl",
+        "version": 1,
+        "occurredAt": "2026-11-25T12:00:00Z",
+        "payload": {
+            "archiveId": "archive-start",
+            "seedUrl": "https://example.org/",
+            "maxDepth": 2,
+            "maxPages": 5,
+            "authGeneration": 3,
+            "normalizerVersion": "v1",
+        },
+    }
+
+    assert validate_message(json.dumps(envelope).encode(), "StartCrawl") == envelope

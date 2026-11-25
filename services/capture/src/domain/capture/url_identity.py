@@ -10,6 +10,8 @@ URL_IDENTITY_VERSION = 1
 
 UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
+SAFE_PATH = "/:@!$&'()*+,;=-._~"
+
 
 class InvalidURLIdentity(ValueError):
     """Raised when a URL cannot be used as a crawl navigation identity."""
@@ -49,17 +51,18 @@ def identify_url(url: str) -> URLIdentity:
     if parsed.port is not None and parsed.port != default_port:
         authority = f"{authority}:{parsed.port}"
 
-    path = normalize_component(parsed.path or "/", safe="/:@!$&'()*+,;=-._~")
+    path = normalize_component(parsed.path or "/", safe=SAFE_PATH)
     path = remove_dot_segments(path)
 
     if not path:
         path = "/"
 
-    query = normalize_component(parsed.query, safe="/?:@!$&'()*+,;=-._~+")
+    query = normalize_component(parsed.query, safe=SAFE_PATH)
 
     fetch_url = urlunsplit((parsed.scheme, authority, path, query, ""))
 
-    fragment = normalize_component(parsed.fragment, safe="/?:@!$&'()*+,;=-._~+")
+    fragment = normalize_component(parsed.fragment, safe=SAFE_PATH)
+
     navigation_fragment = fragment if fragment.startswith("/") or fragment.startswith("!/") else ""
     navigation_url = f"{fetch_url}#{navigation_fragment}" if navigation_fragment else fetch_url
 

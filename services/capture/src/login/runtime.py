@@ -106,6 +106,7 @@ class LoginRuntime:
 
     async def stop(self) -> None:
         self._ready = False
+
         self.manager = None
 
         await self.browser.close_all()

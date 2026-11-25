@@ -20,12 +20,15 @@ def identify_discovered_pages(
     parent: PageTask,
     discovered_urls: tuple[str, ...],
 ) -> tuple[DiscoveredPage, ...]:
-    """Normalize and deduplicate a page's outgoing navigational links.
+    """
+    Normalize and deduplicate a page's outgoing navigational links.
 
     Discovery depth is derived from the parent's current minimum depth, not
     from the order in which a worker happened to encounter the URL.
     """
+
     depth = parent.depth + 1
+
     discovered: dict[str, DiscoveredPage] = {}
 
     for url in discovered_urls:
