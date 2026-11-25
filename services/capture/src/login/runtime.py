@@ -23,6 +23,7 @@ class LoginRuntime:
 
     def __init__(self, settings: LoginSettings) -> None:
         self.settings = settings
+
         self.browser = PlaywrightLoginBrowser(
             LoginBrowserSettings(
                 display_start=settings.display_start,

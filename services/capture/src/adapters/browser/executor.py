@@ -2,10 +2,11 @@ from pathlib import Path
 
 from capture.browser import CaptureLimits, capture_page
 from capture.worker import CaptureArtifact
+from capture.worker.api import CaptureExecutor
 from domain.capture import PageCapture
 
 
-class BrowserPageExecutor:
+class BrowserPageExecutor(CaptureExecutor):
     """Adapts the browser capture engine to the worker's page-execution port."""
 
     def __init__(self, limits: CaptureLimits | None = None) -> None:

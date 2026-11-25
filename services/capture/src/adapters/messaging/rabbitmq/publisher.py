@@ -1,10 +1,12 @@
 import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
 
+from application.capture.outbox import MessagePublisher
+
 from .topology import CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT
 
 
-class RabbitMQMessagePublisher:
+class RabbitMQMessagePublisher(MessagePublisher):
     """Publishes persistent Capture command envelopes with broker confirms."""
 
     def __init__(self, connection: AbstractRobustConnection) -> None:
@@ -12,14 +14,6 @@ class RabbitMQMessagePublisher:
 
         self.channel: AbstractChannel | None = None
         self.exchange: AbstractExchange | None = None
-
-    async def start(self) -> None:
-        self.channel = await self.connection.channel(
-            publisher_confirms=True,
-            on_return_raises=True,
-        )
-
-        self.exchange = await self.channel.get_exchange(CAPTURE_EXCHANGE_NAME)
 
     async def publish(self, message_id: str, envelope: bytes) -> None:
         if self.exchange is None:
@@ -37,6 +31,14 @@ class RabbitMQMessagePublisher:
             routing_key=CAPTURE_PAGE_EVENT,
             mandatory=True,
         )
+
+    async def start(self) -> None:
+        self.channel = await self.connection.channel(
+            publisher_confirms=True,
+            on_return_raises=True,
+        )
+
+        self.exchange = await self.channel.get_exchange(CAPTURE_EXCHANGE_NAME)
 
     async def close(self) -> None:
         if self.channel is not None and not self.channel.is_closed:

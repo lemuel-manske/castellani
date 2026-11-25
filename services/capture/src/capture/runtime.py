@@ -17,6 +17,7 @@ from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application.capture import OutboxDispatcher
+from application.capture.page_tasks import PageTaskProcessor
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from topology.tables import CAPTURE_TABLES
 
@@ -25,8 +26,11 @@ from .worker import new_worker
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
+    from mypy_boto3_s3.client import S3Client
 
 CONSUMER_START_TIMEOUT_SECONDS = 10
+
+SHUTDOWN_TIMEOUT_SECONDS = 35
 
 
 class CaptureRuntime:
@@ -36,11 +40,12 @@ class CaptureRuntime:
         self.settings = settings
 
         self.dynamodb_client: DynamoDBClient | None = None
-        self.s3_client: Any | None = None
+        self.s3_client: S3Client | None = None
         self.archive_retrieval: DynamoDBArchiveRetrieval | None = None
 
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
+        self.consumer: RabbitMQPageTaskConsumer | None = None
 
         self.consumer_task: asyncio.Task[None] | None = None
         self.dispatcher_task: asyncio.Task[None] | None = None
@@ -123,10 +128,12 @@ class CaptureRuntime:
 
             consumer_ready = asyncio.Event()
 
-            self.consumer = RabbitMQPageTaskConsumer(worker)
+            self.consumer = RabbitMQPageTaskConsumer(self.connection)
+
+            processor = PageTaskProcessor(consumer=self.consumer, worker=worker)
 
             self.consumer_task = asyncio.create_task(
-                self.consumer.run(self.connection, ready=consumer_ready),
+                processor.run(ready=consumer_ready),
                 name="capture-rabbitmq-consumer",
             )
 
@@ -155,16 +162,31 @@ class CaptureRuntime:
 
     async def stop(self) -> None:
         self._ready = False
+
         self.archive_retrieval = None
 
-        tasks = [task for task in (self.consumer_task, self.dispatcher_task) if task is not None]
+        if self.consumer is not None:
+            self.consumer.stop()
 
-        for task in tasks:
-            task.cancel()
+        if self.dispatcher_task is not None and not self.dispatcher_task.done():
+            self.dispatcher_task.cancel()
+
+        tasks = [
+            task
+            for task in (self.consumer_task, self.dispatcher_task)
+            if task is not None and not task.done()
+        ]
 
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            _, pending = await asyncio.wait(tasks, timeout=SHUTDOWN_TIMEOUT_SECONDS)
 
+            for task in pending:
+                task.cancel()
+
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+
+        self.consumer = None
         self.consumer_task = None
         self.dispatcher_task = None
 

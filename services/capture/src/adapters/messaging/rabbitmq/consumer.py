@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import AsyncIterator
 from typing import cast
 
 import aio_pika
@@ -11,7 +12,7 @@ from aio_pika.abc import (
 
 from adapters.messaging.contracts import validate_message
 from adapters.messaging.types import JSON
-from capture.worker.api import CaptureRunner
+from application.capture.page_tasks import PageTaskConsumer, PageTaskMessage
 
 from .topology import (
     CAPTURE_DEAD_EXCHANGE,
@@ -22,67 +23,108 @@ from .topology import (
 )
 
 
-class RabbitMQPageTaskConsumer:
-    """Consumes CapturePage commands and delegates execution to the worker."""
+class RabbitMQPageTaskMessage(PageTaskMessage):
+    """A validated CapturePage delivery exposed through a broker-agnostic API."""
 
-    def __init__(self, page_capturer: CaptureRunner) -> None:
-        self.process_page = page_capturer
-
-    async def handle(
+    def __init__(
         self,
-        channel: AbstractChannel,
         message: AbstractIncomingMessage,
+        channel: AbstractChannel,
+        archive_id: str,
+        url_key: str,
+        retry_exhausted: bool,
     ) -> None:
-        envelope = validate_message(message.body, CAPTURE_PAGE_EVENT)
+        self._message = message
+        self._channel = channel
 
-        if envelope is None or retry_count(message) >= MAX_DELIVERY_RETRIES:
-            await publish_dead_letter(channel, message)
-            await message.ack()
+        self.archive_id = archive_id
+        self.url_key = url_key
+        self.retry_exhausted = retry_exhausted
 
-            return
+    async def ack(self) -> None:
+        await self._message.ack()
 
-        payload = cast(JSON, envelope["payload"])
-        archive_id = cast(str, payload["archiveId"])
-        url_key = cast(str, payload["urlKey"])
+    async def reject(self) -> None:
+        await self._message.reject(requeue=False)
 
-        try:
-            await self.process_page(archive_id, url_key)
-        except Exception:
-            await message.reject(requeue=False)
+    async def dead_letter(self) -> None:
+        await publish_dead_letter(self._channel, self._message)
+        await self._message.ack()
 
-            return
 
-        await message.ack()
+class RabbitMQPageTaskConsumer(PageTaskConsumer):
+    """Consumes validated CapturePage envelopes from the provisioned queue."""
 
-    async def run(
+    def __init__(self, connection: AbstractRobustConnection) -> None:
+        self.connection = connection
+
+        self._stopping = asyncio.Event()
+        self._deliveries: asyncio.Queue[RabbitMQPageTaskMessage | None] | None = None
+
+    async def messages(
         self,
-        connection: AbstractRobustConnection,
-        queue_name: str = CAPTURE_PAGE_QUEUE,
         ready: asyncio.Event | None = None,
-    ) -> None:
-        channel = await connection.channel()
+    ) -> AsyncIterator[RabbitMQPageTaskMessage]:
+        channel = await self.connection.channel()
+
+        deliveries: asyncio.Queue[RabbitMQPageTaskMessage | None] = asyncio.Queue()
+
+        if self._stopping.is_set():
+            deliveries.put_nowait(None)
+
+        self._deliveries = deliveries
 
         queue: AbstractQueue | None = None
 
         consumer_tag: str | None = None
 
+        async def consume(message: AbstractIncomingMessage) -> None:
+            envelope = validate_message(message.body, CAPTURE_PAGE_EVENT)
+
+            if envelope is None:
+                await publish_dead_letter(channel, message)
+                await message.ack()
+
+                return
+
+            payload = cast(JSON, envelope["payload"])
+
+            await deliveries.put(
+                RabbitMQPageTaskMessage(
+                    message=message,
+                    channel=channel,
+                    archive_id=cast(str, payload["archiveId"]),
+                    url_key=cast(str, payload["urlKey"]),
+                    retry_exhausted=retry_count(message) >= MAX_DELIVERY_RETRIES,
+                )
+            )
+
         try:
             await channel.set_qos(prefetch_count=1)
 
-            queue = await channel.get_queue(queue_name)
+            queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
 
-            consumer_tag = await queue.consume(lambda message: self.handle(channel, message))
+            consumer_tag = await queue.consume(consume)
 
             if ready is not None:
                 ready.set()
 
-            await asyncio.Event().wait()
+            while (delivery := await deliveries.get()) is not None:
+                yield delivery
         finally:
+            self._deliveries = None
+
             try:
                 if queue is not None and consumer_tag is not None:
                     await queue.cancel(consumer_tag)
             finally:
                 await channel.close()
+
+    def stop(self) -> None:
+        self._stopping.set()
+
+        if self._deliveries is not None:
+            self._deliveries.put_nowait(None)
 
 
 def retry_count(message: AbstractIncomingMessage) -> int:

@@ -17,7 +17,156 @@ from adapters.messaging.rabbitmq.topology import (
     CAPTURE_PAGE_RETRY_QUEUE,
     MAX_DELIVERY_RETRIES,
 )
+from application.capture.page_tasks import PageTaskProcessor
 from utils.fn import noop
+
+
+def capture_page_envelope() -> bytes:
+    return json.dumps(
+        {
+            "messageId": str(uuid4()),
+            "correlationId": "archive-consumer-test",
+            "type": CAPTURE_PAGE_EVENT,
+            "version": 1,
+            "occurredAt": "2026-11-24T12:00:00Z",
+            "payload": {
+                "archiveId": "archive-consumer-test",
+                "urlKey": "url-consumer-test",
+            },
+        }
+    ).encode()
+
+
+async def start_processor(
+    rabbitmq: AbstractRobustConnection,
+    channel: AbstractChannel,
+    body: bytes,
+    capture_page: Any,
+) -> tuple[RabbitMQPageTaskConsumer, asyncio.Task[None]]:
+    queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
+    retry_queue = await channel.get_queue(CAPTURE_PAGE_RETRY_QUEUE)
+    dead_queue = await channel.get_queue(CAPTURE_DEAD_QUEUE)
+
+    await queue.purge()
+    await retry_queue.purge()
+    await dead_queue.purge()
+
+    consumer = RabbitMQPageTaskConsumer(rabbitmq)
+    processor = PageTaskProcessor(consumer=consumer, worker=capture_page)
+    ready = asyncio.Event()
+    task = asyncio.create_task(processor.run(ready=ready))
+
+    await asyncio.wait_for(ready.wait(), timeout=5)
+
+    await publish(channel, body)
+
+    return consumer, task
+
+
+@pytest.mark.integration
+async def test_stop_drains_in_flight_delivery(
+    rabbitmq: AbstractRobustConnection,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    completed = asyncio.Event()
+
+    async def capture_page(archive_id: str, url_key: str) -> bool:
+        noop(archive_id, url_key)
+
+        started.set()
+
+        await release.wait()
+
+        completed.set()
+
+        return True
+
+    channel = await rabbitmq.channel()
+
+    consumer, task = await start_processor(rabbitmq, channel, capture_page_envelope(), capture_page)
+
+    try:
+        await asyncio.wait_for(started.wait(), timeout=5)
+
+        consumer.stop()
+
+        await asyncio.sleep(0.05)
+
+        assert not task.done()
+
+        release.set()
+
+        await asyncio.wait_for(task, timeout=5)
+
+        assert completed.is_set()
+
+        queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
+
+        assert await queue.get(timeout=0.2, fail=False) is None
+    finally:
+        if not task.done():
+            task.cancel()
+
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        await channel.close()
+
+
+async def bounded_stop(task: asyncio.Task[None], timeout: float = 0.2) -> None:
+    _done, pending = await asyncio.wait([task], timeout=timeout)
+
+    for remaining in pending:
+        remaining.cancel()
+
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
+
+@pytest.mark.integration
+async def test_stop_bounds_in_flight_delivery(
+    rabbitmq: AbstractRobustConnection,
+) -> None:
+    started = asyncio.Event()
+
+    async def capture_page(archive_id: str, url_key: str) -> bool:
+        noop(archive_id, url_key)
+
+        started.set()
+
+        await asyncio.Event().wait()
+
+        return True
+
+    channel = await rabbitmq.channel()
+    body = capture_page_envelope()
+
+    consumer, task = await start_processor(rabbitmq, channel, body, capture_page)
+
+    try:
+        await asyncio.wait_for(started.wait(), timeout=5)
+
+        consumer.stop()
+
+        await bounded_stop(task)
+
+        assert task.cancelled()
+
+        queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
+        redelivered = await asyncio.wait_for(queue.get(timeout=5, fail=True), timeout=5)
+
+        await redelivered.ack()
+
+        assert redelivered.body == body
+    finally:
+        if not task.done():
+            task.cancel()
+
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        await channel.close()
 
 
 @pytest.mark.integration
@@ -40,8 +189,9 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
 
     await queue.purge()
 
-    consumer = RabbitMQPageTaskConsumer(capture_page)
-    consumer_task = asyncio.create_task(consumer.run(rabbitmq, ready=ready))
+    consumer = RabbitMQPageTaskConsumer(rabbitmq)
+    processor = PageTaskProcessor(consumer=consumer, worker=capture_page)
+    task = asyncio.create_task(processor.run(ready=ready))
 
     publisher = RabbitMQMessagePublisher(rabbitmq)
 
@@ -55,7 +205,7 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
         envelope = {
             "messageId": message_id,
             "correlationId": "archive-integration-test",
-            "type": "CapturePage",
+            "type": CAPTURE_PAGE_EVENT,
             "version": 1,
             "occurredAt": "2026-11-20T12:00:00Z",
             "payload": {
@@ -70,10 +220,10 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
 
         assert received == [("archive-integration-test", "url-integration-test")]
     finally:
-        consumer_task.cancel()
+        task.cancel()
 
         with pytest.raises(asyncio.CancelledError):
-            await consumer_task
+            await task
 
         await publisher.close()
         await queue.purge()
@@ -85,43 +235,24 @@ async def test_consumer_dead_letters_invalid_envelope(
     rabbitmq: AbstractRobustConnection,
 ) -> None:
     channel = await rabbitmq.channel()
-
-    page_queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
-    retry_queue = await channel.get_queue(CAPTURE_PAGE_RETRY_QUEUE)
-    dead_queue = await channel.get_queue(CAPTURE_DEAD_QUEUE)
-
-    await page_queue.purge()
-    await retry_queue.purge()
-    await dead_queue.purge()
-
-    ready = asyncio.Event()
-
-    consumer = RabbitMQPageTaskConsumer(fail_capture_page)
-    consumer_task = asyncio.create_task(consumer.run(rabbitmq, ready=ready))
-
     body = b'{"type":"CapturePage","version":99}'
 
+    _, task = await start_processor(rabbitmq, channel, body, fail_capture_page)
+
+    dead_queue = await channel.get_queue(CAPTURE_DEAD_QUEUE)
+
     try:
-        await asyncio.wait_for(ready.wait(), timeout=5)
-
-        await publish(channel, body)
-
-        received = await asyncio.wait_for(
-            dead_queue.get(timeout=5, fail=True),
-            timeout=5,
-        )
+        received = await asyncio.wait_for(dead_queue.get(timeout=5, fail=True), timeout=5)
 
         await received.ack()
 
         assert received.body == body
     finally:
-        consumer_task.cancel()
+        task.cancel()
 
         with pytest.raises(asyncio.CancelledError):
-            await consumer_task
+            await task
 
-        await page_queue.purge()
-        await retry_queue.purge()
         await dead_queue.purge()
         await channel.close()
 
@@ -131,19 +262,6 @@ async def test_consumer_dead_letters_message_after_retry_budget(
     rabbitmq: AbstractRobustConnection,
 ) -> None:
     channel = await rabbitmq.channel()
-
-    page_queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
-    retry_queue = await channel.get_queue(CAPTURE_PAGE_RETRY_QUEUE)
-    dead_queue = await channel.get_queue(CAPTURE_DEAD_QUEUE)
-
-    await page_queue.purge()
-    await retry_queue.purge()
-    await dead_queue.purge()
-
-    ready = asyncio.Event()
-
-    consumer = RabbitMQPageTaskConsumer(fail_capture_page)
-    consumer_task = asyncio.create_task(consumer.run(rabbitmq, ready=ready))
 
     envelope = {
         "messageId": str(uuid4()),
@@ -158,6 +276,19 @@ async def test_consumer_dead_letters_message_after_retry_budget(
     }
 
     body = json.dumps(envelope).encode()
+
+    queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
+    retry_queue = await channel.get_queue(CAPTURE_PAGE_RETRY_QUEUE)
+    dead_queue = await channel.get_queue(CAPTURE_DEAD_QUEUE)
+
+    await queue.purge()
+    await retry_queue.purge()
+    await dead_queue.purge()
+
+    consumer = RabbitMQPageTaskConsumer(rabbitmq)
+    processor = PageTaskProcessor(consumer=consumer, worker=fail_capture_page)
+    ready = asyncio.Event()
+    task = asyncio.create_task(processor.run(ready=ready))
 
     try:
         await asyncio.wait_for(ready.wait(), timeout=5)
@@ -175,21 +306,18 @@ async def test_consumer_dead_letters_message_after_retry_budget(
             },
         )
 
-        received = await asyncio.wait_for(
-            dead_queue.get(timeout=5, fail=True),
-            timeout=5,
-        )
+        received = await asyncio.wait_for(dead_queue.get(timeout=5, fail=True), timeout=5)
 
         await received.ack()
 
         assert received.body == body
     finally:
-        consumer_task.cancel()
+        task.cancel()
 
         with pytest.raises(asyncio.CancelledError):
-            await consumer_task
+            await task
 
-        await page_queue.purge()
+        await queue.purge()
         await retry_queue.purge()
         await dead_queue.purge()
         await channel.close()

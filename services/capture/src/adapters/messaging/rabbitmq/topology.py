@@ -1,5 +1,3 @@
-"""Broker names used by Capture. The resources are provisioned by infra/rabbitmq."""
-
 CAPTURE_EXCHANGE_NAME = "castellani.capture"
 CAPTURE_PAGE_EVENT = "CapturePage"
 CAPTURE_PAGE_QUEUE = "castellani.capture.page"
