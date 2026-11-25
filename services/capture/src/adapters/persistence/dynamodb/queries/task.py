@@ -11,7 +11,7 @@ from domain.capture import (
 )
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
-from ..values import optional_number
+from ..values import number_from_item, optional_number
 
 
 def claim_from_item(
@@ -203,11 +203,105 @@ def renew_task_transaction(
     ]
 
 
+def closes_run(run: dict[str, Any]) -> bool:
+    return number_from_item(run, "outstandingPages", "capture run") == 1
+
+
+def _closure_expression(
+    now: float,
+    names: dict[str, str],
+    values: dict[str, Any],
+) -> str:
+    names.update(
+        {
+            "#admission": "admission",
+            "#closed_at": "closedAt",
+            "#manifest": "manifestStatus",
+        }
+    )
+    values.update(
+        {
+            ":closed": {"S": "CLOSED"},
+            ":closed_at": {"S": _isoformat(datetime.fromtimestamp(now, UTC))},
+            ":pending": {"S": "PENDING"},
+        }
+    )
+
+    return "SET #admission = :closed, #closed_at = :closed_at, #manifest = :pending "
+
+
+def completion_run_update(
+    archive_id: str,
+    auth_generation: int,
+    now: float,
+    close: bool,
+) -> dict[str, Any]:
+    names = {
+        "#admission": "admission",
+        "#outstanding": "outstandingPages",
+        "#completed": "completedPages",
+        "#auth_generation": "authGeneration",
+    }
+    values: dict[str, Any] = {
+        ":open": {"S": "OPEN"},
+        ":one": {"N": "1"},
+        ":minus_one": {"N": "-1"},
+        ":zero": {"N": "0"},
+        ":auth_generation": {"N": str(auth_generation)},
+    }
+    expression = _closure_expression(now, names, values) if close else ""
+    expression += "ADD #outstanding :minus_one, #completed :one"
+    operator = "=" if close else ">"
+
+    return {
+        "Update": {
+            "TableName": RUNS_TABLE,
+            "Key": {"archiveId": {"S": archive_id}},
+            "UpdateExpression": expression,
+            "ConditionExpression": (
+                f"#admission = :open AND #outstanding {operator} :one "
+                "AND (#auth_generation = :auth_generation "
+                "OR (:auth_generation = :zero AND attribute_not_exists(#auth_generation)))"
+            ),
+            "ExpressionAttributeNames": names,
+            "ExpressionAttributeValues": values,
+        }
+    }
+
+
+def failure_run_update(archive_id: str, now: float, close: bool) -> dict[str, Any]:
+    names = {
+        "#admission": "admission",
+        "#outstanding": "outstandingPages",
+        "#failed": "failedPages",
+    }
+    values: dict[str, Any] = {
+        ":open": {"S": "OPEN"},
+        ":one": {"N": "1"},
+        ":minus_one": {"N": "-1"},
+    }
+    expression = _closure_expression(now, names, values) if close else ""
+    expression += "ADD #outstanding :minus_one, #failed :one"
+    operator = "=" if close else ">"
+
+    return {
+        "Update": {
+            "TableName": RUNS_TABLE,
+            "Key": {"archiveId": {"S": archive_id}},
+            "UpdateExpression": expression,
+            "ConditionExpression": f"#admission = :open AND #outstanding {operator} :one",
+            "ExpressionAttributeNames": names,
+            "ExpressionAttributeValues": values,
+        }
+    }
+
+
 def complete_task_transaction(
     outcome: CaptureOutcome,
     depth: int,
     message_id: str,
     now: float,
+    close: bool = False,
 ) -> list[dict[str, Any]]:
     capture = outcome.capture
     occurred_at = _isoformat(datetime.fromtimestamp(now, UTC))
@@ -301,31 +395,7 @@ def complete_task_transaction(
                 },
             }
         },
-        {
-            "Update": {
-                "TableName": RUNS_TABLE,
-                "Key": {"archiveId": {"S": outcome.archive_id}},
-                "UpdateExpression": "ADD #outstanding :minus_one, #completed :one",
-                "ConditionExpression": (
-                    "#admission = :open AND #outstanding >= :one "
-                    "AND (#auth_generation = :auth_generation "
-                    "OR (:auth_generation = :zero AND attribute_not_exists(#auth_generation)))"
-                ),
-                "ExpressionAttributeNames": {
-                    "#admission": "admission",
-                    "#outstanding": "outstandingPages",
-                    "#completed": "completedPages",
-                    "#auth_generation": "authGeneration",
-                },
-                "ExpressionAttributeValues": {
-                    ":open": {"S": "OPEN"},
-                    ":minus_one": {"N": "-1"},
-                    ":one": {"N": "1"},
-                    ":zero": {"N": "0"},
-                    ":auth_generation": {"N": str(outcome.auth_generation)},
-                },
-            }
-        },
+        completion_run_update(outcome.archive_id, outcome.auth_generation, now, close),
         {
             "Put": {
                 "TableName": SNAPSHOTS_TABLE,
@@ -546,6 +616,7 @@ def finish_task(
     reason_code: str | None,
     message: str | None,
     now: float,
+    close: bool = False,
 ) -> None:
     names = {
         "#state": "state",
@@ -588,19 +659,7 @@ def finish_task(
                 "ExpressionAttributeValues": values,
             }
         },
-        {
-            "Update": {
-                "TableName": RUNS_TABLE,
-                "Key": {"archiveId": {"S": archive_id}},
-                "UpdateExpression": "ADD #outstanding :minus_one",
-                "ConditionExpression": ("attribute_exists(#outstanding) AND #outstanding >= :one"),
-                "ExpressionAttributeNames": {"#outstanding": "outstandingPages"},
-                "ExpressionAttributeValues": {
-                    ":minus_one": {"N": "-1"},
-                    ":one": {"N": "1"},
-                },
-            }
-        },
+        failure_run_update(archive_id, now, close),
     ]
 
     client.transact_write_items(TransactItems=transaction)

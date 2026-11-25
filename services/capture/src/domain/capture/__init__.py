@@ -21,8 +21,14 @@ from .auth import (
     AuthGenerationChanged,
 )
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
-from .crawl import CrawlStarter, StartCrawl
+from .crawl import CrawlFinalizer, CrawlStarter, StartCrawl
 from .discovery import DiscoveredPage, identify_discovered_pages
+from .manifest import (
+    DEFAULT_NORMALIZER_VERSION,
+    MANIFEST_SCHEMA_VERSION,
+    manifest_key,
+    manifest_message_id,
+)
 from .outbox import OutboxMessage, OutboxRepository
 from .task import (
     InvalidTaskClaimRenewal,
@@ -35,6 +41,8 @@ from .url_identity import InvalidURLIdentity, URLIdentity, identify_url
 
 __all__ = [
     "DEFAULT_AUTH_GENERATION",
+    "DEFAULT_NORMALIZER_VERSION",
+    "MANIFEST_SCHEMA_VERSION",
     "ArchivePage",
     "ArchiveRetrieval",
     "ArtifactReference",
@@ -44,6 +52,7 @@ __all__ = [
     "CaptureAllocator",
     "CaptureOutcome",
     "CaptureReservation",
+    "CrawlFinalizer",
     "CrawlStarter",
     "DiscoveredPage",
     "InvalidArchiveCursor",
@@ -65,6 +74,8 @@ __all__ = [
     "WACZRangeNotSatisfiable",
     "identify_discovered_pages",
     "identify_url",
+    "manifest_key",
+    "manifest_message_id",
     "new_attempt_id",
     "new_reservation_id",
     "new_snapshot_id",

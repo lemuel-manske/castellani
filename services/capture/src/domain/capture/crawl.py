@@ -16,3 +16,7 @@ class StartCrawl:
 
 class CrawlStarter(Protocol):
     async def __call__(self, start: StartCrawl) -> None: ...
+
+
+class CrawlFinalizer(Protocol):
+    async def __call__(self, archive_id: str) -> None: ...

@@ -19,6 +19,7 @@ from domain.capture import (
     AuthGenerationChanged,
     CaptureOutcome,
     PageCapture,
+    TaskClaim,
 )
 
 
@@ -82,12 +83,72 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
 
     assert run["outstandingPages"] == {"N": "0"}
     assert run["completedPages"] == {"N": "1"}
+    assert run["failedPages"] == {"N": "0"}
+    assert run["admission"] == {"S": "CLOSED"}
+    assert run["manifestStatus"] == {"S": "PENDING"}
+    assert run["closedAt"] == {
+        "S": datetime.fromtimestamp(clock(), UTC).isoformat().replace("+00:00", "Z")
+    }
 
     events = outbox_items(dynamodb)
 
     assert len(events) == 1
     assert events[0]["type"] == {"S": "PageCaptured"}
     assert events[0]["payload"]["M"]["snapshotId"] == {"S": "snapshot-1"}
+
+
+@pytest.mark.integration
+async def test_task_completion_keeps_admission_open_while_pages_remain(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    seed_run(dynamodb, admitted_pages=2)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    await repository.complete(
+        CaptureOutcome(
+            archive_id="archive-1",
+            url_key="url-1",
+            attempt_id=claim.attempt_id,
+            fence=claim.fence,
+            snapshot_id="snapshot-remaining",
+            capture=PageCapture(
+                requested_url="https://example.org/",
+                final_url="https://example.org/",
+                redirect_chain=(),
+                status_code=200,
+                content_type="text/html",
+                title="Example",
+                captured_at=datetime(2026, 11, 22, 12, 0, tzinfo=UTC),
+                discovered_urls=(),
+            ),
+            warc_artifacts=(
+                ArtifactReference(
+                    bucket="capture-artifacts",
+                    key="capture-staging/archive-1/url-1/snapshot-remaining/capture.warc.gz",
+                    sha256="d" * 64,
+                    size_bytes=128,
+                ),
+            ),
+        )
+    )
+
+    run = run_item(dynamodb)
+
+    assert run["outstandingPages"] == {"N": "1"}
+    assert run["admission"] == {"S": "OPEN"}
+    assert "closedAt" not in run
+    assert "manifestStatus" not in run
 
 
 @pytest.mark.integration
@@ -217,4 +278,126 @@ async def test_task_failure_decrements_outstanding_pages(
 
     await repository.fail(claim, "navigation_failed", "browser capture failed")
 
-    assert run_item(dynamodb)["outstandingPages"] == {"N": "0"}
+    run = run_item(dynamodb)
+
+    assert run["outstandingPages"] == {"N": "0"}
+    assert run["failedPages"] == {"N": "1"}
+    assert run["admission"] == {"S": "CLOSED"}
+    assert run["manifestStatus"] == {"S": "PENDING"}
+    assert run["closedAt"] == {
+        "S": datetime.fromtimestamp(clock(), UTC).isoformat().replace("+00:00", "Z")
+    }
+
+
+@pytest.mark.integration
+async def test_task_failure_keeps_admission_open_while_pages_remain(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    seed_run(dynamodb, admitted_pages=2)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    await repository.fail(claim, "navigation_failed", "browser capture failed")
+
+    run = run_item(dynamodb)
+
+    assert run["outstandingPages"] == {"N": "1"}
+    assert run["failedPages"] == {"N": "1"}
+    assert run["admission"] == {"S": "OPEN"}
+    assert "closedAt" not in run
+
+
+@pytest.mark.integration
+async def test_task_completion_notifies_finalizer_when_run_closes(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    closed: list[str] = []
+
+    async def on_closed(archive_id: str) -> None:
+        closed.append(archive_id)
+
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+        on_closed=on_closed,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    await repository.complete(outcome_for(claim))
+
+    assert closed == ["archive-1"]
+
+
+@pytest.mark.integration
+async def test_task_failure_notifies_finalizer_when_run_closes(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    closed: list[str] = []
+
+    async def on_closed(archive_id: str) -> None:
+        closed.append(archive_id)
+
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+        on_closed=on_closed,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    await repository.fail(claim, "navigation_failed", "browser capture failed")
+
+    assert closed == ["archive-1"]
+
+
+def outcome_for(claim: TaskClaim) -> CaptureOutcome:
+    return CaptureOutcome(
+        archive_id="archive-1",
+        url_key="url-1",
+        attempt_id=claim.attempt_id,
+        fence=claim.fence,
+        snapshot_id="snapshot-finalizer-notification",
+        capture=PageCapture(
+            requested_url="https://example.org/",
+            final_url="https://example.org/",
+            redirect_chain=(),
+            status_code=200,
+            content_type="text/html",
+            title="Example",
+            captured_at=datetime(2026, 11, 22, 12, 0, tzinfo=UTC),
+            discovered_urls=(),
+        ),
+        warc_artifacts=(
+            ArtifactReference(
+                bucket="capture-artifacts",
+                key="capture-staging/archive-1/url-1/capture.warc.gz",
+                sha256="a" * 64,
+                size_bytes=128,
+            ),
+        ),
+    )

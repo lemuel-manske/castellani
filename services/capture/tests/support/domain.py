@@ -11,17 +11,32 @@ def seed_run(
     max_pages: int = 100,
     admitted_pages: int = 1,
     auth_generation: int | None = None,
+    archive_id: str = "archive-1",
+    seed_url: str | None = None,
+    closed_at: str | None = None,
+    manifest_status: str | None = None,
 ) -> None:
     item: dict[str, Any] = {
-        "archiveId": {"S": "archive-1"},
+        "archiveId": {"S": archive_id},
         "admission": {"S": admission},
         "maxPages": {"N": str(max_pages)},
         "admittedPages": {"N": str(admitted_pages)},
         "outstandingPages": {"N": str(admitted_pages)},
+        "completedPages": {"N": "0"},
+        "failedPages": {"N": "0"},
     }
 
     if auth_generation is not None:
         item["authGeneration"] = {"N": str(auth_generation)}
+
+    if seed_url is not None:
+        item["seedUrl"] = {"S": seed_url}
+
+    if closed_at is not None:
+        item["closedAt"] = {"S": closed_at}
+
+    if manifest_status is not None:
+        item["manifestStatus"] = {"S": manifest_status}
 
     client.put_item(TableName="capture_runs", Item=item)
 
@@ -31,17 +46,22 @@ def seed_frontier(
     depth: int = 0,
     url: str = "https://example.org/",
     url_key: str = "url-1",
+    archive_id: str = "archive-1",
+    state: str = "PENDING",
+    failure_reason: str | None = None,
 ) -> None:
-    client.put_item(
-        TableName="capture_frontier",
-        Item={
-            "archiveId": {"S": "archive-1"},
-            "urlKey": {"S": url_key},
-            "url": {"S": url},
-            "depth": {"N": str(depth)},
-            "state": {"S": "PENDING"},
-        },
-    )
+    item: dict[str, Any] = {
+        "archiveId": {"S": archive_id},
+        "urlKey": {"S": url_key},
+        "url": {"S": url},
+        "depth": {"N": str(depth)},
+        "state": {"S": state},
+    }
+
+    if failure_reason is not None:
+        item["failureReason"] = {"S": failure_reason}
+
+    client.put_item(TableName="capture_frontier", Item=item)
 
 
 def complete_frontier(client: DynamoDBClient) -> None:
@@ -78,16 +98,27 @@ def fail_frontier(client: DynamoDBClient) -> None:
     )
 
 
-def seed_snapshot(client: DynamoDBClient, archive_id: str = "archive-1") -> None:
+def seed_snapshot(
+    client: DynamoDBClient,
+    archive_id: str = "archive-1",
+    snapshot_id: str = "snapshot-1",
+    url_key: str = "url-1",
+    warc_artifacts: tuple[dict[str, Any], ...] = (),
+    min_depth: int = 0,
+) -> None:
     client.put_item(
         TableName="capture_snapshots",
         Item={
-            "snapshotId": {"S": "snapshot-1"},
+            "snapshotId": {"S": snapshot_id},
             "archiveId": {"S": archive_id},
+            "urlKey": {"S": url_key},
             "url": {"S": "https://example.org/"},
             "finalUrl": {"S": "https://example.org/final"},
+            "redirectChain": {"L": [{"S": "https://example.org/"}]},
             "capturedAt": {"S": "2026-11-24T10:00:00Z"},
+            "minDepth": {"N": str(min_depth)},
             "contentType": {"S": "text/html"},
+            "warcArtifacts": {"L": [{"M": artifact} for artifact in warc_artifacts]},
         },
     )
 
