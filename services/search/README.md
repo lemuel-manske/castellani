@@ -28,6 +28,7 @@ Requires Node.js 24.16.0 or later. From `services/search`:
 | `SEARCH_S3_ENDPOINT_URL`                 | S3 endpoint                                                          |
 | `SEARCH_OPENSEARCH_URL`                  | OpenSearch endpoint                                                  |
 | `SEARCH_RABBITMQ_URL`                    | RabbitMQ connection URL                                              |
+| `SEARCH_CONTRACTS_DIR`                   | Directory containing JSON Schema contracts                           |
 | `SEARCH_INDEXING_LEASE_DURATION_SECONDS` | Indexing lease duration. Defaults to 120 seconds                     |
 | `SEARCH_INDEXING_MAX_ATTEMPTS`           | Maximum indexing attempts. Defaults to 5                             |
 | `SEARCH_RECONNECT_DELAY_MILLISECONDS`    | Delay before reconnecting to RabbitMQ. Defaults to 1000 milliseconds |

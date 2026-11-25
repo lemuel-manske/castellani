@@ -24,10 +24,12 @@ check:
 
 
 test-unit:
-	npm test
+	SEARCH_CONTRACTS_DIR=../../contracts \
+		npm test
 
 test-integration:
-	SEARCH_AWS_REGION=us-east-1 \
+	SEARCH_CONTRACTS_DIR=../../contracts \
+		SEARCH_AWS_REGION=us-east-1 \
 		SEARCH_AWS_ACCESS_KEY_ID=minio \
 		SEARCH_AWS_SECRET_ACCESS_KEY=minio-secret \
 		SEARCH_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \

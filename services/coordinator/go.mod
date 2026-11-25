@@ -12,6 +12,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/lemuel-manske/castellani/libs/httpx v0.0.0
 	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 )
 
 require (
@@ -27,6 +28,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.44.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.9 // indirect
 	github.com/aws/smithy-go v1.28.9 // indirect
+	golang.org/x/text v0.14.0 // indirect
 )
 
 replace github.com/lemuel-manske/castellani/libs/httpx => ../../libs/httpx

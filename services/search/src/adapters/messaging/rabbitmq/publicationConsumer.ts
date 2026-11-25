@@ -1,52 +1,67 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
+
 import {
-  isCompensationDecision,
-  isCompletionCrawl,
-  isPublicationIdentity,
+  ARCHIVE_COMPENSATION_DECIDED_EVENT,
+  ARCHIVE_PUBLICATION_DECIDED_EVENT,
+  ARCHIVE_PUBLISHED_EVENT,
+  CRAWL_COMPLETED_EVENT,
+  type CompensationDecision,
+  type CompletionCrawl,
+  type PublicationIdentity,
 } from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
+
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
-import { EVENTS_EXCHANGE, PUBLICATION_TOPOLOGY } from "./topology.js";
-import { readJSON } from "../../../utils.js";
-import { isEventEnvelope } from "../../../application/types.js";
+
+import { validateMessage } from "../../../contracts.js";
+
+import { PUBLICATION_TOPOLOGY } from "./topology.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
 function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
-  let envelope;
+  const message = validateMessage(body);
 
-  try {
-    envelope = readJSON(body);
-  } catch {
+  if (message == null) {
     return null;
   }
 
-  if (!isEventEnvelope(envelope)) {
+  if (message.payload["archiveId"] !== message.correlationId) {
     return null;
   }
 
-  const payload = envelope.payload;
+  const envelope = {
+    version: 1 as const,
+    messageId: message.messageId,
+    correlationId: message.correlationId,
+    occurredAt: message.occurredAt,
+  };
 
-  if (envelope.type === "ArchivePublicationDecided") {
-    return isPublicationIdentity(payload)
-      ? { ...envelope, type: "ArchivePublicationDecided", payload }
-      : null;
+  if (
+    message.type === ARCHIVE_PUBLICATION_DECIDED_EVENT ||
+    message.type === ARCHIVE_PUBLISHED_EVENT
+  ) {
+    return {
+      ...envelope,
+      type: message.type,
+      payload: message.payload as unknown as PublicationIdentity,
+    };
   }
 
-  if (envelope.type === "ArchivePublished") {
-    return isPublicationIdentity(payload)
-      ? { ...envelope, type: "ArchivePublished", payload }
-      : null;
+  if (message.type === ARCHIVE_COMPENSATION_DECIDED_EVENT) {
+    return {
+      ...envelope,
+      type: message.type,
+      payload: message.payload as unknown as CompensationDecision,
+    };
   }
 
-  if (envelope.type === "ArchiveCompensationDecided") {
-    return isCompensationDecision(payload)
-      ? { ...envelope, type: "ArchiveCompensationDecided", payload }
-      : null;
-  }
-
-  if (envelope.type === "CrawlCompleted" && isCompletionCrawl(payload)) {
-    return { ...envelope, type: "CrawlCompleted", payload };
+  if (message.type === CRAWL_COMPLETED_EVENT) {
+    return {
+      ...envelope,
+      type: message.type,
+      payload: message.payload as unknown as CompletionCrawl,
+    };
   }
 
   return null;
@@ -158,61 +173,6 @@ async function startPublicationConsumer(
   channel: ConfirmChannel,
   handle: (event: PublicationEvent) => Promise<void>,
 ): Promise<void> {
-  await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
-    durable: true,
-  });
-
-  await channel.assertExchange(PUBLICATION_TOPOLOGY.retryExchange, "direct", {
-    durable: true,
-  });
-
-  await channel.assertExchange(
-    PUBLICATION_TOPOLOGY.deadLetterExchange,
-    "fanout",
-    {
-      durable: true,
-    },
-  );
-
-  await channel.assertQueue(PUBLICATION_TOPOLOGY.deadLetterQueue, {
-    durable: true,
-  });
-
-  await channel.bindQueue(
-    PUBLICATION_TOPOLOGY.deadLetterQueue,
-    PUBLICATION_TOPOLOGY.deadLetterExchange,
-    "",
-  );
-
-  await channel.assertQueue(PUBLICATION_TOPOLOGY.retryQueue, {
-    durable: true,
-    arguments: {
-      "x-message-ttl": PUBLICATION_TOPOLOGY.retryDelayMilliseconds,
-      "x-dead-letter-exchange": EVENTS_EXCHANGE,
-    },
-  });
-
-  await Promise.all(
-    PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
-      channel.bindQueue(
-        PUBLICATION_TOPOLOGY.retryQueue,
-        PUBLICATION_TOPOLOGY.retryExchange,
-        key,
-      ),
-    ),
-  );
-
-  await channel.assertQueue(PUBLICATION_TOPOLOGY.queue, {
-    durable: true,
-    arguments: { "x-dead-letter-exchange": PUBLICATION_TOPOLOGY.retryExchange },
-  });
-
-  await Promise.all(
-    PUBLICATION_TOPOLOGY.routingKeys.map((key) =>
-      channel.bindQueue(PUBLICATION_TOPOLOGY.queue, EVENTS_EXCHANGE, key),
-    ),
-  );
-
   await channel.prefetch(1);
 
   await channel.consume(PUBLICATION_TOPOLOGY.queue, (message) => {

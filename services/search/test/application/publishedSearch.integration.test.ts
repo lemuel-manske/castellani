@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
+import {
+  ARCHIVE_PUBLICATION_DECIDED_EVENT,
+  ARCHIVE_PUBLISHED_EVENT,
+} from "../../src/domain.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   application,
@@ -48,7 +52,7 @@ it("keeps indexed snapshots hidden until the matching replay-publication acknowl
   };
 
   const decisionEvent = {
-    type: "ArchivePublicationDecided",
+    type: ARCHIVE_PUBLICATION_DECIDED_EVENT,
     version: 1,
     messageId: `publication-decision-${token}`,
     correlationId: archiveId,
@@ -77,7 +81,7 @@ it("keeps indexed snapshots hidden until the matching replay-publication acknowl
   expect(unpublished.nextCursor).toBeNull();
 
   const acknowledgementEvent = {
-    type: "ArchivePublished",
+    type: ARCHIVE_PUBLISHED_EVENT,
     version: 1,
     messageId: `replay-published-${token}`,
     correlationId: archiveId,

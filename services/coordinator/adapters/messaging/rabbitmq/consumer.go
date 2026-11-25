@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	maxDeliveryAttempts    = 5
-	prefetchCount          = 8
-	retryDelayMilliseconds = 5000
+	maxDeliveryAttempts = 5
+	prefetchCount       = 8
 )
 
 func (c *RabbitConsumer) Consume(
@@ -34,10 +33,6 @@ func (c *RabbitConsumer) Consume(
 		return fmt.Errorf("open consumer channel: %w", err)
 	}
 	defer channel.Close()
-
-	if err = c.declareTopology(channel); err != nil {
-		return err
-	}
 
 	if err = channel.Qos(
 		prefetchCount,
@@ -70,7 +65,7 @@ func (c *RabbitConsumer) Consume(
 				return errors.New("coordinator consumer delivery stream closed")
 			}
 
-			event, decodeErr := decodeEvent(delivery.Body)
+			event, decodeErr := eventFromMessage(delivery.Body)
 
 			if decodeErr != nil {
 				if err := delivery.Nack(false, false); err != nil {
@@ -114,8 +109,6 @@ func (c *RabbitConsumer) Consume(
 				delivery.Body,
 				attempts+1,
 			); retryErr != nil {
-				// Preserve the original delivery when retry publication cannot
-				// be confirmed. This may redeliver but cannot lose the event.
 				return fmt.Errorf("schedule retry: %w", retryErr)
 			}
 
@@ -126,130 +119,27 @@ func (c *RabbitConsumer) Consume(
 	}
 }
 
-func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
-	for _, exchange := range []string{c.exchange, RetryExchange, DeadExchange} {
-		if err := channel.ExchangeDeclare(
-			exchange,
-			"topic",
-			true,
-			false,
-			false,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"declare exchange %s: %w",
-				exchange,
-				err,
-			)
-		}
+func eventFromMessage(data []byte) (domain.Event, error) {
+	messageType, err := Validate(data)
+
+	if err != nil || !slices.Contains(EventTypes, messageType) {
+		return domain.Event{}, domain.ErrInvalidEvent
 	}
 
-	_, err := channel.QueueDeclare(
-		DeadQueue,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if err != nil {
-		return fmt.Errorf("declare dead letter queue: %w", err)
-	}
-
-	if err = channel.QueueBind(
-		DeadQueue,
-		"#",
-		DeadExchange,
-		false,
-		nil,
-	); err != nil {
-		return fmt.Errorf("bind dead letter queue: %w", err)
-	}
-
-	_, err = channel.QueueDeclare(
-		RetryQueue,
-		true,
-		false,
-		false,
-		false,
-		amqp.Table{
-			"x-message-ttl":          int32(retryDelayMilliseconds),
-			"x-dead-letter-exchange": c.exchange,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("declare retry queue: %w", err)
-	}
-
-	_, err = channel.QueueDeclare(
-		CoordinatorQueue,
-		true,
-		false,
-		false,
-		false,
-		amqp.Table{
-			"x-dead-letter-exchange": DeadExchange,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("declare coordinator queue: %w", err)
-	}
-
-	for _, eventType := range EventTypes {
-		if err := channel.QueueBind(
-			CoordinatorQueue,
-			eventType,
-			c.exchange,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"bind %s: %w",
-				eventType,
-				err,
-			)
-		}
-
-		if err := channel.QueueBind(
-			RetryQueue,
-			eventType,
-			RetryExchange,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"bind retry %s: %w",
-				eventType,
-				err,
-			)
-		}
-	}
-
-	return nil
-}
-
-func decodeEvent(data []byte) (domain.Event, error) {
 	var wire InboundEnvelope
 
 	if err := json.Unmarshal(data, &wire); err != nil {
-		return domain.Event{}, fmt.Errorf("decode event: %w", err)
+		return domain.Event{}, domain.ErrInvalidEvent
 	}
 
-	recognized := slices.Contains(EventTypes, wire.Type)
-
-	if !recognized || wire.Version != 1 || wire.MessageID == "" || wire.Payload.ArchiveID == "" ||
-		wire.CorrelationID != wire.Payload.ArchiveID {
+	if wire.CorrelationID != wire.Payload.ArchiveID {
 		return domain.Event{}, domain.ErrInvalidEvent
 	}
 
 	return domain.Event{
 		MessageID:       wire.MessageID,
 		ArchiveID:       wire.Payload.ArchiveID,
-		Type:            wire.Type,
+		Type:            messageType,
 		ManifestDigest:  wire.Payload.ManifestDigest,
 		PackageDigest:   wire.Payload.PackageDigest,
 		DecisionVersion: wire.Payload.DecisionVersion,

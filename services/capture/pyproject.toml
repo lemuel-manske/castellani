@@ -9,6 +9,7 @@ dependencies = [
     "cryptography==47.0.0",
     "fastapi==0.115.12",
     "httpx==0.28.1",
+    "jsonschema[format-nongpl]==4.26.0",
     "playwright==1.51.0",
     "pywb==2.11.1",
     "selectolax==0.3.28",

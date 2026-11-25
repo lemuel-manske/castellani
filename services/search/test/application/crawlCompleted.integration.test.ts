@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
+import { CRAWL_COMPLETED_EVENT } from "../../src/domain.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   dynamodb,
@@ -61,7 +62,7 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
 
   await rabbitmq.publishPublication(
     {
-      type: "CrawlCompleted",
+      type: CRAWL_COMPLETED_EVENT,
       version: 1,
       messageId: `crawl-completed-message-${token}`,
       correlationId: archiveId,
@@ -75,15 +76,18 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
           sha256: manifestDigest,
           sizeBytes: manifestBytes.byteLength,
         },
+        seedSucceeded: true,
+        capturedCount: manifest.snapshots.length,
+        failedCount: 0,
       },
     },
-    "CrawlCompleted",
+    CRAWL_COMPLETED_EVENT,
   );
 
   const event = await nextPublicationEvent();
 
   expect(event).toMatchObject({
-    type: "CrawlCompleted",
+    type: CRAWL_COMPLETED_EVENT,
     payload: {
       archiveId,
       manifestDigest,

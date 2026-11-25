@@ -88,6 +88,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/import-rabbitmq-topology
+        with:
+          container-id: ${{ job.services.rabbitmq.id }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24.16.0

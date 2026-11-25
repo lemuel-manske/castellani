@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
+import { PAGE_CAPTURED_EVENT } from "../../src/domain.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   nextPageCaptured,
@@ -30,7 +31,7 @@ it("indexes a captured page delivered through RabbitMQ from its WARC artifact", 
   const event = await nextPageCaptured();
 
   expect(event).toMatchObject({
-    type: "PageCaptured",
+    type: PAGE_CAPTURED_EVENT,
     messageId: fixture.event.messageId,
     payload: {
       archiveId: fixture.event.payload.archiveId,

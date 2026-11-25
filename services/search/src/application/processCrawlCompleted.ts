@@ -4,7 +4,7 @@ import type {
   ArtifactReference,
   CapturedPageReader,
 } from "../ports/artifacts.js";
-import type { CompletionCrawl } from "../domain.js";
+import { PAGE_CAPTURED_EVENT, type CompletionCrawl } from "../domain.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import { processPageCaptured } from "./processPageCaptured.js";
 import { isManifestDocument, ManifestDocument } from "./types.js";
@@ -80,7 +80,7 @@ async function processCrawlCompleted(
   for (const snapshot of manifest.snapshots) {
     await processPageCaptured(
       {
-        type: "PageCaptured",
+        type: PAGE_CAPTURED_EVENT,
         version: 1,
         messageId: `manifest:${event.manifestDigest}:${snapshot.snapshotId}`,
         correlationId: manifest.archiveId,

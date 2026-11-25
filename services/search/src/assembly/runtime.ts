@@ -16,6 +16,8 @@ import {
 
 import { createSearchServer } from "../api/server.js";
 
+import { CRAWL_COMPLETED_EVENT } from "../domain.js";
+
 import { processCrawlCompleted } from "../application/processCrawlCompleted.js";
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import { processPublicationEvent } from "../application/processPublicationEvent.js";
@@ -94,7 +96,7 @@ class SearchRuntime {
           ),
 
         publicationEvent: (event: PublicationEvent) =>
-          event.type === "CrawlCompleted"
+          event.type === CRAWL_COMPLETED_EVENT
             ? processCrawlCompleted(
                 event.payload,
                 artifactReader,

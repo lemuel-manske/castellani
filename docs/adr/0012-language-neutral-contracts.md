@@ -9,7 +9,7 @@ The system has Go, Python, and TypeScript services that must communicate without
 
 ## Decision
 
-Define cross-service contracts in JSON Schema under `contracts/`, independently of any implementation language. Services may validate messages against these schemas but must not share private service models or implementation packages. Contracts describe observable communication, not internal storage layouts.
+Define cross-service contracts in JSON Schema under `contracts/`, independently of any implementation language. Services validate inbound broker messages against these schemas at runtime and must not share private service models, generated validators, or implementation packages. Contracts describe observable communication, not internal storage layouts.
 
 Use RabbitMQ for asynchronous commands and events, and HTTP for synchronous operations:
 
@@ -35,4 +35,4 @@ Page indexing is incremental: once a page is durably captured, its completion ca
 
 Consumers can evolve independently around explicit contracts, and one event can be routed to multiple interested services. HTTP admission and queries introduce direct availability dependencies, so clients require bounded timeouts and defined failure responses.
 
-Schema validation and version-aware consumption are required. The versioned message catalog, payload schemas, fan-out routing, and compatibility rules are specified in [message contracts](../../contracts/messages/README.md); public HTTP operations are specified in [OpenAPI 3.1](../../contracts/openapi/api.yaml). The detailed implementation of RabbitMQ queues, retry scheduling, and dead-letter transport remains deployment configuration. This decision does not imply global event ordering or exactly-once processing.
+Schema validation and version-aware consumption are required. The versioned message catalog, payload schemas, fan-out routing, and compatibility rules are specified in [message contracts](../../contracts/messages/README.md); public HTTP operations are specified in [OpenAPI 3.1](../../contracts/openapi/api.yaml). RabbitMQ queues, retry scheduling, and dead-letter transport are provisioned by [`infra/rabbitmq/definitions.json`](../../infra/rabbitmq/definitions.json); services do not declare broker topology. This decision does not imply global event ordering or exactly-once processing.

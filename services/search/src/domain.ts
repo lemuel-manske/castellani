@@ -1,14 +1,16 @@
-import {
-  ArtifactReference,
-  ArtifactReferenceSchema,
-} from "./ports/artifacts.js";
-import { createSchemaValidator } from "./schema.js";
+import type { ArtifactReference } from "./ports/artifacts.js";
 
 /**
  * Search domain vocabulary.
  *
  * Keep domain concepts and contracts here.
  */
+
+const ARCHIVE_COMPENSATION_DECIDED_EVENT = "ArchiveCompensationDecided";
+const ARCHIVE_PUBLICATION_DECIDED_EVENT = "ArchivePublicationDecided";
+const ARCHIVE_PUBLISHED_EVENT = "ArchivePublished";
+const CRAWL_COMPLETED_EVENT = "CrawlCompleted";
+const PAGE_CAPTURED_EVENT = "PageCaptured";
 
 interface PublicationIdentity {
   archiveId: string;
@@ -26,6 +28,9 @@ interface CompletionCrawl {
   archiveId: string;
   manifestDigest: string;
   manifest: ArtifactReference;
+  seedSucceeded: boolean;
+  capturedCount: number;
+  failedCount: number;
 }
 
 interface PublicationFacts {
@@ -64,69 +69,12 @@ interface ManifestReconciliation {
   complete: boolean;
 }
 
-const PublicationIdentitySchema = {
-  type: "object",
-  properties: {
-    archiveId: { type: "string", minLength: 1 },
-    decisionVersion: { type: "integer", minimum: 1 },
-    packageDigest: { type: "string", minLength: 1 },
-  },
-  required: ["archiveId", "decisionVersion", "packageDigest"],
-  additionalProperties: false,
-} as const;
-
-const publicationIdentityValidator = createSchemaValidator<PublicationIdentity>(
-  PublicationIdentitySchema,
-);
-
-function isPublicationIdentity(value: unknown): value is PublicationIdentity {
-  return publicationIdentityValidator.validate(value);
-}
-
-const CompensationDecisionSchema = {
-  type: "object",
-  properties: {
-    archiveId: { type: "string", minLength: 1 },
-    decisionVersion: { type: "integer", minimum: 1 },
-    reasonCode: { type: "string", minLength: 1 },
-  },
-  required: ["archiveId", "decisionVersion", "reasonCode"],
-  additionalProperties: false,
-} as const;
-
-const compensationDecisionValidator =
-  createSchemaValidator<CompensationDecision>(CompensationDecisionSchema);
-
-function isCompensationDecision(value: unknown): value is CompensationDecision {
-  return compensationDecisionValidator.validate(value);
-}
-
-const CompletionCrawlSchema = {
-  type: "object",
-  properties: {
-    archiveId: { type: "string", minLength: 1 },
-    manifestDigest: { type: "string", minLength: 1 },
-    manifest: ArtifactReferenceSchema,
-  },
-  required: ["archiveId", "manifestDigest", "manifest"],
-  additionalProperties: false,
-} as const;
-
-const completionCrawlValidator = createSchemaValidator<CompletionCrawl>(
-  CompletionCrawlSchema,
-);
-
-function isCompletionCrawl(value: unknown): value is CompletionCrawl {
-  return completionCrawlValidator.validate(value);
-}
-
 export {
-  CompensationDecisionSchema,
-  CompletionCrawlSchema,
-  PublicationIdentitySchema,
-  isCompensationDecision,
-  isCompletionCrawl,
-  isPublicationIdentity,
+  ARCHIVE_COMPENSATION_DECIDED_EVENT,
+  ARCHIVE_PUBLICATION_DECIDED_EVENT,
+  ARCHIVE_PUBLISHED_EVENT,
+  CRAWL_COMPLETED_EVENT,
+  PAGE_CAPTURED_EVENT,
 };
 
 export type {

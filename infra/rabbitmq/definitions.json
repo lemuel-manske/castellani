@@ -1,0 +1,493 @@
+{
+  "rabbit_version": "4.1.4",
+  "users": [],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [],
+  "parameters": [],
+  "policies": [],
+  "exchanges": [
+    {
+      "name": "castellani.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.capture",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.capture.retry",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.capture.dead",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.retry",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.dead",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.search.retry",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.search.dead",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.search.publication.retry",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.search.publication.dead",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "castellani.coordinator",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.dead"
+      }
+    },
+    {
+      "name": "castellani.coordinator.retry",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 5000,
+        "x-dead-letter-exchange": "castellani.events"
+      }
+    },
+    {
+      "name": "castellani.coordinator.dead",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.capture.page",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.capture.retry",
+        "x-dead-letter-routing-key": "CapturePage"
+      }
+    },
+    {
+      "name": "castellani.capture.start",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.capture.retry",
+        "x-dead-letter-routing-key": "StartCrawl"
+      }
+    },
+    {
+      "name": "castellani.capture.page.retry",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 5000,
+        "x-dead-letter-exchange": "castellani.capture",
+        "x-dead-letter-routing-key": "CapturePage"
+      }
+    },
+    {
+      "name": "castellani.capture.start.retry",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 5000,
+        "x-dead-letter-exchange": "castellani.events",
+        "x-dead-letter-routing-key": "StartCrawl"
+      }
+    },
+    {
+      "name": "castellani.capture.dead",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.search.page-captured",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.search.retry",
+        "x-dead-letter-routing-key": "PageCaptured"
+      }
+    },
+    {
+      "name": "castellani.search.page-captured.retry",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 5000,
+        "x-dead-letter-exchange": "castellani.events",
+        "x-dead-letter-routing-key": "PageCaptured"
+      }
+    },
+    {
+      "name": "castellani.search.page-captured.dead",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "castellani.search.publication",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "castellani.search.publication.retry"
+      }
+    },
+    {
+      "name": "castellani.search.publication.retry.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 5000,
+        "x-dead-letter-exchange": "castellani.events"
+      }
+    },
+    {
+      "name": "castellani.search.publication.dead.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.capture.start",
+      "destination_type": "queue",
+      "routing_key": "StartCrawl",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.capture",
+      "vhost": "/",
+      "destination": "castellani.capture.page",
+      "destination_type": "queue",
+      "routing_key": "CapturePage",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.capture.retry",
+      "vhost": "/",
+      "destination": "castellani.capture.page.retry",
+      "destination_type": "queue",
+      "routing_key": "CapturePage",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.capture.retry",
+      "vhost": "/",
+      "destination": "castellani.capture.start.retry",
+      "destination_type": "queue",
+      "routing_key": "StartCrawl",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.capture.dead",
+      "vhost": "/",
+      "destination": "castellani.capture.dead",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "CrawlCompleted",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "ArchivePrepared",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "ArchivePublished",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "ArchiveCompensated",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "SearchCompensated",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "SearchIndexingCompleted",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.coordinator",
+      "destination_type": "queue",
+      "routing_key": "SearchReady",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "CrawlCompleted",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "ArchivePrepared",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "ArchivePublished",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "ArchiveCompensated",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "SearchCompensated",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "SearchIndexingCompleted",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.retry",
+      "vhost": "/",
+      "destination": "castellani.coordinator.retry",
+      "destination_type": "queue",
+      "routing_key": "SearchReady",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.dead",
+      "vhost": "/",
+      "destination": "castellani.coordinator.dead",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.search.page-captured",
+      "destination_type": "queue",
+      "routing_key": "PageCaptured",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.retry",
+      "vhost": "/",
+      "destination": "castellani.search.page-captured.retry",
+      "destination_type": "queue",
+      "routing_key": "PageCaptured",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.dead",
+      "vhost": "/",
+      "destination": "castellani.search.page-captured.dead",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.search.publication",
+      "destination_type": "queue",
+      "routing_key": "ArchivePublicationDecided",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.search.publication",
+      "destination_type": "queue",
+      "routing_key": "ArchivePublished",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.search.publication",
+      "destination_type": "queue",
+      "routing_key": "ArchiveCompensationDecided",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.events",
+      "vhost": "/",
+      "destination": "castellani.search.publication",
+      "destination_type": "queue",
+      "routing_key": "CrawlCompleted",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.publication.retry",
+      "vhost": "/",
+      "destination": "castellani.search.publication.retry.queue",
+      "destination_type": "queue",
+      "routing_key": "ArchivePublicationDecided",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.publication.retry",
+      "vhost": "/",
+      "destination": "castellani.search.publication.retry.queue",
+      "destination_type": "queue",
+      "routing_key": "ArchivePublished",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.publication.retry",
+      "vhost": "/",
+      "destination": "castellani.search.publication.retry.queue",
+      "destination_type": "queue",
+      "routing_key": "ArchiveCompensationDecided",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.publication.retry",
+      "vhost": "/",
+      "destination": "castellani.search.publication.retry.queue",
+      "destination_type": "queue",
+      "routing_key": "CrawlCompleted",
+      "arguments": {}
+    },
+    {
+      "source": "castellani.search.publication.dead",
+      "vhost": "/",
+      "destination": "castellani.search.publication.dead.queue",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
+  ]
+}

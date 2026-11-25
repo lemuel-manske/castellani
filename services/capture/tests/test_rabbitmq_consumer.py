@@ -5,43 +5,9 @@ from uuid import uuid4
 import pytest
 from aio_pika.abc import AbstractRobustConnection
 
-from adapters.messaging.rabbitmq.consumer import (
-    CAPTURE_PAGE_QUEUE,
-    RabbitMQPageTaskConsumer,
-    parse_delivery,
-)
+from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
-
-
-def test_parse_delivery_extracts_archive_and_url_identity() -> None:
-    body = json.dumps(
-        {
-            "messageId": "message-1",
-            "correlationId": "archive-1",
-            "type": "CapturePage",
-            "version": 1,
-            "occurredAt": "2026-11-20T12:00:00Z",
-            "payload": {"archiveId": "archive-1", "urlKey": "v1-identity"},
-        }
-    ).encode()
-
-    assert parse_delivery(body) == ("archive-1", "v1-identity")
-
-
-def test_parse_delivery_rejects_malformed_or_unsupported_envelopes() -> None:
-    assert parse_delivery(b"{") is None
-    assert parse_delivery(b"[]") is None
-
-    envelope = {
-        "messageId": "message-1",
-        "correlationId": "archive-1",
-        "type": "CapturePage",
-        "version": True,
-        "occurredAt": "2026-11-20T12:00:00Z",
-        "payload": {"archiveId": "archive-1", "urlKey": "url-1"},
-    }
-
-    assert parse_delivery(json.dumps(envelope).encode()) is None
+from adapters.messaging.rabbitmq.topology import CAPTURE_PAGE_QUEUE
 
 
 @pytest.mark.integration
@@ -59,10 +25,13 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
 
     ready = asyncio.Event()
 
-    consumer = RabbitMQPageTaskConsumer(capture_page)
+    channel = await rabbitmq.channel()
+    queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
 
-    queue_name = f"{CAPTURE_PAGE_QUEUE}.test-{uuid4()}"
-    consumer_task = asyncio.create_task(consumer.run(rabbitmq, queue_name=queue_name, ready=ready))
+    await queue.purge()
+
+    consumer = RabbitMQPageTaskConsumer(capture_page)
+    consumer_task = asyncio.create_task(consumer.run(rabbitmq, ready=ready))
 
     publisher = RabbitMQMessagePublisher(rabbitmq)
 
@@ -97,12 +66,5 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
             await consumer_task
 
         await publisher.close()
-
-        cleanup_channel = await rabbitmq.channel()
-
-        try:
-            queue = await cleanup_channel.declare_queue(queue_name, durable=True)
-
-            await queue.delete()
-        finally:
-            await cleanup_channel.close()
+        await queue.purge()
+        await channel.close()
