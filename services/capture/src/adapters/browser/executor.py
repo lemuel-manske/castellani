@@ -3,7 +3,7 @@ from pathlib import Path
 from capture.browser import CaptureLimits, capture_page
 from capture.worker import CaptureArtifact
 from capture.worker.api import CaptureExecutor
-from domain.capture import PageCapture
+from domain.capture import AuthContext, PageCapture
 
 
 class BrowserPageExecutor(CaptureExecutor):
@@ -12,8 +12,18 @@ class BrowserPageExecutor(CaptureExecutor):
     def __init__(self, limits: CaptureLimits | None = None) -> None:
         self.limits = limits or CaptureLimits()
 
-    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
-        result = await capture_page(url, output_dir, limits=self.limits)
+    async def execute(
+        self,
+        url: str,
+        output_dir: Path,
+        auth_context: AuthContext,
+    ) -> CaptureArtifact:
+        result = await capture_page(
+            url,
+            output_dir,
+            limits=self.limits,
+            storage_state=auth_context.storage_state,
+        )
 
         return CaptureArtifact(
             capture=PageCapture(

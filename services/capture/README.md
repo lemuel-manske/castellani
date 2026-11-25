@@ -39,7 +39,7 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. The runti
 | `CAPTURE_OUTBOX_POLL_SECONDS` | Outbox polling interval. Defaults to 0.5 seconds |
 | `CAPTURE_OUTBOX_RETRY_SECONDS` | Outbox retry delay. Defaults to 5 seconds |
 | `CAPTURE_ARTIFACT_DIRECTORY` | Local artifact staging directory. Defaults to `/tmp/castellani/capture` |
-| `CAPTURE_AUTH_PROFILE_KEY` | Base64-encoded 32-byte application key used to encrypt authenticated browser profiles |
+| `CAPTURE_AUTH_PROFILE_KEY` | Base64-encoded 32-byte application key used to protect authenticated browser profiles for the login manager and capture workers |
 | `CAPTURE_LOGIN_PORT` | Interactive-login manager listen port. Defaults to 8010 |
 | `CAPTURE_SESSION_TTL_SECONDS` | Interactive session lifetime. Defaults to 1800 seconds |
 | `CAPTURE_LOGIN_MAX_SESSIONS` | Concurrent interactive browsers per manager. Defaults to 4 |

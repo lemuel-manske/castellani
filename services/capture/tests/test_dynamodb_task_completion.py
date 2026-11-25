@@ -9,11 +9,17 @@ from support.domain import (
     run_item,
     seed_frontier,
     seed_run,
+    set_run_auth_generation,
     snapshot_item,
 )
 
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
-from domain.capture import ArtifactReference, CaptureOutcome, PageCapture
+from domain.capture import (
+    ArtifactReference,
+    AuthGenerationChanged,
+    CaptureOutcome,
+    PageCapture,
+)
 
 
 @pytest.mark.integration
@@ -82,6 +88,113 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
     assert len(events) == 1
     assert events[0]["type"] == {"S": "PageCaptured"}
     assert events[0]["payload"]["M"]["snapshotId"] == {"S": "snapshot-1"}
+
+
+@pytest.mark.integration
+async def test_task_completion_accepts_the_current_auth_generation(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    seed_run(dynamodb, auth_generation=1)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    await repository.complete(
+        CaptureOutcome(
+            archive_id="archive-1",
+            url_key="url-1",
+            attempt_id=claim.attempt_id,
+            fence=claim.fence,
+            snapshot_id="snapshot-auth",
+            capture=PageCapture(
+                requested_url="https://example.org/",
+                final_url="https://example.org/",
+                redirect_chain=(),
+                status_code=200,
+                content_type="text/html",
+                title="Example",
+                captured_at=datetime(2026, 11, 22, 12, 0, tzinfo=UTC),
+                discovered_urls=(),
+            ),
+            warc_artifacts=(
+                ArtifactReference(
+                    bucket="capture-artifacts",
+                    key="capture-staging/archive-1/url-1/attempt-1/snapshot-auth/capture.warc.gz",
+                    sha256="b" * 64,
+                    size_bytes=128,
+                ),
+            ),
+            auth_generation=1,
+        )
+    )
+
+    assert frontier_item(dynamodb)["state"] == {"S": "COMPLETED"}
+
+
+@pytest.mark.integration
+async def test_task_completion_rejects_a_stale_auth_generation(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    seed_run(dynamodb, auth_generation=1)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    set_run_auth_generation(dynamodb, 2)
+
+    with pytest.raises(AuthGenerationChanged):
+        await repository.complete(
+            CaptureOutcome(
+                archive_id="archive-1",
+                url_key="url-1",
+                attempt_id=claim.attempt_id,
+                fence=claim.fence,
+                snapshot_id="snapshot-stale",
+                capture=PageCapture(
+                    requested_url="https://example.org/",
+                    final_url="https://example.org/",
+                    redirect_chain=(),
+                    status_code=200,
+                    content_type="text/html",
+                    title="Example",
+                    captured_at=datetime(2026, 11, 22, 12, 0, tzinfo=UTC),
+                    discovered_urls=(),
+                ),
+                warc_artifacts=(
+                    ArtifactReference(
+                        bucket="capture-artifacts",
+                        key=(
+                            "capture-staging/archive-1/url-1/attempt-1/"
+                            "snapshot-stale/capture.warc.gz"
+                        ),
+                        sha256="c" * 64,
+                        size_bytes=128,
+                    ),
+                ),
+                auth_generation=1,
+            )
+        )
+
+    assert frontier_item(dynamodb)["state"] == {"S": "CLAIMED"}
+    assert outbox_items(dynamodb) == []
 
 
 @pytest.mark.integration

@@ -1,12 +1,30 @@
 {
   "rabbit_version": "4.1.4",
-  "users": [],
+  "users": [
+    {
+      "name": "castellani",
+      "password_hash": "cHGr/oeIXlbbC5ye8MJaNI83fYqTEh6u35hS7nOjlaXWmYzX",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ],
+      "limits": {}
+    }
+  ],
   "vhosts": [
     {
       "name": "/"
     }
   ],
-  "permissions": [],
+  "permissions": [
+    {
+      "configure": ".*",
+      "read": ".*",
+      "write": ".*",
+      "user": "castellani",
+      "vhost": "/"
+    }
+  ],
   "parameters": [],
   "policies": [],
   "exchanges": [

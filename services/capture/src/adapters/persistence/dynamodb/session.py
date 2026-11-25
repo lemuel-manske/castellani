@@ -35,13 +35,18 @@ GENERATION_ATTEMPTS = 5
 
 
 class DynamoDBSessionStore(SessionStore):
-    def __init__(self, client: Any, session_ttl_seconds: int) -> None:
+    def __init__(self, client: Any, session_ttl_seconds: int | None = None) -> None:
         self.client = client
         self.session_ttl_seconds = session_ttl_seconds
 
     async def create(self, session: AuthSession, key: str, fingerprint: str) -> None:
+        if self.session_ttl_seconds is None:
+            raise RuntimeError("session TTL is required to create interactive sessions")
+
         now = datetime.now(UTC)
+
         now_epoch = int(now.timestamp())
+
         expires_at = now.timestamp() + self.session_ttl_seconds
         updated_at = utc_now()
 

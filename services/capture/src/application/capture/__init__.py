@@ -1,3 +1,4 @@
+from .auth import StoredAuthContexts
 from .outbox import MessagePublisher, OutboxDispatcher
 
-__all__ = ["MessagePublisher", "OutboxDispatcher"]
+__all__ = ["MessagePublisher", "OutboxDispatcher", "StoredAuthContexts"]

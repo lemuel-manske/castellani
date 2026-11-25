@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from domain.capture import (
+    DEFAULT_AUTH_GENERATION,
     ArtifactReference,
     CaptureOutcome,
     DiscoveredPage,
@@ -9,6 +10,8 @@ from domain.capture import (
     TaskClaim,
 )
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
+
+from ..values import optional_number
 
 
 def claim_from_item(
@@ -46,6 +49,17 @@ def read_run(client: Any, archive_id: str) -> dict[str, Any] | None:
     return item if item else None
 
 
+def auth_generation_changed(client: Any, archive_id: str, expected: int) -> bool:
+    run = read_run(client, archive_id)
+
+    if run is None:
+        return False
+
+    current = optional_number(run, "authGeneration")
+
+    return (DEFAULT_AUTH_GENERATION if current is None else current) != expected
+
+
 def read_frontier(
     client: Any,
     archive_id: str,
@@ -63,6 +77,19 @@ def read_frontier(
     item = response.get("Item")
 
     return item if item else None
+
+
+def read_depth(client: Any, archive_id: str, url_key: str) -> int:
+    item = read_frontier(
+        client,
+        archive_id,
+        url_key,
+    )
+
+    if item is None:
+        raise RuntimeError("page-task disappeared before completion")
+
+    return int(item.get("depth", {}).get("N", "0"))
 
 
 def read_outbox(client: Any, message_id: str) -> dict[str, Any] | None:
@@ -279,16 +306,23 @@ def complete_task_transaction(
                 "TableName": RUNS_TABLE,
                 "Key": {"archiveId": {"S": outcome.archive_id}},
                 "UpdateExpression": "ADD #outstanding :minus_one, #completed :one",
-                "ConditionExpression": ("#admission = :open AND #outstanding >= :one"),
+                "ConditionExpression": (
+                    "#admission = :open AND #outstanding >= :one "
+                    "AND (#auth_generation = :auth_generation "
+                    "OR (:auth_generation = :zero AND attribute_not_exists(#auth_generation)))"
+                ),
                 "ExpressionAttributeNames": {
                     "#admission": "admission",
                     "#outstanding": "outstandingPages",
                     "#completed": "completedPages",
+                    "#auth_generation": "authGeneration",
                 },
                 "ExpressionAttributeValues": {
                     ":open": {"S": "OPEN"},
                     ":minus_one": {"N": "-1"},
                     ":one": {"N": "1"},
+                    ":zero": {"N": "0"},
+                    ":auth_generation": {"N": str(outcome.auth_generation)},
                 },
             }
         },
@@ -326,6 +360,7 @@ def admit_page_transaction(
     page: DiscoveredPage,
     message_id: str,
     now: float,
+    auth_generation: int,
 ) -> list[dict[str, Any]]:
     archive_id = claim.task.archive_id
     url_key = page.identity.url_key
@@ -368,18 +403,22 @@ def admit_page_transaction(
                 "ConditionExpression": (
                     "#admission = :open AND attribute_exists(#maximum) "
                     "AND attribute_exists(#admitted) AND attribute_exists(#outstanding) "
-                    "AND #admitted < #maximum"
+                    "AND #admitted < #maximum "
+                    "AND (#auth_generation = :auth_generation "
+                    "OR (:auth_generation = :zero AND attribute_not_exists(#auth_generation)))"
                 ),
                 "ExpressionAttributeNames": {
                     "#admission": "admission",
                     "#admitted": "admittedPages",
                     "#maximum": "maxPages",
                     "#outstanding": "outstandingPages",
+                    "#auth_generation": "authGeneration",
                 },
                 "ExpressionAttributeValues": {
                     ":open": {"S": "OPEN"},
                     ":zero": {"N": "0"},
                     ":one": {"N": "1"},
+                    ":auth_generation": {"N": str(auth_generation)},
                 },
             }
         },

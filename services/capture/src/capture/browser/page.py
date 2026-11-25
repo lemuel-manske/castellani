@@ -1,10 +1,12 @@
 import asyncio
+import json
 import os
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin
 
 from playwright.async_api import (
@@ -214,8 +216,45 @@ async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult
     )
 
 
+async def apply_storage_state(context: Any, state: dict[str, Any]) -> None:
+    cookies = state.get("cookies", [])
+
+    if cookies:
+        await context.add_cookies(cookies)
+
+    origins = state.get("origins", [])
+
+    if not origins:
+        return
+
+    payload = json.dumps(origins, separators=(",", ":"))
+
+    script = f"""(() => {{
+        const origins = {payload};
+
+        for (const entry of origins) {{
+            if (window.location.origin !== entry.origin) {{
+                continue;
+            }}
+
+            for (const item of entry.localStorage) {{
+                try {{
+                    window.localStorage.setItem(item.name, item.value);
+                }} catch (error) {{
+                    continue;
+                }}
+            }}
+        }}
+    }})()"""
+
+    await context.add_init_script(script=script)
+
+
 async def capture_page(
-    url: str, output_dir: Path, limits: CaptureLimits = DEFAULT_LIMITS
+    url: str,
+    output_dir: Path,
+    limits: CaptureLimits = DEFAULT_LIMITS,
+    storage_state: dict[str, Any] | None = None,
 ) -> BrowserCaptureResult:
     if not is_valid_url(url):
         raise InvalidCaptureURL(
@@ -241,6 +280,9 @@ async def capture_page(
                 viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
                 service_workers="block",
             )
+
+            if storage_state is not None:
+                await apply_storage_state(context, storage_state)
 
             try:
                 request_guard = RequestGuard(limits)

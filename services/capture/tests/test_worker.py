@@ -1,5 +1,7 @@
-from datetime import UTC, datetime
+import asyncio
+import threading
 from pathlib import Path
+from typing import Any
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
@@ -9,37 +11,58 @@ from support.domain import (
     run_item,
     seed_frontier,
     seed_run,
+    set_run_auth_generation,
+    set_run_auth_profile,
     specific_snapshot_item,
 )
+from support.recording import LocalSite
+from support.s3 import FakeS3
 
+from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.artifacts.local import LocalArtifactStore
+from adapters.browser.executor import BrowserPageExecutor
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
+from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
-from capture.worker import CaptureArtifact
+from application.capture import StoredAuthContexts
+from capture.browser import CaptureLimits
 from capture.worker.runner import ConcreteCaptureWorker
-from domain.capture import PageCapture
-from utils.fn import noop
+
+LOCAL_LIMITS = CaptureLimits(allow_private_networks=True)
+
+AUTH_PROFILE_KEY = b"k" * 32
 
 
 @pytest.mark.integration
 async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
     dynamodb: DynamoDBClient,
+    local_site: LocalSite,
+    s3: FakeS3,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seed_run(dynamodb)
-    seed_frontier(dynamodb)
+    seed_frontier(dynamodb, url=f"{local_site.base_url}/slow")
 
-    artifacts = LocalArtifactStore(tmp_path)
+    monkeypatch.setattr("capture.browser.page.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
 
-    worker = new_worker(dynamodb, artifacts, FailingExecutor())
+    worker = new_worker(
+        dynamodb,
+        LocalArtifactStore(tmp_path),
+        s3,
+        limits=CaptureLimits(
+            navigation_timeout_milliseconds=100,
+            allow_private_networks=True,
+        ),
+    )
 
     assert await worker("archive-1", "url-1")
 
     task = frontier_item(dynamodb)
 
     assert task["state"] == {"S": "FAILED"}
-    assert task["failureReason"] == {"S": "capture_failed"}
-    assert task["failureMessage"] == {"S": "browser capture failed"}
+    assert task["failureReason"] == {"S": "navigation_failed"}
+    assert "browser navigation did not produce" in task["failureMessage"]["S"]
 
     assert not (tmp_path / "attempt-1").exists()
 
@@ -47,14 +70,16 @@ async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
 @pytest.mark.integration
 async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
     dynamodb: DynamoDBClient,
+    local_site: LocalSite,
+    s3: FakeS3,
     tmp_path: Path,
 ) -> None:
+    url = f"{local_site.base_url}/page"
+
     seed_run(dynamodb)
-    seed_frontier(dynamodb)
+    seed_frontier(dynamodb, url=url)
 
-    artifacts = LocalArtifactStore(tmp_path)
-
-    worker = new_worker(dynamodb, artifacts, SuccessfulExecutor())
+    worker = new_worker(dynamodb, LocalArtifactStore(tmp_path), s3)
 
     assert await worker("archive-1", "url-1")
 
@@ -62,42 +87,95 @@ async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
 
     assert completed["state"] == {"S": "COMPLETED"}
     assert completed["snapshotId"]["S"]
-    assert completed["warcArtifacts"]["L"][0]["M"]["bucket"] == {"S": "local"}
 
     snapshot = specific_snapshot_item(dynamodb, completed["snapshotId"]["S"])
 
-    assert snapshot["urlKey"] == {"S": "url-1"}
-    assert snapshot["minDepth"] == {"N": "0"}
-    assert (tmp_path / "attempt-1" / "capture.warc.gz").read_bytes() == b"capture"
+    assert snapshot["url"] == {"S": url}
+    assert snapshot["statusCode"] == {"N": "200"}
+    assert snapshot["title"] == {"S": "Recorder acceptance page"}
+
+    warc_files = tuple((tmp_path / "attempt-1").rglob("*.warc.gz"))
+
+    assert warc_files
+    assert all(path.stat().st_size > 0 for path in warc_files)
 
     events = outbox_items(dynamodb)
 
-    assert len(events) == 1
+    assert {event["type"]["S"] for event in events} == {"PageCaptured", "CapturePage"}
 
-    event = events[0]
+    page_captured = next(event for event in events if event["type"] == {"S": "PageCaptured"})
 
-    assert event["type"] == {"S": "PageCaptured"}
-
-    payload = event["payload"]["M"]
+    payload = page_captured["payload"]["M"]
 
     assert payload["archiveId"] == {"S": "archive-1"}
     assert payload["snapshotId"] == completed["snapshotId"]
-    assert payload["url"] == {"S": "https://example.org/"}
+    assert payload["url"] == {"S": url}
     assert payload["warcArtifacts"]["L"][0]["M"]["sha256"]["S"]
 
     run = run_item(dynamodb)
 
-    assert run["outstandingPages"] == {"N": "0"}
+    assert run["admittedPages"] == {"N": "2"}
+    assert run["outstandingPages"] == {"N": "1"}
     assert run["completedPages"] == {"N": "1"}
+
+
+@pytest.mark.integration
+async def test_worker_requeues_task_when_auth_generation_changes(
+    dynamodb: DynamoDBClient,
+    local_site: LocalSite,
+    s3: FakeS3,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_run(dynamodb, auth_generation=1)
+    seed_frontier(dynamodb, url=f"{local_site.base_url}/slow")
+
+    profiles = EncryptedAuthProfileStore(s3, AuthProfileCipher(AUTH_PROFILE_KEY))
+    state: dict[str, list[str]] = {"cookies": [], "origins": []}
+    key = await profiles.save("archive-1", 1, state)
+    set_run_auth_profile(dynamodb, 1, key)
+
+    profile_loaded = threading.Event()
+    original_get_object = s3.get_object
+
+    def get_object(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        result = original_get_object(*args, **kwargs)
+        profile_loaded.set()
+
+        return result
+
+    monkeypatch.setattr(s3, "get_object", get_object)
+
+    async def renew_auth() -> None:
+        await asyncio.to_thread(profile_loaded.wait)
+        await asyncio.to_thread(set_run_auth_generation, dynamodb, 2)
+
+    worker = new_worker(dynamodb, LocalArtifactStore(tmp_path), s3)
+    renewal = asyncio.create_task(renew_auth())
+
+    assert await worker("archive-1", "url-1")
+
+    await renewal
+
+    assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
+    assert run_item(dynamodb)["authGeneration"] == {"N": "2"}
+    assert run_item(dynamodb)["outstandingPages"] == {"N": "1"}
+
+    events = outbox_items(dynamodb)
+
+    assert [event["type"]["S"] for event in events] == ["CapturePage"]
+    assert not (tmp_path / "attempt-1").exists()
 
 
 @pytest.mark.integration
 async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
     dynamodb: DynamoDBClient,
+    local_site: LocalSite,
+    s3: FakeS3,
     tmp_path: Path,
 ) -> None:
     seed_run(dynamodb)
-    seed_frontier(dynamodb)
+    seed_frontier(dynamodb, url=f"{local_site.base_url}/page")
 
     allocator = DynamoDBCaptureAllocator(
         client=dynamodb,
@@ -108,51 +186,24 @@ async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
     held = await allocator.reserve("other-attempt")
     assert held is not None
 
-    worker = new_worker(dynamodb, LocalArtifactStore(tmp_path), UnexpectedExecutor())
+    worker = new_worker(dynamodb, LocalArtifactStore(tmp_path), s3)
 
     assert await worker("archive-1", "url-1")
     assert frontier_item(dynamodb)["state"] == {"S": "PENDING"}
-    assert len(outbox_items(dynamodb)) == 1
 
+    events = outbox_items(dynamodb)
 
-class FailingExecutor:
-    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
-        noop(url, output_dir)
-
-        raise RuntimeError("browser capture failed")
-
-
-class SuccessfulExecutor:
-    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
-        (output_dir / "capture.warc.gz").write_bytes(b"capture")
-
-        return CaptureArtifact(
-            capture=PageCapture(
-                requested_url=url,
-                final_url=url,
-                redirect_chain=(),
-                status_code=200,
-                content_type="text/html",
-                title="Example",
-                captured_at=datetime(2026, 11, 21, 12, 0, tzinfo=UTC),
-                discovered_urls=(),
-            ),
-            blocked_urls=(),
-            warc_files=(output_dir / "capture.warc.gz",),
-        )
-
-
-class UnexpectedExecutor:
-    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact:
-        noop(url, output_dir)
-
-        raise AssertionError("the executor must not run when capacity is unavailable")
+    assert [event["type"]["S"] for event in events] == ["CapturePage"]
+    assert events[0]["payload"]["M"]["urlKey"] == {"S": "url-1"}
+    assert dynamodb.scan(TableName="capture_snapshots")["Items"] == []
+    assert not (tmp_path / "attempt-1").exists()
 
 
 def new_worker(
     dynamodb: DynamoDBClient,
     artifacts: LocalArtifactStore,
-    executor: FailingExecutor | SuccessfulExecutor | UnexpectedExecutor,
+    s3: FakeS3,
+    limits: CaptureLimits = LOCAL_LIMITS,
 ) -> ConcreteCaptureWorker:
     return ConcreteCaptureWorker(
         task_repository=DynamoDBTaskRepository(
@@ -164,6 +215,10 @@ def new_worker(
             slot_count=1,
             lease_duration=30,
         ),
-        executor=executor,
+        executor=BrowserPageExecutor(limits),
         artifacts=artifacts,
+        auth_contexts=StoredAuthContexts(
+            sessions=DynamoDBSessionStore(client=dynamodb),
+            profiles=EncryptedAuthProfileStore(s3, AuthProfileCipher(AUTH_PROFILE_KEY)),
+        ),
     )

@@ -14,6 +14,12 @@ from .archive import (
     WACZObject,
     WACZRangeNotSatisfiable,
 )
+from .auth import (
+    DEFAULT_AUTH_GENERATION,
+    AuthContext,
+    AuthContextStore,
+    AuthGenerationChanged,
+)
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
 from .discovery import DiscoveredPage, identify_discovered_pages
 from .outbox import OutboxMessage, OutboxRepository
@@ -27,9 +33,13 @@ from .task import (
 from .url_identity import InvalidURLIdentity, URLIdentity, identify_url
 
 __all__ = [
+    "DEFAULT_AUTH_GENERATION",
     "ArchivePage",
     "ArchiveRetrieval",
     "ArtifactReference",
+    "AuthContext",
+    "AuthContextStore",
+    "AuthGenerationChanged",
     "CaptureAllocator",
     "CaptureOutcome",
     "CaptureReservation",

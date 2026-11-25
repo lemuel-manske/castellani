@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import uuid4
 
+from .auth import DEFAULT_AUTH_GENERATION
+
 
 @dataclass(frozen=True)
 class PageCapture:
@@ -59,6 +61,7 @@ class CaptureOutcome:
     snapshot_id: str
     capture: PageCapture
     warc_artifacts: tuple[ArtifactReference, ...]
+    auth_generation: int = DEFAULT_AUTH_GENERATION
 
     def __post_init__(self) -> None:
         if not self.archive_id:
@@ -75,6 +78,9 @@ class CaptureOutcome:
 
         if not self.snapshot_id:
             raise ValueError("snapshot_id must not be empty")
+
+        if self.auth_generation < 0:
+            raise ValueError("auth generation must not be negative")
 
         if not self.warc_artifacts:
             raise ValueError("a successful capture must contain at least one WARC artifact")

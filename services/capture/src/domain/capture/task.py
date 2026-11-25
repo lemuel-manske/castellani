@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import uuid4
 
+from .auth import DEFAULT_AUTH_GENERATION
 from .capture import CaptureOutcome
 
 
@@ -85,6 +86,7 @@ class TaskRepository(Protocol):
         self,
         claim: TaskClaim,
         discovered_urls: tuple[str, ...],
+        auth_generation: int = DEFAULT_AUTH_GENERATION,
     ) -> None:
         """Durably account for discoveries before allowing parent completion."""
         ...

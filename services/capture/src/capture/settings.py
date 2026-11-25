@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from environment import positive_float, positive_int, required
+from environment import auth_profile_key, positive_float, positive_int, required
 
 DEFAULT_LEASE_DURATION = 60.0
 DEFAULT_BROWSER_SLOT_COUNT = 10
@@ -23,6 +23,8 @@ class CaptureSettings:
     rabbitmq_url: str
     s3_endpoint_url: str
 
+    auth_profile_key: bytes
+
     browser_slot_count: int = DEFAULT_BROWSER_SLOT_COUNT
 
     lease_duration: float = DEFAULT_LEASE_DURATION
@@ -42,6 +44,7 @@ class CaptureSettings:
             dynamodb_endpoint_url=required("CAPTURE_DYNAMODB_ENDPOINT_URL"),
             rabbitmq_url=required("CAPTURE_RABBITMQ_URL"),
             s3_endpoint_url=required("CAPTURE_S3_ENDPOINT_URL"),
+            auth_profile_key=auth_profile_key(),
             browser_slot_count=positive_int(
                 "CAPTURE_BROWSER_SLOT_COUNT",
                 DEFAULT_BROWSER_SLOT_COUNT,

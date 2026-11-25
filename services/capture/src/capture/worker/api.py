@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from domain.capture import ArtifactReference, PageCapture, TaskClaim
+from domain.capture import ArtifactReference, AuthContext, PageCapture, TaskClaim
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,12 @@ class CaptureExecutor(Protocol):
     Implementations must stop underlying browser work when execution is cancelled.
     """
 
-    async def execute(self, url: str, output_dir: Path) -> CaptureArtifact: ...
+    async def execute(
+        self,
+        url: str,
+        output_dir: Path,
+        auth_context: AuthContext,
+    ) -> CaptureArtifact: ...
 
 
 class ArtifactStore(Protocol):

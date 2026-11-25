@@ -4,6 +4,8 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from domain.capture import (
+    AuthContextStore,
+    AuthGenerationChanged,
     CaptureAllocator,
     CaptureOutcome,
     CaptureReservation,
@@ -25,12 +27,14 @@ class ConcreteCaptureWorker(CaptureRunner):
         capture_allocator: CaptureAllocator,
         executor: CaptureExecutor,
         artifacts: ArtifactStore,
+        auth_contexts: AuthContextStore,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ) -> None:
         self.task_repository = task_repository
         self.capacity_allocator = capture_allocator
         self.executor = executor
         self.artifacts = artifacts
+        self.auth_contexts = auth_contexts
 
         self.on_error = on_error or awaitable(noop)
 
@@ -89,6 +93,12 @@ class ConcreteCaptureWorker(CaptureRunner):
 
                 try:
                     await operation
+                except AuthGenerationChanged as error:
+                    await self.task_repository.release(claim_state[0])
+
+                    await self.on_error(error)
+
+                    return
                 except Exception as error:
                     if not terminal_state[0]:
                         await self.task_repository.fail(
@@ -179,14 +189,18 @@ class ConcreteCaptureWorker(CaptureRunner):
         artifact_claim_state[0] = artifact_claim
         directory_state[0] = directory
 
+        auth_context = await self.auth_contexts.load(claim_state[0].task.archive_id)
+
         artifact: CaptureArtifact = await self.executor.execute(
             claim_state[0].task.url,
             directory,
+            auth_context,
         )
 
         await self.task_repository.admit_discovered(
             claim_state[0],
             artifact.capture.discovered_urls,
+            auth_context.generation,
         )
 
         claim = claim_state[0]
@@ -208,6 +222,7 @@ class ConcreteCaptureWorker(CaptureRunner):
             snapshot_id=snapshot_id,
             capture=artifact.capture,
             warc_artifacts=warc_artifacts,
+            auth_generation=auth_context.generation,
         )
 
         await self.task_repository.complete(outcome)

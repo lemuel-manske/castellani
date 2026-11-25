@@ -1,12 +1,8 @@
-import base64
-import binascii
 import os
 import uuid
 from dataclasses import dataclass, field
 
-from environment import positive_int, required, required_int
-
-AUTH_PROFILE_KEY_ENVIRONMENT = "CAPTURE_AUTH_PROFILE_KEY"
+from environment import auth_profile_key, positive_int, required, required_int
 
 DEFAULT_SESSION_TTL_SECONDS = 1800
 DEFAULT_LOGIN_MAX_SESSIONS = 4
@@ -75,17 +71,3 @@ class LoginSettings:
                 DEFAULT_LOGIN_NOVNC_DIRECTORY,
             ),
         )
-
-
-def auth_profile_key() -> bytes:
-    value = required(AUTH_PROFILE_KEY_ENVIRONMENT)
-
-    try:
-        key = base64.b64decode(value, validate=True)
-    except binascii.Error as error:
-        raise ValueError(f"{AUTH_PROFILE_KEY_ENVIRONMENT} must be base64") from error
-
-    if len(key) != 32:
-        raise ValueError(f"{AUTH_PROFILE_KEY_ENVIRONMENT} must decode to 32 bytes")
-
-    return key

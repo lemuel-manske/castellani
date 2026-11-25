@@ -10,26 +10,34 @@ def seed_run(
     admission: str = "OPEN",
     max_pages: int = 100,
     admitted_pages: int = 1,
+    auth_generation: int | None = None,
 ) -> None:
-    client.put_item(
-        TableName="capture_runs",
-        Item={
-            "archiveId": {"S": "archive-1"},
-            "admission": {"S": admission},
-            "maxPages": {"N": str(max_pages)},
-            "admittedPages": {"N": str(admitted_pages)},
-            "outstandingPages": {"N": str(admitted_pages)},
-        },
-    )
+    item: dict[str, Any] = {
+        "archiveId": {"S": "archive-1"},
+        "admission": {"S": admission},
+        "maxPages": {"N": str(max_pages)},
+        "admittedPages": {"N": str(admitted_pages)},
+        "outstandingPages": {"N": str(admitted_pages)},
+    }
+
+    if auth_generation is not None:
+        item["authGeneration"] = {"N": str(auth_generation)}
+
+    client.put_item(TableName="capture_runs", Item=item)
 
 
-def seed_frontier(client: DynamoDBClient, depth: int = 0) -> None:
+def seed_frontier(
+    client: DynamoDBClient,
+    depth: int = 0,
+    url: str = "https://example.org/",
+    url_key: str = "url-1",
+) -> None:
     client.put_item(
         TableName="capture_frontier",
         Item={
             "archiveId": {"S": "archive-1"},
-            "urlKey": {"S": "url-1"},
-            "url": {"S": "https://example.org/"},
+            "urlKey": {"S": url_key},
+            "url": {"S": url},
             "depth": {"N": str(depth)},
             "state": {"S": "PENDING"},
         },
@@ -137,6 +145,34 @@ def set_run_admission(client: DynamoDBClient, admission: str) -> None:
         Key={"archiveId": {"S": "archive-1"}},
         UpdateExpression="SET admission = :admission",
         ExpressionAttributeValues={":admission": {"S": admission}},
+    )
+
+
+def set_run_auth_generation(client: DynamoDBClient, generation: int) -> None:
+    client.update_item(
+        TableName="capture_runs",
+        Key={"archiveId": {"S": "archive-1"}},
+        UpdateExpression="SET #generation = :generation",
+        ExpressionAttributeNames={"#generation": "authGeneration"},
+        ExpressionAttributeValues={":generation": {"N": str(generation)}},
+    )
+
+
+def set_run_auth_profile(client: DynamoDBClient, generation: int, key: str) -> None:
+    client.update_item(
+        TableName="capture_runs",
+        Key={"archiveId": {"S": "archive-1"}},
+        UpdateExpression=("SET #generation = :generation, #profile = :profile, #bucket = :bucket"),
+        ExpressionAttributeNames={
+            "#generation": "authGeneration",
+            "#profile": "authProfileKey",
+            "#bucket": "authProfileBucket",
+        },
+        ExpressionAttributeValues={
+            ":generation": {"N": str(generation)},
+            ":profile": {"S": key},
+            ":bucket": {"S": "castellani-auth-profiles"},
+        },
     )
 
 

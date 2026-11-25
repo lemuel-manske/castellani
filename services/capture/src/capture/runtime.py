@@ -8,6 +8,7 @@ import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
 
+from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
 from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
@@ -15,8 +16,9 @@ from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
+from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
-from application.capture import OutboxDispatcher
+from application.capture import OutboxDispatcher, StoredAuthContexts
 from application.capture.page_tasks import PageTaskProcessor
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from topology.tables import CAPTURE_TABLES
@@ -107,6 +109,14 @@ class CaptureRuntime:
                 lease_duration=self.settings.lease_duration,
             )
 
+            auth_contexts = StoredAuthContexts(
+                sessions=DynamoDBSessionStore(client=self.dynamodb_client),
+                profiles=EncryptedAuthProfileStore(
+                    s3_client=self.s3_client,
+                    cipher=AuthProfileCipher(self.settings.auth_profile_key),
+                ),
+            )
+
             worker = new_worker(
                 task_repository=task_repository,
                 capture_allocator=allocator,
@@ -115,6 +125,7 @@ class CaptureRuntime:
                     client=self.s3_client,
                     staging_root=Path(self.settings.artifact_directory),
                 ),
+                auth_contexts=auth_contexts,
             )
 
             self.connection = cast(
