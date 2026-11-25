@@ -55,7 +55,7 @@ function createOpenSearchDocumentWriter(client: Client): SearchDocumentWriter {
         index: SEARCH_INDEX_NAME,
         id: document.snapshotId,
         body: document,
-        refresh: false,
+        refresh: "wait_for",
       });
     },
   };

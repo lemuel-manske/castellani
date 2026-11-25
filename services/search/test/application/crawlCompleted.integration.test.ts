@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
+import { SEARCH_INDEX_NAME } from "../../src/adapters/search/opensearch.js";
 import { CRAWL_COMPLETED_EVENT } from "../../src/domain.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
@@ -62,6 +63,11 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
   const manifestKey = `${archiveId}/manifest.json`;
 
   await s3.putObject(manifestBytes, manifestKey);
+
+  await opensearch.client.indices.putSettings({
+    index: SEARCH_INDEX_NAME,
+    body: { index: { refresh_interval: "2s" } },
+  });
 
   await rabbitmq.publishPublication(
     {
@@ -128,9 +134,12 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
     attempts: 1,
   });
 
-  await opensearch.client.indices.refresh();
-
   const indexed = await searchIndex.search({ text: token }, 10);
+
+  await opensearch.client.indices.putSettings({
+    index: SEARCH_INDEX_NAME,
+    body: { index: { refresh_interval: "1s" } },
+  });
 
   expect(indexed.candidates).toMatchObject([
     {
