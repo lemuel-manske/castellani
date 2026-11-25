@@ -1,5 +1,4 @@
 from typing import cast
-from uuid import uuid4
 
 import aio_pika
 import pytest
@@ -8,11 +7,11 @@ from aio_pika.abc import AbstractRobustConnection
 from adapters.messaging.rabbitmq.publisher import (
     RabbitMQMessagePublisher,
 )
-from adapters.messaging.rabbitmq.topology import CAPTURE_PAGE_EVENT
+from adapters.messaging.rabbitmq.topology import CAPTURE_PAGE_QUEUE
 
 
 @pytest.mark.integration
-async def test_publisher_delivers_persistent_message_to_bound_queue(
+async def test_publisher_delivers_persistent_message_to_provisioned_queue(
     rabbitmq: AbstractRobustConnection,
 ) -> None:
     publisher = RabbitMQMessagePublisher(rabbitmq)
@@ -20,14 +19,12 @@ async def test_publisher_delivers_persistent_message_to_bound_queue(
     await publisher.start()
 
     channel = await rabbitmq.channel()
+    queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
 
-    queue_name = f"capture-publisher-test-{uuid4()}"
-    queue = await channel.declare_queue(queue_name, exclusive=True, auto_delete=True)
+    await queue.purge()
 
     try:
         assert publisher.exchange is not None
-
-        await queue.bind(publisher.exchange, routing_key=CAPTURE_PAGE_EVENT)
 
         await publisher.publish("message-1", b'{"type":"CapturePage"}')
 
@@ -40,6 +37,7 @@ async def test_publisher_delivers_persistent_message_to_bound_queue(
 
         await received.ack()
     finally:
+        await queue.purge()
         await channel.close()
         await publisher.close()
 

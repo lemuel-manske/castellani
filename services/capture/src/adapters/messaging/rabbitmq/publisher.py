@@ -19,11 +19,7 @@ class RabbitMQMessagePublisher:
             on_return_raises=True,
         )
 
-        self.exchange = await self.channel.declare_exchange(
-            CAPTURE_EXCHANGE_NAME,
-            aio_pika.ExchangeType.DIRECT,
-            durable=True,
-        )
+        self.exchange = await self.channel.get_exchange(CAPTURE_EXCHANGE_NAME)
 
     async def publish(self, message_id: str, envelope: bytes) -> None:
         if self.exchange is None:

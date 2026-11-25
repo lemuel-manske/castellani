@@ -1,14 +1,17 @@
 import asyncio
-from typing import Any, cast
+from typing import cast
 
-import aio_pika
-from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
+from aio_pika.abc import (
+    AbstractIncomingMessage,
+    AbstractQueue,
+    AbstractRobustConnection,
+)
 
 from adapters.messaging.contracts import validate_message
 from adapters.messaging.types import JSON
 from capture.worker.api import CaptureRunner
 
-from .topology import CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT, CAPTURE_PAGE_QUEUE
+from .topology import CAPTURE_PAGE_EVENT, CAPTURE_PAGE_QUEUE
 
 
 class RabbitMQPageTaskConsumer:
@@ -38,24 +41,16 @@ class RabbitMQPageTaskConsumer:
         queue_name: str = CAPTURE_PAGE_QUEUE,
         ready: asyncio.Event | None = None,
     ) -> None:
-        channel: Any = await connection.channel()
-        queue: Any | None = None
+        channel = await connection.channel()
+
+        queue: AbstractQueue | None = None
+
         consumer_tag: str | None = None
 
         try:
             await channel.set_qos(prefetch_count=1)
 
-            exchange = await channel.declare_exchange(
-                CAPTURE_EXCHANGE_NAME,
-                aio_pika.ExchangeType.DIRECT,
-                durable=True,
-            )
-
-            queue = await channel.declare_queue(queue_name, durable=True)
-
-            assert queue is not None
-
-            await queue.bind(exchange, routing_key=CAPTURE_PAGE_EVENT)
+            queue = await channel.get_queue(queue_name)
 
             consumer_tag = await queue.consume(self.handle)
 
