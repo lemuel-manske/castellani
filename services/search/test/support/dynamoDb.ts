@@ -43,6 +43,9 @@ function createDynamoDbTestSupport() {
 
   return {
     ledger,
+    publicationLedger,
+    manifestLedger,
+
     async getIndexingEntry(
       snapshotId: string,
     ): Promise<Record<string, unknown> | undefined> {
@@ -56,8 +59,35 @@ function createDynamoDbTestSupport() {
 
       return response.Item;
     },
-    publicationLedger,
-    manifestLedger,
+
+    async getPublicationEntry(
+      archiveId: string,
+    ): Promise<Record<string, unknown> | undefined> {
+      const response = await documentClient.send(
+        new GetCommand({
+          TableName: PUBLICATION_LEDGER,
+          Key: { archiveId },
+          ConsistentRead: true,
+        }),
+      );
+
+      return response.Item;
+    },
+
+    async getManifestMetadata(
+      archiveId: string,
+    ): Promise<Record<string, unknown> | undefined> {
+      const response = await documentClient.send(
+        new GetCommand({
+          TableName: MANIFEST_LEDGER,
+          Key: { archiveId, snapshotId: "!manifest" },
+          ConsistentRead: true,
+        }),
+      );
+
+      return response.Item;
+    },
+
     async setup(): Promise<void> {
       await client.send(
         new CreateTableCommand({

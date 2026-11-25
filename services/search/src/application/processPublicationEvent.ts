@@ -4,7 +4,9 @@ import {
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
 } from "../domain.js";
+
 import type { PublicationLedger } from "../ports/publication-ledger.js";
+
 import { PublicationEvent } from "./types.js";
 
 type JustPublicationEvents = Exclude<
@@ -18,13 +20,13 @@ async function processPublicationEvent(
 ): Promise<void> {
   switch (event.type) {
     case ARCHIVE_PUBLICATION_DECIDED_EVENT:
-      await ledger.recordPublicationDecision(event.payload);
+      await ledger.recordPublicationDecision(event.payload, event.messageId);
       return;
     case ARCHIVE_PUBLISHED_EVENT:
-      await ledger.recordReplayPublished(event.payload);
+      await ledger.recordReplayPublished(event.payload, event.messageId);
       return;
     case ARCHIVE_COMPENSATION_DECIDED_EVENT:
-      await ledger.recordCompensationDecision(event.payload);
+      await ledger.recordCompensationDecision(event.payload, event.messageId);
       return;
   }
 }

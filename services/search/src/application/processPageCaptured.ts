@@ -1,7 +1,9 @@
-import { CapturedPageReader } from "../ports/artifacts.js";
-import { IndexingLedger } from "../ports/indexing-ledger.js";
-import { SearchDocumentWriter } from "../ports/search-index.js";
+import type { CapturedPageReader } from "../ports/artifacts.js";
+import type { IndexingLedger } from "../ports/indexing-ledger.js";
+import type { SearchDocumentWriter } from "../ports/search-index.js";
+
 import { indexCapturedPage } from "./indexCapturedPage.js";
+
 import { PageCapturedEvent, PageCapturedResult } from "./types.js";
 
 async function processPageCaptured(

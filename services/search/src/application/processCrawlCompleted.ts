@@ -4,12 +4,20 @@ import type {
   ArtifactReference,
   CapturedPageReader,
 } from "../ports/artifacts.js";
-import { PAGE_CAPTURED_EVENT, type CompletionCrawl } from "../domain.js";
+
+import {
+  CRAWL_COMPLETED_EVENT,
+  PAGE_CAPTURED_EVENT,
+  type CompletionCrawl,
+} from "../domain.js";
+
+import type { IndexingLedger } from "../ports/indexing-ledger.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
+import type { SearchDocumentWriter } from "../ports/search-index.js";
+
 import { processPageCaptured } from "./processPageCaptured.js";
-import { isManifestDocument, ManifestDocument } from "./types.js";
-import { IndexingLedger } from "../ports/indexing-ledger.js";
-import { SearchDocumentWriter } from "../ports/search-index.js";
+
+import { isManifestDocument, ManifestDocument, Event } from "./types.js";
 
 async function readArtifact(
   reader: ArtifactObjectReader,
@@ -57,32 +65,37 @@ function parseManifest(data: Buffer, event: CompletionCrawl): ManifestDocument {
 }
 
 async function processCrawlCompleted(
-  event: CompletionCrawl,
+  event: Event<typeof CRAWL_COMPLETED_EVENT, CompletionCrawl>,
   reader: ArtifactObjectReader,
   manifestLedger: ManifestLedger,
-  ledger: IndexingLedger,
+  indexingLedger: IndexingLedger,
   capturedPageReader: CapturedPageReader,
   documentWriter: SearchDocumentWriter,
   leaseDurationSeconds?: number,
   maxAttempts?: number,
 ): Promise<void> {
-  const data = await readArtifact(reader, event.manifest);
+  const payload = event.payload;
 
-  const manifest = parseManifest(data, event);
+  const data = await readArtifact(reader, payload.manifest);
 
-  await manifestLedger.record({
-    archiveId: manifest.archiveId,
-    manifestDigest: event.manifestDigest,
-    collectionId: manifest.collectionId ?? "",
-    snapshotIds: manifest.snapshots.map(({ snapshotId }) => snapshotId),
-  });
+  const manifest = parseManifest(data, payload);
+
+  await manifestLedger.record(
+    {
+      archiveId: manifest.archiveId,
+      manifestDigest: payload.manifestDigest,
+      collectionId: manifest.collectionId ?? "",
+      snapshotIds: manifest.snapshots.map(({ snapshotId }) => snapshotId),
+    },
+    event.messageId,
+  );
 
   for (const snapshot of manifest.snapshots) {
     await processPageCaptured(
       {
         type: PAGE_CAPTURED_EVENT,
         version: 1,
-        messageId: `manifest:${event.manifestDigest}:${snapshot.snapshotId}`,
+        messageId: `manifest:${payload.manifestDigest}:${snapshot.snapshotId}`,
         correlationId: manifest.archiveId,
         occurredAt: manifest.createdAt,
         payload: {
@@ -99,7 +112,7 @@ async function processCrawlCompleted(
           warcArtifacts: snapshot.warcArtifacts,
         },
       },
-      ledger,
+      indexingLedger,
       capturedPageReader,
       documentWriter,
       leaseDurationSeconds,

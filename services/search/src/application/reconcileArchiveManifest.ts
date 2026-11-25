@@ -1,5 +1,6 @@
 import type { ManifestReconciliation, ManifestSnapshot } from "../domain.js";
 import { reconcileManifest } from "../domain/indexing.js";
+
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 
 async function reconcileArchiveManifest(

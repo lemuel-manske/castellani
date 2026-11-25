@@ -1,14 +1,27 @@
 # ADR implementation gaps
 
-Status of the implementation against the accepted ADRs (29 ADRs, audited 2026-11-24).
+Status of the implementation against the accepted ADRs (29 ADRs, audited 2026-11-24; updated after the contracts/topology work).
 Only observable gaps and contradictions are listed. Paths are relative to the repository root.
 
-## 1. Missing implementation
+## 1. Implemented since audit
+
+| ADR | Change | Evidence |
+|---|---|---|
+| 0012 | All three broker consumers validate inbound envelopes at runtime from `contracts/` JSON Schemas; Search's duplicated inline `PageCaptured` schema is removed. Each loader uses a service-owned directory variable (`/contracts` in containers). | `services/capture/src/adapters/messaging/contracts.py`; `services/coordinator/adapters/messaging/rabbitmq/contracts.go`; `services/search/src/contracts.ts`; `contracts/messages/README.md` |
+| 0004, 0012, 0016 | RabbitMQ exchanges, queues, bindings and DLQ arguments are provisioned from `infra/rabbitmq/definitions.json` through `rabbitmq.conf`; services only reference provisioned names. Compose healthchecks wait for definitions to load, and CI imports them through a reusable composite action. | `infra/rabbitmq/definitions.json`; `infra/rabbitmq/rabbitmq.conf`; `.github/actions/import-rabbitmq-topology/action.yml`; `docker-compose.yaml`; `services/capture/compose.yaml`; `services/search/compose.yaml`; `.github/workflows/capture.yml`; `.github/workflows/search.yml` |
+| 0012 | Search event names are domain constants reused by application code, adapters and tests instead of repeated string literals. | `services/search/src/domain.ts` |
+| 0013 | Terminal page failures now decrement `outstandingPages` atomically with the frontier transition to `FAILED`, so failed pages no longer leave the run's outstanding count stuck above zero. | `services/capture/src/adapters/persistence/dynamodb/queries/task.py`; `services/capture/tests/test_dynamodb_task_completion.py` |
+| 0020 | Capture's `CapturePage` consumer now routes invalid envelopes and messages that exhaust the retry budget to `castellani.capture.dead`, and processing failures go through the provisioned retry queue instead of being requeued in place. Coordinator's invalid and exhausted deliveries dead-letter through the provisioned broker DLX, and its inbox `messageId` is committed atomically with archive effects and outbox messages. Search now records processed `messageId` values atomically with publication, manifest, and indexing ledger effects. | `services/capture/src/adapters/messaging/rabbitmq/consumer.py`; `services/coordinator/adapters/persistence/dynamodb/archive-queries.go`; `services/search/src/adapters/persistence/dynamodb/` |
+| 0016 | The page-task consumer is now a broker-only adapter that yields validated deliveries; `PageTaskProcessor` owns the worker call, outcome decisions and loop, and shutdown stops deliveries before the runtime drains in-flight work within a bounded timeout. Unfinished messages stay unacked for broker redelivery. | `services/capture/src/adapters/messaging/rabbitmq/consumer.py`; `services/capture/src/application/capture/page_tasks.py`; `services/capture/src/capture/runtime.py`; `services/capture/tests/test_rabbitmq_consumer.py` |
+
+Service-level CI checks are green. Stack-level e2e remains unrun and is deferred until the end-to-end path in the priority list exists.
+
+## 2. Missing implementation
 
 | ADR | Gap | Evidence |
 |---|---|---|
 | 0015 | Workers still create fresh attempt-local browser contexts instead of consuming stored authentication generations. There is no auth-rejection detection, durable `WAITING_FOR_AUTH` state, renewal/continue choice, or reactivation and fencing after a new generation. | `services/capture/src/adapters/browser/executor.py`; `services/capture/src/capture/worker/runner.py`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py`; `services/capture/src/domain/capture/capture.py` |
-| 0012, 0013 | `StartCrawl` is published to `castellani.events`, but Capture's only queue binds `castellani.capture`/`CapturePage`; no consumer or binding handles `StartCrawl`, so no run ever seeds the frontier. | `services/coordinator/adapters/messaging/rabbitmq/publisher.go`; `services/capture/src/adapters/messaging/rabbitmq/topology.py`; `consumer.py` |
+| 0012, 0013 | `StartCrawl` is published and its exchange/queue/binding are provisioned, but no Capture consumer handles it; no run ever seeds the frontier. | `services/coordinator/adapters/messaging/rabbitmq/publisher.go`; `infra/rabbitmq/definitions.json`; `services/capture/src/adapters/messaging/rabbitmq/consumer.py` |
 | 0013 | No crawl closure: nothing closes run admission, derives a terminal crawl decision from frontier accounting, emits `CrawlCompleted`, or writes a final manifest. | `services/capture/src/adapters/persistence/dynamodb/queries/task.py`; `services/capture/src/adapters/messaging/rabbitmq/consumer.py` |
 | 0022, 0025 | `allowedOrigins` and `normalizerVersion` are validated and forwarded by Gateway/Coordinator but never consumed by Capture; there is no seed-origin scope enforcement, redirect scope check, or per-host politeness/rate limiting. | `services/gateway/api/archive/archive.go`; `services/coordinator/adapters/persistence/dynamodb/api.go`; `services/capture/src/`; `docs/adr/0022-custom-distributed-crawler.md` |
 | 0022 | Persisted outcomes do not distinguish blocked authentication, unsupported content, or partial capture with missing dependencies; only success/failure codes exist. | `services/capture/src/domain/capture/capture.py`; `docs/adr/0022-custom-distributed-crawler.md` |
@@ -23,21 +36,18 @@ Only observable gaps and contradictions are listed. Paths are relative to the re
 | 0025 | Minimum-depth correction is not implemented: depth is fixed at first admission and there is no link-edge retention or descendant re-evaluation for later shorter paths. | `services/capture/src/domain/capture/discovery.py`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py` |
 | 0026 | Acceptance gate is only partly met: local WARC recording/replay tests exist, but no authenticated, JS-rendered page through a recorder, no WACZ packaging/replay-from-WACZ check, no interrupted-write test, and no Browsertrix comparison. | `services/capture/tests/test_recording.py`; `services/capture/tests/test_replay.py`; `docs/adr/0026-capture-local-warc-recording.md` |
 | 0009 | Cross-service suite covers only Gateway request validation; no async processing, container-failure, competing-consumer, broker-outage, or recovery scenarios. Gateway and Coordinator have zero service-local Go tests. | `tests/tests/*.go`; `services/gateway/Makefile`; `services/coordinator/Makefile` |
-| 0016 | Capture shutdown cancels consumer/dispatcher tasks instead of draining bounded in-flight work. | `services/capture/src/capture/runtime.py`; `docs/adr/0016-containerized-deployment-scaling.md` |
 
-## 2. Contradictions with accepted ADRs
+## 3. Contradictions with accepted ADRs
 
 | ADR | Conflict | Evidence |
 |---|---|---|
-| 0012 | `contracts/` must be authoritative. Search duplicates a `PageCaptured` schema inline requiring `finalUrl` and `redirectChain`, which the published contract marks optional, so contract-valid messages are rejected. | `contracts/messages/page-captured.v1.schema.json`; `services/search/src/application/types.ts` |
-| 0013 | `outstandingPages` is decremented on capture completion but not on terminal failure, so a run with any failed page can never reach crawl termination. | `services/capture/src/adapters/persistence/dynamodb/task.py`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py` |
-| 0020 | Capture page deliveries requeue indefinitely and malformed envelopes are silently rejected with no DLQ; consumers do not atomically register processed `messageId` values with their effects (Search overwrites `lastMessageId` only). | `services/capture/src/adapters/messaging/rabbitmq/consumer.py`; `services/search/src/adapters/persistence/dynamodb/indexing-ledger-queries.ts`; `services/capture/src/adapters/persistence/dynamodb/queries/task.py` |
+| 0020 | Dead-lettering is still a transport outcome rather than a reconciled business outcome: no service durably accounts for DLQ entries back into its workflow, and application-level DLQ reason diagnostics are limited to broker `x-death`. | `infra/rabbitmq/definitions.json`; `services/coordinator/application/recovery.go`; `services/capture/src/adapters/messaging/rabbitmq/consumer.py`; `services/search/src/adapters/messaging/rabbitmq/` |
 | 0026 | pywb is pinned in production dependencies and wired into the runtime while ADR-0026 explicitly defers recorder selection until the acceptance gate passes; no gate result is recorded. | `services/capture/pyproject.toml`; `services/capture/src/adapters/browser/executor.py`; `docs/adr/0026-capture-local-warc-recording.md` |
 | 0021, 0018 | F5's 100-contender invariant is covered only by a service-local integration test; no versioned stack-level F5 scenario asserts it against three replicas as ADR-0018 requires. | `services/capture/tests/test_dynamodb_browser_capacity.py`; `tests/tests/` |
 
-## 3. Priority
+## 4. Priority
 
-1. Close the end-to-end path: route/consume `StartCrawl` → crawl termination + manifest → WACZ packaging/publication → `ArchivePrepared`/`ArchivePublished` → SAGA completion (0012/0013/0014/0023/0027).
+1. Close the end-to-end path: consume the provisioned `StartCrawl` binding → crawl termination + manifest → WACZ packaging/publication → `ArchivePrepared`/`ArchivePublished` → SAGA completion (0012/0013/0014/0023/0027).
 2. Consume stored authentication generations in page workers: detect auth rejection, block only affected tasks in `WAITING_FOR_AUTH`, support renewal/continue and fence stale workers (0015). The dedicated manager and protected profile storage already exist (0028).
 3. Add fault injection, F1–F8 scenarios and metrics (0018); add the missing Search outbox and compensation events (0014/0020).
-4. Resolve remaining contradictions in 0012, 0013, 0020, 0021/0018 and 0026.
+4. Resolve remaining contradictions in 0020, 0021/0018 and 0026; run stack-level e2e only after the end-to-end path above exists.

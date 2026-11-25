@@ -6,9 +6,21 @@ import type {
 
 interface PublicationLedger {
   get(archiveId: string): Promise<PublicationFacts>;
-  recordPublicationDecision(identity: PublicationIdentity): Promise<void>;
-  recordReplayPublished(identity: PublicationIdentity): Promise<void>;
-  recordCompensationDecision(decision: CompensationDecision): Promise<void>;
+
+  recordPublicationDecision(
+    identity: PublicationIdentity,
+    messageId: string,
+  ): Promise<void>;
+
+  recordReplayPublished(
+    identity: PublicationIdentity,
+    messageId: string,
+  ): Promise<void>;
+
+  recordCompensationDecision(
+    decision: CompensationDecision,
+    messageId: string,
+  ): Promise<void>;
 }
 
 export type { PublicationLedger };

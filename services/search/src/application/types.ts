@@ -9,12 +9,14 @@ import {
   type PublicationIdentity,
   type TerminalIndexingOutcome,
 } from "../domain.js";
+
 import { ArtifactReferenceSchema } from "../ports/artifacts.js";
 import type {
   ArtifactReference,
   CapturedPageReference,
 } from "../ports/artifacts.js";
 import type { SearchQuery } from "../ports/search-reader.js";
+
 import { createSchemaValidator } from "../schema.js";
 
 interface SearchPublishedDocumentsInput extends SearchQuery {

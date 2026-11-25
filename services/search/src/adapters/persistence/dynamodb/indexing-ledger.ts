@@ -67,7 +67,13 @@ class DynamoDBIndexingLedger implements IndexingLedger {
 
       return {
         status: "CLAIMED",
-        claim: { archiveId, snapshotId, token, attempts: item.attempts },
+        claim: {
+          archiveId,
+          snapshotId,
+          messageId,
+          token,
+          attempts: item.attempts,
+        },
       };
     } catch (error) {
       if (
@@ -108,6 +114,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
           await exhaustIndexingEntry(this.client, {
             archiveId,
             snapshotId,
+            messageId,
             now,
             attempts,
             maxAttempts,

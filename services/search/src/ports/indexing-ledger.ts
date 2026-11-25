@@ -6,6 +6,7 @@ import type {
 interface SnapshotClaim {
   archiveId: string;
   snapshotId: string;
+  messageId: string;
   token: string;
   attempts: number;
 }

@@ -10,11 +10,12 @@ import {
   putMetadata,
   putSnapshot,
 } from "./manifest-ledger-queries.js";
+import { isConditionalCheckFailure } from "./error-handling.js";
 
 class DynamoDBManifestLedger implements ManifestLedger {
   constructor(private readonly client: DynamoDBDocumentClient) {}
 
-  async record(manifest: ArchiveManifest): Promise<void> {
+  async record(manifest: ArchiveManifest, messageId: string): Promise<void> {
     if (
       !manifest.archiveId ||
       !manifest.manifestDigest ||
@@ -40,7 +41,26 @@ class DynamoDBManifestLedger implements ManifestLedger {
       await putSnapshot(this.client, manifest, snapshotId);
     }
 
-    await putMetadata(this.client, manifest);
+    try {
+      await putMetadata(this.client, manifest, messageId);
+    } catch (error) {
+      if (!isConditionalCheckFailure(error)) {
+        throw error;
+      }
+
+      const metadata = await getMetadata(this.client, manifest.archiveId);
+
+      if (
+        metadata?.manifestDigest !== manifest.manifestDigest ||
+        metadata.collectionId !== manifest.collectionId ||
+        metadata.snapshotCount !== manifest.snapshotIds.length ||
+        !metadata.processedMessageIds?.includes(messageId)
+      ) {
+        throw new PublicationConflictError(
+          "archive manifest changed concurrently; retry the operation",
+        );
+      }
+    }
   }
 
   async contains(

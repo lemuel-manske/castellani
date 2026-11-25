@@ -39,6 +39,7 @@ it("does not repeat indexing work when a PageCaptured event is delivered again",
     snapshotId,
     state: "INDEXED",
     attempts: 1,
+    processedMessageIds: [fixture.event.messageId],
   });
 
   await opensearch.client.indices.refresh();

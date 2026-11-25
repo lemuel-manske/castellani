@@ -6,7 +6,7 @@ interface ArchiveManifest {
 }
 
 interface ManifestLedger {
-  record(manifest: ArchiveManifest): Promise<void>;
+  record(manifest: ArchiveManifest, messageId: string): Promise<void>;
 
   contains(
     archiveId: string,

@@ -27,13 +27,14 @@ class DynamoDBPublicationLedger implements PublicationLedger {
 
   async recordPublicationDecision(
     identity: PublicationIdentity,
+    messageId: string,
   ): Promise<void> {
     const facts = await this.get(identity.archiveId);
 
     recordPublicationDecision(facts, identity);
 
     try {
-      await recordPublicationDecisionQuery(this.client, identity);
+      await recordPublicationDecisionQuery(this.client, identity, messageId);
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;
@@ -51,13 +52,16 @@ class DynamoDBPublicationLedger implements PublicationLedger {
     }
   }
 
-  async recordReplayPublished(identity: PublicationIdentity): Promise<void> {
+  async recordReplayPublished(
+    identity: PublicationIdentity,
+    messageId: string,
+  ): Promise<void> {
     const facts = await this.get(identity.archiveId);
 
     recordReplayPublished(facts, identity);
 
     try {
-      await recordReplayPublishedQuery(this.client, identity);
+      await recordReplayPublishedQuery(this.client, identity, messageId);
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;
@@ -77,13 +81,14 @@ class DynamoDBPublicationLedger implements PublicationLedger {
 
   async recordCompensationDecision(
     decision: CompensationDecision,
+    messageId: string,
   ): Promise<void> {
     const facts = await this.get(decision.archiveId);
 
     recordCompensationDecision(facts, decision);
 
     try {
-      await recordCompensationDecisionQuery(this.client, decision);
+      await recordCompensationDecisionQuery(this.client, decision, messageId);
     } catch (error) {
       if (!isConditionalCheckFailure(error)) {
         throw error;

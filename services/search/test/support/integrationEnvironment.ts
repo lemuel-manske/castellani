@@ -5,6 +5,7 @@ import {
   type CompletionCrawl,
 } from "../../src/domain.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
+import type { Event } from "../../src/application/types.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
 import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
@@ -59,7 +60,9 @@ const application = {
     );
   },
 
-  processCrawlCompleted(event: CompletionCrawl): Promise<void> {
+  processCrawlCompleted(
+    event: Event<typeof CRAWL_COMPLETED_EVENT, CompletionCrawl>,
+  ): Promise<void> {
     return processCrawlCompleted(
       event,
       artifactReader,
@@ -120,7 +123,7 @@ async function receivePageCaptured(
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
   if (publicationLedgerReady && event.type === CRAWL_COMPLETED_EVENT) {
-    await application.processCrawlCompleted(event.payload);
+    await application.processCrawlCompleted(event);
   }
 
   if (publicationLedgerReady && event.type !== CRAWL_COMPLETED_EVENT) {

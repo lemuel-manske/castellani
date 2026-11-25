@@ -98,7 +98,7 @@ class SearchRuntime {
         publicationEvent: (event: PublicationEvent) =>
           event.type === CRAWL_COMPLETED_EVENT
             ? processCrawlCompleted(
-                event.payload,
+                event,
                 artifactReader,
                 manifestLedger,
                 indexingLedger,

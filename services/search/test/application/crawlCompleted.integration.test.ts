@@ -98,6 +98,24 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
     await dynamodb.manifestLedger.contains(archiveId, snapshotId, collectionId),
   ).toBe(true);
 
+  expect(await dynamodb.getManifestMetadata(archiveId)).toMatchObject({
+    manifestDigest,
+    collectionId,
+    processedMessageIds: [event.messageId],
+  });
+
+  await expect(
+    dynamodb.manifestLedger.record(
+      {
+        archiveId,
+        manifestDigest,
+        collectionId,
+        snapshotIds: [snapshotId, `extra-${snapshotId}`],
+      },
+      event.messageId,
+    ),
+  ).rejects.toThrow("archive manifest changed concurrently");
+
   const indexingEntry = await dynamodb.getIndexingEntry(snapshotId);
 
   expect(indexingEntry).toMatchObject({

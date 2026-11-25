@@ -38,12 +38,15 @@ it("keeps indexed snapshots hidden until the matching replay-publication acknowl
 
   expect(indexed).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
 
-  await dynamodb.manifestLedger.record({
-    archiveId,
-    manifestDigest: `manifest-${token}`,
-    collectionId,
-    snapshotIds: [snapshotId],
-  });
+  await dynamodb.manifestLedger.record(
+    {
+      archiveId,
+      manifestDigest: `manifest-${token}`,
+      collectionId,
+      snapshotIds: [snapshotId],
+    },
+    `manifest-message-${token}`,
+  );
 
   const identity = {
     archiveId,
@@ -65,6 +68,16 @@ it("keeps indexed snapshots hidden until the matching replay-publication acknowl
   await expect(nextPublicationEvent()).resolves.toMatchObject({
     type: decisionEvent.type,
     payload: identity,
+  });
+
+  await rabbitmq.publishPublication(decisionEvent, decisionEvent.type);
+
+  await expect(nextPublicationEvent()).resolves.toMatchObject({
+    messageId: decisionEvent.messageId,
+  });
+
+  expect(await dynamodb.getPublicationEntry(archiveId)).toMatchObject({
+    processedMessageIds: [decisionEvent.messageId],
   });
 
   await opensearch.client.indices.refresh();

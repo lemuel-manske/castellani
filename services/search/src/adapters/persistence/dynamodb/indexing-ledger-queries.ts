@@ -32,6 +32,7 @@ interface ClaimIndexingEntryInput {
 interface ExhaustIndexingEntryInput {
   archiveId: string;
   snapshotId: string;
+  messageId: string;
   now: number;
   attempts: number;
   maxAttempts: number;
@@ -100,9 +101,9 @@ async function exhaustIndexingEntry(
       TableName: INDEXING_LEDGER,
       Key: { snapshotId: input.snapshotId },
       UpdateExpression:
-        "SET #state = :failed, #reason = :reason, #updated = :now REMOVE #token, #lease",
+        "SET #state = :failed, #reason = :reason, #updated = :now, #processed = list_append(if_not_exists(#processed, :empty), :messages) REMOVE #token, #lease",
       ConditionExpression:
-        "#archive = :archive AND #attempts = :attempts AND #attempts >= :maxAttempts AND (#state = :pending OR (#state = :processing AND #lease <= :now))",
+        "#archive = :archive AND #attempts = :attempts AND #attempts >= :maxAttempts AND (#state = :pending OR (#state = :processing AND #lease <= :now)) AND (attribute_not_exists(#processed) OR NOT contains(#processed, :message))",
       ExpressionAttributeNames: {
         "#archive": "archiveId",
         "#attempts": "attempts",
@@ -111,6 +112,7 @@ async function exhaustIndexingEntry(
         "#token": "claimToken",
         "#reason": "reasonCode",
         "#updated": "updatedAt",
+        "#processed": "processedMessageIds",
       },
       ExpressionAttributeValues: {
         ":archive": input.archiveId,
@@ -121,6 +123,9 @@ async function exhaustIndexingEntry(
         ":failed": "FAILED",
         ":reason": "INDEXING_ATTEMPTS_EXHAUSTED",
         ":now": input.now,
+        ":empty": [],
+        ":messages": [input.messageId],
+        ":message": input.messageId,
       },
     }),
   );
@@ -190,16 +195,17 @@ async function completeIndexingEntry(
       TableName: INDEXING_LEDGER,
       Key: { snapshotId: input.claim.snapshotId },
       UpdateExpression: hasReason
-        ? "SET #state = :outcome, #reason = :reason, #updated = :now REMOVE #token, #lease"
-        : "SET #state = :outcome, #updated = :now REMOVE #token, #lease",
+        ? "SET #state = :outcome, #reason = :reason, #updated = :now, #processed = list_append(if_not_exists(#processed, :empty), :messages) REMOVE #token, #lease"
+        : "SET #state = :outcome, #updated = :now, #processed = list_append(if_not_exists(#processed, :empty), :messages) REMOVE #token, #lease",
       ConditionExpression:
-        "#archive = :archive AND #state = :processing AND #token = :token",
+        "#archive = :archive AND #state = :processing AND #token = :token AND (attribute_not_exists(#processed) OR NOT contains(#processed, :message))",
       ExpressionAttributeNames: {
         "#archive": "archiveId",
         "#state": "state",
         "#token": "claimToken",
         "#lease": "leaseUntil",
         "#updated": "updatedAt",
+        "#processed": "processedMessageIds",
         ...(hasReason ? { "#reason": "reasonCode" } : {}),
       },
       ExpressionAttributeValues: {
@@ -208,6 +214,9 @@ async function completeIndexingEntry(
         ":token": input.claim.token,
         ":outcome": input.outcome,
         ":now": input.now,
+        ":empty": [],
+        ":messages": [input.claim.messageId],
+        ":message": input.claim.messageId,
         ...(hasReason ? { ":reason": input.reasonCode } : {}),
       },
     }),

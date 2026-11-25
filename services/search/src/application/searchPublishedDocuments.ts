@@ -1,10 +1,12 @@
 import { isPublicationAuthorized } from "../domain/publication.js";
+
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type {
   SearchDocumentReader,
   SearchQuery,
 } from "../ports/search-reader.js";
+
 import {
   PublishedSearchPage,
   PublishedSearchResult,
