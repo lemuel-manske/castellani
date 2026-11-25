@@ -3,15 +3,22 @@ package rabbitmq
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
+	"sort"
 	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+)
+
+const (
+	ContractDirEnv = "COORDINATOR_CONTRACTS_DIR"
+
+	MessagesDir = "messages"
+
+	SchemaGlob = "*.v1.schema.json"
 )
 
 var validators = sync.OnceValues(loadValidators)
@@ -106,25 +113,27 @@ func loadValidators() (map[string]*jsonschema.Schema, error) {
 }
 
 func contractFiles() ([]string, error) {
-	root := os.Getenv("CONTRACTS_DIR")
+	root, ok := os.LookupEnv(ContractDirEnv)
 
-	if root == "" {
-		return nil, errors.New("CONTRACTS_DIR is not set")
+	if !ok || root == "" {
+		return nil, fmt.Errorf("%s is not set", ContractDirEnv)
 	}
 
-	entries, err := os.ReadDir(filepath.Join(root, "messages"))
+	files, err := filepath.Glob(filepath.Join(root, SchemaGlob))
 
 	if err != nil {
-		return nil, fmt.Errorf("read message contracts: %w", err)
+		return nil, fmt.Errorf("glob shared contracts: %w", err)
 	}
 
-	files := []string{filepath.Join(root, "archive-manifest.v1.schema.json")}
+	messageFiles, err := filepath.Glob(filepath.Join(root, MessagesDir, SchemaGlob))
 
-	for _, entry := range entries {
-		if strings.HasSuffix(entry.Name(), ".v1.schema.json") {
-			files = append(files, filepath.Join(root, "messages", entry.Name()))
-		}
+	if err != nil {
+		return nil, fmt.Errorf("glob message contracts: %w", err)
 	}
+
+	files = append(files, messageFiles...)
+
+	sort.Strings(files)
 
 	return files, nil
 }

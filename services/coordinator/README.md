@@ -22,5 +22,6 @@ Requires Go 1.25.4. From `services/coordinator`:
 | `COORDINATOR_STALLED_WORKFLOW_AGE` | Minimum time without a state update before a SAGA decision is reissued. Defaults to 2m |
 | `COORDINATOR_DYNAMODB_ENDPOINT` | Optional DynamoDB-compatible endpoint |
 | `COORDINATOR_RABBITMQ_URL` | Message broker connection |
+| `COORDINATOR_CONTRACTS_DIR` | Directory containing JSON Schema contracts |
 | `COORDINATOR_AWS_ACCESS_KEY_ID` | AWS SDK access key |
 | `COORDINATOR_AWS_SECRET_ACCESS_KEY` | AWS SDK secret key |
