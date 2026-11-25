@@ -1,6 +1,6 @@
 # RabbitMQ message catalog (v1)
 
-All broker messages validate against `envelope.v1.schema.json` and their more specific `*.v1.schema.json` payload schema. Consumers load these schemas at runtime from a required service-owned directory variable (`CAPTURE_CONTRACTS_DIR`, `COORDINATOR_CONTRACTS_DIR`, and `SEARCH_CONTRACTS_DIR`; `/contracts` in containers) and select the validator by `type`; semantic rules that are not expressed in JSON Schema remain explicit consumer checks. This is a **logical** routing catalog; broker declaration/configuration will assign durable exchanges, bindings, queues, backoff and DLQ names. Producers write the envelope to a service-owned transactional outbox before publishing. A consumer acknowledges only when its recoverable business obligation is durable.
+All broker messages validate against `envelope.v1.schema.json` and their more specific `*.v1.schema.json` payload schema. Consumers load these schemas at runtime from a required service-owned directory variable (`CAPTURE_CONTRACTS_DIR`, `COORDINATOR_CONTRACTS_DIR`, and `SEARCH_CONTRACTS_DIR`; `/contracts` in containers) and select the validator by `type`; semantic rules that are not expressed in JSON Schema remain explicit consumer checks. This is a **logical** routing catalog; broker topology is declared in [`infra/rabbitmq/definitions.json`](../../infra/rabbitmq/definitions.json); services only reference the provisioned names. Producers write the envelope to a service-owned transactional outbox before publishing. A consumer acknowledges only when its recoverable business obligation is durable.
 
 | Type | Producer | Consumers | Meaning and deduplication identity |
 |---|---|---|---|
@@ -32,7 +32,7 @@ All broker messages validate against `envelope.v1.schema.json` and their more sp
 
 Use one queue per logical consumer/consumer group where events require fan-out, and a competing consumer queue for Capture page tasks. In particular, `CrawlCompleted` and `ArchivePublished` must reach **both** Coordinator and Search using independently durable queues. A shared queue would split events between consumers and is incorrect. `ArchivePublicationDecided` and `ArchiveCompensationDecided` likewise fan out to Capture and Search. Queues are durable, messages persistent, manual-acknowledged; publisher confirms plus unroutable-message detection are required.
 
-Retries use bounded attempts and backoff, with failed poison messages routed to a DLQ. A transport DLQ does not by itself close a page task or compensate a SAGA; owner reconcilers must account for the outstanding work. Exchange/queue names, TTL defaults, and replay tooling remain broker bootstrap details.
+Retries use bounded attempts and backoff, with failed poison messages routed to a DLQ. A transport DLQ does not by itself close a page task or compensate a SAGA; owner reconcilers must account for the outstanding work. Exchange/queue names, TTL defaults, and bindings are declared in [`infra/rabbitmq/definitions.json`](../../infra/rabbitmq/definitions.json).
 
 ## Manifest and compatibility
 

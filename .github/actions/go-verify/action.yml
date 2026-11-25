@@ -1,5 +1,4 @@
 name: go @ verify
-description: Verify an independent Go module using its standard Makefile
 
 inputs:
   module:

@@ -1,0 +1,27 @@
+name: infra @ import RabbitMQ topology
+
+inputs:
+  container-id:
+    description: Docker container ID of the RabbitMQ service container.
+    required: true
+
+  definitions-path:
+    description: Repository-relative path to the RabbitMQ definitions file.
+    required: false
+
+    default: infra/rabbitmq/definitions.json
+
+runs:
+  using: composite
+  steps:
+    - name: Import definitions
+
+      shell: bash
+
+      env:
+        CONTAINER_ID: ${{ inputs.container-id }}
+        DEFINITIONS_PATH: ${{ inputs.definitions-path }}
+
+      run: |
+        docker cp "$GITHUB_WORKSPACE/$DEFINITIONS_PATH" "$CONTAINER_ID:/tmp/definitions.json"
+        docker exec "$CONTAINER_ID" rabbitmqctl import_definitions /tmp/definitions.json
