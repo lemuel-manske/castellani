@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 
+import { PAGE_CAPTURED_EVENT } from "../../src/domain.js";
 import type { PageCapturedEvent } from "../../src/application/types.js";
 
 import type { SearchDocument } from "../../src/domain/content.js";
@@ -64,7 +65,7 @@ function createCapturedPageFixture(
   };
 
   const event: PageCapturedEvent = {
-    type: "PageCaptured",
+    type: PAGE_CAPTURED_EVENT,
     version: 1,
     messageId: `message-${snapshotId}`,
     correlationId: page.archiveId,

@@ -1,8 +1,13 @@
-import type {
-  CompensationDecision,
-  CompletionCrawl,
-  PublicationIdentity,
-  TerminalIndexingOutcome,
+import {
+  ARCHIVE_COMPENSATION_DECIDED_EVENT,
+  ARCHIVE_PUBLICATION_DECIDED_EVENT,
+  ARCHIVE_PUBLISHED_EVENT,
+  CRAWL_COMPLETED_EVENT,
+  PAGE_CAPTURED_EVENT,
+  type CompensationDecision,
+  type CompletionCrawl,
+  type PublicationIdentity,
+  type TerminalIndexingOutcome,
 } from "../domain.js";
 import { ArtifactReferenceSchema } from "../ports/artifacts.js";
 import type {
@@ -27,13 +32,13 @@ type Event<Type extends string, Payload> = {
 };
 
 type PublicationEvent =
-  | Event<"ArchivePublicationDecided", PublicationIdentity>
-  | Event<"ArchivePublished", PublicationIdentity>
-  | Event<"ArchiveCompensationDecided", CompensationDecision>
-  | Event<"CrawlCompleted", CompletionCrawl>;
+  | Event<typeof ARCHIVE_PUBLICATION_DECIDED_EVENT, PublicationIdentity>
+  | Event<typeof ARCHIVE_PUBLISHED_EVENT, PublicationIdentity>
+  | Event<typeof ARCHIVE_COMPENSATION_DECIDED_EVENT, CompensationDecision>
+  | Event<typeof CRAWL_COMPLETED_EVENT, CompletionCrawl>;
 
 type PageCapturedEvent = Event<
-  "PageCaptured",
+  typeof PAGE_CAPTURED_EVENT,
   CapturedPageReference & {
     redirectChain?: string[];
     urlKey: string;

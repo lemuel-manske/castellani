@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 
 import { validateMessage } from "../src/contracts.js";
+import { ARCHIVE_PUBLISHED_EVENT, PAGE_CAPTURED_EVENT } from "../src/domain.js";
 
 function encode(value: unknown): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(value));
@@ -8,7 +9,7 @@ function encode(value: unknown): Uint8Array {
 
 it("accepts a page captured message without optional fields", () => {
   const envelope = {
-    type: "PageCaptured",
+    type: PAGE_CAPTURED_EVENT,
     version: 1,
     messageId: "message-1",
     correlationId: "archive-1",
@@ -30,12 +31,14 @@ it("accepts a page captured message without optional fields", () => {
     },
   };
 
-  expect(validateMessage(encode(envelope), "PageCaptured")).toEqual(envelope);
+  expect(validateMessage(encode(envelope), PAGE_CAPTURED_EVENT)).toEqual(
+    envelope,
+  );
 });
 
 it("rejects a contract message with an unsupported version", () => {
   const envelope = {
-    type: "ArchivePublished",
+    type: ARCHIVE_PUBLISHED_EVENT,
     version: 2,
     messageId: "message-1",
     correlationId: "archive-1",

@@ -1,6 +1,11 @@
 import { expect, it } from "vitest";
 
 import { parsePublicationEvent } from "../../../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
+import {
+  ARCHIVE_PUBLICATION_DECIDED_EVENT,
+  ARCHIVE_PUBLISHED_EVENT,
+  CRAWL_COMPLETED_EVENT,
+} from "../../../../src/domain.js";
 
 const manifest = {
   bucket: "archive-manifests",
@@ -15,7 +20,7 @@ function encode(value: unknown): Uint8Array {
 
 it("preserves the validated envelope when parsing publication events", () => {
   const envelope = {
-    type: "ArchivePublicationDecided",
+    type: ARCHIVE_PUBLICATION_DECIDED_EVENT,
     version: 1,
     messageId: "message-1",
     correlationId: "archive-1",
@@ -32,7 +37,7 @@ it("preserves the validated envelope when parsing publication events", () => {
 
 it("preserves the validated envelope when parsing completion events", () => {
   const envelope = {
-    type: "CrawlCompleted",
+    type: CRAWL_COMPLETED_EVENT,
     version: 1,
     messageId: "message-1",
     correlationId: "archive-1",
@@ -52,7 +57,7 @@ it("preserves the validated envelope when parsing completion events", () => {
 
 it("rejects a completion payload under a different event type", () => {
   const envelope = {
-    type: "ArchivePublished",
+    type: ARCHIVE_PUBLISHED_EVENT,
     version: 1,
     messageId: "message-1",
     correlationId: "archive-1",

@@ -168,18 +168,7 @@ function createRabbitMqTestSupport() {
               PUBLICATION_TOPOLOGY.queue,
               PUBLICATION_TOPOLOGY.retryQueue,
               PUBLICATION_TOPOLOGY.deadLetterQueue,
-            ].map((queue) => cleanup.deleteQueue(queue).catch(() => undefined)),
-          );
-
-          await Promise.all(
-            [
-              PAGE_CAPTURED_TOPOLOGY.retryExchange,
-              PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
-              PUBLICATION_TOPOLOGY.retryExchange,
-              PUBLICATION_TOPOLOGY.deadLetterExchange,
-            ].map((exchange) =>
-              cleanup.deleteExchange(exchange).catch(() => undefined),
-            ),
+            ].map((queue) => cleanup.purgeQueue(queue).catch(() => undefined)),
           );
         } finally {
           await cleanup.close().catch(() => undefined);

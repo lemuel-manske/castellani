@@ -6,6 +6,12 @@ import type { ArtifactReference } from "./ports/artifacts.js";
  * Keep domain concepts and contracts here.
  */
 
+const ARCHIVE_COMPENSATION_DECIDED_EVENT = "ArchiveCompensationDecided";
+const ARCHIVE_PUBLICATION_DECIDED_EVENT = "ArchivePublicationDecided";
+const ARCHIVE_PUBLISHED_EVENT = "ArchivePublished";
+const CRAWL_COMPLETED_EVENT = "CrawlCompleted";
+const PAGE_CAPTURED_EVENT = "PageCaptured";
+
 interface PublicationIdentity {
   archiveId: string;
   decisionVersion: number;
@@ -62,6 +68,14 @@ interface ManifestReconciliation {
   unexpectedSnapshotIds: string[];
   complete: boolean;
 }
+
+export {
+  ARCHIVE_COMPENSATION_DECIDED_EVENT,
+  ARCHIVE_PUBLICATION_DECIDED_EVENT,
+  ARCHIVE_PUBLISHED_EVENT,
+  CRAWL_COMPLETED_EVENT,
+  PAGE_CAPTURED_EVENT,
+};
 
 export type {
   CompensationDecision,

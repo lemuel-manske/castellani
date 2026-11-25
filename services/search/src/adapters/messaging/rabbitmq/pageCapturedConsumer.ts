@@ -1,15 +1,20 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
+
+import { PAGE_CAPTURED_EVENT } from "../../../domain.js";
+
 import type {
   PageCapturedEvent,
   PageCapturedResult,
 } from "../../../application/types.js";
+
 import { validateMessage } from "../../../contracts.js";
-import { EVENTS_EXCHANGE, PAGE_CAPTURED_TOPOLOGY } from "./topology.js";
+
+import { PAGE_CAPTURED_TOPOLOGY } from "./topology.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
 function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
-  const message = validateMessage(body, "PageCaptured");
+  const message = validateMessage(body, PAGE_CAPTURED_EVENT);
 
   if (message == null) {
     return null;
@@ -20,7 +25,7 @@ function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
   }
 
   return {
-    type: "PageCaptured",
+    type: PAGE_CAPTURED_EVENT,
     version: 1,
     messageId: message.messageId,
     correlationId: message.correlationId,
@@ -133,61 +138,6 @@ async function startPageCapturedConsumer(
   channel: ConfirmChannel,
   handle: (event: PageCapturedEvent) => Promise<PageCapturedResult>,
 ): Promise<void> {
-  await channel.assertExchange(EVENTS_EXCHANGE, "topic", {
-    durable: true,
-  });
-
-  await channel.assertExchange(PAGE_CAPTURED_TOPOLOGY.retryExchange, "direct", {
-    durable: true,
-  });
-
-  await channel.assertExchange(
-    PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
-    "fanout",
-    {
-      durable: true,
-    },
-  );
-
-  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.deadLetterQueue, {
-    durable: true,
-  });
-
-  await channel.bindQueue(
-    PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
-    PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
-    "",
-  );
-
-  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.retryQueue, {
-    durable: true,
-    arguments: {
-      "x-message-ttl": PAGE_CAPTURED_TOPOLOGY.retryDelayMilliseconds,
-      "x-dead-letter-exchange": EVENTS_EXCHANGE,
-      "x-dead-letter-routing-key": PAGE_CAPTURED_TOPOLOGY.routingKey,
-    },
-  });
-
-  await channel.bindQueue(
-    PAGE_CAPTURED_TOPOLOGY.retryQueue,
-    PAGE_CAPTURED_TOPOLOGY.retryExchange,
-    PAGE_CAPTURED_TOPOLOGY.routingKey,
-  );
-
-  await channel.assertQueue(PAGE_CAPTURED_TOPOLOGY.queue, {
-    durable: true,
-    arguments: {
-      "x-dead-letter-exchange": PAGE_CAPTURED_TOPOLOGY.retryExchange,
-      "x-dead-letter-routing-key": PAGE_CAPTURED_TOPOLOGY.routingKey,
-    },
-  });
-
-  await channel.bindQueue(
-    PAGE_CAPTURED_TOPOLOGY.queue,
-    EVENTS_EXCHANGE,
-    PAGE_CAPTURED_TOPOLOGY.routingKey,
-  );
-
   await channel.prefetch(1);
 
   await channel.consume(PAGE_CAPTURED_TOPOLOGY.queue, (message) => {

@@ -1,6 +1,9 @@
 import { afterAll, beforeAll } from "vitest";
 
-import type { CompletionCrawl } from "../../src/domain.js";
+import {
+  CRAWL_COMPLETED_EVENT,
+  type CompletionCrawl,
+} from "../../src/domain.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
 import { processPageCaptured } from "../../src/application/processPageCaptured.js";
@@ -70,7 +73,7 @@ const application = {
   },
 
   processPublicationEvent(
-    event: Exclude<PublicationEvent, { type: "CrawlCompleted" }>,
+    event: Exclude<PublicationEvent, { type: typeof CRAWL_COMPLETED_EVENT }>,
   ): Promise<void> {
     return processPublicationEvent(event, dynamodb.publicationLedger);
   },
@@ -116,11 +119,11 @@ async function receivePageCaptured(
 }
 
 async function receivePublicationEvent(event: PublicationEvent): Promise<void> {
-  if (publicationLedgerReady && event.type === "CrawlCompleted") {
+  if (publicationLedgerReady && event.type === CRAWL_COMPLETED_EVENT) {
     await application.processCrawlCompleted(event.payload);
   }
 
-  if (publicationLedgerReady && event.type !== "CrawlCompleted") {
+  if (publicationLedgerReady && event.type !== CRAWL_COMPLETED_EVENT) {
     await application.processPublicationEvent(event);
   }
 
