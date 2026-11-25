@@ -9,7 +9,7 @@ The system has Go, Python, and TypeScript services that must communicate without
 
 ## Decision
 
-Define cross-service contracts in JSON Schema under `contracts/`, independently of any implementation language. Services may validate messages against these schemas but must not share private service models or implementation packages. Contracts describe observable communication, not internal storage layouts.
+Define cross-service contracts in JSON Schema under `contracts/`, independently of any implementation language. Services validate inbound broker messages against these schemas at runtime and must not share private service models, generated validators, or implementation packages. Contracts describe observable communication, not internal storage layouts.
 
 Use RabbitMQ for asynchronous commands and events, and HTTP for synchronous operations:
 

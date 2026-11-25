@@ -1,6 +1,6 @@
 # RabbitMQ message catalog (v1)
 
-All broker messages validate against `envelope.v1.schema.json` and their more specific `*.v1.schema.json` payload schema. This is a **logical** routing catalog; broker declaration/configuration will assign durable exchanges, bindings, queues, backoff and DLQ names. Producers write the envelope to a service-owned transactional outbox before publishing. A consumer acknowledges only when its recoverable business obligation is durable.
+All broker messages validate against `envelope.v1.schema.json` and their more specific `*.v1.schema.json` payload schema. Consumers load these schemas at runtime from a required service-owned directory variable (`CAPTURE_CONTRACTS_DIR`, `COORDINATOR_CONTRACTS_DIR`, and `SEARCH_CONTRACTS_DIR`; `/contracts` in containers) and select the validator by `type`; semantic rules that are not expressed in JSON Schema remain explicit consumer checks. This is a **logical** routing catalog; broker declaration/configuration will assign durable exchanges, bindings, queues, backoff and DLQ names. Producers write the envelope to a service-owned transactional outbox before publishing. A consumer acknowledges only when its recoverable business obligation is durable.
 
 | Type | Producer | Consumers | Meaning and deduplication identity |
 |---|---|---|---|

@@ -111,6 +111,11 @@ services:
       COORDINATOR_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       COORDINATOR_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
+      COORDINATOR_CONTRACTS_DIR: /contracts
+
+    volumes:
+      - ./contracts:/contracts:ro
+
     depends_on:
       provision:
         condition: service_completed_successfully
@@ -158,6 +163,11 @@ services:
 
       CAPTURE_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       CAPTURE_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      CAPTURE_CONTRACTS_DIR: /contracts
+
+    volumes:
+      - ./contracts:/contracts:ro
 
     depends_on:
       provision:
@@ -239,6 +249,11 @@ services:
 
       SEARCH_AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       SEARCH_AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      SEARCH_CONTRACTS_DIR: /contracts
+
+    volumes:
+      - ./contracts:/contracts:ro
 
     depends_on:
       provision:
