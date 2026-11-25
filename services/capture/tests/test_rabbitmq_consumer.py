@@ -1,11 +1,18 @@
 import asyncio
 import json
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import uuid4
 
 import aio_pika
 import pytest
-from aio_pika.abc import AbstractChannel, AbstractRobustConnection
+from aio_pika.abc import (
+    AbstractChannel,
+    AbstractIncomingMessage,
+    AbstractQueue,
+    AbstractRobustConnection,
+)
 
 from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
@@ -37,10 +44,26 @@ def capture_page_envelope() -> bytes:
     ).encode()
 
 
+@asynccontextmanager
+async def collect(
+    queue: AbstractQueue,
+) -> AsyncGenerator[asyncio.Queue[AbstractIncomingMessage]]:
+    received: asyncio.Queue[AbstractIncomingMessage] = asyncio.Queue()
+
+    async def on_message(message: AbstractIncomingMessage) -> None:
+        await received.put(message)
+
+    consumer_tag = await queue.consume(on_message)
+
+    try:
+        yield received
+    finally:
+        await queue.cancel(consumer_tag)
+
+
 async def start_processor(
     rabbitmq: AbstractRobustConnection,
     channel: AbstractChannel,
-    body: bytes,
     capture_page: Any,
 ) -> tuple[RabbitMQPageTaskConsumer, asyncio.Task[None]]:
     queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
@@ -57,8 +80,6 @@ async def start_processor(
     task = asyncio.create_task(processor.run(ready=ready))
 
     await asyncio.wait_for(ready.wait(), timeout=5)
-
-    await publish(channel, body)
 
     return consumer, task
 
@@ -83,10 +104,13 @@ async def test_stop_drains_in_flight_delivery(
         return True
 
     channel = await rabbitmq.channel()
+    body = capture_page_envelope()
 
-    consumer, task = await start_processor(rabbitmq, channel, capture_page_envelope(), capture_page)
+    consumer, task = await start_processor(rabbitmq, channel, capture_page)
 
     try:
+        await publish(channel, body)
+
         await asyncio.wait_for(started.wait(), timeout=5)
 
         consumer.stop()
@@ -142,9 +166,11 @@ async def test_stop_bounds_in_flight_delivery(
     channel = await rabbitmq.channel()
     body = capture_page_envelope()
 
-    consumer, task = await start_processor(rabbitmq, channel, body, capture_page)
+    consumer, task = await start_processor(rabbitmq, channel, capture_page)
 
     try:
+        await publish(channel, body)
+
         await asyncio.wait_for(started.wait(), timeout=5)
 
         consumer.stop()
@@ -154,11 +180,13 @@ async def test_stop_bounds_in_flight_delivery(
         assert task.cancelled()
 
         queue = await channel.get_queue(CAPTURE_PAGE_QUEUE)
-        redelivered = await asyncio.wait_for(queue.get(timeout=5, fail=True), timeout=5)
 
-        await redelivered.ack()
+        async with collect(queue) as redeliveries:
+            redelivered = await asyncio.wait_for(redeliveries.get(), timeout=5)
 
-        assert redelivered.body == body
+            await redelivered.ack()
+
+            assert redelivered.body == body
     finally:
         if not task.done():
             task.cancel()
@@ -237,16 +265,19 @@ async def test_consumer_dead_letters_invalid_envelope(
     channel = await rabbitmq.channel()
     body = b'{"type":"CapturePage","version":99}'
 
-    _, task = await start_processor(rabbitmq, channel, body, fail_capture_page)
+    _, task = await start_processor(rabbitmq, channel, fail_capture_page)
 
     dead_queue = await channel.get_queue(CAPTURE_DEAD_QUEUE)
 
     try:
-        received = await asyncio.wait_for(dead_queue.get(timeout=5, fail=True), timeout=5)
+        async with collect(dead_queue) as dead_letters:
+            await publish(channel, body)
 
-        await received.ack()
+            received = await asyncio.wait_for(dead_letters.get(), timeout=5)
 
-        assert received.body == body
+            await received.ack()
+
+            assert received.body == body
     finally:
         task.cancel()
 
@@ -293,24 +324,25 @@ async def test_consumer_dead_letters_message_after_retry_budget(
     try:
         await asyncio.wait_for(ready.wait(), timeout=5)
 
-        await publish(
-            channel,
-            body,
-            headers={
-                "x-death": [
-                    {
-                        "queue": CAPTURE_PAGE_RETRY_QUEUE,
-                        "count": MAX_DELIVERY_RETRIES,
-                    }
-                ]
-            },
-        )
+        async with collect(dead_queue) as dead_letters:
+            await publish(
+                channel,
+                body,
+                headers={
+                    "x-death": [
+                        {
+                            "queue": CAPTURE_PAGE_RETRY_QUEUE,
+                            "count": MAX_DELIVERY_RETRIES,
+                        }
+                    ]
+                },
+            )
 
-        received = await asyncio.wait_for(dead_queue.get(timeout=5, fail=True), timeout=5)
+            received = await asyncio.wait_for(dead_letters.get(), timeout=5)
 
-        await received.ack()
+            await received.ack()
 
-        assert received.body == body
+            assert received.body == body
     finally:
         task.cancel()
 

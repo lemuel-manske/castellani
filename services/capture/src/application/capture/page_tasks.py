@@ -1,5 +1,6 @@
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
+from contextlib import aclosing
 from typing import Protocol
 
 from capture.worker.api import CaptureRunner
@@ -23,7 +24,7 @@ class PageTaskConsumer(Protocol):
     def messages(
         self,
         ready: asyncio.Event | None = None,
-    ) -> AsyncIterator[PageTaskMessage]: ...
+    ) -> AsyncGenerator[PageTaskMessage]: ...
 
     def stop(self) -> None: ...
 
@@ -36,17 +37,18 @@ class PageTaskProcessor:
         self.worker = worker
 
     async def run(self, ready: asyncio.Event | None = None) -> None:
-        async for message in self.consumer.messages(ready=ready):
-            if message.retry_exhausted:
-                await message.dead_letter()
+        async with aclosing(self.consumer.messages(ready=ready)) as messages:
+            async for message in messages:
+                if message.retry_exhausted:
+                    await message.dead_letter()
 
-                continue
+                    continue
 
-            try:
-                await self.worker(message.archive_id, message.url_key)
-            except Exception:
-                await message.reject()
+                try:
+                    await self.worker(message.archive_id, message.url_key)
+                except Exception:
+                    await message.reject()
 
-                continue
+                    continue
 
-            await message.ack()
+                await message.ack()

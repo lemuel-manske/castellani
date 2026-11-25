@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import cast
 
 import aio_pika
@@ -64,7 +64,7 @@ class RabbitMQPageTaskConsumer(PageTaskConsumer):
     async def messages(
         self,
         ready: asyncio.Event | None = None,
-    ) -> AsyncIterator[RabbitMQPageTaskMessage]:
+    ) -> AsyncGenerator[RabbitMQPageTaskMessage]:
         channel = await self.connection.channel()
 
         deliveries: asyncio.Queue[RabbitMQPageTaskMessage | None] = asyncio.Queue()
