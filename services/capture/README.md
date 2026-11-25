@@ -32,6 +32,7 @@ The local recording prototype uses pywb as an HTTP(S) recording proxy. The runti
 | `CAPTURE_DYNAMODB_ENDPOINT_URL` | DynamoDB endpoint |
 | `CAPTURE_S3_ENDPOINT_URL` | S3 endpoint |
 | `CAPTURE_RABBITMQ_URL` | RabbitMQ endpoint |
+| `CAPTURE_CONTRACTS_DIR` | Directory containing JSON Schema contracts |
 | `CAPTURE_BROWSER_SLOT_COUNT` | Maximum concurrent browser slots. Defaults to 10 |
 | `CAPTURE_LEASE_DURATION_SECONDS` | Capture lease duration. Defaults to 60 seconds |
 | `CAPTURE_OUTBOX_LEASE_SECONDS` | Outbox lease duration. Defaults to 30 seconds |

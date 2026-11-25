@@ -50,9 +50,7 @@ def s3() -> FakeS3:
 
 @pytest.fixture
 async def rabbitmq() -> AsyncIterator[AbstractRobustConnection]:
-    connection = await aio_pika.connect_robust(
-        os.getenv("CAPTURE_RABBITMQ_URL")
-    )
+    connection = await aio_pika.connect_robust(os.getenv("CAPTURE_RABBITMQ_URL"))
 
     try:
         yield connection
