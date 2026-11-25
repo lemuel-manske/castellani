@@ -11,7 +11,7 @@ The Python Capture service performs independently schedulable page-capture work,
 
 ## Decision
 
-Use Docker Compose as the reference, single-host deployment for the entire application and its infrastructure. A single `docker compose up --build` must be sufficient to build and start the default stack, including idempotent, version-controlled provisioning of required broker topology and MiniStack resources. The resource topology is fixed in versioned Terraform and the owning services' adapters; environment-specific endpoints, exposed ports, and credentials are supplied through configuration.
+Use Docker Compose as the reference, single-host deployment for the entire application and its infrastructure. A single `docker compose up --build` must be sufficient to build and start the default stack, including idempotent, version-controlled provisioning of required broker topology and MiniStack resources. AWS resource topology is fixed in versioned Terraform; broker exchanges, queues, bindings, and DLQ arguments are fixed in [`infra/rabbitmq/definitions.json`](../../infra/rabbitmq/definitions.json). Services only reference provisioned broker names. Environment-specific endpoints, exposed ports, and credentials are supplied through configuration.
 
 The deployment includes the Go Gateway, Go Archive Coordinator, Python Capture, TypeScript Search & Index, RabbitMQ, MiniStack (DynamoDB and S3), and a standalone OpenSearch container (ADR-0007). Application services have their own Dockerfiles and health endpoints. Required persistent infrastructure state must survive application container recreation; deployments must not depend on manually created queues, tables, buckets, or indexes.
 
