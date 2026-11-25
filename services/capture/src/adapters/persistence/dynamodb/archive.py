@@ -1,39 +1,20 @@
 import asyncio
-import base64
-import binascii
-import json
-from collections.abc import AsyncIterator
-from datetime import datetime
-from email.utils import format_datetime
-from typing import Any, cast
+from typing import Any
 
 from domain.capture import (
-    ArchivePage,
     ArchiveRetrieval,
-    InvalidArchiveCursor,
-    InvalidWACZRange,
     PageListing,
     SnapshotReference,
     WACZObject,
     WACZRangeNotSatisfiable,
 )
-from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
+from utils.http import http_last_modified, normalize_etag, parse_range
+from utils.io import stream_body
 
+from .queries.archive import MAX_PAGE_LIMIT, query_pages
+from .queries.archive import read_snapshot as read_snapshot_query
 from .queries.task import read_run
-
-PAGE_STATUSES = {
-    "PENDING": "PENDING",
-    "CLAIMED": "RUNNING",
-    "WAITING_FOR_AUTH": "WAITING_FOR_AUTH",
-    "COMPLETED": "CAPTURED",
-    "FAILED": "FAILED",
-}
-
-DEFAULT_PAGE_LIMIT = 25
-
-MAX_PAGE_LIMIT = 100
-
-WACZ_READ_CHUNK_BYTES = 64 * 1024
+from .values import optional_string
 
 
 class DynamoDBArchiveRetrieval(ArchiveRetrieval):
@@ -56,69 +37,20 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         if limit < 1 or limit > MAX_PAGE_LIMIT:
             raise ValueError("limit must be between 1 and 100")
 
-        return await asyncio.to_thread(self._list_pages, archive_id, limit, cursor)
+        def read() -> PageListing:
+            return query_pages(self.client, archive_id, limit, cursor)
 
-    def _list_pages(
-        self,
-        archive_id: str,
-        limit: int,
-        cursor: str | None,
-    ) -> PageListing:
-        request: dict[str, Any] = {
-            "TableName": FRONTIER_TABLE,
-            "KeyConditionExpression": "archiveId = :archive_id",
-            "ExpressionAttributeValues": {":archive_id": {"S": archive_id}},
-            "Limit": limit + 1,
-        }
-
-        if cursor is not None:
-            request["ExclusiveStartKey"] = decode_cursor(cursor, archive_id)
-
-        response = self.client.query(**request)
-
-        rows = tuple(response.get("Items", ()))
-        items = tuple(page_from_item(item) for item in rows[:limit])
-
-        next_cursor = None
-
-        if len(rows) > limit:
-            last_item = rows[limit - 1]
-            next_cursor = encode_cursor(
-                {
-                    "archiveId": last_item["archiveId"],
-                    "urlKey": last_item["urlKey"],
-                }
-            )
-
-        return PageListing(items=items, next_cursor=next_cursor)
+        return await asyncio.to_thread(read)
 
     async def read_snapshot(
         self,
         archive_id: str,
         snapshot_id: str,
     ) -> SnapshotReference | None:
-        return await asyncio.to_thread(self._read_snapshot, archive_id, snapshot_id)
+        def read() -> SnapshotReference | None:
+            return read_snapshot_query(self.client, archive_id, snapshot_id)
 
-    def _read_snapshot(self, archive_id: str, snapshot_id: str) -> SnapshotReference | None:
-        response = self.client.get_item(
-            TableName=SNAPSHOTS_TABLE,
-            Key={"snapshotId": {"S": snapshot_id}},
-            ConsistentRead=True,
-        )
-
-        item = response.get("Item")
-
-        if item is None or string_value(item, "archiveId") != archive_id:
-            return None
-
-        return SnapshotReference(
-            archive_id=archive_id,
-            snapshot_id=snapshot_id,
-            url=string_value(item, "url"),
-            final_url=string_value(item, "finalUrl", default=""),
-            captured_at=string_value(item, "capturedAt"),
-            content_type=string_value(item, "contentType") or None,
-        )
+        return await asyncio.to_thread(read)
 
     async def read_wacz(
         self,
@@ -127,186 +59,77 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         if_range: str | None,
         metadata_only: bool = False,
     ) -> WACZObject | None:
-        return await asyncio.to_thread(
-            self._read_wacz,
-            archive_id,
-            range_header,
-            if_range,
-            metadata_only,
-        )
+        def read() -> WACZObject | None:
+            run = read_run(self.client, archive_id)
 
-    def _read_wacz(
-        self,
-        archive_id: str,
-        range_header: str | None,
-        if_range: str | None,
-        metadata_only: bool,
-    ) -> WACZObject | None:
-        run = read_run(self.client, archive_id)
+            if run is None or (optional_string(run, "decision") or "") != "PUBLISH":
+                return None
 
-        if run is None or string_value(run, "decision", default="") != "PUBLISH":
-            return None
+            if (optional_string(run, "replayStatus") or "") != "READY":
+                return None
 
-        if string_value(run, "replayStatus", default="") != "READY":
-            return None
+            key = optional_string(run, "packageKey") or ""
 
-        key = string_value(run, "packageKey", default="")
+            if not key:
+                return None
 
-        if not key:
-            return None
+            bucket = optional_string(run, "packageBucket") or self.artifact_bucket
+            version = optional_string(run, "packageVersionId") or None
 
-        bucket = string_value(run, "packageBucket", default="") or self.artifact_bucket
+            request: dict[str, Any] = {"Bucket": bucket, "Key": key}
 
-        head = self.s3_client.head_object(Bucket=bucket, Key=key)
+            if version:
+                request["VersionId"] = version
 
-        etag = str(head["ETag"])
-        content_length = int(head["ContentLength"])
+            head = self.s3_client.head_object(**request)
 
-        last_modified = head.get("LastModified")
+            etag = str(head["ETag"])
+            content_length = int(head["ContentLength"])
 
-        if_range_matches = if_range is None or normalize_etag(if_range) == normalize_etag(etag)
+            last_modified = head.get("LastModified")
 
-        requested = (
-            parse_range(range_header, content_length) if range_header and if_range_matches else None
-        )
+            if_range_matches = if_range is None or normalize_etag(if_range) == normalize_etag(etag)
 
-        if requested is None:
-            body = (
-                None if metadata_only else self.s3_client.get_object(Bucket=bucket, Key=key)["Body"]
+            requested = (
+                parse_range(range_header, content_length)
+                if range_header and if_range_matches
+                else None
             )
+
+            if requested is None:
+                body = None if metadata_only else self.s3_client.get_object(**request)["Body"]
+
+                return WACZObject(
+                    body=None if body is None else stream_body(body),
+                    content_length=content_length,
+                    etag=etag,
+                    last_modified=http_last_modified(last_modified),
+                    content_range=None,
+                    partial=False,
+                )
+
+            start, end = requested
+
+            if start >= content_length or start < 0:
+                raise WACZRangeNotSatisfiable(content_length)
+
+            end = min(end, content_length - 1) if end is not None else content_length - 1
+
+            body = None
+
+            if not metadata_only:
+                body = self.s3_client.get_object(
+                    **request,
+                    Range=f"bytes={start}-{end}",
+                )["Body"]
 
             return WACZObject(
                 body=None if body is None else stream_body(body),
-                content_length=content_length,
+                content_length=end - start + 1,
                 etag=etag,
                 last_modified=http_last_modified(last_modified),
-                content_range=None,
-                partial=False,
+                content_range=f"bytes {start}-{end}/{content_length}",
+                partial=True,
             )
 
-        start, end = requested
-
-        if start >= content_length or start < 0:
-            raise WACZRangeNotSatisfiable(content_length)
-
-        end = min(end, content_length - 1) if end is not None else content_length - 1
-
-        body = None
-
-        if not metadata_only:
-            body = self.s3_client.get_object(
-                Bucket=bucket,
-                Key=key,
-                Range=f"bytes={start}-{end}",
-            )["Body"]
-
-        return WACZObject(
-            body=None if body is None else stream_body(body),
-            content_length=end - start + 1,
-            etag=etag,
-            last_modified=http_last_modified(last_modified),
-            content_range=f"bytes {start}-{end}/{content_length}",
-            partial=True,
-        )
-
-
-def page_from_item(item: dict[str, Any]) -> ArchivePage:
-    state = string_value(item, "state")
-
-    try:
-        status = PAGE_STATUSES[state]
-    except KeyError as error:
-        raise RuntimeError(f"unknown page state: {state}") from error
-
-    return ArchivePage(
-        url=string_value(item, "url"),
-        status=status,
-        snapshot_id=string_value(item, "snapshotId", default="") or None,
-        error_code=string_value(item, "failureReason", default="") or None,
-        captured_at=string_value(item, "capturedAt", default="") or None,
-    )
-
-
-def string_value(item: dict[str, Any], key: str, default: str | None = None) -> str:
-    value = item.get(key, {}).get("S")
-
-    if isinstance(value, str):
-        return value
-
-    if default is not None:
-        return default
-
-    raise RuntimeError(f"DynamoDB item has an invalid {key}")
-
-
-def encode_cursor(key: dict[str, Any]) -> str:
-    data = json.dumps(key, sort_keys=True, separators=(",", ":")).encode()
-
-    return base64.urlsafe_b64encode(data).decode().rstrip("=")
-
-
-def decode_cursor(cursor: str, archive_id: str) -> dict[str, Any]:
-    try:
-        padding = "=" * (-len(cursor) % 4)
-        data = base64.urlsafe_b64decode(cursor + padding)
-        key: Any = json.loads(data)
-    except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
-        raise InvalidArchiveCursor from error
-
-    if not isinstance(key, dict):
-        raise InvalidArchiveCursor
-
-    typed_key = cast(dict[str, Any], key)
-
-    if typed_key.get("archiveId", {}).get("S") != archive_id:
-        raise InvalidArchiveCursor
-
-    if not isinstance(typed_key.get("urlKey", {}).get("S"), str):
-        raise InvalidArchiveCursor
-
-    return typed_key
-
-
-def http_last_modified(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-
-    return format_datetime(value, usegmt=True)
-
-
-def normalize_etag(value: str) -> str:
-    return value.removeprefix("W/").strip('"')
-
-
-def parse_range(header: str, content_length: int) -> tuple[int, int | None]:
-    if not header.startswith("bytes=") or "," in header:
-        raise InvalidWACZRange
-
-    try:
-        start_text, end_text = header[6:].split("-", 1)
-
-        if not start_text:
-            suffix_length = int(end_text)
-
-            if suffix_length < 1:
-                raise InvalidWACZRange
-
-            return max(0, content_length - suffix_length), content_length - 1
-
-        start = int(start_text)
-        end = int(end_text) if end_text else None
-    except ValueError as error:
-        raise InvalidWACZRange from error
-
-    if start < 0 or (end is not None and end < start):
-        raise InvalidWACZRange
-
-    return start, end
-
-
-async def stream_body(body: Any) -> AsyncIterator[bytes]:
-    try:
-        while chunk := await asyncio.to_thread(body.read, WACZ_READ_CHUNK_BYTES):
-            yield chunk
-    finally:
-        await asyncio.to_thread(body.close)
+        return await asyncio.to_thread(read)

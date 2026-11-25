@@ -1,7 +1,7 @@
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
+from mypy_boto3_s3.client import S3Client
 from support.domain import seed_run, set_run_auth_profile
-from support.s3 import FakeS3
 
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
@@ -12,7 +12,7 @@ from domain.capture import DEFAULT_AUTH_GENERATION, AuthContext
 @pytest.mark.integration
 async def test_stored_auth_contexts_defaults_to_an_unauthenticated_context(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
 
@@ -27,7 +27,7 @@ async def test_stored_auth_contexts_defaults_to_an_unauthenticated_context(
 @pytest.mark.integration
 async def test_stored_auth_contexts_loads_a_versioned_protected_profile(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
 

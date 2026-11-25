@@ -5,7 +5,12 @@ from typing import Any
 
 from botocore.exceptions import ClientError
 
-from domain.capture import CaptureAllocator, CaptureReservation, new_reservation_id
+from domain.capture import (
+    CaptureAllocator,
+    CaptureReservation,
+    CaptureReservationLostError,
+    new_reservation_id,
+)
 
 from .error_handling import is_conditional_failure
 from .queries.alloc import (
@@ -19,10 +24,6 @@ from .values import number_from_item
 
 DEFAULT_SLOT_COUNT = 10
 DEFAULT_LEASE_DURATION = 60
-
-
-class CaptureReservationLostError(RuntimeError):
-    """Raised when a reservation can no longer be renewed by its owner."""
 
 
 class DynamoDBCaptureAllocator(CaptureAllocator):
@@ -55,116 +56,104 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
         reservation_id = new_reservation_id(attempt_id)
 
-        return await asyncio.to_thread(
-            self._reserve,
-            attempt_id,
-            reservation_id,
-        )
+        def find_existing_reservation() -> CaptureReservation | None:
+            for slot_number in range(self.slot_count):
+                slot_id = str(slot_number)
+
+                item = read_slot(self.client, slot_id)
+
+                if (
+                    item is not None
+                    and item.get("ownerAttemptId", {}).get("S") == attempt_id
+                    and item.get("reservationId", {}).get("S") == reservation_id
+                    and number_from_item(item, "leaseUntil", "browser slot") > self.clock()
+                ):
+                    return reservation_from_item(slot_id, item)
+
+            return None
+
+        def reserve() -> CaptureReservation | None:
+            existing = find_existing_reservation()
+
+            if existing is not None:
+                return existing
+
+            for slot_number in range(self.slot_count):
+                slot_id = str(slot_number)
+
+                now = self.clock()
+                lease_until = now + self.lease_duration
+
+                try:
+                    response = reserve_slot(
+                        self.client,
+                        slot_id,
+                        attempt_id,
+                        reservation_id,
+                        lease_until,
+                        now,
+                    )
+                except ClientError as error:
+                    if not is_conditional_failure(error):
+                        raise
+
+                    existing = read_slot(self.client, slot_id)
+
+                    if (
+                        existing is not None
+                        and existing.get("ownerAttemptId", {}).get("S") == attempt_id
+                        and existing.get("reservationId", {}).get("S") == reservation_id
+                        and number_from_item(existing, "leaseUntil", "browser slot") > self.clock()
+                    ):
+                        return reservation_from_item(slot_id, existing)
+
+                    continue
+
+                return reservation_from_item(slot_id, response["Attributes"])
+
+            return None
+
+        return await asyncio.to_thread(reserve)
 
     async def renew(self, reservation: CaptureReservation) -> CaptureReservation:
-        return await asyncio.to_thread(self._renew, reservation)
-
-    async def release(self, reservation: CaptureReservation) -> None:
-        await asyncio.to_thread(self._release, reservation)
-
-    def _reserve(
-        self,
-        attempt_id: str,
-        reservation_id: str,
-    ) -> CaptureReservation | None:
-        existing = self._find_existing_reservation(attempt_id, reservation_id)
-
-        if existing is not None:
-            return existing
-
-        for slot_number in range(self.slot_count):
-            slot_id = str(slot_number)
-
+        def renew() -> CaptureReservation:
             now = self.clock()
             lease_until = now + self.lease_duration
 
             try:
-                response = reserve_slot(
+                response = renew_slot(
                     self.client,
-                    slot_id,
-                    attempt_id,
-                    reservation_id,
+                    reservation.slot_id,
+                    reservation.attempt_id,
+                    reservation.reservation_id,
+                    reservation.fence,
                     lease_until,
                     now,
+                )
+            except ClientError as error:
+                if is_conditional_failure(error):
+                    raise CaptureReservationLostError(
+                        "browser capacity reservation is no longer owned"
+                    ) from error
+
+                raise
+
+            return reservation_from_item(reservation.slot_id, response["Attributes"])
+
+        return await asyncio.to_thread(renew)
+
+    async def release(self, reservation: CaptureReservation) -> None:
+        def release() -> None:
+            try:
+                release_slot(
+                    self.client,
+                    reservation.slot_id,
+                    reservation.attempt_id,
+                    reservation.reservation_id,
+                    reservation.fence,
                 )
             except ClientError as error:
                 if not is_conditional_failure(error):
                     raise
 
-                existing = read_slot(self.client, slot_id)
-
-                if (
-                    existing is not None
-                    and existing.get("ownerAttemptId", {}).get("S") == attempt_id
-                    and existing.get("reservationId", {}).get("S") == reservation_id
-                    and number_from_item(existing, "leaseUntil", "browser slot") > self.clock()
-                ):
-                    return reservation_from_item(slot_id, existing)
-
-                continue
-
-            return reservation_from_item(slot_id, response["Attributes"])
-
-        return None
-
-    def _renew(self, reservation: CaptureReservation) -> CaptureReservation:
-        now = self.clock()
-        lease_until = now + self.lease_duration
-
-        try:
-            response = renew_slot(
-                self.client,
-                reservation.slot_id,
-                reservation.attempt_id,
-                reservation.reservation_id,
-                reservation.fence,
-                lease_until,
-                now,
-            )
-        except ClientError as error:
-            if is_conditional_failure(error):
-                raise CaptureReservationLostError(
-                    "browser capacity reservation is no longer owned"
-                ) from error
-
-            raise
-
-        return reservation_from_item(reservation.slot_id, response["Attributes"])
-
-    def _release(self, reservation: CaptureReservation) -> None:
-        try:
-            release_slot(
-                self.client,
-                reservation.slot_id,
-                reservation.attempt_id,
-                reservation.reservation_id,
-                reservation.fence,
-            )
-        except ClientError as error:
-            if not is_conditional_failure(error):
-                raise
-
-    def _find_existing_reservation(
-        self,
-        attempt_id: str,
-        reservation_id: str,
-    ) -> CaptureReservation | None:
-        for slot_number in range(self.slot_count):
-            slot_id = str(slot_number)
-
-            item = read_slot(self.client, slot_id)
-
-            if (
-                item is not None
-                and item.get("ownerAttemptId", {}).get("S") == attempt_id
-                and item.get("reservationId", {}).get("S") == reservation_id
-                and number_from_item(item, "leaseUntil", "browser slot") > self.clock()
-            ):
-                return reservation_from_item(slot_id, item)
-
-        return None
+        await asyncio.to_thread(release)

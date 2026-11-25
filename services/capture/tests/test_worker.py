@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
+from mypy_boto3_s3.client import S3Client
 from support.domain import (
     frontier_item,
     outbox_items,
@@ -16,7 +17,6 @@ from support.domain import (
     specific_snapshot_item,
 )
 from support.recording import LocalSite
-from support.s3 import FakeS3
 
 from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.artifacts.local import LocalArtifactStore
@@ -37,7 +37,7 @@ AUTH_PROFILE_KEY = b"k" * 32
 async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
     dynamodb: DynamoDBClient,
     local_site: LocalSite,
-    s3: FakeS3,
+    s3: S3Client,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -71,7 +71,7 @@ async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
 async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
     dynamodb: DynamoDBClient,
     local_site: LocalSite,
-    s3: FakeS3,
+    s3: S3Client,
     tmp_path: Path,
 ) -> None:
     url = f"{local_site.base_url}/page"
@@ -123,7 +123,7 @@ async def test_worker_completes_with_real_dynamodb_and_artifact_storage(
 async def test_worker_requeues_task_when_auth_generation_changes(
     dynamodb: DynamoDBClient,
     local_site: LocalSite,
-    s3: FakeS3,
+    s3: S3Client,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -138,7 +138,7 @@ async def test_worker_requeues_task_when_auth_generation_changes(
     profile_loaded = threading.Event()
     original_get_object = s3.get_object
 
-    def get_object(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    def get_object(*args: Any, **kwargs: Any) -> Any:
         result = original_get_object(*args, **kwargs)
         profile_loaded.set()
 
@@ -171,7 +171,7 @@ async def test_worker_requeues_task_when_auth_generation_changes(
 async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
     dynamodb: DynamoDBClient,
     local_site: LocalSite,
-    s3: FakeS3,
+    s3: S3Client,
     tmp_path: Path,
 ) -> None:
     seed_run(dynamodb)
@@ -202,7 +202,7 @@ async def test_worker_requeues_task_when_real_allocator_has_no_available_slot(
 def new_worker(
     dynamodb: DynamoDBClient,
     artifacts: LocalArtifactStore,
-    s3: FakeS3,
+    s3: S3Client,
     limits: CaptureLimits = LOCAL_LIMITS,
 ) -> ConcreteCaptureWorker:
     return ConcreteCaptureWorker(

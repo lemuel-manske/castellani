@@ -2,6 +2,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 
+class OutboxLeaseLostError(RuntimeError):
+    """Raised when an outbox message is no longer owned by this dispatcher."""
+
+
 @dataclass(frozen=True)
 class OutboxMessage:
     """A durable message claimed for publication."""

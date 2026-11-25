@@ -6,10 +6,22 @@ from typing import Any
 from urllib.parse import quote
 
 from capture.worker import ArtifactStore
-from domain.capture import ArtifactReference, TaskClaim
+from domain.capture import ArtifactReference, TaskClaim, package_key
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 
 DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
+
+DELETE_BATCH_SIZE = 1000
+
+
+def file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
 
 
 class S3ArtifactStore(ArtifactStore):
@@ -122,3 +134,188 @@ class S3ArtifactStore(ArtifactStore):
         del claim
 
         await asyncio.to_thread(shutil.rmtree, directory, True)
+
+    async def read_object(
+        self,
+        bucket: str,
+        key: str,
+        version_id: str | None = None,
+    ) -> tuple[bytes, ArtifactReference]:
+        def read() -> tuple[bytes, ArtifactReference]:
+            body = self.read_object_sync(bucket, key, version_id)
+
+            return body, ArtifactReference(
+                bucket=bucket,
+                key=key,
+                sha256=hashlib.sha256(body).hexdigest(),
+                size_bytes=len(body),
+                version_id=version_id,
+            )
+
+        return await asyncio.to_thread(read)
+
+    async def download_artifact(self, reference: ArtifactReference, destination: Path) -> Path:
+        def download() -> Path:
+            body = self.read_object_sync(
+                reference.bucket,
+                reference.key,
+                reference.version_id,
+            )
+
+            sha256 = hashlib.sha256(body).hexdigest()
+
+            if sha256 != reference.sha256:
+                raise RuntimeError(f"artifact checksum mismatch for {reference.key}")
+
+            if len(body) != reference.size_bytes:
+                raise RuntimeError(f"artifact size mismatch for {reference.key}")
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(body)
+
+            return destination
+
+        return await asyncio.to_thread(download)
+
+    def read_object_sync(
+        self,
+        bucket: str,
+        key: str,
+        version_id: str | None,
+    ) -> bytes:
+        request: dict[str, Any] = {
+            "Bucket": bucket,
+            "Key": key,
+        }
+
+        if version_id:
+            request["VersionId"] = version_id
+
+        body = self.client.get_object(**request)["Body"]
+
+        try:
+            return body.read()
+        finally:
+            body.close()
+
+    async def persist_package(
+        self,
+        path: Path,
+        archive_id: str,
+        manifest_digest: str,
+    ) -> ArtifactReference:
+        def upload() -> ArtifactReference:
+            digest = file_digest(path)
+            size_bytes = path.stat().st_size
+            key = package_key(archive_id, manifest_digest)
+
+            self.client.upload_file(
+                str(path),
+                ARCHIVE_ARTIFACTS_BUCKET,
+                key,
+                ExtraArgs={
+                    "Metadata": {
+                        "sha256": digest,
+                        "manifestDigest": manifest_digest,
+                    }
+                },
+            )
+
+            metadata = self.client.head_object(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Key=key)
+
+            if metadata.get("Metadata", {}).get("sha256") != digest:
+                raise RuntimeError(f"S3 package checksum metadata mismatch for {key}")
+
+            if metadata.get("ContentLength") != size_bytes:
+                raise RuntimeError(f"S3 package size mismatch for {key}")
+
+            return ArtifactReference(
+                bucket=ARCHIVE_ARTIFACTS_BUCKET,
+                key=key,
+                sha256=digest,
+                size_bytes=size_bytes,
+                version_id=metadata.get("VersionId"),
+            )
+
+        return await asyncio.to_thread(upload)
+
+    async def delete_package(self, archive_id: str, manifest_digest: str) -> None:
+        key = package_key(archive_id, manifest_digest)
+
+        def delete() -> None:
+            delete_versions(self.client, (key,), {key})
+
+        await asyncio.to_thread(delete)
+
+    async def delete_archive_objects(self, archive_id: str) -> int:
+        def delete() -> int:
+            quoted = quote(archive_id, safe="")
+
+            return delete_versions(
+                self.client,
+                (
+                    f"capture-staging/{quoted}/",
+                    f"packages/{quoted}/",
+                ),
+            )
+
+        return await asyncio.to_thread(delete)
+
+
+def delete_versions(
+    client: Any,
+    prefixes: tuple[str, ...],
+    keys: set[str] | None = None,
+) -> int:
+    objects: list[dict[str, str]] = []
+
+    for prefix in prefixes:
+        key_marker: str | None = None
+        version_marker: str | None = None
+
+        while True:
+            request: dict[str, Any] = {
+                "Bucket": ARCHIVE_ARTIFACTS_BUCKET,
+                "Prefix": prefix,
+            }
+
+            if key_marker:
+                request["KeyMarker"] = key_marker
+
+            if version_marker:
+                request["VersionIdMarker"] = version_marker
+
+            response = client.list_object_versions(**request)
+
+            for entry in (
+                *response.get("Versions", ()),
+                *response.get("DeleteMarkers", ()),
+            ):
+                if keys is not None and entry["Key"] not in keys:
+                    continue
+
+                objects.append(
+                    {
+                        "Key": entry["Key"],
+                        "VersionId": entry["VersionId"],
+                    }
+                )
+
+            if not response.get("IsTruncated"):
+                break
+
+            key_marker = response.get("NextKeyMarker")
+            version_marker = response.get("NextVersionIdMarker")
+
+            if not key_marker or not version_marker:
+                raise RuntimeError(f"S3 did not return version markers for {prefix}")
+
+    for offset in range(0, len(objects), DELETE_BATCH_SIZE):
+        batch = objects[offset : offset + DELETE_BATCH_SIZE]
+
+        client.delete_objects(
+            Bucket=ARCHIVE_ARTIFACTS_BUCKET,
+            Delete={"Objects": batch, "Quiet": True},
+        )
+
+    return len(objects)

@@ -13,14 +13,25 @@ from aio_pika.abc import (
 
 from adapters.messaging.contracts import validate_message
 from adapters.messaging.types import JSON
+from application.capture.archive_decisions import (
+    ArchiveCompensationConsumer,
+    ArchiveCompensationMessage,
+    ArchivePublicationConsumer,
+    ArchivePublicationMessage,
+)
 from application.capture.page_tasks import PageTaskConsumer, PageTaskMessage
 from application.capture.start_crawls import StartCrawlConsumer, StartCrawlMessage
-
-from .topology import (
+from topology.messaging import (
+    ARCHIVE_COMPENSATION_DECIDED_EVENT,
+    ARCHIVE_PUBLICATION_DECIDED_EVENT,
+    CAPTURE_COMPENSATION_QUEUE,
+    CAPTURE_COMPENSATION_RETRY_QUEUE,
     CAPTURE_DEAD_EXCHANGE,
     CAPTURE_PAGE_EVENT,
     CAPTURE_PAGE_QUEUE,
     CAPTURE_PAGE_RETRY_QUEUE,
+    CAPTURE_PUBLICATION_QUEUE,
+    CAPTURE_PUBLICATION_RETRY_QUEUE,
     MAX_DELIVERY_RETRIES,
     START_CRAWL_EVENT,
     START_CRAWL_QUEUE,
@@ -37,6 +48,8 @@ class ValidatedDelivery:
 
 
 class RabbitMQValidatedConsumer:
+    """Abstract consumer that consumes validated envelopes from the provisioned queue."""
+
     def __init__(
         self,
         connection: AbstractRobustConnection,
@@ -233,6 +246,128 @@ class RabbitMQStartCrawlConsumer(StartCrawlConsumer):
                 message=delivery.message,
                 channel=delivery.channel,
                 payload=payload,
+                retry_exhausted=delivery.retry_exhausted,
+            )
+
+    def stop(self) -> None:
+        self.source.stop()
+
+
+class RabbitMQPublicationDecisionMessage(ArchivePublicationMessage):
+    """A validated ArchivePublicationDecided delivery."""
+
+    def __init__(
+        self,
+        message: AbstractIncomingMessage,
+        channel: AbstractChannel,
+        envelope: JSON,
+        retry_exhausted: bool,
+    ) -> None:
+        payload = cast(JSON, envelope["payload"])
+
+        self._message = message
+        self._channel = channel
+
+        self.archive_id = cast(str, payload["archiveId"])
+        self.correlation_id = cast(str, envelope["correlationId"])
+        self.decision_version = cast(int, payload["decisionVersion"])
+        self.package_digest = cast(str, payload["packageDigest"])
+        self.occurred_at = cast(str, envelope["occurredAt"])
+        self.retry_exhausted = retry_exhausted
+
+    async def ack(self) -> None:
+        await self._message.ack()
+
+    async def reject(self) -> None:
+        await self._message.reject(requeue=False)
+
+    async def dead_letter(self) -> None:
+        await publish_dead_letter(self._channel, self._message)
+
+        await self._message.ack()
+
+
+class RabbitMQPublicationDecisionConsumer(ArchivePublicationConsumer):
+    """Consumes validated publication decisions from Capture's private queue."""
+
+    def __init__(self, connection: AbstractRobustConnection) -> None:
+        self.source = RabbitMQValidatedConsumer(
+            connection=connection,
+            queue_name=CAPTURE_PUBLICATION_QUEUE,
+            event=ARCHIVE_PUBLICATION_DECIDED_EVENT,
+            retry_queue=CAPTURE_PUBLICATION_RETRY_QUEUE,
+        )
+
+    async def messages(
+        self,
+        ready: asyncio.Event | None = None,
+    ) -> AsyncGenerator[RabbitMQPublicationDecisionMessage]:
+        async for delivery in self.source.deliveries(ready=ready):
+            yield RabbitMQPublicationDecisionMessage(
+                message=delivery.message,
+                channel=delivery.channel,
+                envelope=delivery.envelope,
+                retry_exhausted=delivery.retry_exhausted,
+            )
+
+    def stop(self) -> None:
+        self.source.stop()
+
+
+class RabbitMQCompensationDecisionMessage(ArchiveCompensationMessage):
+    """A validated ArchiveCompensationDecided delivery."""
+
+    def __init__(
+        self,
+        message: AbstractIncomingMessage,
+        channel: AbstractChannel,
+        envelope: JSON,
+        retry_exhausted: bool,
+    ) -> None:
+        payload = cast(JSON, envelope["payload"])
+
+        self._message = message
+        self._channel = channel
+
+        self.archive_id = cast(str, payload["archiveId"])
+        self.correlation_id = cast(str, envelope["correlationId"])
+        self.decision_version = cast(int, payload["decisionVersion"])
+        self.reason_code = cast(str, payload["reasonCode"])
+        self.occurred_at = cast(str, envelope["occurredAt"])
+        self.retry_exhausted = retry_exhausted
+
+    async def ack(self) -> None:
+        await self._message.ack()
+
+    async def reject(self) -> None:
+        await self._message.reject(requeue=False)
+
+    async def dead_letter(self) -> None:
+        await publish_dead_letter(self._channel, self._message)
+
+        await self._message.ack()
+
+
+class RabbitMQCompensationDecisionConsumer(ArchiveCompensationConsumer):
+    """Consumes validated compensation decisions from Capture's private queue."""
+
+    def __init__(self, connection: AbstractRobustConnection) -> None:
+        self.source = RabbitMQValidatedConsumer(
+            connection=connection,
+            queue_name=CAPTURE_COMPENSATION_QUEUE,
+            event=ARCHIVE_COMPENSATION_DECIDED_EVENT,
+            retry_queue=CAPTURE_COMPENSATION_RETRY_QUEUE,
+        )
+
+    async def messages(
+        self,
+        ready: asyncio.Event | None = None,
+    ) -> AsyncGenerator[RabbitMQCompensationDecisionMessage]:
+        async for delivery in self.source.deliveries(ready=ready):
+            yield RabbitMQCompensationDecisionMessage(
+                message=delivery.message,
+                channel=delivery.channel,
+                envelope=delivery.envelope,
                 retry_exhausted=delivery.retry_exhausted,
             )
 

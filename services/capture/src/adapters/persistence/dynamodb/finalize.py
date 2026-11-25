@@ -7,21 +7,21 @@ from typing import Any
 
 from botocore.exceptions import ClientError
 
-from domain.capture import CrawlFinalizer, manifest_key, manifest_message_id
+from adapters.serialization import artifact_document, manifest_document
+from domain.capture import ArtifactReference, CrawlFinalizer, manifest_key, manifest_message_id
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
-from topology.tables import OUTBOX_TABLE, RUNS_TABLE
 
-from .error_handling import is_transaction_canceled
+from .error_handling import ConditionalWriteRejected, is_transaction_canceled
 from .queries.finalize import (
-    artifact_fields,
+    finalize_transaction,
     is_crawl_completed_message,
-    manifest_document,
+    is_published_manifest,
+    plain_attributes,
     query_frontier,
     query_snapshots,
     seed_succeeded,
 )
 from .queries.task import read_outbox, read_run
-from .task import ConditionalWriteRejected
 
 
 class DynamoDBManifestFinalizer(CrawlFinalizer):
@@ -38,147 +38,82 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
         self.clock = clock
 
     async def __call__(self, archive_id: str) -> None:
-        await asyncio.to_thread(self._finalize, archive_id)
+        def finalize() -> None:
+            run = read_run(self.client, archive_id)
 
-    def _finalize(self, archive_id: str) -> None:
-        run = read_run(self.client, archive_id)
-
-        if run is None:
-            raise RuntimeError("Capture run disappeared during finalization")
-
-        if (
-            run.get("admission", {}).get("S") != "CLOSED"
-            or run.get("manifestStatus", {}).get("S") != "PENDING"
-        ):
-            return
-
-        snapshots = query_snapshots(self.client, archive_id)
-        frontier = query_frontier(self.client, archive_id)
-        document = manifest_document(run, snapshots, frontier)
-        body = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
-
-        digest = hashlib.sha256(body).hexdigest()
-        key = manifest_key(archive_id)
-
-        self.s3_client.put_object(
-            Bucket=ARCHIVE_MANIFESTS_BUCKET,
-            Key=key,
-            Body=body,
-            ContentType="application/json",
-        )
-
-        metadata = self.s3_client.head_object(
-            Bucket=ARCHIVE_MANIFESTS_BUCKET,
-            Key=key,
-        )
-
-        artifact = artifact_fields(
-            {
-                "bucket": ARCHIVE_MANIFESTS_BUCKET,
-                "key": key,
-                "sha256": digest,
-                "sizeBytes": len(body),
-                "versionId": metadata.get("VersionId"),
-            }
-        )
-
-        now = self.clock()
-        occurred_at = run["closedAt"]["S"]
-        message_id = manifest_message_id(archive_id)
-        payload: dict[str, Any] = {
-            "archiveId": archive_id,
-            "manifest": artifact,
-            "manifestDigest": digest,
-            "seedSucceeded": seed_succeeded(run, frontier),
-            "capturedCount": len(snapshots),
-            "failedCount": sum(1 for item in frontier if item.get("state") == "FAILED"),
-        }
-
-        transaction = [
-            {
-                "Update": {
-                    "TableName": RUNS_TABLE,
-                    "Key": {"archiveId": {"S": archive_id}},
-                    "UpdateExpression": (
-                        "SET #status = :published, #key = :key, #digest = :digest"
-                    ),
-                    "ConditionExpression": "#status = :pending",
-                    "ExpressionAttributeNames": {
-                        "#status": "manifestStatus",
-                        "#key": "manifestKey",
-                        "#digest": "manifestDigest",
-                    },
-                    "ExpressionAttributeValues": {
-                        ":pending": {"S": "PENDING"},
-                        ":published": {"S": "PUBLISHED"},
-                        ":key": {"S": key},
-                        ":digest": {"S": digest},
-                    },
-                }
-            },
-            {
-                "Put": {
-                    "TableName": OUTBOX_TABLE,
-                    "Item": {
-                        "messageId": {"S": message_id},
-                        "correlationId": {"S": archive_id},
-                        "type": {"S": "CrawlCompleted"},
-                        "version": {"N": "1"},
-                        "occurredAt": {"S": occurred_at},
-                        "payload": {"M": _envelope_attributes(payload)},
-                        "status": {"S": "PENDING"},
-                        "attempts": {"N": "0"},
-                        "nextAttemptAt": {"N": str(now)},
-                    },
-                    "ConditionExpression": "attribute_not_exists(#message_id)",
-                    "ExpressionAttributeNames": {"#message_id": "messageId"},
-                }
-            },
-        ]
-
-        try:
-            self.client.transact_write_items(TransactItems=transaction)
-        except ClientError as error:
-            if not is_transaction_canceled(error):
-                raise
-
-            current = read_run(self.client, archive_id)
+            if run is None:
+                raise RuntimeError("Capture run disappeared during finalization")
 
             if (
-                current is not None
-                and current.get("manifestStatus", {}).get("S") == "PUBLISHED"
-                and current.get("manifestDigest", {}).get("S") == digest
+                run.get("admission", {}).get("S") != "CLOSED"
+                or run.get("manifestStatus", {}).get("S") != "PENDING"
             ):
-                existing = read_outbox(self.client, message_id)
+                return
 
-                if existing is not None and is_crawl_completed_message(
-                    existing, archive_id, digest
-                ):
-                    return
+            plain_run = plain_attributes(run)
+            snapshots = query_snapshots(self.client, archive_id)
+            frontier = query_frontier(self.client, archive_id)
+            document = manifest_document(plain_run, snapshots, frontier)
+            body = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
 
-            raise ConditionalWriteRejected from error
+            digest = hashlib.sha256(body).hexdigest()
+            key = manifest_key(archive_id)
 
+            self.s3_client.put_object(
+                Bucket=ARCHIVE_MANIFESTS_BUCKET,
+                Key=key,
+                Body=body,
+                ContentType="application/json",
+            )
 
-def _envelope_attributes(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "archiveId": {"S": payload["archiveId"]},
-        "manifest": {"M": _artifact_map(payload["manifest"])},
-        "manifestDigest": {"S": payload["manifestDigest"]},
-        "seedSucceeded": {"BOOL": payload["seedSucceeded"]},
-        "capturedCount": {"N": str(payload["capturedCount"])},
-        "failedCount": {"N": str(payload["failedCount"])},
-    }
+            metadata = self.s3_client.head_object(
+                Bucket=ARCHIVE_MANIFESTS_BUCKET,
+                Key=key,
+            )
 
+            artifact = artifact_document(
+                ArtifactReference(
+                    bucket=ARCHIVE_MANIFESTS_BUCKET,
+                    key=key,
+                    sha256=digest,
+                    size_bytes=len(body),
+                    version_id=metadata.get("VersionId"),
+                )
+            )
 
-def _artifact_map(artifact: dict[str, Any]) -> dict[str, Any]:
-    values: dict[str, Any] = {
-        "bucket": {"S": artifact["bucket"]},
-        "key": {"S": artifact["key"]},
-        "sha256": {"S": artifact["sha256"]},
-        "sizeBytes": {"N": str(artifact["sizeBytes"])},
-    }
+            now = self.clock()
+            occurred_at = plain_run["closedAt"]
+            message_id = manifest_message_id(archive_id)
+            seed_ok = seed_succeeded(plain_run, frontier)
 
-    if "versionId" in artifact:
-        values["versionId"] = {"S": artifact["versionId"]}
+            transaction = finalize_transaction(
+                archive_id=archive_id,
+                artifact=artifact,
+                digest=digest,
+                occurred_at=occurred_at,
+                message_id=message_id,
+                now=now,
+                seed_ok=seed_ok,
+                captured_count=len(snapshots),
+                failed_count=sum(1 for item in frontier if item.get("state") == "FAILED"),
+            )
 
-    return values
+            try:
+                self.client.transact_write_items(TransactItems=transaction)
+            except ClientError as error:
+                if not is_transaction_canceled(error):
+                    raise
+
+                current = read_run(self.client, archive_id)
+
+                if current is not None and is_published_manifest(current, digest):
+                    existing = read_outbox(self.client, message_id)
+
+                    if existing is not None and is_crawl_completed_message(
+                        existing, archive_id, digest
+                    ):
+                        return
+
+                raise ConditionalWriteRejected from error
+
+        await asyncio.to_thread(finalize)

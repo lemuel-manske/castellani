@@ -1,17 +1,21 @@
+import hashlib
 from pathlib import Path
 
 import pytest
+from mypy_boto3_s3.client import S3Client
 from support.domain import make_claim
-from support.s3 import FakeS3
+from support.s3 import object_keys, put_object, read_object
 
 from adapters.artifacts.s3 import S3ArtifactStore
+from domain.capture import ArtifactReference
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
     tmp_path: Path,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     store = S3ArtifactStore(s3, tmp_path)
 
@@ -41,15 +45,38 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
 
     assert reference.sha256
     assert reference.size_bytes == len(b"warc-content")
-    assert reference.version_id == "version-1"
+    assert reference.version_id is not None
 
-    assert s3.objects[(ARCHIVE_ARTIFACTS_BUCKET, reference.key)][0] == b"warc-content"
+    assert read_object(s3, ARCHIVE_ARTIFACTS_BUCKET, reference.key) == b"warc-content"
+    assert reference.key in object_keys(s3, ARCHIVE_ARTIFACTS_BUCKET)
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_s3_artifact_store_reads_object_with_reference(s3: S3Client) -> None:
+    put_object(s3, ARCHIVE_ARTIFACTS_BUCKET, "read-object-key", b"manifest")
+
+    body, reference = await S3ArtifactStore(s3).read_object(
+        ARCHIVE_ARTIFACTS_BUCKET,
+        "read-object-key",
+    )
+
+    assert (body, reference) == (
+        b"manifest",
+        ArtifactReference(
+            bucket=ARCHIVE_ARTIFACTS_BUCKET,
+            key="read-object-key",
+            sha256=hashlib.sha256(b"manifest").hexdigest(),
+            size_bytes=len(b"manifest"),
+        ),
+    )
+
+
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_s3_artifact_store_rejects_files_outside_attempt_directory(
     tmp_path: Path,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     store = S3ArtifactStore(s3, tmp_path)
 

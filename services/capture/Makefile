@@ -5,7 +5,7 @@ install:
 
 
 test-infra-up:
-	docker compose up -d --wait dynamodb rabbitmq
+	docker compose up -d --wait dynamodb minio rabbitmq
 
 test-infra-down:
 	docker compose down
@@ -17,6 +17,9 @@ test-unit:
 
 test-integration:
 	CAPTURE_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
+		CAPTURE_S3_ENDPOINT_URL=http://localhost:9000 \
+		CAPTURE_AWS_ACCESS_KEY_ID=minio \
+		CAPTURE_AWS_SECRET_ACCESS_KEY=minio-secret \
 		CAPTURE_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
 		CAPTURE_CONTRACTS_DIR=../../contracts \
 		uv run pytest -m integration

@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from support.clock import Clock
 from support.domain import (
     frontier_item,
     seed_frontier,
@@ -18,7 +18,7 @@ from adapters.persistence.dynamodb.task import (
 
 @pytest.mark.integration
 async def test_claim_sets_new_fence_for_pending_task(
-    dynamodb: DynamoDBClient, clock: FakeClock
+    dynamodb: DynamoDBClient, clock: Clock
 ) -> None:
     seed_run(dynamodb)
 
@@ -63,7 +63,7 @@ async def test_claim_does_not_replace_an_active_attempt(dynamodb: DynamoDBClient
 @pytest.mark.integration
 async def test_expired_claim_is_reclaimed_with_a_higher_fence(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
 
@@ -109,7 +109,7 @@ async def test_claim_requires_an_open_archive_run(dynamodb: DynamoDBClient) -> N
 
 @pytest.mark.integration
 async def test_renewal_extends_lease_preserving_owner_and_fence(
-    dynamodb: DynamoDBClient, clock: FakeClock
+    dynamodb: DynamoDBClient, clock: Clock
 ) -> None:
     seed_run(dynamodb)
 

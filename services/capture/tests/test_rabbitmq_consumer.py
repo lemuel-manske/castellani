@@ -16,7 +16,8 @@ from aio_pika.abc import (
 
 from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
-from adapters.messaging.rabbitmq.topology import (
+from application.capture.page_tasks import PageTaskProcessor
+from topology.messaging import (
     CAPTURE_DEAD_QUEUE,
     CAPTURE_EXCHANGE_NAME,
     CAPTURE_PAGE_EVENT,
@@ -24,7 +25,6 @@ from adapters.messaging.rabbitmq.topology import (
     CAPTURE_PAGE_RETRY_QUEUE,
     MAX_DELIVERY_RETRIES,
 )
-from application.capture.page_tasks import PageTaskProcessor
 from utils.fn import noop
 
 

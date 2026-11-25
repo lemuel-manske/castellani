@@ -10,7 +10,7 @@ Capture executes page-level web captures for Castellani. Its distributed frontie
 Install the matching Playwright browser with `uv run playwright install chromium`.
 
 - `make install`: download dependencies.
-- `make test-infra-up`: start isolated DynamoDB Local and RabbitMQ.
+- `make test-infra-up`: start isolated DynamoDB Local, MinIO, and RabbitMQ.
 - `make test-infra-down`: stop local dependencies.
 - `make run-worker`: start the Capture worker API and background worker runtime.
 - `make run-login`: start the dedicated interactive-login manager.

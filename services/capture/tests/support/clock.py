@@ -1,4 +1,4 @@
-class FakeClock:
+class Clock:
     def __init__(self, now: float = 1_800_000_000.0) -> None:
         self.now = now
 

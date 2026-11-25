@@ -13,6 +13,10 @@ class InvalidReservationRenewal(ValueError):
     """Raised when a reservation renewal violates ownership or lease invariants."""
 
 
+class CaptureReservationLostError(RuntimeError):
+    """Raised when a reservation can no longer be renewed by its owner."""
+
+
 @dataclass(frozen=True)
 class CaptureReservation:
     """A fenced, time-limited reservation of one global browser-capacity slot."""

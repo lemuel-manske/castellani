@@ -15,9 +15,8 @@ from capture.browser import (
 from capture.browser.recording import PyWBRecorder
 from utils.io import read_gzip_files
 
-pytestmark = pytest.mark.integration
 
-
+@pytest.mark.integration
 async def test_capture_follows_redirect(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -30,6 +29,7 @@ async def test_capture_follows_redirect(local_site: LocalSite, tmp_path: Path) -
     )
 
 
+@pytest.mark.integration
 async def test_capture_fails_when_navigation_response_is_interrupted(
     local_site: LocalSite,
     tmp_path: Path,
@@ -50,6 +50,7 @@ async def test_capture_fails_when_navigation_response_is_interrupted(
     assert error.value.reason_code == CaptureFailureCode.NAVIGATION_FAILED
 
 
+@pytest.mark.integration
 async def test_cancellation_stops_capture_recorder(
     local_site: LocalSite,
     tmp_path: Path,
@@ -88,6 +89,7 @@ async def test_cancellation_stops_capture_recorder(
     assert all(code is not None for code in stopped_process_codes)
 
 
+@pytest.mark.integration
 async def test_capture_warc_segments_are_valid_gzip_records(
     local_site: LocalSite,
     tmp_path: Path,
@@ -104,6 +106,7 @@ async def test_capture_warc_segments_are_valid_gzip_records(
         assert b"WARC-Type: request" in content or b"WARC-Type: response" in content
 
 
+@pytest.mark.integration
 async def test_capture_preserves_http_error_response(
     local_site: LocalSite,
     tmp_path: Path,
@@ -115,6 +118,7 @@ async def test_capture_preserves_http_error_response(
     assert capture.warc_files
 
 
+@pytest.mark.integration
 async def test_capture_returns_successful_response(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -122,6 +126,7 @@ async def test_capture_returns_successful_response(local_site: LocalSite, tmp_pa
     assert capture.status_code == 200
 
 
+@pytest.mark.integration
 async def test_capture_extracts_page_title(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -129,6 +134,7 @@ async def test_capture_extracts_page_title(local_site: LocalSite, tmp_path: Path
     assert capture.title == "Recorder acceptance page"
 
 
+@pytest.mark.integration
 async def test_capture_discovers_page_links(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -136,6 +142,7 @@ async def test_capture_discovers_page_links(local_site: LocalSite, tmp_path: Pat
     assert any(url.endswith("/next") for url in capture.discovered_urls)
 
 
+@pytest.mark.integration
 async def test_capture_produces_warc_artifacts(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -143,6 +150,7 @@ async def test_capture_produces_warc_artifacts(local_site: LocalSite, tmp_path: 
     assert capture.warc_files
 
 
+@pytest.mark.integration
 async def test_capture_records_request_record(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -152,6 +160,7 @@ async def test_capture_records_request_record(local_site: LocalSite, tmp_path: P
     assert b"WARC-Type: request" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_response_record(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -161,6 +170,7 @@ async def test_capture_records_response_record(local_site: LocalSite, tmp_path: 
     assert b"WARC-Type: response" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_html_document(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -170,6 +180,7 @@ async def test_capture_records_html_document(local_site: LocalSite, tmp_path: Pa
     assert b"Recorder acceptance page" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_stylesheet(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -179,6 +190,7 @@ async def test_capture_records_stylesheet(local_site: LocalSite, tmp_path: Path)
     assert b"site.css" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_script(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -188,6 +200,7 @@ async def test_capture_records_script(local_site: LocalSite, tmp_path: Path) -> 
     assert b"app.js" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_image(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -197,6 +210,7 @@ async def test_capture_records_image(local_site: LocalSite, tmp_path: Path) -> N
     assert b"pixel.svg" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_download(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/start", tmp_path)
     local_site.stop()
@@ -206,6 +220,7 @@ async def test_capture_records_download(local_site: LocalSite, tmp_path: Path) -
     assert DOWNLOAD.encode() in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_redirected_download(
     local_site: LocalSite,
     tmp_path: Path,
@@ -226,6 +241,7 @@ async def test_capture_records_redirected_download(
     assert DOWNLOAD.encode() in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_direct_download(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/assets/download.bin", tmp_path)
     local_site.stop()
@@ -238,6 +254,7 @@ async def test_capture_records_direct_download(local_site: LocalSite, tmp_path: 
     assert DOWNLOAD.encode() in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_redirected_pdf(
     local_site: LocalSite,
     tmp_path: Path,
@@ -258,6 +275,7 @@ async def test_capture_records_redirected_pdf(
     assert b"%PDF-1.4" in warc_content
 
 
+@pytest.mark.integration
 async def test_capture_records_direct_pdf(local_site: LocalSite, tmp_path: Path) -> None:
     capture = await capture_local_page(f"{local_site.base_url}/assets/document.pdf", tmp_path)
     local_site.stop()

@@ -5,15 +5,16 @@ import aio_pika
 import pytest
 from aio_pika.abc import AbstractRobustConnection
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from mypy_boto3_s3.client import S3Client
+from support.clock import Clock
 from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamodb
 from support.recording import LocalSite, start_local_site
-from support.s3 import FakeS3
+from support.s3 import cleanup_s3, new_s3_client, setup_s3
 
 
 @pytest.fixture
-def clock() -> Iterator[FakeClock]:
-    clock = FakeClock()
+def clock() -> Iterator[Clock]:
+    clock = Clock()
 
     try:
         yield clock
@@ -54,8 +55,15 @@ async def rabbitmq() -> AsyncIterator[AbstractRobustConnection]:
 
 
 @pytest.fixture
-def s3() -> FakeS3:
-    return FakeS3()
+def s3() -> Iterator[S3Client]:
+    client = new_s3_client()
+
+    setup_s3(client)
+
+    try:
+        yield client
+    finally:
+        cleanup_s3(client)
 
 
 @pytest.fixture(autouse=True)

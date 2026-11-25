@@ -13,6 +13,7 @@ jobs:
 
     env:
       DYNAMODB_ENDPOINT_URL: http://localhost:8000
+      S3_ENDPOINT_URL: http://localhost:9000
       RABBITMQ_URL: amqp://castellani:castellani@localhost:5672/
 
     services:
@@ -27,6 +28,24 @@ jobs:
           --health-interval 5s
           --health-timeout 2s
           --health-retries 20
+
+      minio:
+        image: docker.io/pgsty/silo:RELEASE.2026-11-12T00-00-00Z
+
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio-secret
+
+        ports:
+          - 9000:9000
+
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 5s
+          --health-timeout 2s
+          --health-retries 20
+
+        command: server /data
 
       rabbitmq:
         image: rabbitmq:4.1-management

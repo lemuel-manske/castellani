@@ -1,7 +1,6 @@
-from datetime import UTC, datetime
-
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
+from mypy_boto3_s3.client import S3Client
 from support.domain import (
     complete_frontier,
     fail_frontier,
@@ -10,12 +9,10 @@ from support.domain import (
     seed_snapshot,
     set_run_publication,
 )
-from support.s3 import FakeS3
+from support.s3 import put_object
 
-from adapters.persistence.dynamodb.archive import (
-    DynamoDBArchiveRetrieval,
-    encode_cursor,
-)
+from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
+from adapters.persistence.dynamodb.queries.archive import encode_cursor
 from domain.capture import (
     ArchivePage,
     InvalidArchiveCursor,
@@ -23,20 +20,21 @@ from domain.capture import (
     SnapshotReference,
     WACZRangeNotSatisfiable,
 )
+from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from utils.io import collect
 
 
 @pytest.mark.integration
 async def test_list_pages_returns_pending_page(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_frontier(dynamodb)
 
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     listing = await retrieval.list_pages("archive-1", 25, None)
@@ -48,7 +46,7 @@ async def test_list_pages_returns_pending_page(
 @pytest.mark.integration
 async def test_list_pages_maps_completed_page_to_captured(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_frontier(dynamodb)
     complete_frontier(dynamodb)
@@ -56,7 +54,7 @@ async def test_list_pages_maps_completed_page_to_captured(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     listing = await retrieval.list_pages("archive-1", 25, None)
@@ -74,7 +72,7 @@ async def test_list_pages_maps_completed_page_to_captured(
 @pytest.mark.integration
 async def test_list_pages_maps_failed_page_with_error_code(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_frontier(dynamodb)
     fail_frontier(dynamodb)
@@ -82,7 +80,7 @@ async def test_list_pages_maps_failed_page_with_error_code(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     listing = await retrieval.list_pages("archive-1", 25, None)
@@ -99,7 +97,7 @@ async def test_list_pages_maps_failed_page_with_error_code(
 @pytest.mark.integration
 async def test_list_pages_follows_opaque_cursor(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_frontier(dynamodb)
 
@@ -117,7 +115,7 @@ async def test_list_pages_follows_opaque_cursor(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     first = await retrieval.list_pages("archive-1", 1, None)
@@ -134,14 +132,14 @@ async def test_list_pages_follows_opaque_cursor(
 @pytest.mark.integration
 async def test_list_pages_rejects_cursor_from_another_archive(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_frontier(dynamodb)
 
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     cursor = encode_cursor({"archiveId": {"S": "other"}, "urlKey": {"S": "url-1"}})
@@ -153,14 +151,14 @@ async def test_list_pages_rejects_cursor_from_another_archive(
 @pytest.mark.integration
 async def test_read_snapshot_returns_contract_metadata(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_snapshot(dynamodb)
 
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     snapshot = await retrieval.read_snapshot("archive-1", "snapshot-1")
@@ -178,14 +176,14 @@ async def test_read_snapshot_returns_contract_metadata(
 @pytest.mark.integration
 async def test_read_snapshot_ignores_snapshot_from_another_archive(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_snapshot(dynamodb, archive_id="other")
 
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     assert await retrieval.read_snapshot("archive-1", "snapshot-1") is None
@@ -194,14 +192,14 @@ async def test_read_snapshot_ignores_snapshot_from_another_archive(
 @pytest.mark.integration
 async def test_read_wacz_returns_none_before_publication(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
 
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     assert await retrieval.read_wacz("archive-1", None, None) is None
@@ -210,7 +208,7 @@ async def test_read_wacz_returns_none_before_publication(
 @pytest.mark.integration
 async def test_read_wacz_returns_none_until_replay_is_ready(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, replay_status="NOT_READY")
@@ -218,7 +216,7 @@ async def test_read_wacz_returns_none_until_replay_is_ready(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     assert await retrieval.read_wacz("archive-1", None, None) is None
@@ -227,7 +225,7 @@ async def test_read_wacz_returns_none_until_replay_is_ready(
 @pytest.mark.integration
 async def test_read_wacz_returns_none_without_a_package_key(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb)
@@ -235,7 +233,7 @@ async def test_read_wacz_returns_none_without_a_package_key(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     assert await retrieval.read_wacz("archive-1", None, None) is None
@@ -244,7 +242,7 @@ async def test_read_wacz_returns_none_without_a_package_key(
 @pytest.mark.integration
 async def test_read_wacz_streams_published_package(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=PACKAGE_KEY)
@@ -253,7 +251,7 @@ async def test_read_wacz_streams_published_package(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     result = await retrieval.read_wacz("archive-1", None, None)
@@ -261,15 +259,15 @@ async def test_read_wacz_streams_published_package(
     assert result is not None
     assert result.partial is False
     assert result.content_range is None
-    assert result.etag == '"package-1"'
-    assert result.last_modified == "Tue, 24 Nov 2026 10:00:00 GMT"
+    assert result.etag == package_etag(s3)
+    assert result.last_modified is not None
     assert await collect(result.body) == b"0123456789"
 
 
 @pytest.mark.integration
 async def test_read_wacz_delivers_requested_range(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=PACKAGE_KEY)
@@ -278,7 +276,7 @@ async def test_read_wacz_delivers_requested_range(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     result = await retrieval.read_wacz("archive-1", "bytes=2-5", None)
@@ -293,7 +291,7 @@ async def test_read_wacz_delivers_requested_range(
 @pytest.mark.integration
 async def test_read_wacz_delivers_suffix_range(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=PACKAGE_KEY)
@@ -302,7 +300,7 @@ async def test_read_wacz_delivers_suffix_range(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     result = await retrieval.read_wacz("archive-1", "bytes=-4", None)
@@ -313,9 +311,9 @@ async def test_read_wacz_delivers_suffix_range(
 
 
 @pytest.mark.integration
-async def test_read_wacz_ignores_range_with_stale_if_range(
+async def test_read_wacz_honors_range_with_matching_if_range(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=PACKAGE_KEY)
@@ -324,7 +322,29 @@ async def test_read_wacz_ignores_range_with_stale_if_range(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
+    )
+
+    result = await retrieval.read_wacz("archive-1", "bytes=0-1", package_etag(s3))
+
+    assert result is not None
+    assert result.partial is True
+    assert await collect(result.body) == b"01"
+
+
+@pytest.mark.integration
+async def test_read_wacz_ignores_range_with_stale_if_range(
+    dynamodb: DynamoDBClient,
+    s3: S3Client,
+) -> None:
+    seed_run(dynamodb)
+    set_run_publication(dynamodb, package_key=PACKAGE_KEY)
+    put_package(s3)
+
+    retrieval = DynamoDBArchiveRetrieval(
+        client=dynamodb,
+        s3_client=s3,
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     result = await retrieval.read_wacz("archive-1", "bytes=0-1", '"stale"')
@@ -337,7 +357,7 @@ async def test_read_wacz_ignores_range_with_stale_if_range(
 @pytest.mark.integration
 async def test_read_wacz_rejects_invalid_range(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=PACKAGE_KEY)
@@ -346,7 +366,7 @@ async def test_read_wacz_rejects_invalid_range(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     with pytest.raises(InvalidWACZRange):
@@ -356,7 +376,7 @@ async def test_read_wacz_rejects_invalid_range(
 @pytest.mark.integration
 async def test_read_wacz_rejects_unsatisfiable_range(
     dynamodb: DynamoDBClient,
-    s3: FakeS3,
+    s3: S3Client,
 ) -> None:
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=PACKAGE_KEY)
@@ -365,7 +385,7 @@ async def test_read_wacz_rejects_unsatisfiable_range(
     retrieval = DynamoDBArchiveRetrieval(
         client=dynamodb,
         s3_client=s3,
-        artifact_bucket="capture-artifacts",
+        artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
     )
 
     with pytest.raises(WACZRangeNotSatisfiable):
@@ -375,11 +395,9 @@ async def test_read_wacz_rejects_unsatisfiable_range(
 PACKAGE_KEY = "packages/archive-1.wacz"
 
 
-def put_package(s3: FakeS3) -> None:
-    s3.put_object(
-        Bucket="capture-artifacts",
-        Key=PACKAGE_KEY,
-        Body=b"0123456789",
-        ETag='"package-1"',
-        LastModified=datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
-    )
+def put_package(s3: S3Client) -> None:
+    put_object(s3, ARCHIVE_ARTIFACTS_BUCKET, PACKAGE_KEY, b"0123456789")
+
+
+def package_etag(s3: S3Client) -> str:
+    return str(s3.head_object(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Key=PACKAGE_KEY)["ETag"])

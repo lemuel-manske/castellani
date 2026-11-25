@@ -8,11 +8,14 @@ import aio_pika
 import pytest
 from aio_pika.abc import AbstractChannel, AbstractRobustConnection
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from support.clock import Clock
 from support.domain import frontier_item, outbox_item, outbox_items, run_item
 
 from adapters.messaging.rabbitmq.consumer import RabbitMQStartCrawlConsumer
-from adapters.messaging.rabbitmq.topology import (
+from adapters.persistence.dynamodb.run import DynamoDBRunStarter
+from application.capture.start_crawls import StartCrawlProcessor
+from domain.capture import CrawlStarter, StartCrawl, identify_url
+from topology.messaging import (
     CAPTURE_DEAD_QUEUE,
     CAPTURE_PAGE_QUEUE,
     EVENTS_EXCHANGE_NAME,
@@ -20,25 +23,29 @@ from adapters.messaging.rabbitmq.topology import (
     START_CRAWL_QUEUE,
     START_CRAWL_RETRY_QUEUE,
 )
-from adapters.persistence.dynamodb.run import DynamoDBRunStarter
-from application.capture.start_crawls import StartCrawlProcessor
-from domain.capture import CrawlStarter, StartCrawl, identify_url
 
 ARCHIVE_ID = "archive-start-integration"
-SEED_URL = "https://example.org/"
-ALLOWED_ORIGINS = ["https://example.org"]
 COLLECTION_ID = "collection-start"
-NORMALIZER_VERSION = "v1"
-AUTH_GENERATION = 3
 MESSAGE_ID = "message-start-integration"
+
+SEED_URL = "https://example.org/"
 IDENTITY = identify_url(SEED_URL)
+
+ALLOWED_ORIGINS = ["https://example.org"]
+
+NORMALIZER_VERSION = "v1"
+
+AUTH_GENERATION = 3
+
 SEED_MESSAGE_ID = str(
     uuid5(
         NAMESPACE_URL,
         f"capture-page:{ARCHIVE_ID}:{IDENTITY.url_key}",
     )
 )
+
 CLOCK_NOW = 1_800_000_000.0
+
 OCCURRED_AT = datetime.fromtimestamp(CLOCK_NOW, UTC).isoformat().replace("+00:00", "Z")
 
 
@@ -46,7 +53,7 @@ OCCURRED_AT = datetime.fromtimestamp(CLOCK_NOW, UTC).isoformat().replace("+00:00
 async def test_start_crawl_seeds_run_frontier_and_outbox(
     dynamodb: DynamoDBClient,
     rabbitmq: AbstractRobustConnection,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     starter = CountingStarter(DynamoDBRunStarter(client=dynamodb, clock=clock))
     consumer, task, channel = await start_processor(rabbitmq, starter)
@@ -72,7 +79,7 @@ async def test_start_crawl_seeds_run_frontier_and_outbox(
 async def test_start_crawl_dead_letters_unsupported_normalizer_version(
     dynamodb: DynamoDBClient,
     rabbitmq: AbstractRobustConnection,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     starter = CountingStarter(DynamoDBRunStarter(client=dynamodb, clock=clock))
     consumer, task, channel = await start_processor(rabbitmq, starter)
@@ -100,7 +107,7 @@ async def test_start_crawl_dead_letters_unsupported_normalizer_version(
 async def test_start_crawl_redelivery_keeps_one_seed_task(
     dynamodb: DynamoDBClient,
     rabbitmq: AbstractRobustConnection,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     starter = CountingStarter(DynamoDBRunStarter(client=dynamodb, clock=clock))
     consumer, task, channel = await start_processor(rabbitmq, starter)

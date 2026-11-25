@@ -10,6 +10,7 @@ from domain.capture import (
     TaskClaim,
 )
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
+from utils.time import utc
 
 from ..values import number_from_item, optional_number
 
@@ -222,7 +223,7 @@ def _closure_expression(
     values.update(
         {
             ":closed": {"S": "CLOSED"},
-            ":closed_at": {"S": _isoformat(datetime.fromtimestamp(now, UTC))},
+            ":closed_at": {"S": utc(datetime.fromtimestamp(now, UTC))},
             ":pending": {"S": "PENDING"},
         }
     )
@@ -304,14 +305,14 @@ def complete_task_transaction(
     close: bool = False,
 ) -> list[dict[str, Any]]:
     capture = outcome.capture
-    occurred_at = _isoformat(datetime.fromtimestamp(now, UTC))
+    occurred_at = utc(datetime.fromtimestamp(now, UTC))
     captured_at = capture.captured_at
 
     if captured_at.tzinfo is None:
         captured_at = captured_at.replace(tzinfo=UTC)
 
-    captured_at_text = _isoformat(captured_at)
-    artifacts = [_artifact_attribute(item) for item in outcome.warc_artifacts]
+    captured_at_text = utc(captured_at)
+    artifacts = [artifact_attribute(item) for item in outcome.warc_artifacts]
     snapshot_item: dict[str, Any] = {
         "snapshotId": {"S": outcome.snapshot_id},
         "archiveId": {"S": outcome.archive_id},
@@ -434,7 +435,7 @@ def admit_page_transaction(
 ) -> list[dict[str, Any]]:
     archive_id = claim.task.archive_id
     url_key = page.identity.url_key
-    occurred_at = _isoformat(datetime.fromtimestamp(now, UTC))
+    occurred_at = utc(datetime.fromtimestamp(now, UTC))
 
     return [
         {
@@ -541,7 +542,7 @@ def release_task_transaction(
     message_id: str,
     now: float,
 ) -> list[dict[str, Any]]:
-    occurred_at = _isoformat(datetime.fromtimestamp(now, UTC))
+    occurred_at = utc(datetime.fromtimestamp(now, UTC))
 
     return [
         {
@@ -691,7 +692,7 @@ def is_release_message(item: dict[str, Any], claim: TaskClaim) -> bool:
     )
 
 
-def _artifact_attribute(artifact: ArtifactReference) -> dict[str, Any]:
+def artifact_attribute(artifact: ArtifactReference) -> dict[str, Any]:
     values: dict[str, Any] = {
         "bucket": {"S": artifact.bucket},
         "key": {"S": artifact.key},
@@ -703,7 +704,3 @@ def _artifact_attribute(artifact: ArtifactReference) -> dict[str, Any]:
         values["versionId"] = {"S": artifact.version_id}
 
     return {"M": values}
-
-
-def _isoformat(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")

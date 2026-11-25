@@ -6,6 +6,10 @@ from .auth import DEFAULT_AUTH_GENERATION
 from .capture import CaptureOutcome
 
 
+class TaskClaimLostError(RuntimeError):
+    """Raised when a worker no longer owns the current page-task attempt."""
+
+
 class InvalidTaskClaimRenewal(ValueError):
     """Raised when a task claim renewal violates ownership or lease invariants."""
 

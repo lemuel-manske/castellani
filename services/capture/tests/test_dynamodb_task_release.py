@@ -1,6 +1,6 @@
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from support.clock import Clock
 from support.domain import (
     frontier_item,
     outbox_items,
@@ -18,7 +18,7 @@ from adapters.persistence.dynamodb.task import (
 @pytest.mark.integration
 async def test_release_requeues_and_records_capture_page(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb, depth=2)
@@ -62,7 +62,7 @@ async def test_release_requeues_and_records_capture_page(
 @pytest.mark.integration
 async def test_releasing_the_same_claim_twice_is_idempotent(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb, depth=0)
@@ -89,7 +89,7 @@ async def test_releasing_the_same_claim_twice_is_idempotent(
 @pytest.mark.integration
 async def test_stale_claim_cannot_release_reclaimed_task(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb, depth=0)

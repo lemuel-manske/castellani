@@ -8,7 +8,7 @@ from aio_pika.abc import AbstractRobustConnection
 from adapters.messaging.rabbitmq.publisher import (
     RabbitMQMessagePublisher,
 )
-from adapters.messaging.rabbitmq.topology import (
+from topology.messaging import (
     CAPTURE_PAGE_QUEUE,
     CRAWL_COMPLETED_QUEUE,
     PAGE_CAPTURED_QUEUE,
@@ -53,6 +53,9 @@ async def test_publisher_delivers_persistent_message_to_provisioned_queue(
     [
         ("PageCaptured", PAGE_CAPTURED_QUEUE),
         ("CrawlCompleted", CRAWL_COMPLETED_QUEUE),
+        ("ArchivePrepared", CRAWL_COMPLETED_QUEUE),
+        ("ArchivePublished", CRAWL_COMPLETED_QUEUE),
+        ("ArchiveCompensated", CRAWL_COMPLETED_QUEUE),
     ],
 )
 async def test_publisher_routes_events_to_the_events_exchange(

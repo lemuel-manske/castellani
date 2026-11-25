@@ -1,14 +1,9 @@
 from typing import Any
 
-from domain.capture import (
-    DEFAULT_NORMALIZER_VERSION,
-    MANIFEST_SCHEMA_VERSION,
-    ArtifactReference,
-    identify_url,
-)
-from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
+from domain.capture import PACKAGE_PENDING, identify_url
+from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
-from ..values import deserialize_attribute, optional_string, string_from_item
+from ..values import deserialize_attribute
 
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
 _PAGE_SIZE = 100
@@ -65,91 +60,12 @@ def plain_attributes(item: dict[str, Any]) -> dict[str, Any]:
     return {key: deserialize_attribute(value) for key, value in item.items()}
 
 
-def manifest_document(
-    run: dict[str, Any],
-    snapshots: list[dict[str, Any]],
-    frontier: list[dict[str, Any]],
-) -> dict[str, Any]:
-    archive_id = string_from_item(run, "archiveId", "capture run")
-    seed_url = string_from_item(run, "seedUrl", "capture run")
-    created_at = string_from_item(run, "closedAt", "capture run")
-
-    document: dict[str, Any] = {
-        "schemaVersion": MANIFEST_SCHEMA_VERSION,
-        "archiveId": archive_id,
-        "normalizerVersion": optional_string(run, "normalizerVersion")
-        or DEFAULT_NORMALIZER_VERSION,
-        "seedUrl": seed_url,
-        "createdAt": created_at,
-        "snapshots": [snapshot_entry(item) for item in snapshots],
-        "failedPages": [
-            {
-                "urlKey": item["urlKey"],
-                "reasonCode": item.get("failureReason") or "capture_failed",
-            }
-            for item in frontier
-            if item.get("state") == "FAILED"
-        ],
-    }
-
-    collection_id = optional_string(run, "collectionId")
-
-    if collection_id is not None:
-        document["collectionId"] = collection_id
-
-    return document
-
-
 def seed_succeeded(run: dict[str, Any], frontier: list[dict[str, Any]]) -> bool:
-    seed_key = identify_url(string_from_item(run, "seedUrl", "capture run")).url_key
+    seed_key = identify_url(run["seedUrl"]).url_key
 
     return any(
         item.get("urlKey") == seed_key and item.get("state") == "COMPLETED" for item in frontier
     )
-
-
-def snapshot_entry(item: dict[str, Any]) -> dict[str, Any]:
-    entry: dict[str, Any] = {
-        "snapshotId": item["snapshotId"],
-        "urlKey": item["urlKey"],
-        "url": item["url"],
-        "finalUrl": item["finalUrl"],
-        "capturedAt": item["capturedAt"],
-        "warcArtifacts": [artifact_fields(ref) for ref in item["warcArtifacts"]],
-    }
-
-    if "redirectChain" in item:
-        entry["redirectChain"] = item["redirectChain"]
-
-    if "minDepth" in item:
-        entry["minDepth"] = item["minDepth"]
-
-    if "contentType" in item:
-        entry["contentType"] = item["contentType"]
-
-    return entry
-
-
-def artifact_fields(raw: dict[str, Any]) -> dict[str, Any]:
-    reference = ArtifactReference(
-        bucket=raw["bucket"],
-        key=raw["key"],
-        sha256=raw["sha256"],
-        size_bytes=raw["sizeBytes"],
-        version_id=raw.get("versionId"),
-    )
-
-    fields: dict[str, Any] = {
-        "bucket": reference.bucket,
-        "key": reference.key,
-        "sha256": reference.sha256,
-        "sizeBytes": reference.size_bytes,
-    }
-
-    if reference.version_id is not None:
-        fields["versionId"] = reference.version_id
-
-    return fields
 
 
 def is_crawl_completed_message(
@@ -165,3 +81,105 @@ def is_crawl_completed_message(
         and payload.get("archiveId", {}).get("S") == archive_id
         and payload.get("manifestDigest", {}).get("S") == manifest_digest
     )
+
+
+def is_published_manifest(item: dict[str, Any], digest: str) -> bool:
+    return (
+        item.get("manifestStatus", {}).get("S") == "PUBLISHED"
+        and item.get("manifestDigest", {}).get("S") == digest
+    )
+
+
+def dynamodb_artifact_map(artifact: dict[str, Any]) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "bucket": {"S": artifact["bucket"]},
+        "key": {"S": artifact["key"]},
+        "sha256": {"S": artifact["sha256"]},
+        "sizeBytes": {"N": str(artifact["sizeBytes"])},
+    }
+
+    if "versionId" in artifact:
+        values["versionId"] = {"S": artifact["versionId"]}
+
+    return values
+
+
+def envelope_attributes(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "archiveId": {"S": payload["archiveId"]},
+        "manifest": {"M": dynamodb_artifact_map(payload["manifest"])},
+        "manifestDigest": {"S": payload["manifestDigest"]},
+        "seedSucceeded": {"BOOL": payload["seedSucceeded"]},
+        "capturedCount": {"N": str(payload["capturedCount"])},
+        "failedCount": {"N": str(payload["failedCount"])},
+    }
+
+
+def finalize_transaction(
+    archive_id: str,
+    artifact: dict[str, Any],
+    digest: str,
+    occurred_at: str,
+    message_id: str,
+    now: float,
+    seed_ok: bool,
+    captured_count: int,
+    failed_count: int,
+) -> list[dict[str, Any]]:
+    payload: dict[str, Any] = {
+        "archiveId": archive_id,
+        "manifest": artifact,
+        "manifestDigest": digest,
+        "seedSucceeded": seed_ok,
+        "capturedCount": captured_count,
+        "failedCount": failed_count,
+    }
+
+    update_expression = "SET #status = :published, #key = :key, #digest = :digest"
+    names: dict[str, Any] = {
+        "#status": "manifestStatus",
+        "#key": "manifestKey",
+        "#digest": "manifestDigest",
+    }
+    values: dict[str, Any] = {
+        ":pending": {"S": "PENDING"},
+        ":published": {"S": "PUBLISHED"},
+        ":key": {"S": artifact["key"]},
+        ":digest": {"S": digest},
+    }
+
+    if seed_ok:
+        update_expression += ", #package_status = :package_pending"
+        names["#package_status"] = "packageStatus"
+        values[":package_pending"] = {"S": PACKAGE_PENDING}
+
+    return [
+        {
+            "Update": {
+                "TableName": RUNS_TABLE,
+                "Key": {"archiveId": {"S": archive_id}},
+                "UpdateExpression": update_expression,
+                "ConditionExpression": "#status = :pending",
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
+            }
+        },
+        {
+            "Put": {
+                "TableName": OUTBOX_TABLE,
+                "Item": {
+                    "messageId": {"S": message_id},
+                    "correlationId": {"S": archive_id},
+                    "type": {"S": "CrawlCompleted"},
+                    "version": {"N": "1"},
+                    "occurredAt": {"S": occurred_at},
+                    "payload": {"M": envelope_attributes(payload)},
+                    "status": {"S": "PENDING"},
+                    "attempts": {"N": "0"},
+                    "nextAttemptAt": {"N": str(now)},
+                },
+                "ConditionExpression": "attribute_not_exists(#message_id)",
+                "ExpressionAttributeNames": {"#message_id": "messageId"},
+            }
+        },
+    ]

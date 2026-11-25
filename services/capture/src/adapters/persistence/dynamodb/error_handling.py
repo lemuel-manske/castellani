@@ -1,6 +1,10 @@
 from botocore.exceptions import ClientError
 
 
+class ConditionalWriteRejected(RuntimeError):
+    """Raised when a DynamoDB transaction is rejected due to a conditional failure."""
+
+
 def is_conditional_failure(error: ClientError) -> bool:
     response = error.response
 

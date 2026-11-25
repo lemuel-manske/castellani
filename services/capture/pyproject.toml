@@ -14,6 +14,8 @@ dependencies = [
     "pywb==2.11.1",
     "selectolax==0.3.28",
     "uvicorn[standard]==0.34.0",
+    "wacz==0.6.0",
+    "warcio==1.8.2",
     "websockets==17.4",
 ]
 

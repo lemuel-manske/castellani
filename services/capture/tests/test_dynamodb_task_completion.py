@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from support.clock import Clock
 from support.domain import (
     frontier_item,
     outbox_items,
@@ -26,7 +26,7 @@ from domain.capture import (
 @pytest.mark.integration
 async def test_task_completion_commits_snapshot_and_page_captured_once(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb)
@@ -100,7 +100,7 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
 @pytest.mark.integration
 async def test_task_completion_keeps_admission_open_while_pages_remain(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, admitted_pages=2)
     seed_frontier(dynamodb)
@@ -154,7 +154,7 @@ async def test_task_completion_keeps_admission_open_while_pages_remain(
 @pytest.mark.integration
 async def test_task_completion_accepts_the_current_auth_generation(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, auth_generation=1)
     seed_frontier(dynamodb)
@@ -204,7 +204,7 @@ async def test_task_completion_accepts_the_current_auth_generation(
 @pytest.mark.integration
 async def test_task_completion_rejects_a_stale_auth_generation(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, auth_generation=1)
     seed_frontier(dynamodb)
@@ -261,7 +261,7 @@ async def test_task_completion_rejects_a_stale_auth_generation(
 @pytest.mark.integration
 async def test_task_failure_decrements_outstanding_pages(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb)
@@ -292,7 +292,7 @@ async def test_task_failure_decrements_outstanding_pages(
 @pytest.mark.integration
 async def test_task_failure_keeps_admission_open_while_pages_remain(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, admitted_pages=2)
     seed_frontier(dynamodb)
@@ -320,7 +320,7 @@ async def test_task_failure_keeps_admission_open_while_pages_remain(
 @pytest.mark.integration
 async def test_task_completion_notifies_finalizer_when_run_closes(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     closed: list[str] = []
 
@@ -349,7 +349,7 @@ async def test_task_completion_notifies_finalizer_when_run_closes(
 @pytest.mark.integration
 async def test_task_failure_notifies_finalizer_when_run_closes(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     closed: list[str] = []
 

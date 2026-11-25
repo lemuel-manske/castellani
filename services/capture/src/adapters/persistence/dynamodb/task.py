@@ -13,15 +13,21 @@ from domain.capture import (
     CrawlFinalizer,
     DiscoveredPage,
     TaskClaim,
+    TaskClaimLostError,
     TaskRepository,
     identify_discovered_pages,
     new_attempt_id,
 )
 
 from .error_handling import (
-    extract_cancellation_reasons,
+    ConditionalWriteRejected,
     is_conditional_failure,
     is_transaction_canceled,
+)
+from .facilities import (
+    EXPONENTIAL_BACKOFF_ATTEMPTS,
+    EXPONENTIAL_BACKOFF_DELAY,
+    exponential_backoff_transact,
 )
 from .queries.task import (
     admit_page_transaction,
@@ -41,47 +47,6 @@ from .queries.task import (
     renew_task_transaction,
 )
 from .values import number_from_item
-
-EXPONENTIAL_BACKOFF_ATTEMPTS = 5
-EXPONENTIAL_BACKOFF_DELAY = 0.01  # seconds
-
-
-def exponential_backoff_transact(
-    client: Any,
-    items: list[dict[str, Any]],
-    request_token: str | None,
-) -> None:
-    for attempt in range(EXPONENTIAL_BACKOFF_ATTEMPTS):
-        try:
-            request: dict[str, Any] = {"TransactItems": items}
-
-            if request_token is not None:
-                request["ClientRequestToken"] = request_token
-
-            client.transact_write_items(**request)
-
-            return
-        except ClientError as error:
-            if not is_transaction_canceled(error):
-                raise
-
-            codes = extract_cancellation_reasons(error)
-
-            if "ConditionalCheckFailed" in codes:
-                raise ConditionalWriteRejected from error
-
-            if "TransactionConflict" not in codes or attempt == 4:
-                raise
-
-            time.sleep(EXPONENTIAL_BACKOFF_DELAY * (2**attempt))
-
-
-class TaskClaimLostError(RuntimeError):
-    """Raised when a worker no longer owns the current page-task attempt."""
-
-
-class ConditionalWriteRejected(RuntimeError):
-    """Raised when a DynamoDB transaction is rejected due to a conditional failure."""
 
 
 class DynamoDBTaskRepository(TaskRepository):

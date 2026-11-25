@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from support.clock import Clock
 
 from adapters.persistence.dynamodb.alloc import (
     CaptureReservationLostError,
@@ -31,7 +31,7 @@ async def test_capacity_limits_concurrent_reservations(dynamodb: DynamoDBClient)
 
 @pytest.mark.integration
 async def test_reservation_renewal_preserves_its_fence(
-    dynamodb: DynamoDBClient, clock: FakeClock
+    dynamodb: DynamoDBClient, clock: Clock
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
@@ -55,7 +55,7 @@ async def test_reservation_renewal_preserves_its_fence(
 
 @pytest.mark.integration
 async def test_expired_reservation_is_reclaimed_with_a_new_fence(
-    dynamodb: DynamoDBClient, clock: FakeClock
+    dynamodb: DynamoDBClient, clock: Clock
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
@@ -85,7 +85,7 @@ async def test_expired_reservation_is_reclaimed_with_a_new_fence(
 
 @pytest.mark.integration
 async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
-    dynamodb: DynamoDBClient, clock: FakeClock
+    dynamodb: DynamoDBClient, clock: Clock
 ) -> None:
     capacity = DynamoDBCaptureAllocator(
         client=dynamodb,
@@ -110,7 +110,7 @@ async def test_release_is_idempotent_and_stale_release_cannot_free_new_owner(
 
 
 @pytest.mark.integration
-def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient, clock: FakeClock) -> None:
+def test_capacity_rejects_invalid_configuration(dynamodb: DynamoDBClient, clock: Clock) -> None:
     with pytest.raises(ValueError):
         DynamoDBCaptureAllocator(dynamodb, 0, 30, clock)
 

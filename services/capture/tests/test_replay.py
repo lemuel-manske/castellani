@@ -9,9 +9,8 @@ from capture.browser import capture_local_page
 from capture.browser.recording import PyWBReplayServer
 from utils.io import read_gzip_files
 
-pytestmark = pytest.mark.integration
 
-
+@pytest.mark.integration
 async def test_replay_returns_successful_response(
     local_site: LocalSite,
     tmp_path: Path,
@@ -24,6 +23,7 @@ async def test_replay_returns_successful_response(
     assert replay.status_code == 200
 
 
+@pytest.mark.integration
 async def test_replay_executes_page_javascript(
     local_site: LocalSite,
     tmp_path: Path,
@@ -36,6 +36,7 @@ async def test_replay_executes_page_javascript(
     assert replay.page_state == "rendered"
 
 
+@pytest.mark.integration
 async def test_replay_serves_downloaded_resource(
     local_site: LocalSite,
     tmp_path: Path,
@@ -48,6 +49,7 @@ async def test_replay_serves_downloaded_resource(
     assert replay.download_content == DOWNLOAD
 
 
+@pytest.mark.integration
 async def test_replay_applies_recorded_stylesheet(
     local_site: LocalSite,
     tmp_path: Path,
@@ -60,6 +62,7 @@ async def test_replay_applies_recorded_stylesheet(
     assert "sans-serif" in replay.body_font_family
 
 
+@pytest.mark.integration
 async def test_replay_loads_page_image(
     local_site: LocalSite,
     tmp_path: Path,
@@ -72,6 +75,7 @@ async def test_replay_loads_page_image(
     assert replay.image_width == 1
 
 
+@pytest.mark.integration
 async def test_concurrent_captures_replay_only_their_own_pages(
     local_site: LocalSite,
     tmp_path: Path,
@@ -107,6 +111,7 @@ async def test_concurrent_captures_replay_only_their_own_pages(
     )
 
 
+@pytest.mark.integration
 async def test_replay_serves_direct_download(
     local_site: LocalSite,
     tmp_path: Path,
@@ -128,6 +133,7 @@ async def test_replay_serves_direct_download(
         await replay_server.stop()
 
 
+@pytest.mark.integration
 async def test_replay_serves_direct_pdf(
     local_site: LocalSite,
     tmp_path: Path,

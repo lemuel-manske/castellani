@@ -1,6 +1,6 @@
 import pytest
 from mypy_boto3_dynamodb.client import DynamoDBClient
-from support.clock import FakeClock
+from support.clock import Clock
 from support.domain import (
     frontier_item,
     outbox_items,
@@ -20,7 +20,7 @@ from domain.capture import AuthGenerationChanged, identify_url
 @pytest.mark.integration
 async def test_discovery_admission_is_atomic_and_idempotent(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, max_pages=3, admitted_pages=1)
     seed_frontier(dynamodb)
@@ -66,7 +66,7 @@ async def test_discovery_admission_is_atomic_and_idempotent(
 @pytest.mark.integration
 async def test_discovery_admission_never_exceeds_max_pages(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, max_pages=1, admitted_pages=1)
     seed_frontier(dynamodb)
@@ -97,7 +97,7 @@ async def test_discovery_admission_never_exceeds_max_pages(
 @pytest.mark.integration
 async def test_discovery_admission_rejects_a_stale_parent_claim(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb)
     seed_frontier(dynamodb)
@@ -122,7 +122,7 @@ async def test_discovery_admission_rejects_a_stale_parent_claim(
 @pytest.mark.integration
 async def test_discovery_admission_rejects_a_stale_auth_generation(
     dynamodb: DynamoDBClient,
-    clock: FakeClock,
+    clock: Clock,
 ) -> None:
     seed_run(dynamodb, auth_generation=1)
     seed_frontier(dynamodb)

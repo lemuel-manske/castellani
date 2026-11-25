@@ -12,7 +12,9 @@ from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
 from adapters.artifacts.s3 import S3ArtifactStore
 from adapters.browser.executor import BrowserPageExecutor
 from adapters.messaging.rabbitmq.consumer import (
+    RabbitMQCompensationDecisionConsumer,
     RabbitMQPageTaskConsumer,
+    RabbitMQPublicationDecisionConsumer,
     RabbitMQStartCrawlConsumer,
 )
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
@@ -20,10 +22,13 @@ from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
 from adapters.persistence.dynamodb.finalize import DynamoDBManifestFinalizer
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
+from adapters.persistence.dynamodb.publication import DynamoDBArchivePublicationRepository
 from adapters.persistence.dynamodb.run import DynamoDBRunStarter
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application.capture import OutboxDispatcher, StoredAuthContexts
+from application.capture.archive_decisions import ArchiveDecisionProcessor
+from application.capture.archive_preparation import ArchivePackager
 from application.capture.page_tasks import PageTaskProcessor
 from application.capture.start_crawls import StartCrawlProcessor
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
@@ -55,9 +60,13 @@ class CaptureRuntime:
         self.publisher: RabbitMQMessagePublisher | None = None
         self.page_consumer: RabbitMQPageTaskConsumer | None = None
         self.start_consumer: RabbitMQStartCrawlConsumer | None = None
+        self.publication_consumer: RabbitMQPublicationDecisionConsumer | None = None
+        self.compensation_consumer: RabbitMQCompensationDecisionConsumer | None = None
 
         self.consumer_task: asyncio.Task[None] | None = None
         self.start_consumer_task: asyncio.Task[None] | None = None
+        self.packaging_task: asyncio.Task[None] | None = None
+        self.decisions_task: asyncio.Task[None] | None = None
         self.dispatcher_task: asyncio.Task[None] | None = None
 
         self._ready = False
@@ -70,6 +79,10 @@ class CaptureRuntime:
             and not self.consumer_task.done()
             and self.start_consumer_task is not None
             and not self.start_consumer_task.done()
+            and self.packaging_task is not None
+            and not self.packaging_task.done()
+            and self.decisions_task is not None
+            and not self.decisions_task.done()
             and self.dispatcher_task is not None
             and not self.dispatcher_task.done()
         )
@@ -133,14 +146,16 @@ class CaptureRuntime:
                 ),
             )
 
+            artifacts = S3ArtifactStore(
+                client=self.s3_client,
+                staging_root=Path(self.settings.artifact_directory),
+            )
+
             worker = new_worker(
                 task_repository=task_repository,
                 capture_allocator=allocator,
                 executor=BrowserPageExecutor(),
-                artifacts=S3ArtifactStore(
-                    client=self.s3_client,
-                    staging_root=Path(self.settings.artifact_directory),
-                ),
+                artifacts=artifacts,
                 auth_contexts=auth_contexts,
             )
 
@@ -152,6 +167,21 @@ class CaptureRuntime:
             self.publisher = RabbitMQMessagePublisher(self.connection)
 
             await self.publisher.start()
+
+            publication_repository = DynamoDBArchivePublicationRepository(
+                client=self.dynamodb_client,
+            )
+
+            self.packaging_task = asyncio.create_task(
+                ArchivePackager(
+                    repository=publication_repository,
+                    artifacts=artifacts,
+                    root=Path(self.settings.artifact_directory) / "packages",
+                    lease_duration=self.settings.outbox_lease_duration,
+                    poll_interval=self.settings.outbox_poll_interval,
+                ).run(),
+                name="capture-archive-packager",
+            )
 
             consumer_ready = asyncio.Event()
 
@@ -188,6 +218,28 @@ class CaptureRuntime:
                 timeout=CONSUMER_START_TIMEOUT_SECONDS,
             )
 
+            decisions_ready = asyncio.Event()
+
+            self.publication_consumer = RabbitMQPublicationDecisionConsumer(self.connection)
+            self.compensation_consumer = RabbitMQCompensationDecisionConsumer(self.connection)
+
+            decision_processor = ArchiveDecisionProcessor(
+                repository=publication_repository,
+                artifacts=artifacts,
+                publication_consumer=self.publication_consumer,
+                compensation_consumer=self.compensation_consumer,
+            )
+
+            self.decisions_task = asyncio.create_task(
+                decision_processor.run(ready=decisions_ready),
+                name="capture-archive-decisions",
+            )
+
+            await asyncio.wait_for(
+                decisions_ready.wait(),
+                timeout=CONSUMER_START_TIMEOUT_SECONDS,
+            )
+
             dispatcher = OutboxDispatcher(
                 outbox=DynamoDBOutbox(client=self.dynamodb_client),
                 publisher=self.publisher,
@@ -217,14 +269,27 @@ class CaptureRuntime:
         if self.start_consumer is not None:
             self.start_consumer.stop()
 
-        if self.dispatcher_task is not None and not self.dispatcher_task.done():
-            self.dispatcher_task.cancel()
+        if self.publication_consumer is not None:
+            self.publication_consumer.stop()
+
+        if self.compensation_consumer is not None:
+            self.compensation_consumer.stop()
+
+        for task in (
+            self.packaging_task,
+            self.decisions_task,
+            self.dispatcher_task,
+        ):
+            if task is not None and not task.done():
+                task.cancel()
 
         tasks = [
             task
             for task in (
                 self.consumer_task,
                 self.start_consumer_task,
+                self.packaging_task,
+                self.decisions_task,
                 self.dispatcher_task,
             )
             if task is not None and not task.done()
@@ -241,8 +306,13 @@ class CaptureRuntime:
 
         self.page_consumer = None
         self.start_consumer = None
+        self.publication_consumer = None
+        self.compensation_consumer = None
+
         self.consumer_task = None
         self.start_consumer_task = None
+        self.packaging_task = None
+        self.decisions_task = None
         self.dispatcher_task = None
 
         try:
