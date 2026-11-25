@@ -82,3 +82,26 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
     assert len(events) == 1
     assert events[0]["type"] == {"S": "PageCaptured"}
     assert events[0]["payload"]["M"]["snapshotId"] == {"S": "snapshot-1"}
+
+
+@pytest.mark.integration
+async def test_task_failure_decrements_outstanding_pages(
+    dynamodb: DynamoDBClient,
+    clock: FakeClock,
+) -> None:
+    seed_run(dynamodb)
+    seed_frontier(dynamodb)
+
+    repository = DynamoDBTaskRepository(
+        client=dynamodb,
+        lease_duration=30,
+        clock=clock,
+    )
+
+    claim = await repository.claim("archive-1", "url-1")
+
+    assert claim is not None
+
+    await repository.fail(claim, "navigation_failed", "browser capture failed")
+
+    assert run_item(dynamodb)["outstandingPages"] == {"N": "0"}

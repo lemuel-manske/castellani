@@ -535,16 +535,36 @@ def finish_task(
             "SET #state = :state, #reason = :reason, #message = :message REMOVE #attempt, #lease"
         )
 
-    client.update_item(
-        TableName=FRONTIER_TABLE,
-        Key={"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
-        UpdateExpression=update,
-        ConditionExpression=(
-            "#state = :claimed AND #attempt = :attempt AND #fence = :fence AND #lease > :now"
-        ),
-        ExpressionAttributeNames=names,
-        ExpressionAttributeValues=values,
-    )
+    transaction: list[dict[str, Any]] = [
+        {
+            "Update": {
+                "TableName": FRONTIER_TABLE,
+                "Key": {"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
+                "UpdateExpression": update,
+                "ConditionExpression": (
+                    "#state = :claimed AND #attempt = :attempt "
+                    "AND #fence = :fence AND #lease > :now"
+                ),
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
+            }
+        },
+        {
+            "Update": {
+                "TableName": RUNS_TABLE,
+                "Key": {"archiveId": {"S": archive_id}},
+                "UpdateExpression": "ADD #outstanding :minus_one",
+                "ConditionExpression": ("attribute_exists(#outstanding) AND #outstanding >= :one"),
+                "ExpressionAttributeNames": {"#outstanding": "outstandingPages"},
+                "ExpressionAttributeValues": {
+                    ":minus_one": {"N": "-1"},
+                    ":one": {"N": "1"},
+                },
+            }
+        },
+    ]
+
+    client.transact_write_items(TransactItems=transaction)
 
 
 def is_page_captured_message(
