@@ -1,5 +1,6 @@
 import type { CapturedPageReader } from "../ports/artifacts.js";
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
+import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
 import { indexCapturedPage } from "./indexCapturedPage.js";
@@ -11,9 +12,16 @@ async function processPageCaptured(
   ledger: IndexingLedger,
   capturedPageReader: CapturedPageReader,
   documentWriter: SearchDocumentWriter,
-  leaseDurationSeconds?: number,
-  maxAttempts?: number,
+  leaseDurationSeconds: number,
+  maxAttempts: number,
+  publicationLedger: PublicationLedger,
 ): Promise<PageCapturedResult> {
+  const facts = await publicationLedger.get(event.payload.archiveId);
+
+  if (facts.compensationDecision !== null) {
+    return { status: "COMPLETED", outcome: "UNSUPPORTED" };
+  }
+
   const claimResult = await ledger.claim(
     event.payload.archiveId,
     event.payload.snapshotId,

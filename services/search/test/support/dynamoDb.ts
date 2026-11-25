@@ -8,12 +8,14 @@ import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 import {
   MANIFEST_LEDGER,
+  OUTBOX,
   PUBLICATION_LEDGER,
   INDEXING_LEDGER,
 } from "../../src/adapters/persistence/dynamodb/tables.js";
 
 import { DynamoDBIndexingLedger } from "../../src/adapters/persistence/dynamodb/indexing-ledger.js";
 import { DynamoDBManifestLedger } from "../../src/adapters/persistence/dynamodb/manifest-ledger.js";
+import { DynamoDBOutbox } from "../../src/adapters/persistence/dynamodb/outbox.js";
 import { DynamoDBPublicationLedger } from "../../src/adapters/persistence/dynamodb/publication-ledger.js";
 
 import {
@@ -38,7 +40,11 @@ function createDynamoDbTestSupport() {
   });
 
   const ledger = new DynamoDBIndexingLedger(documentClient);
-  const publicationLedger = new DynamoDBPublicationLedger(documentClient);
+  const outbox = new DynamoDBOutbox(documentClient);
+  const publicationLedger = new DynamoDBPublicationLedger(
+    documentClient,
+    outbox,
+  );
   const manifestLedger = new DynamoDBManifestLedger(documentClient);
 
   return {
@@ -151,6 +157,22 @@ function createDynamoDbTestSupport() {
         { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
         { TableName: MANIFEST_LEDGER },
       );
+
+      await client.send(
+        new CreateTableCommand({
+          TableName: OUTBOX,
+          AttributeDefinitions: [
+            { AttributeName: "messageId", AttributeType: "S" },
+          ],
+          KeySchema: [{ AttributeName: "messageId", KeyType: "HASH" }],
+          BillingMode: "PAY_PER_REQUEST",
+        }),
+      );
+
+      await waitUntilTableExists(
+        { client, maxWaitTime: 20, minDelay: 1, maxDelay: 2 },
+        { TableName: OUTBOX },
+      );
     },
 
     async teardown(): Promise<void> {
@@ -163,6 +185,8 @@ function createDynamoDbTestSupport() {
           ),
 
           client.send(new DeleteTableCommand({ TableName: MANIFEST_LEDGER })),
+
+          client.send(new DeleteTableCommand({ TableName: OUTBOX })),
         ]);
       } finally {
         client.destroy();

@@ -5,9 +5,11 @@ import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { createS3ArtifactReader } from "../adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "../adapters/artifacts/warc.js";
+import { createRabbitMQCompensationPublisher } from "../adapters/messaging/rabbitmq/compensationPublisher.js";
 import { createOpenSearchDocumentReader } from "../adapters/search/opensearch-reader.js";
 import { DynamoDBIndexingLedger } from "../adapters/persistence/dynamodb/indexing-ledger.js";
 import { DynamoDBManifestLedger } from "../adapters/persistence/dynamodb/manifest-ledger.js";
+import { DynamoDBOutbox } from "../adapters/persistence/dynamodb/outbox.js";
 import { DynamoDBPublicationLedger } from "../adapters/persistence/dynamodb/publication-ledger.js";
 import {
   createOpenSearchDocumentWriter,
@@ -25,6 +27,7 @@ import type { PublicationEvent } from "../application/types.js";
 
 import type { SearchSettings } from "./config.js";
 import { SearchWorker } from "./worker.js";
+import { startOutboxWorker } from "./outboxWorker.js";
 
 /** Composes Search infrastructure and coordinates its HTTP and worker lifecycles. */
 class SearchRuntime {
@@ -63,8 +66,14 @@ class SearchRuntime {
       node: this.settings.opensearchUrl,
     });
 
+    const outbox = new DynamoDBOutbox(documentClient);
+
     const indexingLedger = new DynamoDBIndexingLedger(documentClient);
-    const publicationLedger = new DynamoDBPublicationLedger(documentClient);
+
+    const publicationLedger = new DynamoDBPublicationLedger(
+      documentClient,
+      outbox,
+    );
     const manifestLedger = new DynamoDBManifestLedger(documentClient);
 
     const artifactReader = createS3ArtifactReader(s3);
@@ -72,6 +81,10 @@ class SearchRuntime {
     const capturedPageReader = createWarcCapturedPageReader(artifactReader);
 
     const documentWriter = createOpenSearchDocumentWriter(opensearch);
+
+    const compensationPublisher = createRabbitMQCompensationPublisher(
+      this.settings.rabbitmqUrl,
+    );
 
     const searchServer = createSearchServer(
       createOpenSearchDocumentReader(opensearch),
@@ -93,6 +106,7 @@ class SearchRuntime {
             documentWriter,
             this.settings.indexingLeaseDurationSeconds,
             this.settings.indexingMaxAttempts,
+            publicationLedger,
           ),
 
         publicationEvent: (event: PublicationEvent) =>
@@ -106,8 +120,9 @@ class SearchRuntime {
                 documentWriter,
                 this.settings.indexingLeaseDurationSeconds,
                 this.settings.indexingMaxAttempts,
+                publicationLedger,
               )
-            : processPublicationEvent(event, publicationLedger),
+            : processPublicationEvent(event, publicationLedger, documentWriter),
       },
     );
 
@@ -119,6 +134,15 @@ class SearchRuntime {
       await searchServer.listen({
         host: "0.0.0.0",
         port: port,
+      });
+
+      void startOutboxWorker(
+        signal,
+        outbox,
+        documentWriter,
+        compensationPublisher,
+      ).catch((error: unknown) => {
+        console.error("Search outbox worker stopped", error);
       });
 
       await worker.start(signal);

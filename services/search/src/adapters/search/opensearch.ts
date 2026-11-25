@@ -58,6 +58,15 @@ function createOpenSearchDocumentWriter(client: Client): SearchDocumentWriter {
         refresh: "wait_for",
       });
     },
+
+    async deleteArchive(archiveId: string) {
+      await client.deleteByQuery({
+        index: SEARCH_INDEX_NAME,
+        conflicts: "proceed",
+        refresh: true,
+        body: { query: { term: { archiveId } } },
+      });
+    },
   };
 }
 

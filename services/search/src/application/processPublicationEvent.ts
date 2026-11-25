@@ -6,6 +6,9 @@ import {
 } from "../domain.js";
 
 import type { PublicationLedger } from "../ports/publication-ledger.js";
+import type { SearchDocumentWriter } from "../ports/search-index.js";
+
+import { createSearchCompensatedOutboxEntry } from "./searchCompensation.js";
 
 import { PublicationEvent } from "./types.js";
 
@@ -17,6 +20,7 @@ type JustPublicationEvents = Exclude<
 async function processPublicationEvent(
   event: JustPublicationEvents,
   ledger: PublicationLedger,
+  documentWriter: SearchDocumentWriter,
 ): Promise<void> {
   switch (event.type) {
     case ARCHIVE_PUBLICATION_DECIDED_EVENT:
@@ -26,7 +30,13 @@ async function processPublicationEvent(
       await ledger.recordReplayPublished(event.payload, event.messageId);
       return;
     case ARCHIVE_COMPENSATION_DECIDED_EVENT:
-      await ledger.recordCompensationDecision(event.payload, event.messageId);
+      await ledger.recordCompensationDecision(
+        event.payload,
+        event.messageId,
+        createSearchCompensatedOutboxEntry(event.payload),
+      );
+
+      await documentWriter.deleteArchive(event.payload.archiveId);
       return;
   }
 }

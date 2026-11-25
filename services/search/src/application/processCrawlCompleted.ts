@@ -13,6 +13,7 @@ import {
 
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
+import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
 import { validateManifest } from "../contracts.js";
@@ -77,8 +78,9 @@ async function processCrawlCompleted(
   indexingLedger: IndexingLedger,
   capturedPageReader: CapturedPageReader,
   documentWriter: SearchDocumentWriter,
-  leaseDurationSeconds?: number,
-  maxAttempts?: number,
+  leaseDurationSeconds: number,
+  maxAttempts: number,
+  publicationLedger: PublicationLedger,
 ): Promise<void> {
   const payload = event.payload;
 
@@ -123,6 +125,7 @@ async function processCrawlCompleted(
       documentWriter,
       leaseDurationSeconds,
       maxAttempts,
+      publicationLedger,
     );
   }
 }

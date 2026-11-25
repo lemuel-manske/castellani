@@ -3,6 +3,8 @@ import * as amqp from "amqplib";
 import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
 
+import { delay } from "./delay.js";
+
 import type {
   PageCapturedEvent,
   PageCapturedResult,
@@ -77,7 +79,7 @@ class SearchWorker {
         await connection?.close().catch(() => undefined);
       }
 
-      await this.waitForReconnectDelay(signal);
+      await delay(signal, this.settings.reconnectDelayMilliseconds);
     }
   }
 
@@ -95,31 +97,6 @@ class SearchWorker {
 
       connection.once("close", finish);
       connection.once("error", finish);
-      signal.addEventListener("abort", finish, { once: true });
-
-      if (isAborted(signal)) {
-        finish();
-      }
-    });
-  }
-
-  private waitForReconnectDelay(signal: AbortSignal): Promise<void> {
-    if (isAborted(signal)) {
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      const finish = () => {
-        clearTimeout(timeout);
-        signal.removeEventListener("abort", finish);
-        resolve();
-      };
-
-      const timeout = setTimeout(
-        finish,
-        this.settings.reconnectDelayMilliseconds,
-      );
-
       signal.addEventListener("abort", finish, { once: true });
 
       if (isAborted(signal)) {

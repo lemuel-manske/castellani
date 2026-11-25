@@ -2,6 +2,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 function bufferJSON(value: unknown): Buffer {
   return Buffer.from(JSON.stringify(value), "utf8");
 }
@@ -22,4 +26,4 @@ function readJSON(data: string | Uint8Array | Buffer): unknown {
   return value;
 }
 
-export { isRecord, readJSON, bufferJSON };
+export { stringValue, isRecord, readJSON, bufferJSON };

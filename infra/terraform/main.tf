@@ -271,6 +271,18 @@ resource "aws_dynamodb_table" "search_publication_ledger" {
   }
 }
 
+resource "aws_dynamodb_table" "search_outbox" {
+  name         = "search_outbox"
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "messageId"
+
+  attribute {
+    name = "messageId"
+    type = "S"
+  }
+}
+
 resource "aws_dynamodb_table" "search_manifest_ledger" {
   name         = "search_manifest_ledger"
   billing_mode = "PAY_PER_REQUEST"

@@ -4,6 +4,8 @@ import type {
   PublicationIdentity,
 } from "../domain.js";
 
+import type { OutboxEntry } from "./outbox.js";
+
 interface PublicationLedger {
   get(archiveId: string): Promise<PublicationFacts>;
 
@@ -20,6 +22,7 @@ interface PublicationLedger {
   recordCompensationDecision(
     decision: CompensationDecision,
     messageId: string,
+    outboxEntry: OutboxEntry,
   ): Promise<void>;
 }
 

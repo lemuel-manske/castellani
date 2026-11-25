@@ -1,7 +1,9 @@
 import { afterAll, beforeAll } from "vitest";
 
 import {
+  ARCHIVE_COMPENSATION_DECIDED_EVENT,
   CRAWL_COMPLETED_EVENT,
+  type CompensationDecision,
   type CompletionCrawl,
 } from "../../src/domain.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
@@ -48,6 +50,8 @@ const capturedPageReader = createWarcCapturedPageReader(artifactReader);
 const documentReader = createOpenSearchDocumentReader(opensearch.client);
 const documentWriter = createOpenSearchDocumentWriter(opensearch.client);
 
+const compensationDecisions: CompensationDecision[] = [];
+
 const application = {
   processPageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
     return processPageCaptured(
@@ -57,6 +61,7 @@ const application = {
       documentWriter,
       INDEXING_LEASE_DURATION_SECONDS,
       INDEXING_MAX_ATTEMPTS,
+      dynamodb.publicationLedger,
     );
   },
 
@@ -72,13 +77,22 @@ const application = {
       documentWriter,
       INDEXING_LEASE_DURATION_SECONDS,
       INDEXING_MAX_ATTEMPTS,
+      dynamodb.publicationLedger,
     );
   },
 
   processPublicationEvent(
     event: Exclude<PublicationEvent, { type: typeof CRAWL_COMPLETED_EVENT }>,
   ): Promise<void> {
-    return processPublicationEvent(event, dynamodb.publicationLedger);
+    if (event.type === ARCHIVE_COMPENSATION_DECIDED_EVENT) {
+      compensationDecisions.push(event.payload);
+    }
+
+    return processPublicationEvent(
+      event,
+      dynamodb.publicationLedger,
+      documentWriter,
+    );
   },
 
   searchPublishedDocuments(input: SearchPublishedDocumentsInput) {
@@ -218,6 +232,7 @@ function setupIntegrationEnvironment(
 
 export {
   application,
+  compensationDecisions,
   dynamodb,
   nextPageCaptured,
   nextPublicationEvent,

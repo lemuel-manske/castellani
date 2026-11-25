@@ -11,6 +11,7 @@ const ARCHIVE_PUBLICATION_DECIDED_EVENT = "ArchivePublicationDecided";
 const ARCHIVE_PUBLISHED_EVENT = "ArchivePublished";
 const CRAWL_COMPLETED_EVENT = "CrawlCompleted";
 const PAGE_CAPTURED_EVENT = "PageCaptured";
+const SEARCH_COMPENSATED_EVENT = "SearchCompensated";
 
 interface PublicationIdentity {
   archiveId: string;
@@ -22,6 +23,11 @@ interface CompensationDecision {
   archiveId: string;
   decisionVersion: number;
   reasonCode: string;
+}
+
+interface SearchCompensationAck {
+  archiveId: string;
+  decisionVersion: number;
 }
 
 interface CompletionCrawl {
@@ -75,6 +81,7 @@ export {
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
   PAGE_CAPTURED_EVENT,
+  SEARCH_COMPENSATED_EVENT,
 };
 
 export type {
@@ -86,6 +93,7 @@ export type {
   NonTerminalIndexingOutcome,
   PublicationFacts,
   PublicationIdentity,
+  SearchCompensationAck,
   SnapshotLedgerEntry,
   TerminalIndexingOutcome,
 };

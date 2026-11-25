@@ -1,12 +1,20 @@
-import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  GetCommand,
+  TransactWriteCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
 import type {
   CompensationDecision,
   PublicationFacts,
   PublicationIdentity,
 } from "../../../domain.js";
 import { emptyPublicationFacts } from "../../../domain/publication.js";
-import { PUBLICATION_LEDGER } from "./tables.js";
+
+import type { OutboxEntry } from "../../../ports/outbox.js";
+
+import { OUTBOX, PUBLICATION_LEDGER } from "./tables.js";
 
 interface PublicationLedgerItem {
   publicationDecision?: string;
@@ -95,31 +103,55 @@ async function recordReplayPublishedQuery(
   );
 }
 
-async function recordCompensationDecisionQuery(
+async function recordCompensationDecisionTransaction(
   client: DynamoDBDocumentClient,
   decision: CompensationDecision,
   messageId: string,
+  outboxEntry: OutboxEntry,
 ): Promise<void> {
   await client.send(
-    new UpdateCommand({
-      TableName: PUBLICATION_LEDGER,
-      Key: { archiveId: decision.archiveId },
-      UpdateExpression:
-        "SET #compensation = :identity, #processed = list_append(if_not_exists(#processed, :empty), :messages)",
-      ConditionExpression:
-        "attribute_not_exists(#publication) AND attribute_not_exists(#replay) AND (attribute_not_exists(#compensation) OR #compensation = :identity) AND (attribute_not_exists(#processed) OR NOT contains(#processed, :message))",
-      ExpressionAttributeNames: {
-        "#publication": "publicationDecision",
-        "#replay": "replayPublication",
-        "#compensation": "compensationDecision",
-        "#processed": "processedMessageIds",
-      },
-      ExpressionAttributeValues: {
-        ":identity": serializeFact(decision),
-        ":empty": [],
-        ":messages": [messageId],
-        ":message": messageId,
-      },
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: PUBLICATION_LEDGER,
+            Key: { archiveId: decision.archiveId },
+            UpdateExpression:
+              "SET #compensation = :identity, #processed = list_append(if_not_exists(#processed, :empty), :messages)",
+            ConditionExpression:
+              "attribute_not_exists(#publication) AND attribute_not_exists(#replay) AND (attribute_not_exists(#compensation) OR #compensation = :identity) AND (attribute_not_exists(#processed) OR NOT contains(#processed, :message))",
+            ExpressionAttributeNames: {
+              "#publication": "publicationDecision",
+              "#replay": "replayPublication",
+              "#compensation": "compensationDecision",
+              "#processed": "processedMessageIds",
+            },
+            ExpressionAttributeValues: {
+              ":identity": serializeFact(decision),
+              ":empty": [],
+              ":messages": [messageId],
+              ":message": messageId,
+            },
+          },
+        },
+        {
+          Put: {
+            TableName: OUTBOX,
+            Item: {
+              messageId: outboxEntry.messageId,
+              correlationId: outboxEntry.correlationId,
+              type: outboxEntry.type,
+              occurredAt: outboxEntry.occurredAt,
+              envelope: outboxEntry.envelope,
+              cleanupRequired: outboxEntry.cleanupRequired,
+              state: "PENDING",
+              attempts: 0,
+              createdAt: outboxEntry.occurredAt,
+            },
+            ConditionExpression: "attribute_not_exists(messageId)",
+          },
+        },
+      ],
     }),
   );
 }
@@ -178,7 +210,7 @@ function parseFact(value: string | undefined, name: string): unknown {
 export {
   getPublicationEntry,
   getPublicationFacts,
-  recordCompensationDecisionQuery,
+  recordCompensationDecisionTransaction,
   recordPublicationDecisionQuery,
   recordReplayPublishedQuery,
 };
