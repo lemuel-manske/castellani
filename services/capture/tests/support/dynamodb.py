@@ -89,10 +89,7 @@ TABLES: tuple[CreateTableInputTypeDef, ...] = (
 
 
 def new_dynamodb_client() -> DynamoDBClient:
-    endpoint_url = os.environ.get("DYNAMODB_ENDPOINT_URL")
-
-    if not endpoint_url:
-        raise RuntimeError("DYNAMODB_ENDPOINT_URL must be configured for tests")
+    endpoint_url = os.environ.get("CAPTURE_DYNAMODB_ENDPOINT_URL")
 
     return Session().client(
         "dynamodb",

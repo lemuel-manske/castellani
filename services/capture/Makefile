@@ -12,11 +12,13 @@ test-infra-down:
 
 
 test-unit:
-	uv run pytest -m "not integration"
+	CAPTURE_CONTRACTS_DIR=../../contracts \
+		uv run pytest -m "not integration"
 
 test-integration:
-	DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
-		RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
+	CAPTURE_DYNAMODB_ENDPOINT_URL=http://localhost:8000 \
+		CAPTURE_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
+		CAPTURE_CONTRACTS_DIR=../../contracts \
 		uv run pytest -m integration
 
 test: test-unit test-integration
