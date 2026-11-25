@@ -4,14 +4,6 @@ package rabbitmq
 import "github.com/lemuel-manske/castellani/services/coordinator/domain"
 
 const (
-	DeadExchange   = "castellani.dead"
-	EventsExchange = "castellani.events"
-	RetryExchange  = "castellani.retry"
-
-	CoordinatorQueue = "castellani.coordinator"
-	DeadQueue        = "castellani.coordinator.dead"
-	RetryQueue       = "castellani.coordinator.retry"
-
 	HeaderAttempt = "x-coordinator-attempt"
 )
 
@@ -27,7 +19,6 @@ var EventTypes = []string{
 
 type RabbitConsumer struct {
 	url       string
-	exchange  string
 	publisher *RabbitPublisher
 }
 
@@ -57,7 +48,6 @@ type InboundEnvelope struct {
 func NewRabbitConsumer(url string, publisher *RabbitPublisher) *RabbitConsumer {
 	return &RabbitConsumer{
 		url:       url,
-		exchange:  EventsExchange,
 		publisher: publisher,
 	}
 }

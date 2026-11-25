@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	maxDeliveryAttempts    = 5
-	prefetchCount          = 8
-	retryDelayMilliseconds = 5000
+	maxDeliveryAttempts = 5
+	prefetchCount       = 8
 )
 
 func (c *RabbitConsumer) Consume(
@@ -34,10 +33,6 @@ func (c *RabbitConsumer) Consume(
 		return fmt.Errorf("open consumer channel: %w", err)
 	}
 	defer channel.Close()
-
-	if err = c.declareTopology(channel); err != nil {
-		return err
-	}
 
 	if err = channel.Qos(
 		prefetchCount,
@@ -122,112 +117,6 @@ func (c *RabbitConsumer) Consume(
 			}
 		}
 	}
-}
-
-func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
-	for _, exchange := range []string{c.exchange, RetryExchange, DeadExchange} {
-		if err := channel.ExchangeDeclare(
-			exchange,
-			"topic",
-			true,
-			false,
-			false,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"declare exchange %s: %w",
-				exchange,
-				err,
-			)
-		}
-	}
-
-	_, err := channel.QueueDeclare(
-		DeadQueue,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if err != nil {
-		return fmt.Errorf("declare dead letter queue: %w", err)
-	}
-
-	if err = channel.QueueBind(
-		DeadQueue,
-		"#",
-		DeadExchange,
-		false,
-		nil,
-	); err != nil {
-		return fmt.Errorf("bind dead letter queue: %w", err)
-	}
-
-	_, err = channel.QueueDeclare(
-		RetryQueue,
-		true,
-		false,
-		false,
-		false,
-		amqp.Table{
-			"x-message-ttl":          int32(retryDelayMilliseconds),
-			"x-dead-letter-exchange": c.exchange,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("declare retry queue: %w", err)
-	}
-
-	_, err = channel.QueueDeclare(
-		CoordinatorQueue,
-		true,
-		false,
-		false,
-		false,
-		amqp.Table{
-			"x-dead-letter-exchange": DeadExchange,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("declare coordinator queue: %w", err)
-	}
-
-	for _, eventType := range EventTypes {
-		if err := channel.QueueBind(
-			CoordinatorQueue,
-			eventType,
-			c.exchange,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"bind %s: %w",
-				eventType,
-				err,
-			)
-		}
-
-		if err := channel.QueueBind(
-			RetryQueue,
-			eventType,
-			RetryExchange,
-			false,
-			nil,
-		); err != nil {
-			return fmt.Errorf(
-				"bind retry %s: %w",
-				eventType,
-				err,
-			)
-		}
-	}
-
-	return nil
 }
 
 func eventFromMessage(data []byte) (domain.Event, error) {
