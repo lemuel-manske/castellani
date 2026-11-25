@@ -125,11 +125,12 @@ class DynamoDBOutbox(OutboxRepository):
         if not isinstance(claimed, dict):
             raise RuntimeError("DynamoDB did not return the claimed outbox record")
 
-        envelope = message_from_item(cast(dict[str, Any], claimed))
+        message = message_from_item(cast(dict[str, Any], claimed))
 
         return OutboxMessage(
             message_id=message_id,
-            envelope=json.dumps(envelope, separators=(",", ":")).encode(),
+            message_type=message["type"],
+            envelope=json.dumps(message, separators=(",", ":")).encode(),
             lease_token=lease_token,
         )
 

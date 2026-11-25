@@ -18,6 +18,7 @@ from adapters.messaging.rabbitmq.consumer import (
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
+from adapters.persistence.dynamodb.finalize import DynamoDBManifestFinalizer
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
 from adapters.persistence.dynamodb.run import DynamoDBRunStarter
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
@@ -107,9 +108,15 @@ class CaptureRuntime:
                 artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
             )
 
+            finalizer = DynamoDBManifestFinalizer(
+                client=self.dynamodb_client,
+                s3_client=self.s3_client,
+            )
+
             task_repository = DynamoDBTaskRepository(
                 client=self.dynamodb_client,
                 lease_duration=self.settings.lease_duration,
+                on_closed=finalizer,
             )
 
             allocator = DynamoDBCaptureAllocator(

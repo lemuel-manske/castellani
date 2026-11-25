@@ -242,7 +242,11 @@ async def test_consumer_receives_capture_page_from_rabbitmq(
             },
         }
 
-        await publisher.publish(message_id, json.dumps(envelope).encode())
+        await publisher.publish(
+            message_id,
+            CAPTURE_PAGE_EVENT,
+            json.dumps(envelope).encode(),
+        )
 
         await asyncio.wait_for(processed.wait(), timeout=5)
 

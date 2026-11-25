@@ -7,7 +7,7 @@ from domain.capture import OutboxMessage
 
 @pytest.fixture
 def message() -> OutboxMessage:
-    return OutboxMessage("message-1", b'{"type":"CapturePage"}', "lease-1")
+    return OutboxMessage("message-1", "CapturePage", b'{"type":"CapturePage"}', "lease-1")
 
 
 async def test_dispatcher_publishes_then_confirms_a_claimed_message(
@@ -21,7 +21,7 @@ async def test_dispatcher_publishes_then_confirms_a_claimed_message(
 
     assert await dispatcher.dispatch_once()
 
-    assert publisher.published == [(message.message_id, message.envelope)]
+    assert publisher.published == [(message.message_id, message.message_type, message.envelope)]
     assert outbox.confirmed == [message]
     assert outbox.rescheduled == []
 
@@ -37,7 +37,7 @@ async def test_dispatcher_reschedules_a_message_when_publication_fails(
 
     assert await dispatcher.dispatch_once()
 
-    assert publisher.published == [(message.message_id, message.envelope)]
+    assert publisher.published == [(message.message_id, message.message_type, message.envelope)]
     assert outbox.confirmed == []
     assert outbox.rescheduled == [(message, 12)]
 
@@ -68,5 +68,5 @@ async def test_dispatcher_does_not_confirm_when_persistence_confirmation_fails(
     with pytest.raises(RuntimeError, match="DynamoDB unavailable"):
         await dispatcher.dispatch_once()
 
-    assert publisher.published == [(message.message_id, message.envelope)]
+    assert publisher.published == [(message.message_id, message.message_type, message.envelope)]
     assert outbox.rescheduled == []

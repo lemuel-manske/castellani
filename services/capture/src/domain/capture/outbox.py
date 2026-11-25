@@ -7,6 +7,7 @@ class OutboxMessage:
     """A durable message claimed for publication."""
 
     message_id: str
+    message_type: str
     envelope: bytes
     lease_token: str
 

@@ -3,20 +3,56 @@ from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnec
 
 from application.capture.outbox import MessagePublisher
 
-from .topology import CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT
+from .topology import (
+    CAPTURE_EXCHANGE_NAME,
+    CAPTURE_PAGE_EVENT,
+    CRAWL_COMPLETED_EVENT,
+    EVENTS_EXCHANGE_NAME,
+    PAGE_CAPTURED_EVENT,
+)
+
+ROUTES = {
+    CAPTURE_PAGE_EVENT: (CAPTURE_EXCHANGE_NAME, CAPTURE_PAGE_EVENT),
+    PAGE_CAPTURED_EVENT: (EVENTS_EXCHANGE_NAME, PAGE_CAPTURED_EVENT),
+    CRAWL_COMPLETED_EVENT: (EVENTS_EXCHANGE_NAME, CRAWL_COMPLETED_EVENT),
+}
 
 
 class RabbitMQMessagePublisher(MessagePublisher):
-    """Publishes persistent Capture command envelopes with broker confirms."""
+    """Publishes persistent outbox envelopes to their provisioned exchanges."""
 
     def __init__(self, connection: AbstractRobustConnection) -> None:
         self.connection = connection
 
         self.channel: AbstractChannel | None = None
-        self.exchange: AbstractExchange | None = None
+        self.capture_exchange: AbstractExchange | None = None
+        self.events_exchange: AbstractExchange | None = None
 
-    async def publish(self, message_id: str, envelope: bytes) -> None:
-        if self.exchange is None:
+    @property
+    def is_started(self) -> bool:
+        return (
+            self.channel is not None
+            and self.capture_exchange is not None
+            and self.events_exchange is not None
+        )
+
+    async def publish(self, message_id: str, message_type: str, envelope: bytes) -> None:
+        if not self.is_started:
+            raise RuntimeError("RabbitMQ publisher has not been started")
+
+        if message_type not in ROUTES:
+            raise RuntimeError(f"unsupported outbox message type: {message_type}")
+
+        exchange_name, routing_key = ROUTES[message_type]
+
+        exchanges = {
+            CAPTURE_EXCHANGE_NAME: self.capture_exchange,
+            EVENTS_EXCHANGE_NAME: self.events_exchange,
+        }
+
+        exchange = exchanges[exchange_name]
+
+        if exchange is None:
             raise RuntimeError("RabbitMQ publisher has not been started")
 
         message = aio_pika.Message(
@@ -26,9 +62,9 @@ class RabbitMQMessagePublisher(MessagePublisher):
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         )
 
-        await self.exchange.publish(
+        await exchange.publish(
             message,
-            routing_key=CAPTURE_PAGE_EVENT,
+            routing_key=routing_key,
             mandatory=True,
         )
 
@@ -38,11 +74,13 @@ class RabbitMQMessagePublisher(MessagePublisher):
             on_return_raises=True,
         )
 
-        self.exchange = await self.channel.get_exchange(CAPTURE_EXCHANGE_NAME)
+        self.capture_exchange = await self.channel.get_exchange(CAPTURE_EXCHANGE_NAME)
+        self.events_exchange = await self.channel.get_exchange(EVENTS_EXCHANGE_NAME)
 
     async def close(self) -> None:
         if self.channel is not None and not self.channel.is_closed:
             await self.channel.close()
 
         self.channel = None
-        self.exchange = None
+        self.capture_exchange = None
+        self.events_exchange = None

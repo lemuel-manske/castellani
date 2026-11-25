@@ -31,6 +31,7 @@ async def test_claim_returns_due_message_and_acquires_delivery_lease(
     assert message is not None
 
     assert message.message_id == "message-1"
+    assert message.message_type == "CapturePage"
     assert message.lease_token == "lease-1"
 
     assert json.loads(message.envelope) == {

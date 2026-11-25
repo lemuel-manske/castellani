@@ -1,3 +1,4 @@
+import json
 from typing import cast
 
 import aio_pika
@@ -7,7 +8,11 @@ from aio_pika.abc import AbstractRobustConnection
 from adapters.messaging.rabbitmq.publisher import (
     RabbitMQMessagePublisher,
 )
-from adapters.messaging.rabbitmq.topology import CAPTURE_PAGE_QUEUE
+from adapters.messaging.rabbitmq.topology import (
+    CAPTURE_PAGE_QUEUE,
+    CRAWL_COMPLETED_QUEUE,
+    PAGE_CAPTURED_QUEUE,
+)
 
 
 @pytest.mark.integration
@@ -24,9 +29,9 @@ async def test_publisher_delivers_persistent_message_to_provisioned_queue(
     await queue.purge()
 
     try:
-        assert publisher.exchange is not None
+        assert publisher.is_started
 
-        await publisher.publish("message-1", b'{"type":"CapturePage"}')
+        await publisher.publish("message-1", "CapturePage", b'{"type":"CapturePage"}')
 
         received = await queue.get(timeout=5, fail=True)
 
@@ -42,8 +47,47 @@ async def test_publisher_delivers_persistent_message_to_provisioned_queue(
         await publisher.close()
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("message_type", "queue_name"),
+    [
+        ("PageCaptured", PAGE_CAPTURED_QUEUE),
+        ("CrawlCompleted", CRAWL_COMPLETED_QUEUE),
+    ],
+)
+async def test_publisher_routes_events_to_the_events_exchange(
+    rabbitmq: AbstractRobustConnection,
+    message_type: str,
+    queue_name: str,
+) -> None:
+    publisher = RabbitMQMessagePublisher(rabbitmq)
+
+    await publisher.start()
+
+    channel = await rabbitmq.channel()
+    queue = await channel.get_queue(queue_name)
+
+    await queue.purge()
+
+    try:
+        envelope = json.dumps({"type": message_type}).encode()
+
+        await publisher.publish("message-2", message_type, envelope)
+
+        received = await queue.get(timeout=5, fail=True)
+
+        assert received.message_id == "message-2"
+        assert received.body == envelope
+
+        await received.ack()
+    finally:
+        await queue.purge()
+        await channel.close()
+        await publisher.close()
+
+
 async def test_publisher_rejects_publication_before_startup() -> None:
     publisher = RabbitMQMessagePublisher(cast(AbstractRobustConnection, object()))
 
     with pytest.raises(RuntimeError, match="has not been started"):
-        await publisher.publish("message-1", b"{}")
+        await publisher.publish("message-1", "CapturePage", b"{}")

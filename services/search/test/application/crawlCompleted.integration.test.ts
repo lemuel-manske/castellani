@@ -36,6 +36,8 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
     schemaVersion: 1,
     archiveId,
     collectionId,
+    normalizerVersion: "v1",
+    seedUrl: fixture.event.payload.url,
     createdAt: "2026-11-22T10:00:00.000Z",
     snapshots: [
       {
@@ -48,6 +50,7 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
         warcArtifacts: fixture.event.payload.warcArtifacts,
       },
     ],
+    failedPages: [],
   };
 
   const manifestBytes = bufferJSON(manifest);

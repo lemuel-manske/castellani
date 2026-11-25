@@ -30,10 +30,10 @@ class FailingOutbox(FakeOutbox):
 class FakePublisher:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
-        self.published: list[tuple[str, bytes]] = []
+        self.published: list[tuple[str, str, bytes]] = []
 
-    async def publish(self, message_id: str, envelope: bytes) -> None:
-        self.published.append((message_id, envelope))
+    async def publish(self, message_id: str, message_type: str, envelope: bytes) -> None:
+        self.published.append((message_id, message_type, envelope))
 
         if self.error is not None:
             raise self.error

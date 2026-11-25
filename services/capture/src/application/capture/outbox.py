@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class MessagePublisher(Protocol):
     """Publishes an immutable message envelope to the broker."""
 
-    async def publish(self, message_id: str, envelope: bytes) -> None: ...
+    async def publish(self, message_id: str, message_type: str, envelope: bytes) -> None: ...
 
 
 class OutboxDispatcher:
@@ -47,7 +47,11 @@ class OutboxDispatcher:
             return False
 
         try:
-            await self.publisher.publish(message.message_id, message.envelope)
+            await self.publisher.publish(
+                message.message_id,
+                message.message_type,
+                message.envelope,
+            )
         except Exception:
             logger.exception("failed to publish outbox message %s", message.message_id)
 

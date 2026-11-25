@@ -15,9 +15,11 @@ import type { IndexingLedger } from "../ports/indexing-ledger.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
+import { validateManifest } from "../contracts.js";
+
 import { processPageCaptured } from "./processPageCaptured.js";
 
-import { isManifestDocument, ManifestDocument, Event } from "./types.js";
+import { ManifestDocument, Event } from "./types.js";
 
 async function readArtifact(
   reader: ArtifactObjectReader,
@@ -38,6 +40,10 @@ async function readArtifact(
   }
 
   return data;
+}
+
+function isManifestDocument(value: unknown): value is ManifestDocument {
+  return validateManifest(value);
 }
 
 function parseManifest(data: Buffer, event: CompletionCrawl): ManifestDocument {
