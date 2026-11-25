@@ -1,34 +1,32 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
-import { isPageCapturedEvent } from "../../../application/types.js";
 import type {
   PageCapturedEvent,
   PageCapturedResult,
 } from "../../../application/types.js";
+import { validateMessage } from "../../../contracts.js";
 import { EVENTS_EXCHANGE, PAGE_CAPTURED_TOPOLOGY } from "./topology.js";
-import { readJSON } from "../../../utils.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
 function parsePageCaptured(body: Uint8Array): PageCapturedEvent | null {
-  let value;
+  const message = validateMessage(body, "PageCaptured");
 
-  try {
-    value = readJSON(body);
-  } catch {
+  if (message == null) {
     return null;
   }
 
-  if (!isPageCapturedEvent(value)) {
+  if (message.payload["archiveId"] !== message.correlationId) {
     return null;
   }
 
-  const event = value;
-
-  if (event.payload.archiveId !== event.correlationId) {
-    return null;
-  }
-
-  return event;
+  return {
+    type: "PageCaptured",
+    version: 1,
+    messageId: message.messageId,
+    correlationId: message.correlationId,
+    occurredAt: message.occurredAt,
+    payload: message.payload as unknown as PageCapturedEvent["payload"],
+  };
 }
 
 function deliveryRetryCount(message: ConsumeMessage): number {

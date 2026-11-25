@@ -1,52 +1,63 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
-import {
-  isCompensationDecision,
-  isCompletionCrawl,
-  isPublicationIdentity,
+
+import type {
+  CompensationDecision,
+  CompletionCrawl,
+  PublicationIdentity,
 } from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
+
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
+
+import { validateMessage } from "../../../contracts.js";
+
 import { EVENTS_EXCHANGE, PUBLICATION_TOPOLOGY } from "./topology.js";
-import { readJSON } from "../../../utils.js";
-import { isEventEnvelope } from "../../../application/types.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
 function parsePublicationEvent(body: Uint8Array): PublicationEvent | null {
-  let envelope;
+  const message = validateMessage(body);
 
-  try {
-    envelope = readJSON(body);
-  } catch {
+  if (message == null) {
     return null;
   }
 
-  if (!isEventEnvelope(envelope)) {
+  if (message.payload["archiveId"] !== message.correlationId) {
     return null;
   }
 
-  const payload = envelope.payload;
+  const envelope = {
+    version: 1 as const,
+    messageId: message.messageId,
+    correlationId: message.correlationId,
+    occurredAt: message.occurredAt,
+  };
 
-  if (envelope.type === "ArchivePublicationDecided") {
-    return isPublicationIdentity(payload)
-      ? { ...envelope, type: "ArchivePublicationDecided", payload }
-      : null;
+  if (
+    message.type === "ArchivePublicationDecided" ||
+    message.type === "ArchivePublished"
+  ) {
+    return {
+      ...envelope,
+      type: message.type,
+      payload: message.payload as unknown as PublicationIdentity,
+    };
   }
 
-  if (envelope.type === "ArchivePublished") {
-    return isPublicationIdentity(payload)
-      ? { ...envelope, type: "ArchivePublished", payload }
-      : null;
+  if (message.type === "ArchiveCompensationDecided") {
+    return {
+      ...envelope,
+      type: message.type,
+      payload: message.payload as unknown as CompensationDecision,
+    };
   }
 
-  if (envelope.type === "ArchiveCompensationDecided") {
-    return isCompensationDecision(payload)
-      ? { ...envelope, type: "ArchiveCompensationDecided", payload }
-      : null;
-  }
-
-  if (envelope.type === "CrawlCompleted" && isCompletionCrawl(payload)) {
-    return { ...envelope, type: "CrawlCompleted", payload };
+  if (message.type === "CrawlCompleted") {
+    return {
+      ...envelope,
+      type: message.type,
+      payload: message.payload as unknown as CompletionCrawl,
+    };
   }
 
   return null;

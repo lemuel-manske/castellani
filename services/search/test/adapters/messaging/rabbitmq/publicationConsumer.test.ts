@@ -41,6 +41,9 @@ it("preserves the validated envelope when parsing completion events", () => {
       archiveId: "archive-1",
       manifestDigest: `sha256:${"a".repeat(64)}`,
       manifest,
+      seedSucceeded: true,
+      capturedCount: 1,
+      failedCount: 0,
     },
   };
 
