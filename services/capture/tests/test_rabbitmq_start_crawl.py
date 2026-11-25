@@ -69,6 +69,34 @@ async def test_start_crawl_seeds_run_frontier_and_outbox(
 
 
 @pytest.mark.integration
+async def test_start_crawl_dead_letters_unsupported_normalizer_version(
+    dynamodb: DynamoDBClient,
+    rabbitmq: AbstractRobustConnection,
+    clock: FakeClock,
+) -> None:
+    starter = CountingStarter(DynamoDBRunStarter(client=dynamodb, clock=clock))
+    consumer, task, channel = await start_processor(rabbitmq, starter)
+    envelope = json.loads(start_crawl_envelope())
+    envelope["payload"]["normalizerVersion"] = "v2"
+
+    try:
+        await publish(channel, json.dumps(envelope).encode())
+
+        dead = await channel.get_queue(CAPTURE_DEAD_QUEUE)
+
+        received = await dead.get(timeout=5, fail=True)
+
+        assert json.loads(received.body)["payload"]["normalizerVersion"] == "v2"
+
+        assert starter.calls == 0
+    finally:
+        consumer.stop()
+        await task
+        await purge_queues(channel)
+        await channel.close()
+
+
+@pytest.mark.integration
 async def test_start_crawl_redelivery_keeps_one_seed_task(
     dynamodb: DynamoDBClient,
     rabbitmq: AbstractRobustConnection,

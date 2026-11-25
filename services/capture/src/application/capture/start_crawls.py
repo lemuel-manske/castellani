@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import aclosing
 from typing import Protocol
 
-from domain.capture import CrawlStarter, StartCrawl
+from domain.capture import CrawlStarter, StartCrawl, is_supported_normalizer_version
 
 
 class StartCrawlMessage(Protocol):
@@ -48,6 +48,11 @@ class StartCrawlProcessor:
         async with aclosing(self.consumer.messages(ready=ready)) as messages:
             async for message in messages:
                 if message.retry_exhausted:
+                    await message.dead_letter()
+
+                    continue
+
+                if not is_supported_normalizer_version(message.normalizer_version):
                     await message.dead_letter()
 
                     continue

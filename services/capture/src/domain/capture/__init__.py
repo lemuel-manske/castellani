@@ -26,6 +26,7 @@ from .discovery import DiscoveredPage, identify_discovered_pages
 from .manifest import (
     DEFAULT_NORMALIZER_VERSION,
     MANIFEST_SCHEMA_VERSION,
+    is_supported_normalizer_version,
     manifest_key,
     manifest_message_id,
 )
@@ -74,6 +75,7 @@ __all__ = [
     "WACZRangeNotSatisfiable",
     "identify_discovered_pages",
     "identify_url",
+    "is_supported_normalizer_version",
     "manifest_key",
     "manifest_message_id",
     "new_attempt_id",
