@@ -16,7 +16,9 @@ import (
 const (
 	ContractDirEnv = "COORDINATOR_CONTRACTS_DIR"
 
-	MessagesDir = "messages"
+	DocumentsDir = "documents"
+	MessagesDir  = "messages"
+	TypesDir     = "types"
 
 	SchemaGlob = "*.v1.schema.json"
 )
@@ -119,19 +121,17 @@ func contractFiles() ([]string, error) {
 		return nil, fmt.Errorf("%s is not set", ContractDirEnv)
 	}
 
-	files, err := filepath.Glob(filepath.Join(root, SchemaGlob))
+	var files []string
 
-	if err != nil {
-		return nil, fmt.Errorf("glob shared contracts: %w", err)
+	for _, directory := range []string{DocumentsDir, MessagesDir, TypesDir} {
+		directoryFiles, err := filepath.Glob(filepath.Join(root, directory, SchemaGlob))
+
+		if err != nil {
+			return nil, fmt.Errorf("glob %s contracts: %w", directory, err)
+		}
+
+		files = append(files, directoryFiles...)
 	}
-
-	messageFiles, err := filepath.Glob(filepath.Join(root, MessagesDir, SchemaGlob))
-
-	if err != nil {
-		return nil, fmt.Errorf("glob message contracts: %w", err)
-	}
-
-	files = append(files, messageFiles...)
 
 	sort.Strings(files)
 

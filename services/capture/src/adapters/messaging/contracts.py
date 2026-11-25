@@ -12,7 +12,7 @@ from .types import JSON
 
 CONTRACT_DIR_ENV = "CAPTURE_CONTRACTS_DIR"
 
-MESSAGES_DIR = "messages"
+SCHEMA_DIRS = ("documents", "messages", "types")
 
 SCHEMA_GLOB = "*.v1.schema.json"
 
@@ -72,8 +72,9 @@ def schemas() -> dict[str, JSON]:
     root = Path(os.environ[CONTRACT_DIR_ENV])
 
     paths: list[Path] = []
-    paths.extend(sorted(root.glob(SCHEMA_GLOB)))
-    paths.extend(sorted((root / MESSAGES_DIR).glob(SCHEMA_GLOB)))
+
+    for directory in SCHEMA_DIRS:
+        paths.extend(sorted((root / directory).glob(SCHEMA_GLOB)))
 
     loaded: dict[str, JSON] = {}
 

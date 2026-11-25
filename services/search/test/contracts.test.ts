@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { validateMessage } from "../src/contracts.js";
+import { validateManifest, validateMessage } from "../src/contracts.js";
 import { ARCHIVE_PUBLISHED_EVENT, PAGE_CAPTURED_EVENT } from "../src/domain.js";
 
 function encode(value: unknown): Uint8Array {
@@ -51,4 +51,29 @@ it("rejects a contract message with an unsupported version", () => {
   };
 
   expect(validateMessage(encode(envelope))).toBeNull();
+});
+
+it("accepts a contract-complete archive manifest", () => {
+  expect(
+    validateManifest({
+      schemaVersion: 1,
+      archiveId: "archive-1",
+      normalizerVersion: "v1",
+      seedUrl: "https://example.com/",
+      createdAt: "2026-11-25T12:00:00Z",
+      snapshots: [],
+      failedPages: [],
+    }),
+  ).toBe(true);
+});
+
+it("rejects a manifest missing required contract fields", () => {
+  expect(
+    validateManifest({
+      schemaVersion: 1,
+      archiveId: "archive-1",
+      createdAt: "2026-11-25T12:00:00Z",
+      snapshots: [],
+    }),
+  ).toBe(false);
 });

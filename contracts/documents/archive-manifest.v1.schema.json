@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "archive-manifest.v1.schema.json",
+  "$id": "documents/archive-manifest.v1.schema.json",
   "title": "Immutable final crawl manifest",
   "type": "object",
   "additionalProperties": false,
@@ -58,32 +58,6 @@
     }
   },
   "$defs": {
-    "ArtifactRef": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["bucket", "key", "sha256", "sizeBytes"],
-      "properties": {
-        "bucket": {
-          "type": "string",
-          "minLength": 1
-        },
-        "key": {
-          "type": "string",
-          "minLength": 1
-        },
-        "versionId": {
-          "type": "string"
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "sizeBytes": {
-          "type": "integer",
-          "minimum": 0
-        }
-      }
-    },
     "SnapshotEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -132,7 +106,7 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "$ref": "#/$defs/ArtifactRef"
+            "$ref": "../types/artifact-ref.v1.schema.json"
           }
         }
       }

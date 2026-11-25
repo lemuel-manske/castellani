@@ -46,7 +46,7 @@
           "minLength": 1
         },
         "package": {
-          "$ref": "../archive-manifest.v1.schema.json#/$defs/ArtifactRef"
+          "$ref": "../types/artifact-ref.v1.schema.json"
         },
         "packageDigest": {
           "type": "string",

@@ -10,9 +10,11 @@ const addFormats = require("ajv-formats") as unknown as AddFormats;
 
 const CONTRACT_DIR_ENV = "SEARCH_CONTRACTS_DIR";
 
-const MESSAGES_DIR = "messages";
+const SCHEMA_DIRS = ["documents", "messages", "types"];
 
 const SCHEMA_GLOB = "*.v1.schema.json";
+
+const MANIFEST_SCHEMA_ID = "documents/archive-manifest.v1.schema.json";
 
 interface ValidateFunction {
   (value: unknown): boolean;
@@ -38,15 +40,22 @@ interface ValidatedMessage {
   payload: Record<string, unknown>;
 }
 
-let messageValidators: Map<string, ValidateFunction> | undefined;
+interface ContractSet {
+  ajv: AjvInstance;
+  validators: Map<string, ValidateFunction>;
+}
+
+let contracts: ContractSet | undefined;
 
 function validateMessage(
   body: Uint8Array,
   expectedType?: string,
 ): ValidatedMessage | null {
-  const validators = messageValidators ?? loadValidators();
+  const loaded = contracts ?? loadContracts();
 
-  messageValidators = validators;
+  contracts = loaded;
+
+  const validators = loaded.validators;
 
   const value = readJSON(body);
 
@@ -64,7 +73,7 @@ function validateMessage(
   return value as unknown as ValidatedMessage;
 }
 
-function loadValidators(): Map<string, ValidateFunction> {
+function loadContracts(): ContractSet {
   const directory = process.env[CONTRACT_DIR_ENV];
 
   if (directory === undefined || directory.trim() === "") {
@@ -106,14 +115,19 @@ function loadValidators(): Map<string, ValidateFunction> {
     validators.set(messageType, validator);
   }
 
-  return validators;
+  return { ajv, validators };
 }
 
 function contractPaths(directory: string): string[] {
-  const shared = globSync(join(directory, SCHEMA_GLOB)).sort();
-  const messages = globSync(join(directory, MESSAGES_DIR, SCHEMA_GLOB)).sort();
+  const paths: string[] = [];
 
-  return [...shared, ...messages];
+  for (const schemaDirectory of SCHEMA_DIRS) {
+    paths.push(
+      ...globSync(join(directory, schemaDirectory, SCHEMA_GLOB)).sort(),
+    );
+  }
+
+  return paths;
 }
 
 function readSchema(path: string): Record<string, unknown> {
@@ -144,4 +158,14 @@ function schemaMessageType(
   return type["const"];
 }
 
-export { validateMessage };
+function validateManifest(value: unknown): boolean {
+  const loaded = contracts ?? loadContracts();
+
+  contracts = loaded;
+
+  const validator = loaded.ajv.getSchema(MANIFEST_SCHEMA_ID);
+
+  return validator !== undefined && validator(value);
+}
+
+export { validateManifest, validateMessage };

@@ -48,7 +48,7 @@
           "minLength": 1
         },
         "manifest": {
-          "$ref": "../archive-manifest.v1.schema.json#/$defs/ArtifactRef"
+          "$ref": "../types/artifact-ref.v1.schema.json"
         },
         "manifestDigest": {
           "type": "string",

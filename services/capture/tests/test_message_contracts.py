@@ -47,3 +47,29 @@ def test_message_contracts_validate_start_crawl_from_contract() -> None:
     }
 
     assert validate_message(json.dumps(envelope).encode(), "StartCrawl") == envelope
+
+
+def test_message_contracts_validate_crawl_completed_with_shared_manifest_ref() -> None:
+    envelope = {
+        "messageId": "message-completed",
+        "correlationId": "archive-1",
+        "type": "CrawlCompleted",
+        "version": 1,
+        "occurredAt": "2026-11-25T12:00:00Z",
+        "payload": {
+            "archiveId": "archive-1",
+            "manifest": {
+                "bucket": "castellani-archive-manifests",
+                "key": "manifests/archive-1/manifest.json",
+                "sha256": "a" * 64,
+                "sizeBytes": 128,
+                "versionId": "version-1",
+            },
+            "manifestDigest": "a" * 64,
+            "seedSucceeded": True,
+            "capturedCount": 1,
+            "failedCount": 0,
+        },
+    }
+
+    assert validate_message(json.dumps(envelope).encode(), "CrawlCompleted") == envelope
