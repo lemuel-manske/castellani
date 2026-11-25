@@ -70,7 +70,7 @@ func (c *RabbitConsumer) Consume(
 				return errors.New("coordinator consumer delivery stream closed")
 			}
 
-			event, decodeErr := decodeEvent(delivery.Body)
+			event, decodeErr := eventFromMessage(delivery.Body)
 
 			if decodeErr != nil {
 				if err := delivery.Nack(false, false); err != nil {
@@ -114,8 +114,6 @@ func (c *RabbitConsumer) Consume(
 				delivery.Body,
 				attempts+1,
 			); retryErr != nil {
-				// Preserve the original delivery when retry publication cannot
-				// be confirmed. This may redeliver but cannot lose the event.
 				return fmt.Errorf("schedule retry: %w", retryErr)
 			}
 
@@ -232,24 +230,27 @@ func (c *RabbitConsumer) declareTopology(channel *amqp.Channel) error {
 	return nil
 }
 
-func decodeEvent(data []byte) (domain.Event, error) {
+func eventFromMessage(data []byte) (domain.Event, error) {
+	messageType, err := Validate(data)
+
+	if err != nil || !slices.Contains(EventTypes, messageType) {
+		return domain.Event{}, domain.ErrInvalidEvent
+	}
+
 	var wire InboundEnvelope
 
 	if err := json.Unmarshal(data, &wire); err != nil {
-		return domain.Event{}, fmt.Errorf("decode event: %w", err)
+		return domain.Event{}, domain.ErrInvalidEvent
 	}
 
-	recognized := slices.Contains(EventTypes, wire.Type)
-
-	if !recognized || wire.Version != 1 || wire.MessageID == "" || wire.Payload.ArchiveID == "" ||
-		wire.CorrelationID != wire.Payload.ArchiveID {
+	if wire.CorrelationID != wire.Payload.ArchiveID {
 		return domain.Event{}, domain.ErrInvalidEvent
 	}
 
 	return domain.Event{
 		MessageID:       wire.MessageID,
 		ArchiveID:       wire.Payload.ArchiveID,
-		Type:            wire.Type,
+		Type:            messageType,
 		ManifestDigest:  wire.Payload.ManifestDigest,
 		PackageDigest:   wire.Payload.PackageDigest,
 		DecisionVersion: wire.Payload.DecisionVersion,
