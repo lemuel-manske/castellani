@@ -20,7 +20,7 @@ def test_wacz_endpoint_streams_exact_requested_byte_range(
 ) -> None:
     archive_id = "archive-1"
     package_key = "packages/archive-1.wacz"
-    package = b"PK\x03\x04archive-payload"
+    package = b"PK\\x03\\x04archive-payload"
 
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=package_key)
