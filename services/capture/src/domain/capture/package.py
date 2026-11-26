@@ -66,10 +66,8 @@ class PackageCommitRejected(RuntimeError):
     """Raised when a package cannot be committed to its run."""
 
 
-def package_key(archive_id: str, manifest_digest: str) -> str:
-    package_id = uuid5(NAMESPACE_URL, f"wacz:{archive_id}:{manifest_digest}")
-
-    return f"packages/{quote(archive_id, safe='')}/{manifest_digest}/{package_id}.wacz"
+def package_key(archive_id: str, manifest_digest: str, package_digest: str) -> str:
+    return f"packages/{quote(archive_id, safe='')}/{manifest_digest}/{package_digest}.wacz"
 
 
 def archive_prepared_message_id(archive_id: str, manifest_digest: str) -> str:

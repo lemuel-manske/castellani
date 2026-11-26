@@ -63,7 +63,6 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
                 key="capture-staging/archive-1/url-1/attempt-1/snapshot-1/capture.warc.gz",
                 sha256="a" * 64,
                 size_bytes=128,
-                version_id="version-1",
             ),
         ),
     )
@@ -79,7 +78,12 @@ async def test_task_completion_commits_snapshot_and_page_captured_once(
     assert frontier["snapshotId"] == {"S": "snapshot-1"}
     assert snapshot["archiveId"] == {"S": "archive-1"}
 
-    assert snapshot["warcArtifacts"]["L"][0]["M"]["versionId"] == {"S": "version-1"}
+    assert snapshot["warcArtifacts"]["L"][0]["M"] == {
+        "bucket": {"S": "capture-artifacts"},
+        "key": {"S": "capture-staging/archive-1/url-1/attempt-1/snapshot-1/capture.warc.gz"},
+        "sha256": {"S": "a" * 64},
+        "sizeBytes": {"N": "128"},
+    }
 
     assert run["outstandingPages"] == {"N": "0"}
     assert run["completedPages"] == {"N": "1"}

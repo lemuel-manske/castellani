@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from boto3.session import Session
 from mypy_boto3_s3.client import S3Client
-from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
+from mypy_boto3_s3.type_defs import DeleteTypeDef, ObjectIdentifierTypeDef
 
 from config.environment import (
     CAPTURE_AWS_ACCESS_KEY_ID,
@@ -44,64 +44,38 @@ def setup_s3(client: S3Client) -> None:
         if bucket not in existing:
             client.create_bucket(Bucket=bucket)
 
-        client.put_bucket_versioning(
-            Bucket=bucket,
-            VersioningConfiguration={"Status": "Enabled"},
-        )
-
 
 def cleanup_s3(client: S3Client) -> None:
     for bucket in BUCKETS:
         objects: list[ObjectIdentifierTypeDef] = []
-        pages = client.get_paginator("list_object_versions").paginate(Bucket=bucket)
+        pages = client.get_paginator("list_objects_v2").paginate(Bucket=bucket)
 
         for page in pages:
-            for entry in (*page.get("Versions", ()), *page.get("DeleteMarkers", ())):
-                key = entry.get("Key")
-                version_id = entry.get("VersionId")
+            for item in page.get("Contents", ()):
+                key = item.get("Key")
 
-                if key is None or version_id is None:
-                    continue
-
-                objects.append({"Key": key, "VersionId": version_id})
+                if key is not None:
+                    objects.append({"Key": key})
 
         for offset in range(0, len(objects), DELETE_BATCH_SIZE):
-            client.delete_objects(
-                Bucket=bucket,
-                Delete={"Objects": objects[offset : offset + DELETE_BATCH_SIZE], "Quiet": True},
-            )
+            delete: DeleteTypeDef = {
+                "Objects": objects[offset : offset + DELETE_BATCH_SIZE],
+                "Quiet": True,
+            }
+            client.delete_objects(Bucket=bucket, Delete=delete)
 
 
 def put_object(client: S3Client, bucket: str, key: str, body: bytes) -> dict[str, Any]:
     return cast(dict[str, Any], client.put_object(Bucket=bucket, Key=key, Body=body))
 
 
-def read_object(client: S3Client, bucket: str, key: str, version_id: str | None = None) -> bytes:
-    request: dict[str, Any] = {"Bucket": bucket, "Key": key}
-
-    if version_id is not None:
-        request["VersionId"] = version_id
-
-    body = client.get_object(**request)["Body"]
+def read_object(client: S3Client, bucket: str, key: str) -> bytes:
+    body = client.get_object(Bucket=bucket, Key=key)["Body"]
 
     try:
         return body.read()
     finally:
         body.close()
-
-
-def object_version_ids(client: S3Client, bucket: str, key: str) -> tuple[str, ...]:
-    response = client.list_object_versions(Bucket=bucket, Prefix=key)
-    versions: list[str] = []
-
-    for item in response.get("Versions", ()):
-        item_key = item.get("Key")
-        version_id = item.get("VersionId")
-
-        if item_key == key and version_id is not None:
-            versions.append(version_id)
-
-    return tuple(versions)
 
 
 def object_keys(client: S3Client, bucket: str, prefix: str = "") -> tuple[str, ...]:

@@ -313,7 +313,7 @@ func wipeBucket(
 
 	var objects []s3types.ObjectIdentifier
 
-	paginator := s3.NewListObjectVersionsPaginator(client, &s3.ListObjectVersionsInput{
+	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 	})
 
@@ -321,12 +321,8 @@ func wipeBucket(
 		page, err := paginator.NextPage(ctx)
 		require.NoError(t, err)
 
-		for _, version := range page.Versions {
-			objects = append(objects, objectIdentifier(version.Key, version.VersionId))
-		}
-
-		for _, marker := range page.DeleteMarkers {
-			objects = append(objects, objectIdentifier(marker.Key, marker.VersionId))
+		for _, object := range page.Contents {
+			objects = append(objects, s3types.ObjectIdentifier{Key: object.Key})
 		}
 	}
 
@@ -337,18 +333,6 @@ func wipeBucket(
 		bucket,
 		objects,
 	)
-}
-
-func objectIdentifier(key, versionID *string) s3types.ObjectIdentifier {
-	identifier := s3types.ObjectIdentifier{
-		Key: key,
-	}
-
-	if versionID != nil && aws.ToString(versionID) != "null" {
-		identifier.VersionId = versionID
-	}
-
-	return identifier
 }
 
 func deleteObjects(

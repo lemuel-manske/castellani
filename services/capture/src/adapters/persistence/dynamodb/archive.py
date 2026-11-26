@@ -74,12 +74,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
                 return None
 
             bucket = optional_string(run, "packageBucket") or self.artifact_bucket
-            version = optional_string(run, "packageVersionId") or None
-
             request: dict[str, Any] = {"Bucket": bucket, "Key": key}
-
-            if version:
-                request["VersionId"] = version
 
             head = self.s3_client.head_object(**request)
 

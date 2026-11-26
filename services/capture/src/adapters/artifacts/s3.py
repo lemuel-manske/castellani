@@ -118,7 +118,6 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
                         key=key,
                         sha256=sha256,
                         size_bytes=size_bytes,
-                        version_id=metadata.get("VersionId"),
                     )
                 )
 
@@ -140,17 +139,15 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
         self,
         bucket: str,
         key: str,
-        version_id: str | None = None,
     ) -> tuple[bytes, ArtifactReference]:
         def read() -> tuple[bytes, ArtifactReference]:
-            body = self.read_object_sync(bucket, key, version_id)
+            body = self.read_object_sync(bucket, key)
 
             return body, ArtifactReference(
                 bucket=bucket,
                 key=key,
                 sha256=hashlib.sha256(body).hexdigest(),
                 size_bytes=len(body),
-                version_id=version_id,
             )
 
         return await asyncio.to_thread(read)
@@ -160,7 +157,6 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
             body = self.read_object_sync(
                 reference.bucket,
                 reference.key,
-                reference.version_id,
             )
 
             sha256 = hashlib.sha256(body).hexdigest()
@@ -182,15 +178,11 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
         self,
         bucket: str,
         key: str,
-        version_id: str | None,
     ) -> bytes:
         request: dict[str, Any] = {
             "Bucket": bucket,
             "Key": key,
         }
-
-        if version_id:
-            request["VersionId"] = version_id
 
         body = self.client.get_object(**request)["Body"]
 
@@ -207,8 +199,8 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
     ) -> ArtifactReference:
         def upload() -> ArtifactReference:
             digest = file_digest(path)
-            size_bytes = path.stat().st_size
-            key = package_key(archive_id, manifest_digest)
+
+            key = package_key(archive_id, manifest_digest, digest)
 
             self.client.upload_file(
                 str(path),
@@ -227,6 +219,8 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
             if metadata.get("Metadata", {}).get("sha256") != digest:
                 raise RuntimeError(f"S3 package checksum metadata mismatch for {key}")
 
+            size_bytes = path.stat().st_size
+
             if metadata.get("ContentLength") != size_bytes:
                 raise RuntimeError(f"S3 package size mismatch for {key}")
 
@@ -235,24 +229,15 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
                 key=key,
                 sha256=digest,
                 size_bytes=size_bytes,
-                version_id=metadata.get("VersionId"),
             )
 
         return await asyncio.to_thread(upload)
-
-    async def delete_package(self, archive_id: str, manifest_digest: str) -> None:
-        key = package_key(archive_id, manifest_digest)
-
-        def delete() -> None:
-            delete_versions(self.client, (key,), {key})
-
-        await asyncio.to_thread(delete)
 
     async def delete_archive_objects(self, archive_id: str) -> int:
         def delete() -> int:
             quoted = quote(archive_id, safe="")
 
-            return delete_versions(
+            return delete_objects_by_prefix(
                 self.client,
                 (
                     f"capture-staging/{quoted}/",
@@ -263,60 +248,28 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
         return await asyncio.to_thread(delete)
 
 
-def delete_versions(
-    client: Any,
-    prefixes: tuple[str, ...],
-    keys: set[str] | None = None,
-) -> int:
-    objects: list[dict[str, str]] = []
+def delete_objects_by_prefix(client: Any, prefixes: tuple[str, ...]) -> int:
+    deleted = 0
+    paginator = client.get_paginator("list_objects_v2")
 
     for prefix in prefixes:
-        key_marker: str | None = None
-        version_marker: str | None = None
+        objects: list[dict[str, str]] = []
 
-        while True:
-            request: dict[str, Any] = {
-                "Bucket": ARCHIVE_ARTIFACTS_BUCKET,
-                "Prefix": prefix,
-            }
+        for page in paginator.paginate(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Prefix=prefix):
+            objects.extend(
+                {"Key": item["Key"]}
+                for item in page.get("Contents", ())
+                if item.get("Key") is not None
+            )
 
-            if key_marker:
-                request["KeyMarker"] = key_marker
+        for offset in range(0, len(objects), DELETE_BATCH_SIZE):
+            batch = objects[offset : offset + DELETE_BATCH_SIZE]
 
-            if version_marker:
-                request["VersionIdMarker"] = version_marker
+            client.delete_objects(
+                Bucket=ARCHIVE_ARTIFACTS_BUCKET,
+                Delete={"Objects": batch, "Quiet": True},
+            )
 
-            response = client.list_object_versions(**request)
+            deleted += len(batch)
 
-            for entry in (
-                *response.get("Versions", ()),
-                *response.get("DeleteMarkers", ()),
-            ):
-                if keys is not None and entry["Key"] not in keys:
-                    continue
-
-                objects.append(
-                    {
-                        "Key": entry["Key"],
-                        "VersionId": entry["VersionId"],
-                    }
-                )
-
-            if not response.get("IsTruncated"):
-                break
-
-            key_marker = response.get("NextKeyMarker")
-            version_marker = response.get("NextVersionIdMarker")
-
-            if not key_marker or not version_marker:
-                raise RuntimeError(f"S3 did not return version markers for {prefix}")
-
-    for offset in range(0, len(objects), DELETE_BATCH_SIZE):
-        batch = objects[offset : offset + DELETE_BATCH_SIZE]
-
-        client.delete_objects(
-            Bucket=ARCHIVE_ARTIFACTS_BUCKET,
-            Delete={"Objects": batch, "Quiet": True},
-        )
-
-    return len(objects)
+    return deleted

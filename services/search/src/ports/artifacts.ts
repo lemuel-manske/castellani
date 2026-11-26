@@ -3,7 +3,6 @@ import type { CapturedPage } from "../domain/index.js";
 interface ArtifactReference {
   bucket: string;
   key: string;
-  versionId?: string;
   sha256: string;
   sizeBytes: number;
 }

@@ -15,7 +15,6 @@ class PackageArtifacts(ABC):
         self,
         bucket: str,
         key: str,
-        version_id: str | None = None,
     ) -> tuple[bytes, ArtifactReference]: ...
 
     @abstractmethod
@@ -32,6 +31,3 @@ class PackageArtifacts(ABC):
         archive_id: str,
         manifest_digest: str,
     ) -> ArtifactReference: ...
-
-    @abstractmethod
-    async def delete_package(self, archive_id: str, manifest_digest: str) -> None: ...
