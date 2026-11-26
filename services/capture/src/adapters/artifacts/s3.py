@@ -184,7 +184,6 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
             "Key": key,
         }
 
-
         body = self.client.get_object(**request)["Body"]
 
         try:
