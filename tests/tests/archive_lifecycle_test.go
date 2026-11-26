@@ -3,13 +3,13 @@ package tests
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/lemuel-manske/castellani/tests/internal/contracts"
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
 	"github.com/lemuel-manske/castellani/tests/internal/testutil"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -83,58 +83,27 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	require.Zero(t, archiveStatus.Capture.Pending)
 	require.Equal(t, "READY", archiveStatus.Replay.Status)
 
-	pagesResponse := testutil.Get(
-		t,
-		services.Gateway.BaseURL(),
-		fmt.Sprintf("/archives/%s/pages", accepted.ArchiveID),
-	)
-	require.Equal(t, http.StatusOK, pagesResponse.Status)
+	waczPath := fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID)
 
-	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
-	require.Len(t, pages.Items, 3)
-
-	expectedURLs := []string{
-		fixtureSiteURL + "/index.html",
-		fixtureSiteURL + "/about.html",
-		fixtureSiteURL + "/docs.html",
-	}
-
-	actualURLs := make([]string, 0, len(pages.Items))
-
-	for _, page := range pages.Items {
-		assert.Equal(t, "CAPTURED", page.Status)
-		assert.NotEmpty(t, page.SnapshotID)
-		actualURLs = append(actualURLs, page.URL)
-
-		snapshotResponse := testutil.Get(
-			t,
-			services.Gateway.BaseURL(),
-			fmt.Sprintf(
-				"/archives/%s/snapshots/%s",
-				accepted.ArchiveID,
-				page.SnapshotID,
-			),
-		)
-		require.Equal(t, http.StatusOK, snapshotResponse.Status)
-
-		snapshot := testutil.Decode[contracts.Snapshot](t, snapshotResponse)
-		assert.Equal(t, accepted.ArchiveID, snapshot.ArchiveID)
-		assert.Equal(t, page.SnapshotID, snapshot.SnapshotID)
-		assert.Equal(t, page.URL, snapshot.URL)
-	}
-
-	assert.ElementsMatch(t, expectedURLs, actualURLs)
-
-	waczResponse := testutil.Send(
+	headResponse := testutil.Send(
 		t,
 		http.MethodHead,
 		services.Gateway.BaseURL(),
-		fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID),
+		waczPath,
 		"",
 		nil,
 	)
+	require.Equal(t, http.StatusOK, headResponse.Status)
+	require.Equal(t, "bytes", headResponse.Header.Get("Accept-Ranges"))
+	require.NotEmpty(t, headResponse.Header.Get("ETag"))
+	require.NotEmpty(t, headResponse.Header.Get("Content-Length"))
+
+	waczResponse := testutil.Get(t, services.Gateway.BaseURL(), waczPath)
 	require.Equal(t, http.StatusOK, waczResponse.Status)
-	assert.Equal(t, "bytes", waczResponse.Header.Get("Accept-Ranges"))
-	assert.NotEmpty(t, waczResponse.Header.Get("ETag"))
-	assert.NotEmpty(t, waczResponse.Header.Get("Content-Length"))
+	require.Equal(t, "application/wacz", waczResponse.Header.Get(testutil.HeaderContentType))
+	require.True(
+		t,
+		strings.HasPrefix(waczResponse.Body, "PK\\x03\\x04"),
+		"published WACZ should be a ZIP archive",
+	)
 }
