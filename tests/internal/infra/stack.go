@@ -65,7 +65,11 @@ func start(t *testing.T) Dependencies {
 
 	terraformDir := prepareTerraform(t, root)
 
-	stack = newComposeStack(t, filepath.Join(root, "docker-compose.yaml"))
+	stack = newComposeStack(
+		t,
+		filepath.Join(root, "docker-compose.yaml"),
+		filepath.Join(root, "tests", "docker-compose.e2e.yaml"),
+	)
 
 	stack.WithEnv(stackEnvironment(terraformDir))
 
