@@ -69,7 +69,7 @@ func (c *Client) CreateArchive(
 	}
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-	request.Header.Set(httpx.IdempotencyHeader, key)
+	request.Header.Set(httpx.HeaderIdempotencyKey, key)
 
 	status, rawResponse, err := c.execute(request)
 

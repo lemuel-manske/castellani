@@ -32,7 +32,7 @@ func NewHandler(app application.Application) Handler {
 }
 
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get(httpx.IdempotencyHeader)
+	key := r.Header.Get(httpx.HeaderIdempotencyKey)
 
 	if !httpx.ValidIdempotencyKey(key) {
 		httpx.WriteProblem(w, httpx.NewProblem(
@@ -110,7 +110,7 @@ func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accepted.StatusURL = common.ArchivePathPrefix + url.PathEscape(accepted.ArchiveID)
-	w.Header().Set(httpx.LocationHeader, accepted.StatusURL)
+	w.Header().Set(httpx.HeaderLocation, accepted.StatusURL)
 	httpx.JSON(
 		w,
 		http.StatusAccepted,

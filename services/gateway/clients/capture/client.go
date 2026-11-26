@@ -157,7 +157,7 @@ func (c *Client) CreateSession(
 	}
 
 	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-	request.Header.Set(httpx.IdempotencyHeader, key)
+	request.Header.Set(httpx.HeaderIdempotencyKey, key)
 
 	data, err := c.execute(request, http.StatusCreated)
 

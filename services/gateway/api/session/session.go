@@ -27,7 +27,7 @@ func NewSessionsHandler(app application.Application) SessionsHandler {
 }
 
 func (h SessionsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get(httpx.IdempotencyHeader)
+	key := r.Header.Get(httpx.HeaderIdempotencyKey)
 
 	if !httpx.ValidIdempotencyKey(key) {
 		httpx.WriteProblem(w, httpx.NewProblem(
@@ -79,7 +79,7 @@ func (h SessionsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set(httpx.LocationHeader, common.SessionPathPrefix+url.PathEscape(result.SessionID))
+	w.Header().Set(httpx.HeaderLocation, common.SessionPathPrefix+url.PathEscape(result.SessionID))
 	httpx.JSON(
 		w,
 		http.StatusCreated,
