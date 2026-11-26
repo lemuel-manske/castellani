@@ -1,4 +1,5 @@
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 
 def string_from_item(item: dict[str, Any], key: str, resource: str) -> str:
@@ -39,6 +40,31 @@ def optional_string(item: dict[str, Any], key: str) -> str | None:
     value = item.get(key)
 
     return value["S"] if value else None
+
+
+def serialize_map(value: Mapping[str, object]) -> dict[str, Any]:
+    return {key: serialize_attribute(item) for key, item in value.items()}
+
+
+def serialize_attribute(value: object) -> dict[str, Any]:
+    if isinstance(value, bool):
+        return {"BOOL": value}
+
+    if isinstance(value, str):
+        return {"S": value}
+
+    if isinstance(value, int):
+        return {"N": str(value)}
+
+    if isinstance(value, dict):
+        return {"M": serialize_map(cast(dict[str, object], value))}
+
+    if isinstance(value, list):
+        return {
+            "L": [serialize_attribute(item) for item in cast(list[object], value)]
+        }
+
+    raise TypeError(f"unsupported DynamoDB message value: {type(value).__name__}")
 
 
 def deserialize_attribute(attribute: dict[str, Any]) -> Any:

@@ -1,9 +1,11 @@
 from typing import Any
 
+from contracts.messages import CRAWL_COMPLETED_EVENT, CrawlCompletedPayload
+from contracts.types import ArtifactReferenceContract
 from domain.capture import PACKAGE_PENDING, identify_url
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
-from ..values import deserialize_attribute
+from ..values import deserialize_attribute, serialize_map
 
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
 _PAGE_SIZE = 100
@@ -76,7 +78,7 @@ def is_crawl_completed_message(
     payload = item.get("payload", {}).get("M", {})
 
     return (
-        item.get("type", {}).get("S") == "CrawlCompleted"
+        item.get("type", {}).get("S") == CRAWL_COMPLETED_EVENT
         and item.get("correlationId", {}).get("S") == archive_id
         and payload.get("archiveId", {}).get("S") == archive_id
         and payload.get("manifestDigest", {}).get("S") == manifest_digest
@@ -90,34 +92,9 @@ def is_published_manifest(item: dict[str, Any], digest: str) -> bool:
     )
 
 
-def dynamodb_artifact_map(artifact: dict[str, Any]) -> dict[str, Any]:
-    values: dict[str, Any] = {
-        "bucket": {"S": artifact["bucket"]},
-        "key": {"S": artifact["key"]},
-        "sha256": {"S": artifact["sha256"]},
-        "sizeBytes": {"N": str(artifact["sizeBytes"])},
-    }
-
-    if "versionId" in artifact:
-        values["versionId"] = {"S": artifact["versionId"]}
-
-    return values
-
-
-def envelope_attributes(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "archiveId": {"S": payload["archiveId"]},
-        "manifest": {"M": dynamodb_artifact_map(payload["manifest"])},
-        "manifestDigest": {"S": payload["manifestDigest"]},
-        "seedSucceeded": {"BOOL": payload["seedSucceeded"]},
-        "capturedCount": {"N": str(payload["capturedCount"])},
-        "failedCount": {"N": str(payload["failedCount"])},
-    }
-
-
 def finalize_transaction(
     archive_id: str,
-    artifact: dict[str, Any],
+    artifact: ArtifactReferenceContract,
     digest: str,
     occurred_at: str,
     message_id: str,
@@ -126,7 +103,7 @@ def finalize_transaction(
     captured_count: int,
     failed_count: int,
 ) -> list[dict[str, Any]]:
-    payload: dict[str, Any] = {
+    payload: CrawlCompletedPayload = {
         "archiveId": archive_id,
         "manifest": artifact,
         "manifestDigest": digest,
@@ -170,10 +147,10 @@ def finalize_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": archive_id},
-                    "type": {"S": "CrawlCompleted"},
+                    "type": {"S": CRAWL_COMPLETED_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": occurred_at},
-                    "payload": {"M": envelope_attributes(payload)},
+                    "payload": {"M": serialize_map(payload)},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},

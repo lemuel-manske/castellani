@@ -1,5 +1,14 @@
 from typing import Any
 
+from adapters.serialization import artifact_document
+from contracts.messages import (
+    ARCHIVE_COMPENSATED_EVENT,
+    ARCHIVE_PREPARED_EVENT,
+    ARCHIVE_PUBLISHED_EVENT,
+    ArchiveCompensatedPayload,
+    ArchivePreparedPayload,
+    ArchivePublishedPayload,
+)
 from domain.capture import (
     DECISION_COMPENSATE,
     DECISION_PUBLISH,
@@ -7,7 +16,6 @@ from domain.capture import (
     PACKAGE_PREPARED,
     PACKAGE_PREPARING,
     REPLAY_READY,
-    ArtifactReference,
     CompensationDecision,
     PendingPackage,
     PreparedPackage,
@@ -15,7 +23,7 @@ from domain.capture import (
 )
 from topology.tables import OUTBOX_TABLE, RUNS_TABLE
 
-from ..values import optional_number, optional_string, string_from_item
+from ..values import optional_number, optional_string, serialize_map, string_from_item
 
 
 def pending_package_scan() -> dict[str, Any]:
@@ -119,6 +127,12 @@ def prepare_package_transaction(
     now: float,
 ) -> list[dict[str, Any]]:
     artifact = prepared.artifact
+    payload: ArchivePreparedPayload = {
+        "archiveId": prepared.archive_id,
+        "package": artifact_document(artifact),
+        "packageDigest": artifact.sha256,
+        "manifestDigest": prepared.manifest_digest,
+    }
 
     return [
         {
@@ -171,17 +185,10 @@ def prepare_package_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": prepared.archive_id},
-                    "type": {"S": "ArchivePrepared"},
+                    "type": {"S": ARCHIVE_PREPARED_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": occurred_at},
-                    "payload": {
-                        "M": {
-                            "archiveId": {"S": prepared.archive_id},
-                            "package": {"M": artifact_map(artifact)},
-                            "packageDigest": {"S": artifact.sha256},
-                            "manifestDigest": {"S": prepared.manifest_digest},
-                        }
-                    },
+                    "payload": {"M": serialize_map(payload)},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},
@@ -198,6 +205,12 @@ def publication_transaction(
     message_id: str,
     now: float,
 ) -> list[dict[str, Any]]:
+    payload: ArchivePublishedPayload = {
+        "archiveId": decision.archive_id,
+        "decisionVersion": decision.decision_version,
+        "packageDigest": decision.package_digest,
+    }
+
     return [
         {
             "Update": {
@@ -232,16 +245,10 @@ def publication_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": decision.archive_id},
-                    "type": {"S": "ArchivePublished"},
+                    "type": {"S": ARCHIVE_PUBLISHED_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": decision.occurred_at},
-                    "payload": {
-                        "M": {
-                            "archiveId": {"S": decision.archive_id},
-                            "decisionVersion": {"N": str(decision.decision_version)},
-                            "packageDigest": {"S": decision.package_digest},
-                        }
-                    },
+                    "payload": {"M": serialize_map(payload)},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},
@@ -278,21 +285,21 @@ def compensation_transaction(
     message_id: str,
     now: float,
 ) -> dict[str, Any]:
+    payload: ArchiveCompensatedPayload = {
+        "archiveId": decision.archive_id,
+        "decisionVersion": decision.decision_version,
+    }
+
     return {
         "Put": {
             "TableName": OUTBOX_TABLE,
             "Item": {
                 "messageId": {"S": message_id},
                 "correlationId": {"S": decision.archive_id},
-                "type": {"S": "ArchiveCompensated"},
+                "type": {"S": ARCHIVE_COMPENSATED_EVENT},
                 "version": {"N": "1"},
                 "occurredAt": {"S": decision.occurred_at},
-                "payload": {
-                    "M": {
-                        "archiveId": {"S": decision.archive_id},
-                        "decisionVersion": {"N": str(decision.decision_version)},
-                    }
-                },
+                "payload": {"M": serialize_map(payload)},
                 "status": {"S": "PENDING"},
                 "attempts": {"N": "0"},
                 "nextAttemptAt": {"N": str(now)},
@@ -303,25 +310,11 @@ def compensation_transaction(
     }
 
 
-def artifact_map(artifact: ArtifactReference) -> dict[str, Any]:
-    values: dict[str, Any] = {
-        "bucket": {"S": artifact.bucket},
-        "key": {"S": artifact.key},
-        "sha256": {"S": artifact.sha256},
-        "sizeBytes": {"N": str(artifact.size_bytes)},
-    }
-
-    if artifact.version_id:
-        values["versionId"] = {"S": artifact.version_id}
-
-    return values
-
-
 def is_prepared_message(item: dict[str, Any], archive_id: str, digest: str) -> bool:
     payload = item.get("payload", {}).get("M", {})
 
     return (
-        item.get("type", {}).get("S") == "ArchivePrepared"
+        item.get("type", {}).get("S") == ARCHIVE_PREPARED_EVENT
         and item.get("correlationId", {}).get("S") == archive_id
         and payload.get("archiveId", {}).get("S") == archive_id
         and payload.get("packageDigest", {}).get("S") == digest
@@ -332,7 +325,7 @@ def is_published_message(item: dict[str, Any], decision: PublicationDecision) ->
     payload = item.get("payload", {}).get("M", {})
 
     return (
-        item.get("type", {}).get("S") == "ArchivePublished"
+        item.get("type", {}).get("S") == ARCHIVE_PUBLISHED_EVENT
         and item.get("correlationId", {}).get("S") == decision.archive_id
         and payload.get("archiveId", {}).get("S") == decision.archive_id
         and payload.get("decisionVersion", {}).get("N") == str(decision.decision_version)
@@ -344,7 +337,7 @@ def is_compensated_message(item: dict[str, Any], decision: CompensationDecision)
     payload = item.get("payload", {}).get("M", {})
 
     return (
-        item.get("type", {}).get("S") == "ArchiveCompensated"
+        item.get("type", {}).get("S") == ARCHIVE_COMPENSATED_EVENT
         and item.get("correlationId", {}).get("S") == decision.archive_id
         and payload.get("archiveId", {}).get("S") == decision.archive_id
         and payload.get("decisionVersion", {}).get("N") == str(decision.decision_version)

@@ -1,6 +1,8 @@
-from typing import Any
+from typing import Any, cast
 
+from contracts.envelope import Envelope
 from topology.tables import OUTBOX_TABLE
+from utils.types import JSON
 
 from ..values import (
     deserialize_attribute,
@@ -139,12 +141,22 @@ def reschedule_message(
     )
 
 
-def message_from_item(item: dict[str, Any]) -> dict[str, Any]:
+def message_from_item(item: dict[str, Any]) -> Envelope[JSON]:
+    version = number_from_item(item, "version", "outbox record")
+
+    if version != 1:
+        raise RuntimeError("DynamoDB outbox record has an unsupported envelope version")
+
+    payload = deserialize_attribute(item.get("payload", {}))
+
+    if not isinstance(payload, dict):
+        raise RuntimeError("DynamoDB outbox record has an invalid envelope payload")
+
     return {
         "messageId": string_from_item(item, "messageId", "outbox record"),
         "correlationId": string_from_item(item, "correlationId", "outbox record"),
         "type": string_from_item(item, "type", "outbox record"),
-        "version": number_from_item(item, "version", "outbox record"),
+        "version": 1,
         "occurredAt": string_from_item(item, "occurredAt", "outbox record"),
-        "payload": deserialize_attribute(item.get("payload", {})),
+        "payload": cast(JSON, payload),
     }

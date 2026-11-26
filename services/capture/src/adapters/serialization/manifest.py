@@ -1,6 +1,7 @@
 import json
 from typing import Any, cast
 
+from contracts.types import ArtifactReferenceContract
 from domain.capture import (
     DEFAULT_NORMALIZER_VERSION,
     MANIFEST_SCHEMA_VERSION,
@@ -62,7 +63,7 @@ def snapshot_entry(item: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
-def artifact_reference(raw: dict[str, Any]) -> ArtifactReference:
+def artifact_reference(raw: ArtifactReferenceContract) -> ArtifactReference:
     version = raw.get("versionId")
 
     return ArtifactReference(
@@ -74,8 +75,8 @@ def artifact_reference(raw: dict[str, Any]) -> ArtifactReference:
     )
 
 
-def artifact_document(reference: ArtifactReference) -> dict[str, Any]:
-    document: dict[str, Any] = {
+def artifact_document(reference: ArtifactReference) -> ArtifactReferenceContract:
+    document: ArtifactReferenceContract = {
         "bucket": reference.bucket,
         "key": reference.key,
         "sha256": reference.sha256,
@@ -120,7 +121,7 @@ def artifact_references(body: bytes, archive_id: str) -> tuple[ArtifactReference
             if not isinstance(raw_artifact, dict):
                 raise ValueError("manifest contains an invalid artifact reference")
 
-            artifact = cast(dict[str, Any], raw_artifact)
+            artifact = cast(ArtifactReferenceContract, raw_artifact)
 
             references.append(artifact_reference(artifact))
 

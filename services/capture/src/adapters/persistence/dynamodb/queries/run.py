@@ -1,8 +1,11 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from contracts.messages import CAPTURE_PAGE_EVENT, CapturePagePayload
 from domain.capture import StartCrawl, identify_url
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE
+
+from ..values import serialize_map
 
 
 def seed_run_transaction(
@@ -39,6 +42,11 @@ def seed_run_transaction(
     if start.normalizer_version is not None:
         run_item["normalizerVersion"] = {"S": start.normalizer_version}
 
+    payload: CapturePagePayload = {
+        "archiveId": start.archive_id,
+        "urlKey": identity.url_key,
+    }
+
     return [
         {
             "Put": {
@@ -72,15 +80,10 @@ def seed_run_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": start.archive_id},
-                    "type": {"S": "CapturePage"},
+                    "type": {"S": CAPTURE_PAGE_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": occurred_at},
-                    "payload": {
-                        "M": {
-                            "archiveId": {"S": start.archive_id},
-                            "urlKey": {"S": identity.url_key},
-                        }
-                    },
+                    "payload": {"M": serialize_map(payload)},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},

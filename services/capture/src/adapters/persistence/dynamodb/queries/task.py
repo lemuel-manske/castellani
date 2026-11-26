@@ -1,6 +1,13 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from adapters.serialization import artifact_document
+from contracts.messages import (
+    CAPTURE_PAGE_EVENT,
+    PAGE_CAPTURED_EVENT,
+    CapturePagePayload,
+    PageCapturedPayload,
+)
 from domain.capture import (
     DEFAULT_AUTH_GENERATION,
     ArtifactReference,
@@ -12,7 +19,7 @@ from domain.capture import (
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from utils.time import utc
 
-from ..values import number_from_item, optional_number
+from ..values import number_from_item, optional_number, serialize_map
 
 
 def claim_from_item(
@@ -334,19 +341,21 @@ def complete_task_transaction(
     if capture.status_code is not None:
         snapshot_item["statusCode"] = {"N": str(capture.status_code)}
 
-    payload: dict[str, Any] = {
-        "archiveId": {"S": outcome.archive_id},
-        "snapshotId": {"S": outcome.snapshot_id},
-        "urlKey": {"S": outcome.url_key},
-        "url": {"S": capture.requested_url},
-        "finalUrl": {"S": capture.final_url},
-        "redirectChain": {"L": [{"S": url} for url in capture.redirect_chain]},
-        "capturedAt": {"S": captured_at_text},
-        "warcArtifacts": {"L": artifacts},
+    payload: PageCapturedPayload = {
+        "archiveId": outcome.archive_id,
+        "snapshotId": outcome.snapshot_id,
+        "urlKey": outcome.url_key,
+        "url": capture.requested_url,
+        "finalUrl": capture.final_url,
+        "redirectChain": list(capture.redirect_chain),
+        "capturedAt": captured_at_text,
+        "warcArtifacts": [artifact_document(item) for item in outcome.warc_artifacts],
     }
 
     if capture.content_type is not None:
-        payload["contentType"] = {"S": capture.content_type}
+        payload["contentType"] = capture.content_type
+
+    dynamodb_payload = serialize_map(payload)
 
     return [
         {
@@ -411,10 +420,10 @@ def complete_task_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": outcome.archive_id},
-                    "type": {"S": "PageCaptured"},
+                    "type": {"S": PAGE_CAPTURED_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": occurred_at},
-                    "payload": {"M": payload},
+                    "payload": {"M": dynamodb_payload},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},
@@ -436,6 +445,7 @@ def admit_page_transaction(
     archive_id = claim.task.archive_id
     url_key = page.identity.url_key
     occurred_at = utc(datetime.fromtimestamp(now, UTC))
+    payload: CapturePagePayload = {"archiveId": archive_id, "urlKey": url_key}
 
     return [
         {
@@ -517,15 +527,10 @@ def admit_page_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": archive_id},
-                    "type": {"S": "CapturePage"},
+                    "type": {"S": CAPTURE_PAGE_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": occurred_at},
-                    "payload": {
-                        "M": {
-                            "archiveId": {"S": archive_id},
-                            "urlKey": {"S": url_key},
-                        }
-                    },
+                    "payload": {"M": serialize_map(payload)},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},
@@ -543,6 +548,10 @@ def release_task_transaction(
     now: float,
 ) -> list[dict[str, Any]]:
     occurred_at = utc(datetime.fromtimestamp(now, UTC))
+    payload: CapturePagePayload = {
+        "archiveId": claim.task.archive_id,
+        "urlKey": claim.task.url_key,
+    }
 
     return [
         {
@@ -587,15 +596,10 @@ def release_task_transaction(
                 "Item": {
                     "messageId": {"S": message_id},
                     "correlationId": {"S": claim.task.archive_id},
-                    "type": {"S": "CapturePage"},
+                    "type": {"S": CAPTURE_PAGE_EVENT},
                     "version": {"N": "1"},
                     "occurredAt": {"S": occurred_at},
-                    "payload": {
-                        "M": {
-                            "archiveId": {"S": claim.task.archive_id},
-                            "urlKey": {"S": claim.task.url_key},
-                        }
-                    },
+                    "payload": {"M": serialize_map(payload)},
                     "status": {"S": "PENDING"},
                     "attempts": {"N": "0"},
                     "nextAttemptAt": {"N": str(now)},
@@ -674,7 +678,7 @@ def is_page_captured_message(
     payload = item.get("payload", {}).get("M", {})
 
     return (
-        item.get("type", {}).get("S") == "PageCaptured"
+        item.get("type", {}).get("S") == PAGE_CAPTURED_EVENT
         and item.get("correlationId", {}).get("S") == archive_id
         and payload.get("archiveId", {}).get("S") == archive_id
         and payload.get("snapshotId", {}).get("S") == snapshot_id
@@ -686,7 +690,7 @@ def is_release_message(item: dict[str, Any], claim: TaskClaim) -> bool:
 
     return (
         item.get("correlationId", {}).get("S") == claim.task.archive_id
-        and item.get("type", {}).get("S") == "CapturePage"
+        and item.get("type", {}).get("S") == CAPTURE_PAGE_EVENT
         and payload.get("archiveId", {}).get("S") == claim.task.archive_id
         and payload.get("urlKey", {}).get("S") == claim.task.url_key
     )
