@@ -11,8 +11,8 @@ def is_supported_normalizer_version(version: str | None) -> bool:
     return version is None or version == DEFAULT_NORMALIZER_VERSION
 
 
-def manifest_key(archive_id: str) -> str:
-    return f"manifests/{quote(archive_id, safe='')}/manifest.json"
+def manifest_key(archive_id: str, digest: str) -> str:
+    return f"manifests/{quote(archive_id, safe='')}/{digest}.json"
 
 
 def manifest_message_id(archive_id: str) -> str:
