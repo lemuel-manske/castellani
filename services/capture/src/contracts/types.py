@@ -1,4 +1,4 @@
-from typing import NotRequired, TypedDict
+from typing import TypedDict
 
 
 class ArtifactReferenceContract(TypedDict):
@@ -6,4 +6,3 @@ class ArtifactReferenceContract(TypedDict):
     key: str
     sha256: str
     sizeBytes: int
-    versionId: NotRequired[str]
