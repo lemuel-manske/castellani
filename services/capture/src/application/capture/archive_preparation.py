@@ -8,7 +8,7 @@ from pathlib import Path
 
 from adapters.serialization import artifact_references
 from capture.wacz import create_wacz, validate_wacz
-from domain.capture import PackageCommitRejected, PendingPackage, PreparedPackage
+from domain.capture import PendingPackage, PreparedPackage
 from ports.artifacts import PackageArtifacts
 from ports.capture import ArchivePublicationRepository
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
@@ -102,19 +102,14 @@ class ArchivePackager:
                 pending.manifest_digest,
             )
 
-        try:
-            await self.repository.prepare(
-                PreparedPackage(
-                    archive_id=pending.archive_id,
-                    artifact=artifact,
-                    manifest_digest=pending.manifest_digest,
-                    occurred_at=datetime.fromtimestamp(self.clock(), UTC)
-                    .isoformat()
-                    .replace("+00:00", "Z"),
-                    lease_owner=pending.lease_owner,
-                )
+        await self.repository.prepare(
+            PreparedPackage(
+                archive_id=pending.archive_id,
+                artifact=artifact,
+                manifest_digest=pending.manifest_digest,
+                occurred_at=datetime.fromtimestamp(self.clock(), UTC)
+                .isoformat()
+                .replace("+00:00", "Z"),
+                lease_owner=pending.lease_owner,
             )
-        except PackageCommitRejected:
-            await self.artifacts.delete_package(pending.archive_id, pending.manifest_digest)
-
-            raise
+        )
