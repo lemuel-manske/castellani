@@ -3,6 +3,7 @@ from typing import Any, cast
 
 from boto3.session import Session
 from mypy_boto3_s3.client import S3Client
+from mypy_boto3_s3.type_defs import DeleteTypeDef, ObjectIdentifierTypeDef
 
 from config.environment import (
     CAPTURE_AWS_ACCESS_KEY_ID,
@@ -46,21 +47,22 @@ def setup_s3(client: S3Client) -> None:
 
 def cleanup_s3(client: S3Client) -> None:
     for bucket in BUCKETS:
-        objects: list[dict[str, str]] = []
+        objects: list[ObjectIdentifierTypeDef] = []
         pages = client.get_paginator("list_objects_v2").paginate(Bucket=bucket)
 
         for page in pages:
-            objects.extend(
-                {"Key": item["Key"]}
-                for item in page.get("Contents", ())
-                if item.get("Key") is not None
-            )
+            for item in page.get("Contents", ()):
+                key = item.get("Key")
+
+                if key is not None:
+                    objects.append({"Key": key})
 
         for offset in range(0, len(objects), DELETE_BATCH_SIZE):
-            client.delete_objects(
-                Bucket=bucket,
-                Delete={"Objects": objects[offset : offset + DELETE_BATCH_SIZE], "Quiet": True},
-            )
+            delete: DeleteTypeDef = {
+                "Objects": objects[offset : offset + DELETE_BATCH_SIZE],
+                "Quiet": True,
+            }
+            client.delete_objects(Bucket=bucket, Delete=delete)
 
 
 def put_object(client: S3Client, bucket: str, key: str, body: bytes) -> dict[str, Any]:
