@@ -8,20 +8,15 @@ import {
 } from "@aws-sdk/client-s3";
 import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
 
-import {
-  ACCESS_KEY_ID,
-  REGION,
-  SEARCH_S3_ENDPOINT_URL,
-  SECRET_ACCESS_KEY,
-} from "./env.js";
+import type { SearchSettings } from "../../src/config.js";
 
-function createS3TestSupport() {
+function createS3TestSupport(settings: SearchSettings) {
   const client = new S3Client({
-    region: REGION,
-    endpoint: SEARCH_S3_ENDPOINT_URL,
+    region: settings.awsRegion,
+    endpoint: settings.s3EndpointUrl,
     credentials: {
-      accessKeyId: ACCESS_KEY_ID,
-      secretAccessKey: SECRET_ACCESS_KEY,
+      accessKeyId: settings.awsAccessKeyId,
+      secretAccessKey: settings.awsSecretAccessKey,
     },
     forcePathStyle: true,
   });

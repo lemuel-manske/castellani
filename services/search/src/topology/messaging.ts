@@ -1,4 +1,4 @@
-import { PAGE_CAPTURED_EVENT } from "../../../domain.js";
+import { PAGE_CAPTURED_EVENT } from "../domain/index.js";
 
 const EVENTS_EXCHANGE = "castellani.events";
 

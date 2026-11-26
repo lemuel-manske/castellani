@@ -1,5 +1,8 @@
-import type { ManifestReconciliation, ManifestSnapshot } from "../domain.js";
-import { reconcileManifest } from "../domain/indexing.js";
+import {
+  reconcileManifest,
+  type ManifestReconciliation,
+  type ManifestSnapshot,
+} from "../domain/index.js";
 
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 

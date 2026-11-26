@@ -5,7 +5,8 @@ import {
   EVENTS_EXCHANGE,
   PAGE_CAPTURED_TOPOLOGY,
   PUBLICATION_TOPOLOGY,
-} from "../../src/adapters/messaging/rabbitmq/topology.js";
+} from "../../src/topology/messaging.js";
+
 import { startPageCapturedConsumer } from "../../src/adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { startPublicationConsumer } from "../../src/adapters/messaging/rabbitmq/publicationConsumer.js";
 
@@ -15,10 +16,11 @@ import type {
   PublicationEvent,
 } from "../../src/application/types.js";
 
-import { SEARCH_RABBITMQ_URL } from "./env.js";
-import { bufferJSON } from "../../src/utils.js";
+import { bufferJSON } from "../../src/utils/index.js";
 
-function createRabbitMqTestSupport() {
+import type { SearchSettings } from "../../src/config.js";
+
+function createRabbitMqTestSupport(settings: SearchSettings) {
   let connection: amqp.ChannelModel | undefined;
   let consumerChannel: amqp.ConfirmChannel | undefined;
   let publicationConsumerChannel: amqp.ConfirmChannel | undefined;
@@ -53,9 +55,8 @@ function createRabbitMqTestSupport() {
       handleCapture: (event: PageCapturedEvent) => Promise<PageCapturedResult>,
       handlePublication: (event: PublicationEvent) => Promise<void>,
     ): Promise<void> {
-      connection = await amqp.connect(
-        SEARCH_RABBITMQ_URL ?? "amqp://localhost",
-      );
+      connection = await amqp.connect(settings.rabbitmqUrl);
+
       consumerChannel = await connection.createConfirmChannel();
       publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();

@@ -1,5 +1,38 @@
 import { parse } from "node-html-parser";
 
+const DEFAULT_MAX_TEXT_LENGTH = 1_000_000;
+
+const CONTENT_EXTRACTION_KIND = {
+  INDEXABLE: "INDEXABLE",
+  UNSUPPORTED: "UNSUPPORTED",
+} as const;
+
+const CONTENT_REASON_CODE = {
+  UNSUPPORTED_CONTENT_TYPE: "UNSUPPORTED_CONTENT_TYPE",
+  EMPTY_CONTENT: "EMPTY_CONTENT",
+} as const;
+
+const NON_CONTENT_ELEMENTS = [
+  "script",
+  "style",
+  "noscript",
+  "template",
+  "svg",
+  "canvas",
+  "iframe",
+  "object",
+  "embed",
+  "nav",
+  "header",
+  "footer",
+  "aside",
+  "form",
+  "button",
+  "input",
+  "select",
+  "textarea",
+];
+
 interface CapturedPage {
   archiveId: string;
   snapshotId: string;
@@ -31,38 +64,18 @@ interface SearchDocument {
 }
 
 type ContentExtraction =
-  | { kind: "INDEXABLE"; document: SearchDocument }
   | {
-      kind: "UNSUPPORTED";
-      reasonCode: "UNSUPPORTED_CONTENT_TYPE" | "EMPTY_CONTENT";
+      kind: typeof CONTENT_EXTRACTION_KIND.INDEXABLE;
+      document: SearchDocument;
+    }
+  | {
+      kind: typeof CONTENT_EXTRACTION_KIND.UNSUPPORTED;
+      reasonCode: (typeof CONTENT_REASON_CODE)[keyof typeof CONTENT_REASON_CODE];
     };
 
 interface ExtractionOptions {
   maxTextLength?: number;
 }
-
-const DEFAULT_MAX_TEXT_LENGTH = 1_000_000;
-
-const NON_CONTENT_ELEMENTS = [
-  "script",
-  "style",
-  "noscript",
-  "template",
-  "svg",
-  "canvas",
-  "iframe",
-  "object",
-  "embed",
-  "nav",
-  "header",
-  "footer",
-  "aside",
-  "form",
-  "button",
-  "input",
-  "select",
-  "textarea",
-];
 
 function normalizeText(value: string): string {
   return value
@@ -130,11 +143,14 @@ function extractSearchableContent(
   const text = extracted.text.slice(0, maxTextLength);
 
   if (!text) {
-    return { kind: "UNSUPPORTED", reasonCode: "EMPTY_CONTENT" };
+    return {
+      kind: CONTENT_EXTRACTION_KIND.UNSUPPORTED,
+      reasonCode: CONTENT_REASON_CODE.EMPTY_CONTENT,
+    };
   }
 
   return {
-    kind: "INDEXABLE",
+    kind: CONTENT_EXTRACTION_KIND.INDEXABLE,
     document: {
       archiveId: page.archiveId,
       snapshotId: page.snapshotId,
@@ -149,7 +165,12 @@ function extractSearchableContent(
   };
 }
 
-export { extractSearchableContent };
+export {
+  CONTENT_EXTRACTION_KIND,
+  CONTENT_REASON_CODE,
+  extractSearchableContent,
+};
+
 export type {
   CapturedPage,
   ContentExtraction,

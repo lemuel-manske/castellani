@@ -1,7 +1,8 @@
-import type {
-  TerminalIndexingOutcome,
-  SnapshotLedgerEntry,
-} from "../domain.js";
+import {
+  INDEXING_CLAIM_STATUS,
+  type SnapshotLedgerEntry,
+  type TerminalIndexingOutcome,
+} from "../domain/index.js";
 
 interface SnapshotClaim {
   archiveId: string;
@@ -12,10 +13,16 @@ interface SnapshotClaim {
 }
 
 type IndexingClaimResult =
-  | { status: "CLAIMED"; claim: SnapshotClaim }
-  | { status: "BUSY"; leaseUntil: number }
   | {
-      status: "TERMINAL";
+      status: typeof INDEXING_CLAIM_STATUS.CLAIMED;
+      claim: SnapshotClaim;
+    }
+  | {
+      status: typeof INDEXING_CLAIM_STATUS.BUSY;
+      leaseUntil: number;
+    }
+  | {
+      status: typeof INDEXING_CLAIM_STATUS.TERMINAL;
       outcome: TerminalIndexingOutcome;
     };
 

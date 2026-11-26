@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
-import { ARCHIVE_COMPENSATION_DECIDED_EVENT } from "../../src/domain.js";
+import { ARCHIVE_COMPENSATION_DECIDED_EVENT } from "../../src/domain/index.js";
 
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {

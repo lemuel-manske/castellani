@@ -1,7 +1,9 @@
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
 import type { ArchiveManifest } from "../../../ports/manifest-ledger.js";
-import { MANIFEST_LEDGER } from "./tables.js";
+
+import { MANIFEST_LEDGER } from "../../../topology/tables.js";
 
 const METADATA_KEY = "!manifest";
 

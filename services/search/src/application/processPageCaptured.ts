@@ -1,3 +1,8 @@
+import {
+  INDEXING_CLAIM_STATUS,
+  INDEXING_OUTCOME,
+  PAGE_CAPTURE_STATUS,
+} from "../domain/index.js";
 import type { CapturedPageReader } from "../ports/artifacts.js";
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 import type { PublicationLedger } from "../ports/publication-ledger.js";
@@ -19,7 +24,10 @@ async function processPageCaptured(
   const facts = await publicationLedger.get(event.payload.archiveId);
 
   if (facts.compensationDecision !== null) {
-    return { status: "COMPLETED", outcome: "UNSUPPORTED" };
+    return {
+      status: PAGE_CAPTURE_STATUS.COMPLETED,
+      outcome: INDEXING_OUTCOME.UNSUPPORTED,
+    };
   }
 
   const claimResult = await ledger.claim(
@@ -30,12 +38,15 @@ async function processPageCaptured(
     maxAttempts,
   );
 
-  if (claimResult.status === "BUSY") {
-    return { status: "BUSY" };
+  if (claimResult.status === INDEXING_CLAIM_STATUS.BUSY) {
+    return { status: PAGE_CAPTURE_STATUS.BUSY };
   }
 
-  if (claimResult.status === "TERMINAL") {
-    return { status: "COMPLETED", outcome: claimResult.outcome };
+  if (claimResult.status === INDEXING_CLAIM_STATUS.TERMINAL) {
+    return {
+      status: PAGE_CAPTURE_STATUS.COMPLETED,
+      outcome: claimResult.outcome,
+    };
   }
 
   try {
@@ -49,10 +60,12 @@ async function processPageCaptured(
     await ledger.complete(
       claimResult.claim,
       result.outcome,
-      result.outcome === "UNSUPPORTED" ? result.reasonCode : undefined,
+      result.outcome === INDEXING_OUTCOME.UNSUPPORTED
+        ? result.reasonCode
+        : undefined,
     );
 
-    return { status: "COMPLETED", outcome: result.outcome };
+    return { status: PAGE_CAPTURE_STATUS.COMPLETED, outcome: result.outcome };
   } catch (error) {
     const reason =
       error instanceof Error ? error.message : "unknown indexing error";

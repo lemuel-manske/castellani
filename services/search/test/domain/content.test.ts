@@ -1,6 +1,10 @@
 import { it, expect } from "vitest";
-import { extractSearchableContent } from "../../src/domain/content.js";
-import type { CapturedPage } from "../../src/domain/content.js";
+import {
+  CONTENT_EXTRACTION_KIND,
+  CONTENT_REASON_CODE,
+  extractSearchableContent,
+  type CapturedPage,
+} from "../../src/domain/index.js";
 
 const page = (overrides: Partial<CapturedPage> = {}): CapturedPage => ({
   archiveId: "archive-1",
@@ -14,7 +18,7 @@ const page = (overrides: Partial<CapturedPage> = {}): CapturedPage => ({
 
 it("extracts searchable text and page metadata from HTML", () => {
   expect(extractSearchableContent(page())).toMatchObject({
-    kind: "INDEXABLE",
+    kind: CONTENT_EXTRACTION_KIND.INDEXABLE,
     document: {
       archiveId: "archive-1",
       snapshotId: "snapshot-1",
@@ -32,7 +36,7 @@ it("uses the final URL when supplied", () => {
   expect(
     extractSearchableContent(page({ finalUrl: "https://example.com/final" })),
   ).toMatchObject({
-    kind: "INDEXABLE",
+    kind: CONTENT_EXTRACTION_KIND.INDEXABLE,
     document: { finalUrl: "https://example.com/final" },
   });
 });
@@ -42,5 +46,8 @@ it("returns an unsupported outcome when extracted text is empty", () => {
     extractSearchableContent(
       page({ content: "<html><body><nav>Only navigation</nav></body></html>" }),
     ),
-  ).toEqual({ kind: "UNSUPPORTED", reasonCode: "EMPTY_CONTENT" });
+  ).toEqual({
+    kind: CONTENT_EXTRACTION_KIND.UNSUPPORTED,
+    reasonCode: CONTENT_REASON_CODE.EMPTY_CONTENT,
+  });
 });

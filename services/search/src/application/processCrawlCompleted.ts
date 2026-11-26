@@ -9,7 +9,7 @@ import {
   CRAWL_COMPLETED_EVENT,
   PAGE_CAPTURED_EVENT,
   type CompletionCrawl,
-} from "../domain.js";
+} from "../domain/index.js";
 
 import type { IndexingLedger } from "../ports/indexing-ledger.js";
 import type { ManifestLedger } from "../ports/manifest-ledger.js";

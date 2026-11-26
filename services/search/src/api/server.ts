@@ -1,9 +1,15 @@
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
+
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type { SearchDocumentReader } from "../ports/search-reader.js";
+
+import { HEALTH_READY_ROUTE } from "../common/routes.js";
+
 import { mapError } from "./errors.js";
+import { problem } from "./problem.js";
+
 import { searchRoutes } from "./routes/search.js";
 
 function createSearchServer(
@@ -26,7 +32,14 @@ function createSearchServer(
       .send(mapped);
   });
 
-  server.get("/health/ready", () => ({ status: "ok" }));
+  server.setNotFoundHandler((_request, reply) =>
+    reply
+      .code(404)
+      .type("application/problem+json")
+      .send(problem(404, "Not Found", "the requested route does not exist")),
+  );
+
+  server.get(HEALTH_READY_ROUTE, () => ({ status: "ok" }));
 
   server.register(searchRoutes, {
     reader,

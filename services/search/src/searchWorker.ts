@@ -1,23 +1,19 @@
 import * as amqp from "amqplib";
 
-import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
-import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
+import { startPageCapturedConsumer } from "./adapters/messaging/rabbitmq/pageCapturedConsumer.js";
+import { startPublicationConsumer } from "./adapters/messaging/rabbitmq/publicationConsumer.js";
 
-import { delay } from "../utils/index.js";
+import { isAborted, delay } from "./utils/index.js";
 
 import type {
   PageCapturedEvent,
   PageCapturedResult,
   PublicationEvent,
-} from "../application/types.js";
+} from "./application/types.js";
 
 interface SearchWorkerHandlers {
   pageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult>;
   publicationEvent(event: PublicationEvent): Promise<void>;
-}
-
-function isAborted(signal: AbortSignal): boolean {
-  return signal.aborted;
 }
 
 interface SearchWorkerSettings {

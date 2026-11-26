@@ -1,4 +1,4 @@
-import type { SearchDocument } from "../domain/content.js";
+import type { SearchDocument } from "../domain/index.js";
 
 interface SearchDocumentWriter {
   index(document: SearchDocument): Promise<void>;

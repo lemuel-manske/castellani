@@ -1,19 +1,18 @@
 import { expect, it } from "vitest";
 import {
   canExposeSnapshot,
-  reconcileManifest,
-} from "../../src/domain/indexing.js";
-import {
   emptyPublicationFacts,
+  INDEXING_OUTCOME,
+  reconcileManifest,
   recordPublicationDecision,
   recordReplayPublished,
-} from "../../src/domain/publication.js";
+} from "../../src/domain/index.js";
 
 const manifest = [{ snapshotId: "snapshot-1" }, { snapshotId: "snapshot-2" }];
 
 it("identifies work missing from the ledger when completion arrives first", () => {
   const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-1", outcome: "INDEXED" },
+    { snapshotId: "snapshot-1", outcome: INDEXING_OUTCOME.INDEXED },
   ]);
 
   expect(result).toEqual({
@@ -27,8 +26,8 @@ it("identifies work missing from the ledger when completion arrives first", () =
 
 it("counts each expected snapshot once and treats terminal failures as accounted", () => {
   const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-1", outcome: "INDEXED" },
-    { snapshotId: "snapshot-2", outcome: "FAILED" },
+    { snapshotId: "snapshot-1", outcome: INDEXING_OUTCOME.INDEXED },
+    { snapshotId: "snapshot-2", outcome: INDEXING_OUTCOME.FAILED },
   ]);
 
   expect(result.complete).toBe(true);
@@ -37,8 +36,8 @@ it("counts each expected snapshot once and treats terminal failures as accounted
 
 it("does not consider pending entries terminal", () => {
   const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-1", outcome: "PENDING" },
-    { snapshotId: "snapshot-2", outcome: "UNSUPPORTED" },
+    { snapshotId: "snapshot-1", outcome: INDEXING_OUTCOME.PENDING },
+    { snapshotId: "snapshot-2", outcome: INDEXING_OUTCOME.UNSUPPORTED },
   ]);
 
   expect(result.complete).toBe(false);
@@ -47,7 +46,7 @@ it("does not consider pending entries terminal", () => {
 
 it("reports ledger entries not present in the immutable manifest", () => {
   const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-3", outcome: "INDEXED" },
+    { snapshotId: "snapshot-3", outcome: INDEXING_OUTCOME.INDEXED },
   ]);
 
   expect(result.unexpectedSnapshotIds).toEqual(["snapshot-3"]);
@@ -64,8 +63,8 @@ it("rejects conflicting ledger outcomes for one snapshot", () => {
     reconcileManifest(
       [{ snapshotId: "snapshot-1" }],
       [
-        { snapshotId: "snapshot-1", outcome: "INDEXED" },
-        { snapshotId: "snapshot-1", outcome: "FAILED" },
+        { snapshotId: "snapshot-1", outcome: INDEXING_OUTCOME.INDEXED },
+        { snapshotId: "snapshot-1", outcome: INDEXING_OUTCOME.FAILED },
       ],
     ),
   ).toThrow("conflicting outcomes");
@@ -85,15 +84,30 @@ const published = recordReplayPublished(
 );
 
 it("exposes only indexed snapshots in the manifest after publication", () => {
-  expect(canExposeSnapshot("snapshot-1", manifest, "INDEXED", published)).toBe(
-    true,
-  );
-  expect(canExposeSnapshot("snapshot-1", manifest, "PENDING", published)).toBe(
-    false,
-  );
-  expect(canExposeSnapshot("snapshot-3", manifest, "INDEXED", published)).toBe(
-    false,
-  );
+  expect(
+    canExposeSnapshot(
+      "snapshot-1",
+      manifest,
+      INDEXING_OUTCOME.INDEXED,
+      published,
+    ),
+  ).toBe(true);
+  expect(
+    canExposeSnapshot(
+      "snapshot-1",
+      manifest,
+      INDEXING_OUTCOME.PENDING,
+      published,
+    ),
+  ).toBe(false);
+  expect(
+    canExposeSnapshot(
+      "snapshot-3",
+      manifest,
+      INDEXING_OUTCOME.INDEXED,
+      published,
+    ),
+  ).toBe(false);
 });
 
 it("keeps indexed documents hidden before both publication facts arrive", () => {
@@ -104,14 +118,19 @@ it("keeps indexed documents hidden before both publication facts arrive", () => 
   });
 
   expect(
-    canExposeSnapshot("snapshot-1", manifest, "INDEXED", decisionOnly),
+    canExposeSnapshot(
+      "snapshot-1",
+      manifest,
+      INDEXING_OUTCOME.INDEXED,
+      decisionOnly,
+    ),
   ).toBe(false);
 });
 
 it("does not count an active processing claim as terminal", () => {
   const result = reconcileManifest(manifest, [
-    { snapshotId: "snapshot-1", outcome: "PROCESSING" },
-    { snapshotId: "snapshot-2", outcome: "INDEXED" },
+    { snapshotId: "snapshot-1", outcome: INDEXING_OUTCOME.PROCESSING },
+    { snapshotId: "snapshot-2", outcome: INDEXING_OUTCOME.INDEXED },
   ]);
 
   expect(result.complete).toBe(false);

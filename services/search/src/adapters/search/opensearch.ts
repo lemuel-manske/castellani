@@ -1,8 +1,8 @@
 import type { Client } from "@opensearch-project/opensearch";
 import type { SearchDocumentWriter } from "../../ports/search-index.js";
-import type { SearchDocument } from "../../domain/content.js";
+import type { SearchDocument } from "../../domain/index.js";
 
-import { SEARCH_INDEX_NAME } from "./topology.js";
+import { SEARCH_INDEX_NAME } from "../../topology/search.js";
 
 const SEARCH_INDEX_BODY = {
   settings: {

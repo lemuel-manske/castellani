@@ -5,8 +5,8 @@ import {
   recordCompensationDecision,
   recordPublicationDecision,
   recordReplayPublished,
-} from "../../src/domain/publication.js";
-import type { PublicationIdentity } from "../../src/domain.js";
+  type PublicationIdentity,
+} from "../../src/domain/index.js";
 
 const identity: PublicationIdentity = {
   archiveId: "archive-1",

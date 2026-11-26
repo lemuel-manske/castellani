@@ -1,17 +1,20 @@
-import { SearchSettings } from "./assembly/config.js";
+import { SearchSettings } from "./config.js";
 import { SearchRuntime } from "./assembly/runtime.js";
 
-const runtime = new SearchRuntime(SearchSettings.fromEnvironment());
 const shutdown = new AbortController();
+
+const runtime = new SearchRuntime(SearchSettings.fromEnvironment());
 
 process.once("SIGINT", () => {
   shutdown.abort();
 });
+
 process.once("SIGTERM", () => {
   shutdown.abort();
 });
 
 runtime.start(shutdown.signal).catch((error: unknown) => {
   console.error("Search service stopped unexpectedly", error);
+
   process.exitCode = 1;
 });

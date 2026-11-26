@@ -1,3 +1,4 @@
+// Package config contains constants for environment variable names used in the coordinator application.
 package config
 
 const (

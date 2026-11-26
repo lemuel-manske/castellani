@@ -3,12 +3,15 @@ import {
   ARCHIVE_PUBLICATION_DECIDED_EVENT,
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
+  CONTENT_REASON_CODE,
+  INDEXING_OUTCOME,
+  PAGE_CAPTURE_STATUS,
   PAGE_CAPTURED_EVENT,
   type CompensationDecision,
   type CompletionCrawl,
   type PublicationIdentity,
   type TerminalIndexingOutcome,
-} from "../domain.js";
+} from "../domain/index.js";
 
 import type {
   ArtifactReference,
@@ -47,17 +50,20 @@ type PageCapturedEvent = Event<
 
 type PageCapturedResult =
   | {
-      status: "COMPLETED";
+      status: typeof PAGE_CAPTURE_STATUS.COMPLETED;
       outcome: TerminalIndexingOutcome;
     }
-  | { status: "BUSY" };
+  | { status: typeof PAGE_CAPTURE_STATUS.BUSY };
 
 type SnapshotIndexingResult =
-  | { outcome: "INDEXED"; snapshotId: string }
   | {
-      outcome: "UNSUPPORTED";
+      outcome: typeof INDEXING_OUTCOME.INDEXED;
       snapshotId: string;
-      reasonCode: "UNSUPPORTED_CONTENT_TYPE" | "EMPTY_CONTENT";
+    }
+  | {
+      outcome: typeof INDEXING_OUTCOME.UNSUPPORTED;
+      snapshotId: string;
+      reasonCode: (typeof CONTENT_REASON_CODE)[keyof typeof CONTENT_REASON_CODE];
     };
 
 interface PublishedSearchResult {

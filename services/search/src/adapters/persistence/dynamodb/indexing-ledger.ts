@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import type {
-  SnapshotLedgerEntry,
-  TerminalIndexingOutcome,
-} from "../../../domain.js";
+import {
+  INDEXING_CLAIM_STATUS,
+  INDEXING_OUTCOME,
+  type SnapshotLedgerEntry,
+  type TerminalIndexingOutcome,
+} from "../../../domain/index.js";
 import {
   IndexingClaimLostError,
   IndexingIdentityConflictError,
@@ -66,7 +68,7 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       }
 
       return {
-        status: "CLAIMED",
+        status: INDEXING_CLAIM_STATUS.CLAIMED,
         claim: {
           archiveId,
           snapshotId,
@@ -94,16 +96,16 @@ class DynamoDBIndexingLedger implements IndexingLedger {
       }
 
       if (
-        item.state === "INDEXED" ||
-        item.state === "UNSUPPORTED" ||
-        item.state === "FAILED"
+        item.state === INDEXING_OUTCOME.INDEXED ||
+        item.state === INDEXING_OUTCOME.UNSUPPORTED ||
+        item.state === INDEXING_OUTCOME.FAILED
       ) {
-        return { status: "TERMINAL", outcome: item.state };
+        return { status: INDEXING_CLAIM_STATUS.TERMINAL, outcome: item.state };
       }
 
       const leaseExpired =
-        item.state === "PENDING" ||
-        (item.state === "PROCESSING" &&
+        item.state === INDEXING_OUTCOME.PENDING ||
+        (item.state === INDEXING_OUTCOME.PROCESSING &&
           item.leaseUntil !== undefined &&
           item.leaseUntil <= now);
 
@@ -120,7 +122,10 @@ class DynamoDBIndexingLedger implements IndexingLedger {
             maxAttempts,
           });
 
-          return { status: "TERMINAL", outcome: "FAILED" };
+          return {
+            status: INDEXING_CLAIM_STATUS.TERMINAL,
+            outcome: INDEXING_OUTCOME.FAILED,
+          };
         } catch (exhaustionError) {
           if (isConditionalCheckFailure(exhaustionError)) {
             throw exhaustionError;
@@ -137,21 +142,27 @@ class DynamoDBIndexingLedger implements IndexingLedger {
           }
 
           if (
-            current.state === "INDEXED" ||
-            current.state === "UNSUPPORTED" ||
-            current.state === "FAILED"
+            current.state === INDEXING_OUTCOME.INDEXED ||
+            current.state === INDEXING_OUTCOME.UNSUPPORTED ||
+            current.state === INDEXING_OUTCOME.FAILED
           ) {
-            return { status: "TERMINAL", outcome: current.state };
+            return {
+              status: INDEXING_CLAIM_STATUS.TERMINAL,
+              outcome: current.state,
+            };
           }
 
           return {
-            status: "BUSY",
+            status: INDEXING_CLAIM_STATUS.BUSY,
             leaseUntil: current.leaseUntil ?? now,
           };
         }
       }
 
-      return { status: "BUSY", leaseUntil: item.leaseUntil ?? now };
+      return {
+        status: INDEXING_CLAIM_STATUS.BUSY,
+        leaseUntil: item.leaseUntil ?? now,
+      };
     }
   }
 

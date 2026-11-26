@@ -1,6 +1,9 @@
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
 
-import { PAGE_CAPTURED_EVENT } from "../../../domain.js";
+import {
+  PAGE_CAPTURE_STATUS,
+  PAGE_CAPTURED_EVENT,
+} from "../../../domain/index.js";
 
 import type {
   PageCapturedEvent,
@@ -9,7 +12,7 @@ import type {
 
 import { validateMessage } from "../../../contracts.js";
 
-import { PAGE_CAPTURED_TOPOLOGY } from "./topology.js";
+import { PAGE_CAPTURED_TOPOLOGY } from "../../../topology/messaging.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
@@ -58,28 +61,17 @@ function publishDeadLetter(
   channel: ConfirmChannel,
   message: ConsumeMessage,
 ): Promise<void> {
+  const properties = message.properties;
+
+  properties.contentType ??= "application/json";
+
   return new Promise((resolve, reject) => {
     channel.publish(
       PAGE_CAPTURED_TOPOLOGY.deadLetterExchange,
       "",
       message.content,
       {
-        contentType:
-          typeof message.properties.contentType === "string"
-            ? message.properties.contentType
-            : "application/json",
-
-        ...(typeof message.properties.messageId === "string"
-          ? { messageId: message.properties.messageId }
-          : {}),
-
-        ...(typeof message.properties.correlationId === "string"
-          ? { correlationId: message.properties.correlationId }
-          : {}),
-
-        ...(message.properties.headers === undefined
-          ? {}
-          : { headers: message.properties.headers }),
+        ...properties,
         persistent: true,
       },
       (error) => {
@@ -122,7 +114,7 @@ async function handlePageCapturedMessage(
   try {
     const result = await handle(event);
 
-    if (result.status === "BUSY") {
+    if (result.status === PAGE_CAPTURE_STATUS.BUSY) {
       channel.nack(message, false, false);
 
       return;

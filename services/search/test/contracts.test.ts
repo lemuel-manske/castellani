@@ -1,7 +1,10 @@
 import { expect, it } from "vitest";
 
 import { validateManifest, validateMessage } from "../src/contracts.js";
-import { ARCHIVE_PUBLISHED_EVENT, PAGE_CAPTURED_EVENT } from "../src/domain.js";
+import {
+  ARCHIVE_PUBLISHED_EVENT,
+  PAGE_CAPTURED_EVENT,
+} from "../src/domain/index.js";
 
 function encode(value: unknown): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(value));

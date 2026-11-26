@@ -1,33 +1,37 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { S3Client } from "@aws-sdk/client-s3";
 import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
-import { createS3ArtifactReader } from "../adapters/artifacts/s3.js";
-import { createWarcCapturedPageReader } from "../adapters/artifacts/warc.js";
-import { createRabbitMQCompensationPublisher } from "../adapters/messaging/rabbitmq/compensationPublisher.js";
-import { createOpenSearchDocumentReader } from "../adapters/search/opensearch-reader.js";
-import { DynamoDBIndexingLedger } from "../adapters/persistence/dynamodb/indexing-ledger.js";
-import { DynamoDBManifestLedger } from "../adapters/persistence/dynamodb/manifest-ledger.js";
-import { DynamoDBOutbox } from "../adapters/persistence/dynamodb/outbox.js";
-import { DynamoDBPublicationLedger } from "../adapters/persistence/dynamodb/publication-ledger.js";
+import { DynamoDBIndexingLedger } from "./adapters/persistence/dynamodb/indexing-ledger.js";
+import { DynamoDBManifestLedger } from "./adapters/persistence/dynamodb/manifest-ledger.js";
+import { DynamoDBOutbox } from "./adapters/persistence/dynamodb/outbox.js";
+import { DynamoDBPublicationLedger } from "./adapters/persistence/dynamodb/publication-ledger.js";
+import { createOpenSearchDocumentReader } from "./adapters/search/opensearch-reader.js";
 import {
   createOpenSearchDocumentWriter,
   ensureSearchIndex,
-} from "../adapters/search/opensearch.js";
+} from "./adapters/search/opensearch.js";
+import { createRabbitMQCompensationPublisher } from "./adapters/messaging/rabbitmq/compensationPublisher.js";
+import { createS3ArtifactReader } from "./adapters/artifacts/s3.js";
+import { createWarcCapturedPageReader } from "./adapters/artifacts/warc.js";
 
-import { createSearchServer } from "../api/server.js";
+import { createSearchServer } from "./api/server.js";
 
-import { CRAWL_COMPLETED_EVENT } from "../domain.js";
+import { CRAWL_COMPLETED_EVENT } from "./domain/index.js";
 
-import { processCrawlCompleted } from "../application/processCrawlCompleted.js";
-import { processPageCaptured } from "../application/processPageCaptured.js";
-import { processPublicationEvent } from "../application/processPublicationEvent.js";
-import type { PublicationEvent } from "../application/types.js";
+import type { PublicationEvent } from "./application/types.js";
+import { processCrawlCompleted } from "./application/processCrawlCompleted.js";
+import { processPageCaptured } from "./application/processPageCaptured.js";
+import { processPublicationEvent } from "./application/processPublicationEvent.js";
+
+import { isAborted } from "./utils/delay.js";
 
 import type { SearchSettings } from "./config.js";
-import { SearchWorker } from "./worker.js";
+import { SearchWorker } from "./searchWorker.js";
 import { startOutboxWorker } from "./outboxWorker.js";
+
+const HOST = "0.0.0.0";
 
 /** Composes Search infrastructure and coordinates its HTTP and worker lifecycles. */
 class SearchRuntime {
@@ -36,7 +40,7 @@ class SearchRuntime {
   async start(
     signal: AbortSignal = new AbortController().signal,
   ): Promise<void> {
-    if (signal.aborted) {
+    if (isAborted(signal)) {
       return;
     }
 
@@ -132,7 +136,7 @@ class SearchRuntime {
       const port = parseInt(this.settings.httpPort, 10);
 
       await searchServer.listen({
-        host: "0.0.0.0",
+        host: HOST,
         port: port,
       });
 

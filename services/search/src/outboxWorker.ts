@@ -1,10 +1,10 @@
-import { dispatchCompensationOutbox } from "../application/dispatchCompensationOutbox.js";
+import { dispatchCompensationOutbox } from "./application/dispatchCompensationOutbox.js";
 
-import type { CompensationPublisher } from "../ports/compensation-publisher.js";
-import type { Outbox } from "../ports/outbox.js";
-import type { SearchDocumentWriter } from "../ports/search-index.js";
+import type { CompensationPublisher } from "./ports/compensation-publisher.js";
+import type { Outbox } from "./ports/outbox.js";
+import type { SearchDocumentWriter } from "./ports/search-index.js";
 
-import { delay } from "../utils/index.js";
+import { delay, isAborted } from "./utils/index.js";
 
 const DISPATCH_INTERVAL_MILLISECONDS = 500;
 const DISPATCH_ERROR_DELAY_MILLISECONDS = 2000;
@@ -16,7 +16,7 @@ async function startOutboxWorker(
   documentWriter: SearchDocumentWriter,
   publisher: CompensationPublisher,
 ): Promise<void> {
-  while (!signal.aborted) {
+  while (!isAborted(signal)) {
     try {
       const dispatched = await dispatchCompensationOutbox(
         outbox,

@@ -1,4 +1,4 @@
-import type { CapturedPage } from "../domain/content.js";
+import type { CapturedPage } from "../domain/index.js";
 
 interface ArtifactReference {
   bucket: string;
@@ -43,10 +43,7 @@ class CapturedResponseNotFoundError extends Error {
   }
 }
 
-export {
-  ArtifactIntegrityError,
-  CapturedResponseNotFoundError,
-};
+export { ArtifactIntegrityError, CapturedResponseNotFoundError };
 
 export type {
   ArtifactObjectReader,

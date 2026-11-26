@@ -1,14 +1,12 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import type {
-  CompensationDecision,
-  PublicationIdentity,
-} from "../../../domain.js";
 import {
   PublicationConflictError,
   recordCompensationDecision,
   recordPublicationDecision,
   recordReplayPublished,
-} from "../../../domain/publication.js";
+  type CompensationDecision,
+  type PublicationIdentity,
+} from "../../../domain/index.js";
 import type { Outbox, OutboxEntry } from "../../../ports/outbox.js";
 import type { PublicationLedger } from "../../../ports/publication-ledger.js";
 import {

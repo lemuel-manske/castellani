@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { SearchSettings } from "../../src/assembly/config.js";
+import { SearchSettings } from "../../src/config.js";
 
 const requiredEnvironment = {
   SEARCH_HTTP_PORT: "3000",

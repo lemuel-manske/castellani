@@ -4,7 +4,7 @@ import {
   SEARCH_COMPENSATED_EVENT,
   type CompensationDecision,
   type SearchCompensationAck,
-} from "../domain.js";
+} from "../domain/index.js";
 
 import type { OutboxEntry } from "../ports/outbox.js";
 

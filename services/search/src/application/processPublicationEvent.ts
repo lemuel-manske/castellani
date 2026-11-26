@@ -3,7 +3,7 @@ import {
   ARCHIVE_PUBLICATION_DECIDED_EVENT,
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
-} from "../domain.js";
+} from "../domain/index.js";
 
 import type { PublicationLedger } from "../ports/publication-ledger.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";

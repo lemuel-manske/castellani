@@ -1,4 +1,8 @@
-import { extractSearchableContent } from "../domain/content.js";
+import {
+  CONTENT_EXTRACTION_KIND,
+  INDEXING_OUTCOME,
+  extractSearchableContent,
+} from "../domain/index.js";
 import type {
   ArtifactReference,
   CapturedPageReader,
@@ -18,9 +22,9 @@ async function indexCapturedPage(
 
   const extraction = extractSearchableContent(capturedPage);
 
-  if (extraction.kind === "UNSUPPORTED") {
+  if (extraction.kind === CONTENT_EXTRACTION_KIND.UNSUPPORTED) {
     return {
-      outcome: "UNSUPPORTED",
+      outcome: INDEXING_OUTCOME.UNSUPPORTED,
       snapshotId: page.snapshotId,
       reasonCode: extraction.reasonCode,
     };
@@ -28,7 +32,10 @@ async function indexCapturedPage(
 
   await documentWriter.index(extraction.document);
 
-  return { outcome: "INDEXED", snapshotId: page.snapshotId };
+  return {
+    outcome: INDEXING_OUTCOME.INDEXED,
+    snapshotId: page.snapshotId,
+  };
 }
 
 export { indexCapturedPage };

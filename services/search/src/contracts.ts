@@ -2,7 +2,7 @@ import { globSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
-import { isRecord, readJSON } from "./utils.js";
+import { isRecord, readJSON } from "./utils/index.js";
 
 const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020.js") as unknown as AjvConstructor;

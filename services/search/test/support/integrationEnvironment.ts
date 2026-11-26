@@ -1,11 +1,14 @@
 import { afterAll, beforeAll } from "vitest";
 
+import { SearchSettings } from "../../src/config.js";
+import { SEARCH_HTTP_PORT } from "../../src/config/environment.js";
+
 import {
   ARCHIVE_COMPENSATION_DECIDED_EVENT,
   CRAWL_COMPLETED_EVENT,
   type CompensationDecision,
   type CompletionCrawl,
-} from "../../src/domain.js";
+} from "../../src/domain/index.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 import type { Event } from "../../src/application/types.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
@@ -30,20 +33,15 @@ import { createOpenSearchTestSupport } from "./openSearch.js";
 import { createRabbitMqTestSupport } from "./rabbitMq.js";
 import { createS3TestSupport } from "./s3.js";
 
-import {
-  SEARCH_DYNAMODB_ENDPOINT_URL,
-  SEARCH_OPENSEARCH_URL,
-  SEARCH_RABBITMQ_URL,
-  SEARCH_S3_ENDPOINT_URL,
-} from "./env.js";
+const settings = SearchSettings.fromEnvironment({
+  ...process.env,
+  [SEARCH_HTTP_PORT]: process.env[SEARCH_HTTP_PORT] ?? "0",
+});
 
-const INDEXING_LEASE_DURATION_SECONDS = 120;
-const INDEXING_MAX_ATTEMPTS = 5;
-
-const dynamodb = createDynamoDbTestSupport();
-const opensearch = createOpenSearchTestSupport();
-const rabbitmq = createRabbitMqTestSupport();
-const s3 = createS3TestSupport();
+const dynamodb = createDynamoDbTestSupport(settings);
+const opensearch = createOpenSearchTestSupport(settings);
+const rabbitmq = createRabbitMqTestSupport(settings);
+const s3 = createS3TestSupport(settings);
 
 const artifactReader = createS3ArtifactReader(s3.client);
 const capturedPageReader = createWarcCapturedPageReader(artifactReader);
@@ -59,8 +57,8 @@ const application = {
       dynamodb.ledger,
       capturedPageReader,
       documentWriter,
-      INDEXING_LEASE_DURATION_SECONDS,
-      INDEXING_MAX_ATTEMPTS,
+      settings.indexingLeaseDurationSeconds,
+      settings.indexingMaxAttempts,
       dynamodb.publicationLedger,
     );
   },
@@ -75,8 +73,8 @@ const application = {
       dynamodb.ledger,
       capturedPageReader,
       documentWriter,
-      INDEXING_LEASE_DURATION_SECONDS,
-      INDEXING_MAX_ATTEMPTS,
+      settings.indexingLeaseDurationSeconds,
+      settings.indexingMaxAttempts,
       dynamodb.publicationLedger,
     );
   },
@@ -175,22 +173,22 @@ function nextPublicationEvent(): Promise<PublicationEvent> {
 
 const integrations = {
   dynamodb: {
-    endpoint: SEARCH_DYNAMODB_ENDPOINT_URL,
+    endpoint: settings.dynamodbEndpointUrl,
     setup: () => dynamodb.setup(),
     teardown: () => dynamodb.teardown(),
   },
   opensearch: {
-    endpoint: SEARCH_OPENSEARCH_URL,
+    endpoint: settings.opensearchUrl,
     setup: () => opensearch.setup(),
     teardown: () => opensearch.teardown(),
   },
   rabbitmq: {
-    endpoint: SEARCH_RABBITMQ_URL,
+    endpoint: settings.rabbitmqUrl,
     setup: () => rabbitmq.setup(receivePageCaptured, receivePublicationEvent),
     teardown: () => rabbitmq.teardown(),
   },
   s3: {
-    endpoint: SEARCH_S3_ENDPOINT_URL,
+    endpoint: settings.s3EndpointUrl,
     setup: () => s3.setup(),
     teardown: () => s3.teardown(),
   },
@@ -205,7 +203,7 @@ function setupIntegrationEnvironment(
 
   beforeAll(async () => {
     const missing = selected.filter(
-      (service) => !integrations[service].endpoint?.trim(),
+      (service) => !integrations[service].endpoint.trim(),
     );
 
     if (missing.length > 0) {

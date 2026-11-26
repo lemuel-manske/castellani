@@ -1,8 +1,25 @@
-import type {
-  CompensationDecision,
-  PublicationFacts,
-  PublicationIdentity,
-} from "../domain.js";
+interface PublicationIdentity {
+  archiveId: string;
+  decisionVersion: number;
+  packageDigest: string;
+}
+
+interface CompensationDecision {
+  archiveId: string;
+  decisionVersion: number;
+  reasonCode: string;
+}
+
+interface SearchCompensationAck {
+  archiveId: string;
+  decisionVersion: number;
+}
+
+interface PublicationFacts {
+  publicationDecision: PublicationIdentity | null;
+  replayPublication: PublicationIdentity | null;
+  compensationDecision: CompensationDecision | null;
+}
 
 const emptyPublicationFacts = (): PublicationFacts => ({
   publicationDecision: null,
@@ -13,6 +30,7 @@ const emptyPublicationFacts = (): PublicationFacts => ({
 class PublicationConflictError extends Error {
   constructor(message: string) {
     super(message);
+
     this.name = "PublicationConflictError";
   }
 }
@@ -159,4 +177,11 @@ export {
   recordCompensationDecision,
   recordPublicationDecision,
   recordReplayPublished,
+};
+
+export type {
+  CompensationDecision,
+  PublicationFacts,
+  PublicationIdentity,
+  SearchCompensationAck,
 };

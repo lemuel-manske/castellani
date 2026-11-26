@@ -5,7 +5,7 @@ import {
   ARCHIVE_PUBLICATION_DECIDED_EVENT,
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
-} from "../../../../src/domain.js";
+} from "../../../../src/domain/index.js";
 
 const manifest = {
   bucket: "archive-manifests",

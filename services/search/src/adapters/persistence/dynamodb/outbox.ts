@@ -3,20 +3,19 @@ import { randomUUID } from "node:crypto";
 import { GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
+import { OUTBOX_STATE } from "../../../ports/outbox.js";
 import type {
   ClaimedOutboxMessage,
   Outbox,
   OutboxEntry,
 } from "../../../ports/outbox.js";
 
-import { stringValue } from "../../../utils.js";
+import { OUTBOX } from "../../../topology/tables.js";
+
+import { stringValue } from "../../../utils/index.js";
 
 import { isConditionalCheckFailure } from "./error-handling.js";
-import { OUTBOX } from "./tables.js";
 
-const PENDING = "PENDING";
-const CLAIMED = "CLAIMED";
-const PUBLISHED = "PUBLISHED";
 const SCAN_LIMIT = 50;
 
 function entryFromItem(
@@ -79,8 +78,8 @@ class DynamoDBOutbox implements Outbox {
             "#state": "state",
           },
           ExpressionAttributeValues: {
-            ":pending": PENDING,
-            ":claimed": CLAIMED,
+            ":pending": OUTBOX_STATE.PENDING,
+            ":claimed": OUTBOX_STATE.CLAIMED,
             ":now": now,
           },
         }),
@@ -108,8 +107,8 @@ class DynamoDBOutbox implements Outbox {
                 "#state": "state",
               },
               ExpressionAttributeValues: {
-                ":pending": PENDING,
-                ":claimed": CLAIMED,
+                ":pending": OUTBOX_STATE.PENDING,
+                ":claimed": OUTBOX_STATE.CLAIMED,
                 ":now": now,
                 ":until": now + leaseDurationSeconds,
                 ":token": leaseToken,
@@ -157,7 +156,7 @@ class DynamoDBOutbox implements Outbox {
             "#cleanup": "cleanupRequired",
           },
           ExpressionAttributeValues: {
-            ":claimed": CLAIMED,
+            ":claimed": OUTBOX_STATE.CLAIMED,
             ":token": message.leaseToken,
             ":pendingCleanup": true,
             ":done": false,
@@ -187,9 +186,9 @@ class DynamoDBOutbox implements Outbox {
           "#state": "state",
         },
         ExpressionAttributeValues: {
-          ":claimed": CLAIMED,
+          ":claimed": OUTBOX_STATE.CLAIMED,
           ":token": message.leaseToken,
-          ":published": PUBLISHED,
+          ":published": OUTBOX_STATE.PUBLISHED,
           ":now": new Date().toISOString(),
         },
       }),

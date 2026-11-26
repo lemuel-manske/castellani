@@ -3,13 +3,18 @@ import type {
   DynamoDBDocumentClient,
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
-import type {
-  IndexingOutcome,
-  TerminalIndexingOutcome,
-  SnapshotLedgerEntry,
-} from "../../../domain.js";
+
+import {
+  INDEXING_OUTCOME,
+  INDEXING_REASON_CODE,
+  type IndexingOutcome,
+  type SnapshotLedgerEntry,
+  type TerminalIndexingOutcome,
+} from "../../../domain/index.js";
+
 import type { SnapshotClaim } from "../../../ports/indexing-ledger.js";
-import { INDEXING_LEDGER } from "./tables.js";
+
+import { INDEXING_LEDGER } from "../../../topology/tables.js";
 
 interface LedgerItem {
   archiveId?: string;
@@ -75,8 +80,8 @@ async function claimIndexingEntry(
       },
       ExpressionAttributeValues: {
         ":archive": input.archiveId,
-        ":processing": "PROCESSING",
-        ":pending": "PENDING",
+        ":processing": INDEXING_OUTCOME.PROCESSING,
+        ":pending": INDEXING_OUTCOME.PENDING,
         ":token": input.token,
         ":lease": input.leaseUntil,
         ":zero": 0,
@@ -118,10 +123,10 @@ async function exhaustIndexingEntry(
         ":archive": input.archiveId,
         ":attempts": input.attempts,
         ":maxAttempts": input.maxAttempts,
-        ":pending": "PENDING",
-        ":processing": "PROCESSING",
-        ":failed": "FAILED",
-        ":reason": "INDEXING_ATTEMPTS_EXHAUSTED",
+        ":pending": INDEXING_OUTCOME.PENDING,
+        ":processing": INDEXING_OUTCOME.PROCESSING,
+        ":failed": INDEXING_OUTCOME.FAILED,
+        ":reason": INDEXING_REASON_CODE.ATTEMPTS_EXHAUSTED,
         ":now": input.now,
         ":empty": [],
         ":messages": [input.messageId],
@@ -210,7 +215,7 @@ async function completeIndexingEntry(
       },
       ExpressionAttributeValues: {
         ":archive": input.claim.archiveId,
-        ":processing": "PROCESSING",
+        ":processing": INDEXING_OUTCOME.PROCESSING,
         ":token": input.claim.token,
         ":outcome": input.outcome,
         ":now": input.now,
@@ -245,8 +250,8 @@ async function releaseIndexingEntry(
       },
       ExpressionAttributeValues: {
         ":archive": input.claim.archiveId,
-        ":processing": "PROCESSING",
-        ":pending": "PENDING",
+        ":processing": INDEXING_OUTCOME.PROCESSING,
+        ":pending": INDEXING_OUTCOME.PENDING,
         ":token": input.claim.token,
         ":reason": input.reason,
         ":now": input.now,

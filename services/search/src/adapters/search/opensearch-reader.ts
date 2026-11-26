@@ -1,14 +1,18 @@
 import type { Client } from "@opensearch-project/opensearch";
-import type { SearchDocument } from "../../domain/content.js";
+
+import type { SearchDocument } from "../../domain/index.js";
+
+import { InvalidSearchCursorError } from "../../ports/search-reader.js";
 import type {
   SearchDocumentCandidate,
   SearchDocumentPage,
   SearchDocumentReader,
   SearchQuery,
 } from "../../ports/search-reader.js";
-import { bufferJSON, readJSON } from "../../utils.js";
 
-import { SEARCH_INDEX_NAME } from "./topology.js";
+import { bufferJSON, readJSON } from "../../utils/index.js";
+
+import { SEARCH_INDEX_NAME } from "../../topology/search.js";
 
 type SearchSortCursor = [number, string | number, string];
 
@@ -40,7 +44,7 @@ function decodeCursor(
     const value = readJSON(cursor);
 
     if (!Array.isArray(value) || value.length !== 3) {
-      throw new Error("invalid search cursor");
+      throw new InvalidSearchCursorError();
     }
 
     const sortValues: unknown[] = value;
@@ -52,12 +56,12 @@ function decodeCursor(
       (typeof capturedAt !== "string" && typeof capturedAt !== "number") ||
       typeof snapshotId !== "string"
     ) {
-      throw new Error("invalid search cursor");
+      throw new InvalidSearchCursorError();
     }
 
     return [score, capturedAt, snapshotId];
   } catch {
-    throw new Error("invalid search cursor");
+    throw new InvalidSearchCursorError();
   }
 }
 

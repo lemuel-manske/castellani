@@ -1,11 +1,11 @@
 import { Client } from "@opensearch-project/opensearch";
 import { ensureSearchIndex } from "../../src/adapters/search/opensearch.js";
 
-import { SEARCH_OPENSEARCH_URL } from "./env.js";
+import type { SearchSettings } from "../../src/config.js";
 
-function createOpenSearchTestSupport() {
+function createOpenSearchTestSupport(settings: SearchSettings) {
   const client = new Client({
-    node: SEARCH_OPENSEARCH_URL,
+    node: settings.opensearchUrl,
   });
 
   return {
@@ -21,4 +21,4 @@ function createOpenSearchTestSupport() {
   };
 }
 
-export { SEARCH_OPENSEARCH_URL, createOpenSearchTestSupport };
+export { createOpenSearchTestSupport };

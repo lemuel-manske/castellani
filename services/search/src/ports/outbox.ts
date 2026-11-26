@@ -1,3 +1,9 @@
+const OUTBOX_STATE = {
+  PENDING: "PENDING",
+  CLAIMED: "CLAIMED",
+  PUBLISHED: "PUBLISHED",
+} as const;
+
 interface OutboxEntry {
   messageId: string;
   correlationId: string;
@@ -22,5 +28,7 @@ interface Outbox {
 
   confirm(message: ClaimedOutboxMessage): Promise<void>;
 }
+
+export { OUTBOX_STATE };
 
 export type { ClaimedOutboxMessage, Outbox, OutboxEntry };

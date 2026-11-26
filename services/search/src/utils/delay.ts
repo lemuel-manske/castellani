@@ -1,6 +1,10 @@
+function isAborted(signal: AbortSignal): boolean {
+  return signal.aborted;
+}
+
 /** Waits for a bounded delay, returning early when shutdown is requested. */
 function delay(signal: AbortSignal, milliseconds: number): Promise<void> {
-  if (signal.aborted) {
+  if (isAborted(signal)) {
     return Promise.resolve();
   }
 
@@ -15,10 +19,10 @@ function delay(signal: AbortSignal, milliseconds: number): Promise<void> {
 
     signal.addEventListener("abort", finish, { once: true });
 
-    if (signal.aborted) {
+    if (isAborted(signal)) {
       finish();
     }
   });
 }
 
-export { delay };
+export { isAborted, delay };

@@ -1,3 +1,17 @@
+import {
+  SEARCH_AWS_ACCESS_KEY_ID,
+  SEARCH_AWS_REGION,
+  SEARCH_AWS_SECRET_ACCESS_KEY,
+  SEARCH_DYNAMODB_ENDPOINT_URL,
+  SEARCH_HTTP_PORT,
+  SEARCH_INDEXING_LEASE_DURATION_SECONDS,
+  SEARCH_INDEXING_MAX_ATTEMPTS,
+  SEARCH_OPENSEARCH_URL,
+  SEARCH_RABBITMQ_URL,
+  SEARCH_RECONNECT_DELAY_MILLISECONDS,
+  SEARCH_S3_ENDPOINT_URL,
+} from "./config/environment.js";
+
 interface SearchSettingsOptions {
   awsRegion: string;
   awsAccessKeyId: string;
@@ -59,45 +73,45 @@ class SearchSettings {
 
   static fromEnvironment(env: NodeJS.ProcessEnv = process.env): SearchSettings {
     return new SearchSettings({
-      awsRegion: required("SEARCH_AWS_REGION", env.SEARCH_AWS_REGION),
+      awsRegion: required(SEARCH_AWS_REGION, env[SEARCH_AWS_REGION]),
       awsAccessKeyId: required(
-        "SEARCH_AWS_ACCESS_KEY_ID",
-        env.SEARCH_AWS_ACCESS_KEY_ID,
+        SEARCH_AWS_ACCESS_KEY_ID,
+        env[SEARCH_AWS_ACCESS_KEY_ID],
       ),
       awsSecretAccessKey: required(
-        "SEARCH_AWS_SECRET_ACCESS_KEY",
-        env.SEARCH_AWS_SECRET_ACCESS_KEY,
+        SEARCH_AWS_SECRET_ACCESS_KEY,
+        env[SEARCH_AWS_SECRET_ACCESS_KEY],
       ),
 
-      httpPort: required("SEARCH_HTTP_PORT", env.SEARCH_HTTP_PORT),
+      httpPort: required(SEARCH_HTTP_PORT, env[SEARCH_HTTP_PORT]),
 
       dynamodbEndpointUrl: required(
-        "SEARCH_DYNAMODB_ENDPOINT_URL",
-        env.SEARCH_DYNAMODB_ENDPOINT_URL,
+        SEARCH_DYNAMODB_ENDPOINT_URL,
+        env[SEARCH_DYNAMODB_ENDPOINT_URL],
       ),
       s3EndpointUrl: required(
-        "SEARCH_S3_ENDPOINT_URL",
-        env.SEARCH_S3_ENDPOINT_URL,
+        SEARCH_S3_ENDPOINT_URL,
+        env[SEARCH_S3_ENDPOINT_URL],
       ),
-      rabbitmqUrl: required("SEARCH_RABBITMQ_URL", env.SEARCH_RABBITMQ_URL),
+      rabbitmqUrl: required(SEARCH_RABBITMQ_URL, env[SEARCH_RABBITMQ_URL]),
       opensearchUrl: required(
-        "SEARCH_OPENSEARCH_URL",
-        env.SEARCH_OPENSEARCH_URL,
+        SEARCH_OPENSEARCH_URL,
+        env[SEARCH_OPENSEARCH_URL],
       ),
 
       indexingLeaseDurationSeconds: integer(
-        "SEARCH_INDEXING_LEASE_DURATION_SECONDS",
-        env.SEARCH_INDEXING_LEASE_DURATION_SECONDS,
+        SEARCH_INDEXING_LEASE_DURATION_SECONDS,
+        env[SEARCH_INDEXING_LEASE_DURATION_SECONDS],
         DEFAULT_INDEXING_LEASE_DURATION_SECONDS,
       ),
       indexingMaxAttempts: integer(
-        "SEARCH_INDEXING_MAX_ATTEMPTS",
-        env.SEARCH_INDEXING_MAX_ATTEMPTS,
+        SEARCH_INDEXING_MAX_ATTEMPTS,
+        env[SEARCH_INDEXING_MAX_ATTEMPTS],
         DEFAULT_INDEXING_MAX_ATTEMPTS,
       ),
       reconnectDelayMilliseconds: integer(
-        "SEARCH_RECONNECT_DELAY_MILLISECONDS",
-        env.SEARCH_RECONNECT_DELAY_MILLISECONDS,
+        SEARCH_RECONNECT_DELAY_MILLISECONDS,
+        env[SEARCH_RECONNECT_DELAY_MILLISECONDS],
         DEFAULT_RECONNECT_DELAY_MILLISECONDS,
       ),
     });

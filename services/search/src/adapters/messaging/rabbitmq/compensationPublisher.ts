@@ -3,13 +3,9 @@ import * as amqp from "amqplib";
 import type { ClaimedOutboxMessage } from "../../../ports/outbox.js";
 import type { CompensationPublisher } from "../../../ports/compensation-publisher.js";
 
-import { EVENTS_EXCHANGE } from "./topology.js";
+import { EVENTS_EXCHANGE } from "../../../topology/messaging.js";
 
 const PUBLISH_TIMEOUT_MILLISECONDS = 15000;
-
-function messageError(error: unknown, fallback: string): Error {
-  return error instanceof Error ? error : new Error(fallback);
-}
 
 function createRabbitMQCompensationPublisher(
   rabbitmqUrl: string,
@@ -48,12 +44,20 @@ function createRabbitMQCompensationPublisher(
                 clearTimeout(timeout);
 
                 if (error) {
-                  reject(messageError(error, "compensation publish failed"));
+                  if (error instanceof Error) {
+                    reject(error);
+
+                    return;
+                  }
+
+                  reject(new Error("compensation publish failed"));
+
                   return;
                 }
 
                 if (returned) {
                   reject(new Error("compensation message was unroutable"));
+
                   return;
                 }
 
@@ -63,6 +67,7 @@ function createRabbitMQCompensationPublisher(
 
             if (!published) {
               clearTimeout(timeout);
+
               reject(new Error("compensation message was not accepted"));
             }
           });

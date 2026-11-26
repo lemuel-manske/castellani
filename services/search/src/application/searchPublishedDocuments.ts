@@ -1,4 +1,4 @@
-import { isPublicationAuthorized } from "../domain/publication.js";
+import { isPublicationAuthorized } from "../domain/index.js";
 
 import type { ManifestLedger } from "../ports/manifest-ledger.js";
 import type { PublicationLedger } from "../ports/publication-ledger.js";
@@ -20,21 +20,12 @@ async function searchPublishedDocuments(
   manifestLedger: ManifestLedger,
 ): Promise<PublishedSearchPage> {
   const {
-    text,
-    archiveId,
-    snapshotId,
-    capturedFrom,
-    capturedTo,
     limit,
     cursor,
   } = input;
 
   const query: SearchQuery = {
-    text,
-    ...(archiveId !== undefined && { archiveId }),
-    ...(snapshotId !== undefined && { snapshotId }),
-    ...(capturedFrom !== undefined && { capturedFrom }),
-    ...(capturedTo !== undefined && { capturedTo }),
+    ...input,
   };
 
   const results: PublishedSearchResult[] = [];

@@ -5,16 +5,17 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
-import type {
-  CompensationDecision,
-  PublicationFacts,
-  PublicationIdentity,
-} from "../../../domain.js";
-import { emptyPublicationFacts } from "../../../domain/publication.js";
+import {
+  emptyPublicationFacts,
+  type CompensationDecision,
+  type PublicationFacts,
+  type PublicationIdentity,
+} from "../../../domain/index.js";
 
+import { OUTBOX_STATE } from "../../../ports/outbox.js";
 import type { OutboxEntry } from "../../../ports/outbox.js";
 
-import { OUTBOX, PUBLICATION_LEDGER } from "./tables.js";
+import { OUTBOX, PUBLICATION_LEDGER } from "../../../topology/tables.js";
 
 interface PublicationLedgerItem {
   publicationDecision?: string;
@@ -144,7 +145,7 @@ async function recordCompensationDecisionTransaction(
               occurredAt: outboxEntry.occurredAt,
               envelope: outboxEntry.envelope,
               cleanupRequired: outboxEntry.cleanupRequired,
-              state: "PENDING",
+              state: OUTBOX_STATE.PENDING,
               attempts: 0,
               createdAt: outboxEntry.occurredAt,
             },

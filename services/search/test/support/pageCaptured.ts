@@ -1,4 +1,4 @@
-import { PAGE_CAPTURED_EVENT } from "../../src/domain.js";
+import { PAGE_CAPTURED_EVENT } from "../../src/domain/index.js";
 import { createCapturedPageFixture } from "./fixtures.js";
 
 const EXPECTED_VERSION = 1;

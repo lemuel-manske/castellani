@@ -1,5 +1,5 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { PublicationConflictError } from "../../../domain/publication.js";
+import { PublicationConflictError } from "../../../domain/index.js";
 import type {
   ArchiveManifest,
   ManifestLedger,

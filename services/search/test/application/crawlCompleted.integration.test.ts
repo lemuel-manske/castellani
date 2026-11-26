@@ -2,7 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
 import { SEARCH_INDEX_NAME } from "../../src/adapters/search/opensearch.js";
-import { CRAWL_COMPLETED_EVENT } from "../../src/domain.js";
+
+import {
+  CRAWL_COMPLETED_EVENT,
+  INDEXING_OUTCOME,
+} from "../../src/domain/index.js";
+
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   dynamodb,
@@ -13,7 +18,8 @@ import {
   searchIndex,
   setupIntegrationEnvironment,
 } from "../support/integrationEnvironment.js";
-import { bufferJSON } from "../../src/utils.js";
+
+import { bufferJSON } from "../../src/utils/index.js";
 
 setupIntegrationEnvironment(["dynamodb", "opensearch", "rabbitmq", "s3"]);
 
@@ -130,7 +136,7 @@ it("indexes the snapshots described by a CrawlCompleted manifest delivered throu
   expect(indexingEntry).toMatchObject({
     archiveId,
     snapshotId,
-    state: "INDEXED",
+    state: INDEXING_OUTCOME.INDEXED,
     attempts: 1,
   });
 

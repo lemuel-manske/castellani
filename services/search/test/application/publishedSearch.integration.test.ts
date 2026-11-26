@@ -4,7 +4,9 @@ import { expect, it } from "vitest";
 import {
   ARCHIVE_PUBLICATION_DECIDED_EVENT,
   ARCHIVE_PUBLISHED_EVENT,
-} from "../../src/domain.js";
+  INDEXING_OUTCOME,
+  PAGE_CAPTURE_STATUS,
+} from "../../src/domain/index.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   application,
@@ -36,7 +38,10 @@ it("keeps indexed snapshots hidden until the matching replay-publication acknowl
 
   const indexed = await application.processPageCaptured(fixture.event);
 
-  expect(indexed).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
+  expect(indexed).toEqual({
+    status: PAGE_CAPTURE_STATUS.COMPLETED,
+    outcome: INDEXING_OUTCOME.INDEXED,
+  });
 
   await dynamodb.manifestLedger.record(
     {

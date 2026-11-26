@@ -1,19 +1,63 @@
-import type {
-  IndexingOutcome,
-  TerminalIndexingOutcome,
-  ManifestReconciliation,
-  ManifestSnapshot,
-  PublicationFacts,
-  SnapshotLedgerEntry,
-} from "../domain.js";
-
 import { isPublicationAuthorized } from "./publication.js";
+import type { PublicationFacts } from "./publication.js";
+
+const INDEXING_OUTCOME = {
+  PENDING: "PENDING",
+  PROCESSING: "PROCESSING",
+  INDEXED: "INDEXED",
+  UNSUPPORTED: "UNSUPPORTED",
+  FAILED: "FAILED",
+} as const;
+
+const INDEXING_CLAIM_STATUS = {
+  CLAIMED: "CLAIMED",
+  BUSY: "BUSY",
+  TERMINAL: "TERMINAL",
+} as const;
+
+const PAGE_CAPTURE_STATUS = {
+  COMPLETED: "COMPLETED",
+  BUSY: INDEXING_CLAIM_STATUS.BUSY,
+} as const;
+
+const INDEXING_REASON_CODE = {
+  ATTEMPTS_EXHAUSTED: "INDEXING_ATTEMPTS_EXHAUSTED",
+} as const;
+
+type IndexingOutcome = (typeof INDEXING_OUTCOME)[keyof typeof INDEXING_OUTCOME];
+
+type NonTerminalIndexingOutcome =
+  typeof INDEXING_OUTCOME.PENDING | typeof INDEXING_OUTCOME.PROCESSING;
+
+type TerminalIndexingOutcome =
+  | typeof INDEXING_OUTCOME.INDEXED
+  | typeof INDEXING_OUTCOME.UNSUPPORTED
+  | typeof INDEXING_OUTCOME.FAILED;
+
+interface ManifestSnapshot {
+  snapshotId: string;
+}
+
+interface SnapshotLedgerEntry {
+  snapshotId: string;
+  outcome: IndexingOutcome;
+}
+
+interface ManifestReconciliation {
+  expectedCount: number;
+  terminalCount: number;
+  missingSnapshotIds: string[];
+  unexpectedSnapshotIds: string[];
+  complete: boolean;
+}
 
 function isTerminalIndexingOutcome(
   outcome: IndexingOutcome,
 ): outcome is TerminalIndexingOutcome {
   return (
-    outcome === "INDEXED" || outcome === "UNSUPPORTED" || outcome === "FAILED"
+    outcome === INDEXING_OUTCOME.INDEXED ||
+    outcome === INDEXING_OUTCOME.UNSUPPORTED ||
+    outcome === INDEXING_OUTCOME.FAILED
   );
 }
 
@@ -93,7 +137,7 @@ function canExposeSnapshot(
 ): boolean {
   if (
     !snapshotId ||
-    outcome !== "INDEXED" ||
+    outcome !== INDEXING_OUTCOME.INDEXED ||
     !isPublicationAuthorized(publication)
   ) {
     return false;
@@ -104,4 +148,20 @@ function canExposeSnapshot(
   );
 }
 
-export { canExposeSnapshot, reconcileManifest };
+export {
+  INDEXING_CLAIM_STATUS,
+  INDEXING_OUTCOME,
+  INDEXING_REASON_CODE,
+  PAGE_CAPTURE_STATUS,
+  canExposeSnapshot,
+  reconcileManifest,
+};
+
+export type {
+  IndexingOutcome,
+  ManifestReconciliation,
+  ManifestSnapshot,
+  NonTerminalIndexingOutcome,
+  SnapshotLedgerEntry,
+  TerminalIndexingOutcome,
+};

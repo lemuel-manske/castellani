@@ -5,17 +5,17 @@ import {
   ARCHIVE_PUBLICATION_DECIDED_EVENT,
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
+  PublicationConflictError,
   type CompensationDecision,
   type CompletionCrawl,
   type PublicationIdentity,
-} from "../../../domain.js";
-import { PublicationConflictError } from "../../../domain/publication.js";
+} from "../../../domain/index.js";
 
 import type { PublicationEvent } from "../../../application/processPublicationEvent.js";
 
 import { validateMessage } from "../../../contracts.js";
 
-import { PUBLICATION_TOPOLOGY } from "./topology.js";
+import { PUBLICATION_TOPOLOGY } from "../../../topology/messaging.js";
 
 const MAX_DELIVERY_RETRIES = 5;
 
@@ -91,28 +91,17 @@ function publishDeadLetter(
   channel: ConfirmChannel,
   message: ConsumeMessage,
 ): Promise<void> {
+  const properties = message.properties;
+
+  properties.contentType ??= "application/json";
+
   return new Promise((resolve, reject) =>
     channel.publish(
       PUBLICATION_TOPOLOGY.deadLetterExchange,
       "",
       message.content,
       {
-        contentType:
-          typeof message.properties.contentType === "string"
-            ? message.properties.contentType
-            : "application/json",
-
-        ...(typeof message.properties.messageId === "string"
-          ? { messageId: message.properties.messageId }
-          : {}),
-
-        ...(typeof message.properties.correlationId === "string"
-          ? { correlationId: message.properties.correlationId }
-          : {}),
-
-        ...(message.properties.headers === undefined
-          ? {}
-          : { headers: message.properties.headers }),
+        ...properties,
         persistent: true,
       },
       (error) => {

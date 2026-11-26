@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
+import {
+  INDEXING_OUTCOME,
+  PAGE_CAPTURE_STATUS,
+} from "../../src/domain/index.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   application,
@@ -29,15 +33,21 @@ it("does not repeat indexing work when a PageCaptured event is delivered again",
   const first = await application.processPageCaptured(fixture.event);
   const duplicate = await application.processPageCaptured(fixture.event);
 
-  expect(first).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
-  expect(duplicate).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
+  expect(first).toEqual({
+    status: PAGE_CAPTURE_STATUS.COMPLETED,
+    outcome: INDEXING_OUTCOME.INDEXED,
+  });
+  expect(duplicate).toEqual({
+    status: PAGE_CAPTURE_STATUS.COMPLETED,
+    outcome: INDEXING_OUTCOME.INDEXED,
+  });
 
   const entry = await dynamodb.getIndexingEntry(snapshotId);
 
   expect(entry).toMatchObject({
     archiveId: fixture.event.payload.archiveId,
     snapshotId,
-    state: "INDEXED",
+    state: INDEXING_OUTCOME.INDEXED,
     attempts: 1,
     processedMessageIds: [fixture.event.messageId],
   });
@@ -68,7 +78,7 @@ it("releases a failed indexing claim so the same event can be retried", async ()
   const released = await dynamodb.getIndexingEntry(snapshotId);
 
   expect(released).toMatchObject({
-    state: "PENDING",
+    state: INDEXING_OUTCOME.PENDING,
     attempts: 1,
   });
 
@@ -76,12 +86,15 @@ it("releases a failed indexing claim so the same event can be retried", async ()
 
   const retried = await application.processPageCaptured(fixture.event);
 
-  expect(retried).toEqual({ status: "COMPLETED", outcome: "INDEXED" });
+  expect(retried).toEqual({
+    status: PAGE_CAPTURE_STATUS.COMPLETED,
+    outcome: INDEXING_OUTCOME.INDEXED,
+  });
 
   const recovered = await dynamodb.getIndexingEntry(snapshotId);
 
   expect(recovered).toMatchObject({
-    state: "INDEXED",
+    state: INDEXING_OUTCOME.INDEXED,
     attempts: 2,
   });
 

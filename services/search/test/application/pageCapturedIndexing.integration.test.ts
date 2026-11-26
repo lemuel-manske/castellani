@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 
-import { PAGE_CAPTURED_EVENT } from "../../src/domain.js";
+import { PAGE_CAPTURED_EVENT } from "../../src/domain/index.js";
 import { createCapturedPageFixture } from "../support/fixtures.js";
 import {
   nextPageCaptured,

@@ -1,4 +1,4 @@
-import type { SearchDocument } from "../domain/content.js";
+import type { SearchDocument } from "../domain/index.js";
 
 interface SearchQuery {
   text: string;
@@ -28,6 +28,16 @@ interface SearchDocumentReader {
     cursor?: string,
   ): Promise<SearchDocumentPage>;
 }
+
+class InvalidSearchCursorError extends Error {
+  constructor() {
+    super("invalid search cursor");
+
+    this.name = "InvalidSearchCursorError";
+  }
+}
+
+export { InvalidSearchCursorError };
 
 export type {
   SearchDocumentCandidate,

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { WARCParser } from "warcio";
 
-import type { CapturedPage } from "../../domain/content.js";
+import type { CapturedPage } from "../../domain/index.js";
 
 import {
   ArtifactIntegrityError,

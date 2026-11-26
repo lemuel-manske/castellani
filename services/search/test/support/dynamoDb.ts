@@ -11,27 +11,22 @@ import {
   OUTBOX,
   PUBLICATION_LEDGER,
   INDEXING_LEDGER,
-} from "../../src/adapters/persistence/dynamodb/tables.js";
+} from "../../src/topology/tables.js";
 
 import { DynamoDBIndexingLedger } from "../../src/adapters/persistence/dynamodb/indexing-ledger.js";
 import { DynamoDBManifestLedger } from "../../src/adapters/persistence/dynamodb/manifest-ledger.js";
 import { DynamoDBOutbox } from "../../src/adapters/persistence/dynamodb/outbox.js";
 import { DynamoDBPublicationLedger } from "../../src/adapters/persistence/dynamodb/publication-ledger.js";
 
-import {
-  REGION,
-  SEARCH_DYNAMODB_ENDPOINT_URL,
-  ACCESS_KEY_ID,
-  SECRET_ACCESS_KEY,
-} from "./env.js";
+import type { SearchSettings } from "../../src/config.js";
 
-function createDynamoDbTestSupport() {
+function createDynamoDbTestSupport(settings: SearchSettings) {
   const client = new DynamoDBClient({
-    region: REGION,
-    endpoint: SEARCH_DYNAMODB_ENDPOINT_URL,
+    region: settings.awsRegion,
+    endpoint: settings.dynamodbEndpointUrl,
     credentials: {
-      accessKeyId: ACCESS_KEY_ID,
-      secretAccessKey: SECRET_ACCESS_KEY,
+      accessKeyId: settings.awsAccessKeyId,
+      secretAccessKey: settings.awsSecretAccessKey,
     },
   });
 

@@ -2,7 +2,7 @@ import type {
   CompensationDecision,
   PublicationFacts,
   PublicationIdentity,
-} from "../domain.js";
+} from "../domain/index.js";
 
 import type { OutboxEntry } from "./outbox.js";
 
