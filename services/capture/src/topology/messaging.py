@@ -1,16 +1,6 @@
 CAPTURE_EXCHANGE_NAME = "castellani.capture"
 EVENTS_EXCHANGE_NAME = "castellani.events"
 
-ARCHIVE_COMPENSATED_EVENT = "ArchiveCompensated"
-ARCHIVE_COMPENSATION_DECIDED_EVENT = "ArchiveCompensationDecided"
-ARCHIVE_PREPARED_EVENT = "ArchivePrepared"
-ARCHIVE_PUBLICATION_DECIDED_EVENT = "ArchivePublicationDecided"
-ARCHIVE_PUBLISHED_EVENT = "ArchivePublished"
-CAPTURE_PAGE_EVENT = "CapturePage"
-CRAWL_COMPLETED_EVENT = "CrawlCompleted"
-PAGE_CAPTURED_EVENT = "PageCaptured"
-START_CRAWL_EVENT = "StartCrawl"
-
 CAPTURE_DEAD_EXCHANGE = "castellani.capture.dead"
 
 CAPTURE_COMPENSATION_QUEUE = "castellani.capture.compensation"

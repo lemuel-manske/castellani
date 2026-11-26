@@ -1,17 +1,16 @@
 import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
 
-from ports.messaging import MessagePublisher
-from topology.messaging import (
+from contracts.messages import (
     ARCHIVE_COMPENSATED_EVENT,
     ARCHIVE_PREPARED_EVENT,
     ARCHIVE_PUBLISHED_EVENT,
-    CAPTURE_EXCHANGE_NAME,
     CAPTURE_PAGE_EVENT,
     CRAWL_COMPLETED_EVENT,
-    EVENTS_EXCHANGE_NAME,
     PAGE_CAPTURED_EVENT,
 )
+from ports.messaging import MessagePublisher
+from topology.messaging import CAPTURE_EXCHANGE_NAME, EVENTS_EXCHANGE_NAME
 
 ROUTES = {
     ARCHIVE_COMPENSATED_EVENT: (EVENTS_EXCHANGE_NAME, ARCHIVE_COMPENSATED_EVENT),

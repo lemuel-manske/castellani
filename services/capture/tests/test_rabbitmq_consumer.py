@@ -17,10 +17,10 @@ from aio_pika.abc import (
 from adapters.messaging.rabbitmq.consumer import RabbitMQPageTaskConsumer
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from application.capture.page_tasks import PageTaskProcessor
+from contracts.messages import CAPTURE_PAGE_EVENT
 from topology.messaging import (
     CAPTURE_DEAD_QUEUE,
     CAPTURE_EXCHANGE_NAME,
-    CAPTURE_PAGE_EVENT,
     CAPTURE_PAGE_QUEUE,
     CAPTURE_PAGE_RETRY_QUEUE,
     MAX_DELIVERY_RETRIES,

@@ -12,6 +12,17 @@ from aio_pika.abc import (
 )
 
 from adapters.messaging.contracts import validate_message
+from contracts.envelope import Envelope
+from contracts.messages import (
+    ARCHIVE_COMPENSATION_DECIDED_EVENT,
+    ARCHIVE_PUBLICATION_DECIDED_EVENT,
+    CAPTURE_PAGE_EVENT,
+    START_CRAWL_EVENT,
+    ArchiveCompensationDecidedEnvelope,
+    ArchivePublicationDecidedEnvelope,
+    CapturePagePayload,
+    StartCrawlPayload,
+)
 from ports.messaging import (
     ArchiveCompensationConsumer,
     ArchiveCompensationMessage,
@@ -23,18 +34,14 @@ from ports.messaging import (
     StartCrawlMessage,
 )
 from topology.messaging import (
-    ARCHIVE_COMPENSATION_DECIDED_EVENT,
-    ARCHIVE_PUBLICATION_DECIDED_EVENT,
     CAPTURE_COMPENSATION_QUEUE,
     CAPTURE_COMPENSATION_RETRY_QUEUE,
     CAPTURE_DEAD_EXCHANGE,
-    CAPTURE_PAGE_EVENT,
     CAPTURE_PAGE_QUEUE,
     CAPTURE_PAGE_RETRY_QUEUE,
     CAPTURE_PUBLICATION_QUEUE,
     CAPTURE_PUBLICATION_RETRY_QUEUE,
     MAX_DELIVERY_RETRIES,
-    START_CRAWL_EVENT,
     START_CRAWL_QUEUE,
     START_CRAWL_RETRY_QUEUE,
 )
@@ -45,7 +52,7 @@ from utils.types import JSON
 class ValidatedDelivery:
     message: AbstractIncomingMessage
     channel: AbstractChannel
-    envelope: JSON
+    envelope: Envelope[JSON]
     retry_exhausted: bool
 
 
@@ -176,13 +183,13 @@ class RabbitMQPageTaskConsumer(PageTaskConsumer):
         ready: asyncio.Event | None = None,
     ) -> AsyncGenerator[RabbitMQPageTaskMessage]:
         async for delivery in self.source.deliveries(ready=ready):
-            payload = cast(JSON, delivery.envelope["payload"])
+            payload = cast(CapturePagePayload, delivery.envelope["payload"])
 
             yield RabbitMQPageTaskMessage(
                 message=delivery.message,
                 channel=delivery.channel,
-                archive_id=cast(str, payload["archiveId"]),
-                url_key=cast(str, payload["urlKey"]),
+                archive_id=payload["archiveId"],
+                url_key=payload["urlKey"],
                 retry_exhausted=delivery.retry_exhausted,
             )
 
@@ -197,20 +204,20 @@ class RabbitMQStartCrawlMessage(StartCrawlMessage):
         self,
         message: AbstractIncomingMessage,
         channel: AbstractChannel,
-        payload: JSON,
+        payload: StartCrawlPayload,
         retry_exhausted: bool,
     ) -> None:
         self._message = message
         self._channel = channel
 
-        self.archive_id = cast(str, payload["archiveId"])
-        self.seed_url = cast(str, payload["seedUrl"])
-        self.max_depth = cast(int, payload["maxDepth"])
-        self.max_pages = cast(int, payload["maxPages"])
-        self.collection_id = cast(str | None, payload.get("collectionId"))
-        self.allowed_origins = tuple(cast(list[str], payload.get("allowedOrigins", [])))
-        self.auth_generation = cast(int | None, payload.get("authGeneration"))
-        self.normalizer_version = cast(str | None, payload.get("normalizerVersion"))
+        self.archive_id = payload["archiveId"]
+        self.seed_url = payload["seedUrl"]
+        self.max_depth = payload["maxDepth"]
+        self.max_pages = payload["maxPages"]
+        self.collection_id = payload.get("collectionId")
+        self.allowed_origins = tuple(payload.get("allowedOrigins", []))
+        self.auth_generation = payload.get("authGeneration")
+        self.normalizer_version = payload.get("normalizerVersion")
 
         self.retry_exhausted = retry_exhausted
 
@@ -242,7 +249,7 @@ class RabbitMQStartCrawlConsumer(StartCrawlConsumer):
         ready: asyncio.Event | None = None,
     ) -> AsyncGenerator[RabbitMQStartCrawlMessage]:
         async for delivery in self.source.deliveries(ready=ready):
-            payload = cast(JSON, delivery.envelope["payload"])
+            payload = cast(StartCrawlPayload, delivery.envelope["payload"])
 
             yield RabbitMQStartCrawlMessage(
                 message=delivery.message,
@@ -262,19 +269,19 @@ class RabbitMQPublicationDecisionMessage(ArchivePublicationMessage):
         self,
         message: AbstractIncomingMessage,
         channel: AbstractChannel,
-        envelope: JSON,
+        envelope: ArchivePublicationDecidedEnvelope,
         retry_exhausted: bool,
     ) -> None:
-        payload = cast(JSON, envelope["payload"])
+        payload = envelope["payload"]
 
         self._message = message
         self._channel = channel
 
-        self.archive_id = cast(str, payload["archiveId"])
-        self.correlation_id = cast(str, envelope["correlationId"])
-        self.decision_version = cast(int, payload["decisionVersion"])
-        self.package_digest = cast(str, payload["packageDigest"])
-        self.occurred_at = cast(str, envelope["occurredAt"])
+        self.archive_id = payload["archiveId"]
+        self.correlation_id = envelope["correlationId"]
+        self.decision_version = payload["decisionVersion"]
+        self.package_digest = payload["packageDigest"]
+        self.occurred_at = envelope["occurredAt"]
         self.retry_exhausted = retry_exhausted
 
     async def ack(self) -> None:
@@ -308,7 +315,7 @@ class RabbitMQPublicationDecisionConsumer(ArchivePublicationConsumer):
             yield RabbitMQPublicationDecisionMessage(
                 message=delivery.message,
                 channel=delivery.channel,
-                envelope=delivery.envelope,
+                envelope=cast(ArchivePublicationDecidedEnvelope, delivery.envelope),
                 retry_exhausted=delivery.retry_exhausted,
             )
 
@@ -323,19 +330,19 @@ class RabbitMQCompensationDecisionMessage(ArchiveCompensationMessage):
         self,
         message: AbstractIncomingMessage,
         channel: AbstractChannel,
-        envelope: JSON,
+        envelope: ArchiveCompensationDecidedEnvelope,
         retry_exhausted: bool,
     ) -> None:
-        payload = cast(JSON, envelope["payload"])
+        payload = envelope["payload"]
 
         self._message = message
         self._channel = channel
 
-        self.archive_id = cast(str, payload["archiveId"])
-        self.correlation_id = cast(str, envelope["correlationId"])
-        self.decision_version = cast(int, payload["decisionVersion"])
-        self.reason_code = cast(str, payload["reasonCode"])
-        self.occurred_at = cast(str, envelope["occurredAt"])
+        self.archive_id = payload["archiveId"]
+        self.correlation_id = envelope["correlationId"]
+        self.decision_version = payload["decisionVersion"]
+        self.reason_code = payload["reasonCode"]
+        self.occurred_at = envelope["occurredAt"]
         self.retry_exhausted = retry_exhausted
 
     async def ack(self) -> None:
@@ -369,7 +376,7 @@ class RabbitMQCompensationDecisionConsumer(ArchiveCompensationConsumer):
             yield RabbitMQCompensationDecisionMessage(
                 message=delivery.message,
                 channel=delivery.channel,
-                envelope=delivery.envelope,
+                envelope=cast(ArchiveCompensationDecidedEnvelope, delivery.envelope),
                 retry_exhausted=delivery.retry_exhausted,
             )
 

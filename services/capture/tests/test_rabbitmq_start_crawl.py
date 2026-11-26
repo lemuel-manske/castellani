@@ -14,13 +14,13 @@ from support.domain import frontier_item, outbox_item, outbox_items, run_item
 from adapters.messaging.rabbitmq.consumer import RabbitMQStartCrawlConsumer
 from adapters.persistence.dynamodb.run import DynamoDBRunStarter
 from application.capture.start_crawls import StartCrawlProcessor
+from contracts.messages import START_CRAWL_EVENT
 from domain.capture import StartCrawl, identify_url
 from ports.capture import CrawlStarter
 from topology.messaging import (
     CAPTURE_DEAD_QUEUE,
     CAPTURE_PAGE_QUEUE,
     EVENTS_EXCHANGE_NAME,
-    START_CRAWL_EVENT,
     START_CRAWL_QUEUE,
     START_CRAWL_RETRY_QUEUE,
 )

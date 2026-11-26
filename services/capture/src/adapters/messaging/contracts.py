@@ -9,6 +9,7 @@ from jsonschema.validators import validator_for
 from referencing import Registry, Resource
 
 from config.environment import CAPTURE_CONTRACTS_DIR
+from contracts.envelope import Envelope
 from utils.types import JSON
 
 SCHEMA_DIRS = ("documents", "messages", "types")
@@ -16,7 +17,7 @@ SCHEMA_DIRS = ("documents", "messages", "types")
 SCHEMA_GLOB = "*.v1.schema.json"
 
 
-def validate_message(body: bytes, message_type: str) -> JSON | None:
+def validate_message(body: bytes, message_type: str) -> Envelope[JSON] | None:
     contract_validators = validators()
 
     try:
@@ -32,7 +33,7 @@ def validate_message(body: bytes, message_type: str) -> JSON | None:
     if validator is None or not validator.is_valid(decoded):
         return None
 
-    return cast(JSON, decoded)
+    return cast(Envelope[JSON], decoded)
 
 
 @cache
