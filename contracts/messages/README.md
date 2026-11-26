@@ -20,12 +20,19 @@ All broker messages validate against `../types/envelope.v1.schema.json` and thei
 ## Semantic conventions
 
 - Commands are requests to perform work (`StartCrawl`, `CapturePage`); events report committed facts (the rest).
+
 - `messageId` identifies a **logical emission**, not `archiveId`, `snapshotId`, task, or attempt. Retrying the same outbox emission preserves its original `messageId`. Distinct logical emissions have distinct message IDs even if they refer to the same run.
+
 - `correlationId` is `archiveId` for all run-scoped events. No cross-service raw credential or browser state data travels in payloads.
+
 - Version is a major schema contract number. Producers must not change v1 payload semantics incompatibly. Add optional compatible fields or emit a new explicit version; consumers must reject or DLQ unsupported versions without losing business recovery accounting.
+
 - A `CrawlCompleted` event gives the Indexer a recovery source: immutable manifest entries, not another service's DynamoDB records. The manifest digest must remain consistent for a run.
+
 - A durable `ArchivePublicationDecided` event proves Coordinator's decision *only once* a participant reconciles it with valid local run and package facts. Capture must persist the accepted decision, fence stale operations, and check local `PUBLISHED` on every replay read.
+
 - Search stores publish decision and replay publication as **independent** facts. It can see either first. It must not expose search results unless both refer to the same authorized run/package. `SearchReady` means eventual projection readiness, not a prerequisite for `COMPLETED`.
+
 - The Coordinator correlates compensation acknowledgments by decision version, not by delivery order. Publication and compensation events are mutually exclusive for a run.
 
 ## Delivery topology
@@ -36,4 +43,4 @@ Retries use bounded attempts and backoff, with failed poison messages routed to 
 
 ## Manifest and compatibility
 
-Final capture-set manifest uses the document contract `../documents/archive-manifest.v1.schema.json`, whose artifact references use the shared `../types/artifact-ref.v1.schema.json` type. Its `snapshots` array enumerates the **authorized successful** snapshots only; `failedPages` reports failed logical navigations. A manifest is immutable once emitted. WACZ contents are selected from the same committed manifest, and package digest identifies the prepared immutable artifact. Artifact refs are readable through authorized service-to-service S3 access without granting read access to Capture-private DynamoDB tables.
+Final capture-set manifest uses the document contract `archive-manifest.v1.schema.json`, whose artifact references use the shared `../types/artifact-ref.v1.schema.json` type. Its `snapshots` array enumerates the **authorized successful** snapshots only; `failedPages` reports failed logical navigations. A manifest is immutable once emitted. WACZ contents are selected from the same committed manifest, and package digest identifies the prepared immutable artifact. Artifact refs are readable through authorized service-to-service S3 access without granting read access to Capture-private DynamoDB tables.
