@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 
 from config.environment import (
+    CAPTURE_ALLOW_PRIVATE_NETWORKS,
     CAPTURE_ARTIFACT_DIRECTORY,
     CAPTURE_AWS_ACCESS_KEY_ID,
     CAPTURE_AWS_REGION,
@@ -15,6 +16,7 @@ from config.environment import (
     CAPTURE_RABBITMQ_URL,
     CAPTURE_S3_ENDPOINT_URL,
     auth_profile_key,
+    boolean,
     positive_float,
     positive_int,
     required,
@@ -51,6 +53,7 @@ class CaptureSettings:
     outbox_retry_delay: float = DEFAULT_OUTBOX_RETRY_DELAY
 
     artifact_directory: str = DEFAULT_ARTIFACT_DIRECTORY
+    allow_private_networks: bool = False
 
     @classmethod
     def from_environment(cls) -> "CaptureSettings":
@@ -86,4 +89,5 @@ class CaptureSettings:
                 CAPTURE_ARTIFACT_DIRECTORY,
                 DEFAULT_ARTIFACT_DIRECTORY,
             ),
+            allow_private_networks=boolean(CAPTURE_ALLOW_PRIVATE_NETWORKS),
         )
