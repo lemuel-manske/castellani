@@ -199,7 +199,7 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
     ) -> ArtifactReference:
         def upload() -> ArtifactReference:
             digest = file_digest(path)
-            size_bytes = path.stat().st_size
+
             key = package_key(archive_id, manifest_digest, digest)
 
             self.client.upload_file(
@@ -218,6 +218,8 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
 
             if metadata.get("Metadata", {}).get("sha256") != digest:
                 raise RuntimeError(f"S3 package checksum metadata mismatch for {key}")
+
+            size_bytes = path.stat().st_size
 
             if metadata.get("ContentLength") != size_bytes:
                 raise RuntimeError(f"S3 package size mismatch for {key}")
