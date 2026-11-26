@@ -704,7 +704,4 @@ def artifact_attribute(artifact: ArtifactReference) -> dict[str, Any]:
         "sizeBytes": {"N": str(artifact.size_bytes)},
     }
 
-    if artifact.version_id is not None:
-        values["versionId"] = {"S": artifact.version_id}
-
     return {"M": values}
