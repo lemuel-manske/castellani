@@ -264,10 +264,12 @@ def delete_objects_by_prefix(client: Any, prefixes: tuple[str, ...]) -> int:
 
         for offset in range(0, len(objects), DELETE_BATCH_SIZE):
             batch = objects[offset : offset + DELETE_BATCH_SIZE]
+
             client.delete_objects(
                 Bucket=ARCHIVE_ARTIFACTS_BUCKET,
                 Delete={"Objects": batch, "Quiet": True},
             )
+
             deleted += len(batch)
 
     return deleted
