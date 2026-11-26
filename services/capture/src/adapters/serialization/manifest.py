@@ -64,14 +64,11 @@ def snapshot_entry(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def artifact_reference(raw: ArtifactReferenceContract) -> ArtifactReference:
-    version = raw.get("versionId")
-
     return ArtifactReference(
         bucket=str(raw["bucket"]),
         key=str(raw["key"]),
         sha256=str(raw["sha256"]),
         size_bytes=int(raw["sizeBytes"]),
-        version_id=None if version is None else str(version),
     )
 
 
@@ -83,8 +80,6 @@ def artifact_document(reference: ArtifactReference) -> ArtifactReferenceContract
         "sizeBytes": reference.size_bytes,
     }
 
-    if reference.version_id is not None:
-        document["versionId"] = reference.version_id
 
     return document
 
