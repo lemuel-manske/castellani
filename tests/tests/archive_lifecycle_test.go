@@ -71,6 +71,7 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, waczResponse.Status)
 	require.Equal(
+		t,
 		"application/wacz",
 		waczResponse.Header.Get(testutil.HeaderContentType),
 	)
