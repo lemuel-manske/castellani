@@ -31,4 +31,3 @@ class PackageArtifacts(ABC):
         archive_id: str,
         manifest_digest: str,
     ) -> ArtifactReference: ...
-

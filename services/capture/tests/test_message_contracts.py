@@ -96,6 +96,10 @@ def test_message_contracts_validate_start_crawl_from_contract() -> None:
 
 
 def test_message_contracts_validate_crawl_completed_with_shared_manifest_ref() -> None:
+    key = (
+        "manifests/archive-1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+    )
+
     envelope = {
         "messageId": "message-completed",
         "correlationId": "archive-1",
@@ -106,7 +110,7 @@ def test_message_contracts_validate_crawl_completed_with_shared_manifest_ref() -
             "archiveId": "archive-1",
             "manifest": {
                 "bucket": "castellani-archive-manifests",
-                "key": "manifests/archive-1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json",
+                "key": key,
                 "sha256": "a" * 64,
                 "sizeBytes": 128,
                 "versionId": "legacy-version",
@@ -128,12 +132,8 @@ def test_python_contract_types_match_shared_schemas() -> None:
 
     assert set(Envelope.__annotations__) == set(envelope_schema["properties"])
     assert Envelope.__required_keys__ == frozenset(envelope_schema["required"])
-    assert set(ArtifactReferenceContract.__annotations__) == set(
-        artifact_schema["properties"]
-    )
-    assert ArtifactReferenceContract.__required_keys__ == frozenset(
-        artifact_schema["required"]
-    )
+    assert set(ArtifactReferenceContract.__annotations__) == set(artifact_schema["properties"])
+    assert ArtifactReferenceContract.__required_keys__ == frozenset(artifact_schema["required"])
 
     for schema_id, message_type, payload_type in MESSAGE_CONTRACTS:
         schema = contract_schemas[schema_id]

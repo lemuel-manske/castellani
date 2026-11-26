@@ -80,7 +80,6 @@ def artifact_document(reference: ArtifactReference) -> ArtifactReferenceContract
         "sizeBytes": reference.size_bytes,
     }
 
-
     return document
 
 

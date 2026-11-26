@@ -60,9 +60,7 @@ def serialize_attribute(value: object) -> dict[str, Any]:
         return {"M": serialize_map(cast(dict[str, object], value))}
 
     if isinstance(value, list):
-        return {
-            "L": [serialize_attribute(item) for item in cast(list[object], value)]
-        }
+        return {"L": [serialize_attribute(item) for item in cast(list[object], value)]}
 
     raise TypeError(f"unsupported DynamoDB message value: {type(value).__name__}")
 
