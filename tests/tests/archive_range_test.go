@@ -60,8 +60,12 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 	)
 
 	require.Equal(t, http.StatusPartialContent, waczResponse.Status)
-	require.Equal(t, "bytes 0-3/", waczResponse.Header.Get("Content-Range")[:11])
+	require.True(
+		t,
+		strings.HasPrefix(waczResponse.Header.Get("Content-Range"), "bytes 0-3/"),
+		"unexpected Content-Range: %q",
+		waczResponse.Header.Get("Content-Range"),
+	)
 	require.Equal(t, "application/wacz", waczResponse.Header.Get(testutil.HeaderContentType))
 	require.Equal(t, "\x50\x4b\x03\x04", waczResponse.Body)
-	require.True(t, strings.HasPrefix(waczResponse.Header.Get("Content-Range"), "bytes 0-3/"))
 }
