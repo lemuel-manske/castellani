@@ -7,7 +7,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
-func newComposeStack(t *testing.T, composeFile string) *compose.DockerCompose {
+func newComposeStack(t *testing.T, composeFiles ...string) *compose.DockerCompose {
 	t.Helper()
 
 	var (
@@ -16,7 +16,7 @@ func newComposeStack(t *testing.T, composeFile string) *compose.DockerCompose {
 	)
 
 	require.NotPanics(t, func() {
-		stack, err = compose.NewDockerComposeWith(compose.WithStackFiles(composeFile))
+		stack, err = compose.NewDockerComposeWith(compose.WithStackFiles(composeFiles...))
 	}, "Docker must be running to execute the e2e suite")
 
 	require.NoError(t, err)
