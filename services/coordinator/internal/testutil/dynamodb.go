@@ -23,7 +23,11 @@ func setupDynamoDB(t *testing.T, client *dynamodb.Client) {
 
 		tableName := aws.ToString(table.TableName)
 		t.Cleanup(func() {
-			deleteDynamoDBTable(t, client, tableName)
+			deleteDynamoDBTable(
+				t,
+				client,
+				tableName,
+			)
 		})
 
 		waitContext, cancel := context.WithTimeout(t.Context(), tableWaitTimeout)
@@ -40,7 +44,11 @@ func setupDynamoDB(t *testing.T, client *dynamodb.Client) {
 	}
 }
 
-func deleteDynamoDBTable(t *testing.T, client *dynamodb.Client, tableName string) {
+func deleteDynamoDBTable(
+	t *testing.T,
+	client *dynamodb.Client,
+	tableName string,
+) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), tableWaitTimeout)
@@ -51,7 +59,11 @@ func deleteDynamoDBTable(t *testing.T, client *dynamodb.Client, tableName string
 	})
 
 	if err != nil {
-		t.Errorf("delete DynamoDB table %s: %v", tableName, err)
+		t.Errorf(
+			"delete DynamoDB table %s: %v",
+			tableName,
+			err,
+		)
 
 		return
 	}
@@ -65,7 +77,11 @@ func deleteDynamoDBTable(t *testing.T, client *dynamodb.Client, tableName string
 	)
 
 	if err != nil {
-		t.Errorf("wait for DynamoDB table %s to be deleted: %v", tableName, err)
+		t.Errorf(
+			"wait for DynamoDB table %s to be deleted: %v",
+			tableName,
+			err,
+		)
 	}
 }
 

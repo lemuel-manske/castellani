@@ -1,22 +1,8 @@
-// Package contracts contains Coordinator message wire types.
 package contracts
 
-// Keep these definitions in sync with the repository-root
-// contracts/messages/start-crawl.v1.schema.json, which is the source of truth.
-const (
-	StartCrawlType  = "StartCrawl"
+const StartCrawlType = "StartCrawl"
 
-	EnvelopeVersion = 1
-)
-
-type StartCrawlEnvelope struct {
-	MessageID     string            `json:"messageId"`
-	CorrelationID string            `json:"correlationId"`
-	Type          string            `json:"type"`
-	Version       int               `json:"version"`
-	OccurredAt    string            `json:"occurredAt"`
-	Payload       StartCrawlPayload `json:"payload"`
-}
+type StartCrawlEnvelope = Envelope[StartCrawlPayload]
 
 type StartCrawlPayload struct {
 	ArchiveID      string   `json:"archiveId"`

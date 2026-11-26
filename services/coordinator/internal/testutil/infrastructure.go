@@ -34,17 +34,41 @@ func NewInfrastructure(t *testing.T) *Infrastructure {
 	accessKeyID := os.Getenv(config.AccessKeyIDEnvironment)
 	secretAccessKey := os.Getenv(config.SecretAccessKeyEnvironment)
 
-	require.NotEmpty(t, dynamoDBEndpoint, config.DynamoDBEndpointEnvironment)
-	require.NotEmpty(t, rabbitMQURL, config.RabbitMQURLEnvironment)
-	require.NotEmpty(t, awsRegion, config.RegionEnvironment)
-	require.NotEmpty(t, accessKeyID, config.AccessKeyIDEnvironment)
-	require.NotEmpty(t, secretAccessKey, config.SecretAccessKeyEnvironment)
+	require.NotEmpty(
+		t,
+		dynamoDBEndpoint,
+		config.DynamoDBEndpointEnvironment,
+	)
+	require.NotEmpty(
+		t,
+		rabbitMQURL,
+		config.RabbitMQURLEnvironment,
+	)
+	require.NotEmpty(
+		t,
+		awsRegion,
+		config.RegionEnvironment,
+	)
+	require.NotEmpty(
+		t,
+		accessKeyID,
+		config.AccessKeyIDEnvironment,
+	)
+	require.NotEmpty(
+		t,
+		secretAccessKey,
+		config.SecretAccessKeyEnvironment,
+	)
 
 	awsConfig, err := awsconfig.LoadDefaultConfig(
 		t.Context(),
 		awsconfig.WithRegion(awsRegion),
 		awsconfig.WithCredentialsProvider(
-			awscredentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+			awscredentials.NewStaticCredentialsProvider(
+				accessKeyID,
+				secretAccessKey,
+				"",
+			),
 		),
 	)
 

@@ -88,24 +88,27 @@ func encodeEffect(
 	effect domain.Effect,
 	now time.Time,
 ) ([]byte, error) {
-	payload := map[string]any{
-		"archiveId":       effect.ArchiveID,
-		"decisionVersion": effect.DecisionVersion,
+	var payload any = contracts.ArchiveCompensationDecidedPayload{
+		ArchiveID:       effect.ArchiveID,
+		DecisionVersion: effect.DecisionVersion,
+		ReasonCode:      effect.ReasonCode,
 	}
 
 	if effect.Type == domain.CommandPublicationDecided {
-		payload["packageDigest"] = effect.PackageDigest
-	} else {
-		payload["reasonCode"] = effect.ReasonCode
+		payload = contracts.ArchivePublicationDecidedPayload{
+			ArchiveID:       effect.ArchiveID,
+			DecisionVersion: effect.DecisionVersion,
+			PackageDigest:   effect.PackageDigest,
+		}
 	}
 
-	envelope, err := json.Marshal(map[string]any{
-		"messageId":     messageID,
-		"correlationId": effect.ArchiveID,
-		"type":          effect.Type,
-		"version":       contracts.EnvelopeVersion,
-		"occurredAt":    now.Format(time.RFC3339Nano),
-		"payload":       payload,
+	envelope, err := json.Marshal(contracts.Envelope[any]{
+		MessageID:     messageID,
+		CorrelationID: effect.ArchiveID,
+		Type:          effect.Type,
+		Version:       contracts.EnvelopeVersion,
+		OccurredAt:    now.Format(time.RFC3339Nano),
+		Payload:       payload,
 	})
 
 	if err != nil {

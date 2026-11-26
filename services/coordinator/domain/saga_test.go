@@ -22,17 +22,29 @@ func TestApply_CrawlCompletedWithSuccessfulSeedFinalizes(t *testing.T) {
 		Failed:         1,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:             "archive-1",
-		Status:         StatusFinalizing,
-		Capture:        CaptureProgress{Captured: 3, Failed: 1},
-		Decision:       DecisionNone,
-		CrawlTerminal:  true,
-		SeedSucceeded:  true,
-		ManifestDigest: "manifest-1",
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:     "archive-1",
+			Status: StatusFinalizing,
+			Capture: CaptureProgress{
+				Captured: 3,
+				Failed:   1,
+			},
+			Decision:       DecisionNone,
+			CrawlTerminal:  true,
+			SeedSucceeded:  true,
+			ManifestDigest: "manifest-1",
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -51,30 +63,49 @@ func TestApply_CrawlCompletedWithFailedSeedDecidesCompensation(t *testing.T) {
 		Failed:         1,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:              "archive-1",
-		Status:          StatusCompensating,
-		Capture:         CaptureProgress{Captured: 2, Failed: 1},
-		Decision:        DecisionCompensate,
-		DecisionVersion: 1,
-		CrawlTerminal:   true,
-		ManifestDigest:  "manifest-1",
-	}, next)
-	assert.Equal(t, []Effect{{
-		Type:            CommandCompensationDecided,
-		ArchiveID:       "archive-1",
-		DecisionVersion: 1,
-		ReasonCode:      "seed-capture-failed",
-	}}, effects)
+	assert.Equal(
+		t,
+		Archive{
+			ID:     "archive-1",
+			Status: StatusCompensating,
+			Capture: CaptureProgress{
+				Captured: 2,
+				Failed:   1,
+			},
+			Decision:        DecisionCompensate,
+			DecisionVersion: 1,
+			CrawlTerminal:   true,
+			ManifestDigest:  "manifest-1",
+		},
+		next,
+	)
+
+	assert.Equal(
+		t,
+		[]Effect{{
+			Type:            CommandCompensationDecided,
+			ArchiveID:       "archive-1",
+			DecisionVersion: 1,
+			ReasonCode:      "seed-capture-failed",
+		}},
+		effects,
+	)
 }
 
 func TestApply_CrawlCompletedDuplicateIsIgnored(t *testing.T) {
 	archive := Archive{
-		ID:             "archive-1",
-		Status:         StatusFinalizing,
-		Capture:        CaptureProgress{Captured: 2, Failed: 1},
+		ID:     "archive-1",
+		Status: StatusFinalizing,
+		Capture: CaptureProgress{
+			Captured: 2,
+			Failed:   1,
+		},
 		Decision:       DecisionNone,
 		CrawlTerminal:  true,
 		SeedSucceeded:  true,
@@ -89,7 +120,11 @@ func TestApply_CrawlCompletedDuplicateIsIgnored(t *testing.T) {
 		Failed:         20,
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CrawlCompletedWithDifferentDuplicateManifestIsInvalid(t *testing.T) {
@@ -104,21 +139,35 @@ func TestApply_CrawlCompletedWithDifferentDuplicateManifestIsInvalid(t *testing.
 		ManifestDigest: "manifest-2",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CrawlCompletedWithoutManifestIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Decision: DecisionNone}
+	archive := Archive{
+		ID:       "archive-1",
+		Decision: DecisionNone,
+	}
 	event := Event{
 		ArchiveID: "archive-1",
 		Type:      EventCrawlCompleted,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CrawlCompletedWithNegativeCapturedCountIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Decision: DecisionNone}
+	archive := Archive{
+		ID:       "archive-1",
+		Decision: DecisionNone,
+	}
 	event := Event{
 		ArchiveID:      "archive-1",
 		Type:           EventCrawlCompleted,
@@ -126,11 +175,18 @@ func TestApply_CrawlCompletedWithNegativeCapturedCountIsInvalid(t *testing.T) {
 		Captured:       -1,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CrawlCompletedWithNegativeFailedCountIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Decision: DecisionNone}
+	archive := Archive{
+		ID:       "archive-1",
+		Decision: DecisionNone,
+	}
 	event := Event{
 		ArchiveID:      "archive-1",
 		Type:           EventCrawlCompleted,
@@ -138,7 +194,11 @@ func TestApply_CrawlCompletedWithNegativeFailedCountIsInvalid(t *testing.T) {
 		Failed:         -1,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CrawlCompletedAfterDecisionIsIgnored(t *testing.T) {
@@ -155,11 +215,18 @@ func TestApply_CrawlCompletedAfterDecisionIsIgnored(t *testing.T) {
 		SeedSucceeded:  true,
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedStoresDigests(t *testing.T) {
-	archive := Archive{ID: "archive-1", Decision: DecisionNone}
+	archive := Archive{
+		ID:       "archive-1",
+		Decision: DecisionNone,
+	}
 	event := Event{
 		ArchiveID:      "archive-1",
 		Type:           EventArchivePrepared,
@@ -167,38 +234,61 @@ func TestApply_ArchivePreparedStoresDigests(t *testing.T) {
 		PackageDigest:  "package-1",
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:                     "archive-1",
-		Decision:               DecisionNone,
-		ManifestDigest:         "",
-		PreparedManifestDigest: "manifest-1",
-		PackageDigest:          "package-1",
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:                     "archive-1",
+			Decision:               DecisionNone,
+			ManifestDigest:         "",
+			PreparedManifestDigest: "manifest-1",
+			PackageDigest:          "package-1",
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
 func TestApply_ArchivePreparedWithoutPackageDigestIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Decision: DecisionNone}
+	archive := Archive{
+		ID:       "archive-1",
+		Decision: DecisionNone,
+	}
 	event := Event{
 		ArchiveID:      "archive-1",
 		Type:           EventArchivePrepared,
 		ManifestDigest: "manifest-1",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedWithoutManifestDigestIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Decision: DecisionNone}
+	archive := Archive{
+		ID:       "archive-1",
+		Decision: DecisionNone,
+	}
 	event := Event{
 		ArchiveID:     "archive-1",
 		Type:          EventArchivePrepared,
 		PackageDigest: "package-1",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedDuplicateIsIgnored(t *testing.T) {
@@ -215,7 +305,11 @@ func TestApply_ArchivePreparedDuplicateIsIgnored(t *testing.T) {
 		PackageDigest:  "package-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedWithDifferentPackageDigestIsInvalid(t *testing.T) {
@@ -232,7 +326,11 @@ func TestApply_ArchivePreparedWithDifferentPackageDigestIsInvalid(t *testing.T) 
 		PackageDigest:  "package-2",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedWithDifferentManifestDigestIsInvalid(t *testing.T) {
@@ -249,7 +347,11 @@ func TestApply_ArchivePreparedWithDifferentManifestDigestIsInvalid(t *testing.T)
 		PackageDigest:  "package-1",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedAfterDecisionIsIgnored(t *testing.T) {
@@ -264,7 +366,11 @@ func TestApply_ArchivePreparedAfterDecisionIsIgnored(t *testing.T) {
 		PackageDigest:  "package-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePreparedAfterSuccessfulCrawlDecidesPublication(t *testing.T) {
@@ -283,25 +389,38 @@ func TestApply_ArchivePreparedAfterSuccessfulCrawlDecidesPublication(t *testing.
 		PackageDigest:  "package-1",
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:                     "archive-1",
-		Status:                 StatusFinalizing,
-		Decision:               DecisionPublish,
-		DecisionVersion:        1,
-		CrawlTerminal:          true,
-		SeedSucceeded:          true,
-		ManifestDigest:         "manifest-1",
-		PreparedManifestDigest: "manifest-1",
-		PackageDigest:          "package-1",
-	}, next)
-	assert.Equal(t, []Effect{{
-		Type:            CommandPublicationDecided,
-		ArchiveID:       "archive-1",
-		DecisionVersion: 1,
-		PackageDigest:   "package-1",
-	}}, effects)
+	assert.Equal(
+		t,
+		Archive{
+			ID:                     "archive-1",
+			Status:                 StatusFinalizing,
+			Decision:               DecisionPublish,
+			DecisionVersion:        1,
+			CrawlTerminal:          true,
+			SeedSucceeded:          true,
+			ManifestDigest:         "manifest-1",
+			PreparedManifestDigest: "manifest-1",
+			PackageDigest:          "package-1",
+		},
+		next,
+	)
+
+	assert.Equal(
+		t,
+		[]Effect{{
+			Type:            CommandPublicationDecided,
+			ArchiveID:       "archive-1",
+			DecisionVersion: 1,
+			PackageDigest:   "package-1",
+		}},
+		effects,
+	)
 }
 
 func TestApply_ArchivePreparedAfterCrawlWithDifferentManifestIsInvalid(t *testing.T) {
@@ -319,7 +438,11 @@ func TestApply_ArchivePreparedAfterCrawlWithDifferentManifestIsInvalid(t *testin
 		PackageDigest:  "package-1",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CrawlCompletedAfterPreparedPackageDecidesPublication(t *testing.T) {
@@ -338,26 +461,41 @@ func TestApply_CrawlCompletedAfterPreparedPackageDecidesPublication(t *testing.T
 		Captured:       3,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:                     "archive-1",
-		Status:                 StatusFinalizing,
-		Capture:                CaptureProgress{Captured: 3},
-		Decision:               DecisionPublish,
-		DecisionVersion:        1,
-		CrawlTerminal:          true,
-		SeedSucceeded:          true,
-		ManifestDigest:         "manifest-1",
-		PreparedManifestDigest: "manifest-1",
-		PackageDigest:          "package-1",
-	}, next)
-	assert.Equal(t, []Effect{{
-		Type:            CommandPublicationDecided,
-		ArchiveID:       "archive-1",
-		DecisionVersion: 1,
-		PackageDigest:   "package-1",
-	}}, effects)
+	assert.Equal(
+		t,
+		Archive{
+			ID:     "archive-1",
+			Status: StatusFinalizing,
+			Capture: CaptureProgress{
+				Captured: 3,
+			},
+			Decision:               DecisionPublish,
+			DecisionVersion:        1,
+			CrawlTerminal:          true,
+			SeedSucceeded:          true,
+			ManifestDigest:         "manifest-1",
+			PreparedManifestDigest: "manifest-1",
+			PackageDigest:          "package-1",
+		},
+		next,
+	)
+
+	assert.Equal(
+		t,
+		[]Effect{{
+			Type:            CommandPublicationDecided,
+			ArchiveID:       "archive-1",
+			DecisionVersion: 1,
+			PackageDigest:   "package-1",
+		}},
+		effects,
+	)
 }
 
 func TestApply_CrawlCompletedWithDifferentPreparedManifestIsInvalid(t *testing.T) {
@@ -374,7 +512,11 @@ func TestApply_CrawlCompletedWithDifferentPreparedManifestIsInvalid(t *testing.T
 		SeedSucceeded:  true,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePublishedCompletesArchiveAndReadiesReplay(t *testing.T) {
@@ -392,24 +534,38 @@ func TestApply_ArchivePublishedCompletesArchiveAndReadiesReplay(t *testing.T) {
 		PackageDigest:   "package-1",
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:              "archive-1",
-		Status:          StatusCompleted,
-		Replay:          ReplayProgress{Status: ReplayReady},
-		Decision:        DecisionPublish,
-		DecisionVersion: 2,
-		PackageDigest:   "package-1",
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:     "archive-1",
+			Status: StatusCompleted,
+			Replay: ReplayProgress{
+				Status: ReplayReady,
+			},
+			Decision:        DecisionPublish,
+			DecisionVersion: 2,
+			PackageDigest:   "package-1",
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
 func TestApply_ArchivePublishedWithCaptureFailuresCompletesWithErrors(t *testing.T) {
 	archive := Archive{
-		ID:              "archive-1",
-		Status:          StatusFinalizing,
-		Capture:         CaptureProgress{Captured: 2, Failed: 1},
+		ID:     "archive-1",
+		Status: StatusFinalizing,
+		Capture: CaptureProgress{
+			Captured: 2,
+			Failed:   1,
+		},
 		Decision:        DecisionPublish,
 		DecisionVersion: 2,
 		PackageDigest:   "package-1",
@@ -421,17 +577,31 @@ func TestApply_ArchivePublishedWithCaptureFailuresCompletesWithErrors(t *testing
 		PackageDigest:   "package-1",
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:              "archive-1",
-		Status:          StatusCompletedWithErrors,
-		Capture:         CaptureProgress{Captured: 2, Failed: 1},
-		Replay:          ReplayProgress{Status: ReplayReady},
-		Decision:        DecisionPublish,
-		DecisionVersion: 2,
-		PackageDigest:   "package-1",
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:     "archive-1",
+			Status: StatusCompletedWithErrors,
+			Capture: CaptureProgress{
+				Captured: 2,
+				Failed:   1,
+			},
+			Replay: ReplayProgress{
+				Status: ReplayReady,
+			},
+			Decision:        DecisionPublish,
+			DecisionVersion: 2,
+			PackageDigest:   "package-1",
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -450,7 +620,11 @@ func TestApply_ArchivePublishedWithoutPublishDecisionIsIgnored(t *testing.T) {
 		PackageDigest:   "package-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePublishedWithDifferentDecisionVersionIsIgnored(t *testing.T) {
@@ -468,7 +642,11 @@ func TestApply_ArchivePublishedWithDifferentDecisionVersionIsIgnored(t *testing.
 		PackageDigest:   "package-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchivePublishedWithDifferentPackageDigestIsIgnored(t *testing.T) {
@@ -486,14 +664,20 @@ func TestApply_ArchivePublishedWithDifferentPackageDigestIsIgnored(t *testing.T)
 		PackageDigest:   "package-2",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_DuplicateArchivePublishedForCompletedArchiveIsIgnored(t *testing.T) {
 	archive := Archive{
-		ID:              "archive-1",
-		Status:          StatusCompleted,
-		Replay:          ReplayProgress{Status: ReplayNotReady},
+		ID:     "archive-1",
+		Status: StatusCompleted,
+		Replay: ReplayProgress{
+			Status: ReplayNotReady,
+		},
 		Decision:        DecisionPublish,
 		DecisionVersion: 2,
 		PackageDigest:   "package-1",
@@ -505,14 +689,20 @@ func TestApply_DuplicateArchivePublishedForCompletedArchiveIsIgnored(t *testing.
 		PackageDigest:   "package-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_DuplicateArchivePublishedForCompletedWithErrorsArchiveIsIgnored(t *testing.T) {
 	archive := Archive{
-		ID:              "archive-1",
-		Status:          StatusCompletedWithErrors,
-		Replay:          ReplayProgress{Status: ReplayNotReady},
+		ID:     "archive-1",
+		Status: StatusCompletedWithErrors,
+		Replay: ReplayProgress{
+			Status: ReplayNotReady,
+		},
 		Decision:        DecisionPublish,
 		DecisionVersion: 2,
 		PackageDigest:   "package-1",
@@ -524,7 +714,11 @@ func TestApply_DuplicateArchivePublishedForCompletedWithErrorsArchiveIsIgnored(t
 		PackageDigest:   "package-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_ArchiveCompensatedMarksCaptureCompensated(t *testing.T) {
@@ -540,15 +734,24 @@ func TestApply_ArchiveCompensatedMarksCaptureCompensated(t *testing.T) {
 		DecisionVersion: 3,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:                 "archive-1",
-		Status:             StatusCompensating,
-		Decision:           DecisionCompensate,
-		DecisionVersion:    3,
-		CaptureCompensated: true,
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:                 "archive-1",
+			Status:             StatusCompensating,
+			Decision:           DecisionCompensate,
+			DecisionVersion:    3,
+			CaptureCompensated: true,
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -565,15 +768,24 @@ func TestApply_SearchCompensatedMarksSearchCompensated(t *testing.T) {
 		DecisionVersion: 3,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:                "archive-1",
-		Status:            StatusCompensating,
-		Decision:          DecisionCompensate,
-		DecisionVersion:   3,
-		SearchCompensated: true,
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:                "archive-1",
+			Status:            StatusCompensating,
+			Decision:          DecisionCompensate,
+			DecisionVersion:   3,
+			SearchCompensated: true,
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -591,16 +803,25 @@ func TestApply_CompensationCompletesWhenBothTargetsAreCompensated(t *testing.T) 
 		DecisionVersion: 3,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:                 "archive-1",
-		Status:             StatusFailed,
-		Decision:           DecisionCompensate,
-		DecisionVersion:    3,
-		CaptureCompensated: true,
-		SearchCompensated:  true,
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:                 "archive-1",
+			Status:             StatusFailed,
+			Decision:           DecisionCompensate,
+			DecisionVersion:    3,
+			CaptureCompensated: true,
+			SearchCompensated:  true,
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -617,7 +838,11 @@ func TestApply_CompensationForDifferentDecisionIsIgnored(t *testing.T) {
 		DecisionVersion: 3,
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_CompensationWithDifferentDecisionVersionIsIgnored(t *testing.T) {
@@ -633,7 +858,11 @@ func TestApply_CompensationWithDifferentDecisionVersionIsIgnored(t *testing.T) {
 		DecisionVersion: 2,
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchReadyMarksSearchReady(t *testing.T) {
@@ -643,7 +872,11 @@ func TestApply_SearchReadyMarksSearchReady(t *testing.T) {
 		Decision:        DecisionPublish,
 		DecisionVersion: 2,
 		ManifestDigest:  "manifest-1",
-		Search:          SearchProgress{Status: SearchIndexing, Indexed: 2, Expected: 4},
+		Search: SearchProgress{
+			Status:   SearchIndexing,
+			Indexed:  2,
+			Expected: 4,
+		},
 	}
 	event := Event{
 		ArchiveID:       "archive-1",
@@ -652,16 +885,29 @@ func TestApply_SearchReadyMarksSearchReady(t *testing.T) {
 		ManifestDigest:  "manifest-1",
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:              "archive-1",
-		Status:          StatusFinalizing,
-		Decision:        DecisionPublish,
-		DecisionVersion: 2,
-		ManifestDigest:  "manifest-1",
-		Search:          SearchProgress{Status: SearchReady, Indexed: 2, Expected: 4},
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:              "archive-1",
+			Status:          StatusFinalizing,
+			Decision:        DecisionPublish,
+			DecisionVersion: 2,
+			ManifestDigest:  "manifest-1",
+			Search: SearchProgress{
+				Status:   SearchReady,
+				Indexed:  2,
+				Expected: 4,
+			},
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -671,7 +917,9 @@ func TestApply_SearchReadyWithoutPublishDecisionIsIgnored(t *testing.T) {
 		Decision:        DecisionCompensate,
 		DecisionVersion: 2,
 		ManifestDigest:  "manifest-1",
-		Search:          SearchProgress{Status: SearchPending},
+		Search: SearchProgress{
+			Status: SearchPending,
+		},
 	}
 	event := Event{
 		ArchiveID:       "archive-1",
@@ -680,7 +928,11 @@ func TestApply_SearchReadyWithoutPublishDecisionIsIgnored(t *testing.T) {
 		ManifestDigest:  "manifest-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchReadyWithDifferentDecisionVersionIsIgnored(t *testing.T) {
@@ -689,7 +941,9 @@ func TestApply_SearchReadyWithDifferentDecisionVersionIsIgnored(t *testing.T) {
 		Decision:        DecisionPublish,
 		DecisionVersion: 2,
 		ManifestDigest:  "manifest-1",
-		Search:          SearchProgress{Status: SearchIndexing},
+		Search: SearchProgress{
+			Status: SearchIndexing,
+		},
 	}
 	event := Event{
 		ArchiveID:       "archive-1",
@@ -698,7 +952,11 @@ func TestApply_SearchReadyWithDifferentDecisionVersionIsIgnored(t *testing.T) {
 		ManifestDigest:  "manifest-1",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchReadyWithDifferentManifestIsIgnored(t *testing.T) {
@@ -707,7 +965,9 @@ func TestApply_SearchReadyWithDifferentManifestIsIgnored(t *testing.T) {
 		Decision:        DecisionPublish,
 		DecisionVersion: 2,
 		ManifestDigest:  "manifest-1",
-		Search:          SearchProgress{Status: SearchIndexing},
+		Search: SearchProgress{
+			Status: SearchIndexing,
+		},
 	}
 	event := Event{
 		ArchiveID:       "archive-1",
@@ -716,7 +976,11 @@ func TestApply_SearchReadyWithDifferentManifestIsIgnored(t *testing.T) {
 		ManifestDigest:  "manifest-2",
 	}
 
-	assertIgnored(t, archive, event)
+	assertIgnored(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchIndexingCompletedTracksProgress(t *testing.T) {
@@ -724,7 +988,9 @@ func TestApply_SearchIndexingCompletedTracksProgress(t *testing.T) {
 		ID:             "archive-1",
 		Status:         StatusFinalizing,
 		ManifestDigest: "manifest-1",
-		Search:         SearchProgress{Status: SearchPending},
+		Search: SearchProgress{
+			Status: SearchPending,
+		},
 	}
 	event := Event{
 		ArchiveID:      "archive-1",
@@ -734,14 +1000,27 @@ func TestApply_SearchIndexingCompletedTracksProgress(t *testing.T) {
 		Expected:       5,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:             "archive-1",
-		Status:         StatusFinalizing,
-		ManifestDigest: "manifest-1",
-		Search:         SearchProgress{Status: SearchIndexing, Indexed: 3, Expected: 5},
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:             "archive-1",
+			Status:         StatusFinalizing,
+			ManifestDigest: "manifest-1",
+			Search: SearchProgress{
+				Status:   SearchIndexing,
+				Indexed:  3,
+				Expected: 5,
+			},
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
@@ -749,7 +1028,11 @@ func TestApply_SearchIndexingCompletedPreservesReadyStatus(t *testing.T) {
 	archive := Archive{
 		ID:             "archive-1",
 		ManifestDigest: "manifest-1",
-		Search:         SearchProgress{Status: SearchReady, Indexed: 2, Expected: 2},
+		Search: SearchProgress{
+			Status:   SearchReady,
+			Indexed:  2,
+			Expected: 2,
+		},
 	}
 	event := Event{
 		ArchiveID:      "archive-1",
@@ -759,28 +1042,49 @@ func TestApply_SearchIndexingCompletedPreservesReadyStatus(t *testing.T) {
 		Expected:       4,
 	}
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, Archive{
-		ID:             "archive-1",
-		ManifestDigest: "manifest-1",
-		Search:         SearchProgress{Status: SearchReady, Indexed: 4, Expected: 4},
-	}, next)
+	assert.Equal(
+		t,
+		Archive{
+			ID:             "archive-1",
+			ManifestDigest: "manifest-1",
+			Search: SearchProgress{
+				Status:   SearchReady,
+				Indexed:  4,
+				Expected: 4,
+			},
+		},
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
 func TestApply_SearchIndexingCompletedWithoutManifestIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1"}
+	archive := Archive{
+		ID: "archive-1",
+	}
 	event := Event{
 		ArchiveID: "archive-1",
 		Type:      EventSearchIndexingCompleted,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchIndexingCompletedWithNegativeIndexedCountIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1"}
+	archive := Archive{
+		ID: "archive-1",
+	}
 	event := Event{
 		ArchiveID:      "archive-1",
 		Type:           EventSearchIndexingCompleted,
@@ -788,11 +1092,17 @@ func TestApply_SearchIndexingCompletedWithNegativeIndexedCountIsInvalid(t *testi
 		Indexed:        -1,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchIndexingCompletedWithNegativeExpectedCountIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1"}
+	archive := Archive{
+		ID: "archive-1",
+	}
 	event := Event{
 		ArchiveID:      "archive-1",
 		Type:           EventSearchIndexingCompleted,
@@ -800,7 +1110,11 @@ func TestApply_SearchIndexingCompletedWithNegativeExpectedCountIsInvalid(t *test
 		Expected:       -1,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_SearchIndexingCompletedWithDifferentManifestIsInvalid(t *testing.T) {
@@ -814,30 +1128,52 @@ func TestApply_SearchIndexingCompletedWithDifferentManifestIsInvalid(t *testing.
 		ManifestDigest: "manifest-2",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_EventForDifferentArchiveIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Status: StatusAccepted}
+	archive := Archive{
+		ID:     "archive-1",
+		Status: StatusAccepted,
+	}
 	event := Event{
 		ArchiveID: "archive-2",
 		Type:      EventCrawlCompleted,
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
 func TestApply_UnknownEventIsInvalid(t *testing.T) {
-	archive := Archive{ID: "archive-1", Status: StatusAccepted}
+	archive := Archive{
+		ID:     "archive-1",
+		Status: StatusAccepted,
+	}
 	event := Event{
 		ArchiveID: "archive-1",
 		Type:      "unknown",
 	}
 
-	assertInvalidEvent(t, archive, event)
+	assertInvalidEvent(
+		t,
+		archive,
+		event,
+	)
 }
 
-func apply(t *testing.T, archive Archive, event Event) (Archive, []Effect) {
+func apply(
+	t *testing.T,
+	archive Archive,
+	event Event,
+) (Archive, []Effect) {
 	t.Helper()
 
 	next, effects, err := Apply(archive, event)
@@ -846,21 +1182,48 @@ func apply(t *testing.T, archive Archive, event Event) (Archive, []Effect) {
 	return next, effects
 }
 
-func assertIgnored(t *testing.T, archive Archive, event Event) {
+func assertIgnored(
+	t *testing.T,
+	archive Archive,
+	event Event,
+) {
 	t.Helper()
 
-	next, effects := apply(t, archive, event)
+	next, effects := apply(
+		t,
+		archive,
+		event,
+	)
 
-	assert.Equal(t, archive, next)
+	assert.Equal(
+		t,
+		archive,
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
 
-func assertInvalidEvent(t *testing.T, archive Archive, event Event) {
+func assertInvalidEvent(
+	t *testing.T,
+	archive Archive,
+	event Event,
+) {
 	t.Helper()
 
 	next, effects, err := Apply(archive, event)
 
-	require.ErrorIs(t, err, ErrInvalidEvent)
-	assert.Equal(t, archive, next)
+	require.ErrorIs(
+		t,
+		err,
+		ErrInvalidEvent,
+	)
+
+	assert.Equal(
+		t,
+		archive,
+		next,
+	)
+
 	assert.Nil(t, effects)
 }
