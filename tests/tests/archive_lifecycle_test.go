@@ -18,6 +18,15 @@ const (
 	archiveTimeout = 3 * time.Minute
 )
 
+// Feature: Successful archive lifecycle
+//
+// Scenario: A valid crawl is accepted, captured, and published as a replayable WACZ.
+// Given the E2E stack is running and a deterministic three-page website is reachable
+// When a client submits an archive request for the website's index page
+// Then the Gateway accepts the request and returns its archive resource location
+// And the archive eventually completes with all three pages captured successfully
+// And each captured page has a retrievable snapshot with matching archive and URL metadata
+// And the published WACZ is retrievable with the expected content type and ZIP signature
 func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	services := infra.Start(t)
 
