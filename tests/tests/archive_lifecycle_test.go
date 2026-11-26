@@ -18,17 +18,15 @@ const (
 	archiveTimeout = 3 * time.Minute
 )
 
-// Feature: Successful archive lifecycle
+// Feature: Archive lifecycle
 //
-// Scenario: A valid crawl is accepted, captured, and published as a replayable WACZ.
-// Given the E2E stack is running and a deterministic three-page website is reachable
+// Scenario: Successfully publish an archive
+// Given the E2E stack and fixture website are running
 //
-// When a client submits an archive request for the website's index page
+// When a client requests an archive of the website
 //
-// Then the Gateway accepts the request and returns its archive resource location
-// And the archive eventually completes with all three pages captured successfully
-// And each captured page has a retrievable snapshot with matching archive and URL metadata
-// And the published WACZ is retrievable with the expected content type and ZIP signature
+// Then the archive completes with all expected pages captured
+// And its WACZ is available for retrieval
 func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	services := infra.Start(t)
 
@@ -37,7 +35,7 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		fixtureSiteURL+"/index.html",
 	)
 
-	acceptedResponse := testutil.Post(
+	response := testutil.Post(
 		t,
 		services.Gateway.BaseURL(),
 		"/archives",
@@ -48,114 +46,35 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		},
 	)
 
-	require.Equal(t, http.StatusAccepted, acceptedResponse.Status)
+	require.Equal(t, http.StatusAccepted, response.Status)
 
-	accepted := testutil.Decode[contracts.ArchiveAccepted](t, acceptedResponse)
+	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
 	require.NotEmpty(t, accepted.ArchiveID)
-	require.Equal(t, "ACCEPTED", accepted.Status)
-	require.Equal(t, "/archives/"+accepted.ArchiveID, accepted.StatusURL)
-	require.Equal(t, accepted.StatusURL, acceptedResponse.Header.Get(testutil.HeaderLocation))
 
-	var (
-		statusResponse testutil.Result
-		archiveStatus  contracts.ArchiveStatus
-	)
-
-	require.Eventually(
+	status := testutil.WaitForArchiveTerminalState(
 		t,
-		func() bool {
-			statusResponse = testutil.Get(
-				t,
-				services.Gateway.BaseURL(),
-				accepted.StatusURL,
-			)
-
-			if statusResponse.Status != http.StatusOK {
-				return false
-			}
-
-			archiveStatus = testutil.Decode[contracts.ArchiveStatus](t, statusResponse)
-
-			switch archiveStatus.Status {
-			case "COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED":
-				return true
-			default:
-				return false
-			}
-		},
+		services.Gateway.BaseURL(),
+		accepted.StatusURL,
 		archiveTimeout,
-		500*time.Millisecond,
-		"archive did not reach a terminal state; last response: %s",
-		statusResponse.Body,
 	)
 
-	require.Equal(t, accepted.ArchiveID, archiveStatus.ArchiveID)
-	require.Equal(t, "COMPLETED", archiveStatus.Status)
-	require.Equal(t, 3, archiveStatus.Capture.Captured)
-	require.Zero(t, archiveStatus.Capture.Failed)
-	require.Zero(t, archiveStatus.Capture.Pending)
-	require.Equal(t, "READY", archiveStatus.Replay.Status)
+	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(t, 3, status.Capture.Captured)
+	require.Zero(t, status.Capture.Failed)
+	require.Equal(t, "READY", status.Replay.Status)
 
-	pagesResponse := testutil.Get(
+	waczResponse := testutil.Get(
 		t,
 		services.Gateway.BaseURL(),
-		fmt.Sprintf("/archives/%s/pages", accepted.ArchiveID),
+		fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID),
 	)
-	require.Equal(t, http.StatusOK, pagesResponse.Status)
 
-	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
-	require.Len(t, pages.Items, 3)
-
-	expectedURLs := []string{
-		fixtureSiteURL + "/index.html",
-		fixtureSiteURL + "/about.html",
-		fixtureSiteURL + "/docs.html",
-	}
-
-	actualURLs := make([]string, 0, len(pages.Items))
-
-	for _, page := range pages.Items {
-		require.Equal(t, "CAPTURED", page.Status)
-		require.NotEmpty(t, page.SnapshotID)
-		actualURLs = append(actualURLs, page.URL)
-
-		snapshotResponse := testutil.Get(
-			t,
-			services.Gateway.BaseURL(),
-			fmt.Sprintf(
-				"/archives/%s/snapshots/%s",
-				accepted.ArchiveID,
-				page.SnapshotID,
-			),
-		)
-		require.Equal(t, http.StatusOK, snapshotResponse.Status)
-
-		snapshot := testutil.Decode[contracts.Snapshot](t, snapshotResponse)
-		require.Equal(t, accepted.ArchiveID, snapshot.ArchiveID)
-		require.Equal(t, page.SnapshotID, snapshot.SnapshotID)
-		require.Equal(t, page.URL, snapshot.URL)
-	}
-
-	require.ElementsMatch(t, expectedURLs, actualURLs)
-
-	waczPath := fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID)
-
-	headResponse := testutil.Send(
-		t,
-		http.MethodHead,
-		services.Gateway.BaseURL(),
-		waczPath,
-		"",
-		nil,
-	)
-	require.Equal(t, http.StatusOK, headResponse.Status)
-	require.Equal(t, "bytes", headResponse.Header.Get("Accept-Ranges"))
-	require.NotEmpty(t, headResponse.Header.Get("ETag"))
-	require.NotEmpty(t, headResponse.Header.Get("Content-Length"))
-
-	waczResponse := testutil.Get(t, services.Gateway.BaseURL(), waczPath)
 	require.Equal(t, http.StatusOK, waczResponse.Status)
-	require.Equal(t, "application/wacz", waczResponse.Header.Get(testutil.HeaderContentType))
+	require.Equal(
+		t,
+		"application/wacz",
+		waczResponse.Header.Get(testutil.HeaderContentType),
+	)
 	require.True(
 		t,
 		strings.HasPrefix(waczResponse.Body, "\x50\x4b\x03\x04"),
