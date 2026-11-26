@@ -45,3 +45,11 @@ For documentation-only changes, a single reviewable step is usually sufficient. 
 - Keep documentation aligned with the authoritative ADRs, specifications, and conventions; do not duplicate design details in service READMEs.
 - At each review checkpoint, summarize the step's result and **explicitly request approval** before proceeding.
 - Do not merge, open a pull request, or perform unrelated cleanup unless the user has authorized that action. Completing the final step does not imply permission to merge.
+
+## 6. Keep diagnostics and logging proportional
+
+- Prefer focused tests, deterministic reproductions, and inspection of existing behavior over adding service-level diagnostic logging.
+- Treat investigation-only instrumentation as temporary: add it narrowly when necessary to identify a failure, use it to establish the root cause, implement the fix, and remove the temporary instrumentation in the same contribution.
+- Keep diagnostic logging permanently only when it provides meaningful operational value: it must help detect or diagnose a production issue enough to justify its runtime, storage, and observability costs.
+- Do not log expected control flow or add speculative, redundant, or duplicated validations and checks merely for reassurance. Keep checks at the layer that owns the relevant invariant.
+- Prefer a focused regression test for the demonstrated failure over retaining investigation scaffolding or broad defensive checks.
