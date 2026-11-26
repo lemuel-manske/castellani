@@ -8,6 +8,7 @@ import (
 
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/topology"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -23,7 +24,7 @@ func (p *RabbitPublisher) Publish(ctx context.Context, message application.Messa
 
 	return p.publish(
 		ctx,
-		p.exchange,
+		topology.EventsExchange,
 		message.Type,
 		publishing,
 	)
@@ -47,7 +48,7 @@ func (p *RabbitPublisher) PublishRetry(
 
 	return p.publish(
 		ctx,
-		RetryExchange,
+		topology.RetryExchange,
 		event.Type,
 		publishing,
 	)

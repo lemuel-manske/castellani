@@ -53,7 +53,11 @@ func Validate(data []byte) (string, error) {
 	}
 
 	if err := validator.Validate(instance); err != nil {
-		return "", fmt.Errorf("validate %s message: %w", envelope.Type, err)
+		return "", fmt.Errorf(
+			"validate %s message: %w",
+			envelope.Type,
+			err,
+		)
 	}
 
 	return envelope.Type, nil
@@ -86,7 +90,11 @@ func loadValidators() (map[string]*jsonschema.Schema, error) {
 		}
 
 		if err := compiler.AddResource(resourceURL, document); err != nil {
-			return nil, fmt.Errorf("add contract %s: %w", path, err)
+			return nil, fmt.Errorf(
+				"add contract %s: %w",
+				path,
+				err,
+			)
 		}
 
 		resources[path] = document
@@ -105,7 +113,11 @@ func loadValidators() (map[string]*jsonschema.Schema, error) {
 		schema, err := compiler.Compile(urls[path])
 
 		if err != nil {
-			return nil, fmt.Errorf("compile contract %s: %w", path, err)
+			return nil, fmt.Errorf(
+				"compile contract %s: %w",
+				path,
+				err,
+			)
 		}
 
 		result[messageType] = schema
@@ -124,10 +136,18 @@ func contractFiles() ([]string, error) {
 	var files []string
 
 	for _, directory := range []string{DocumentsDir, MessagesDir, TypesDir} {
-		directoryFiles, err := filepath.Glob(filepath.Join(root, directory, SchemaGlob))
+		directoryFiles, err := filepath.Glob(filepath.Join(
+			root,
+			directory,
+			SchemaGlob,
+		))
 
 		if err != nil {
-			return nil, fmt.Errorf("glob %s contracts: %w", directory, err)
+			return nil, fmt.Errorf(
+				"glob %s contracts: %w",
+				directory,
+				err,
+			)
 		}
 
 		files = append(files, directoryFiles...)
@@ -142,17 +162,28 @@ func fileURL(path string) (string, error) {
 	absolute, err := filepath.Abs(path)
 
 	if err != nil {
-		return "", fmt.Errorf("resolve contract %s: %w", path, err)
+		return "", fmt.Errorf(
+			"resolve contract %s: %w",
+			path,
+			err,
+		)
 	}
 
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String(), nil
+	return (&url.URL{
+		Scheme: "file",
+		Path:   filepath.ToSlash(absolute),
+	}).String(), nil
 }
 
 func readSchema(path string) (any, error) {
 	file, err := os.Open(path)
 
 	if err != nil {
-		return nil, fmt.Errorf("open contract %s: %w", path, err)
+		return nil, fmt.Errorf(
+			"open contract %s: %w",
+			path,
+			err,
+		)
 	}
 
 	defer file.Close()
@@ -160,7 +191,11 @@ func readSchema(path string) (any, error) {
 	document, err := jsonschema.UnmarshalJSON(file)
 
 	if err != nil {
-		return nil, fmt.Errorf("decode contract %s: %w", path, err)
+		return nil, fmt.Errorf(
+			"decode contract %s: %w",
+			path,
+			err,
+		)
 	}
 
 	return document, nil

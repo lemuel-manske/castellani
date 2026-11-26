@@ -23,8 +23,7 @@ type RabbitConsumer struct {
 }
 
 type RabbitPublisher struct {
-	url      string
-	exchange string
+	url string
 }
 
 type InboundEnvelope struct {
@@ -54,7 +53,6 @@ func NewRabbitConsumer(url string, publisher *RabbitPublisher) *RabbitConsumer {
 
 func NewRabbitPublisher(url string) *RabbitPublisher {
 	return &RabbitPublisher{
-		url:      url,
-		exchange: EventsExchange,
+		url: url,
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/lemuel-manske/castellani/services/coordinator/contracts"
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 )
 
@@ -83,39 +83,6 @@ func archiveFromItem(id string, item map[string]types.AttributeValue) domain.Arc
 	}
 }
 
-func outboxPut(
-	messageID, messageType string,
-	envelope []byte,
-	now time.Time,
-) types.TransactWriteItem {
-	return types.TransactWriteItem{
-		Put: &types.Put{
-			TableName:           aws.String(OutboxTable),
-			ConditionExpression: aws.String("attribute_not_exists(messageId)"),
-			Item: map[string]types.AttributeValue{
-				"messageId": &types.AttributeValueMemberS{
-					Value: messageID,
-				},
-				"type": &types.AttributeValueMemberS{
-					Value: messageType,
-				},
-				"state": &types.AttributeValueMemberS{
-					Value: OutboxPending,
-				},
-				"envelope": &types.AttributeValueMemberS{
-					Value: string(envelope),
-				},
-				"createdAt": &types.AttributeValueMemberS{
-					Value: now.Format(time.RFC3339Nano),
-				},
-				"attempts": &types.AttributeValueMemberN{
-					Value: "0",
-				},
-			},
-		},
-	}
-}
-
 func encodeEffect(
 	messageID string,
 	effect domain.Effect,
@@ -136,7 +103,7 @@ func encodeEffect(
 		"messageId":     messageID,
 		"correlationId": effect.ArchiveID,
 		"type":          effect.Type,
-		"version":       messageVersion,
+		"version":       contracts.EnvelopeVersion,
 		"occurredAt":    now.Format(time.RFC3339Nano),
 		"payload":       payload,
 	})

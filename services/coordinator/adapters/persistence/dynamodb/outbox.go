@@ -9,7 +9,7 @@ import (
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 )
 
-func (r *DynamoOutbox) Claim(
+func (r *DynamoOutboxRepository) Claim(
 	ctx context.Context,
 	lease time.Duration,
 ) (application.Message, bool, error) {
@@ -70,7 +70,7 @@ func (r *DynamoOutbox) Claim(
 	}
 }
 
-func (r *DynamoOutbox) Confirm(ctx context.Context, message application.Message) error {
+func (r *DynamoOutboxRepository) Confirm(ctx context.Context, message application.Message) error {
 	return confirmOutboxEntry(
 		ctx,
 		r.client,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
+	"github.com/lemuel-manske/castellani/services/coordinator/contracts"
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 )
 
@@ -35,13 +36,13 @@ func (r *DynamoArchiveRepository) Admit(
 
 	now := time.Now().UTC()
 
-	command := StartCrawlEnvelope{
+	command := contracts.StartCrawlEnvelope{
 		MessageID:     messageID,
 		CorrelationID: archiveID,
-		Type:          StartCrawlType,
-		Version:       messageVersion,
+		Type:          contracts.StartCrawlType,
+		Version:       contracts.EnvelopeVersion,
 		OccurredAt:    now.Format(time.RFC3339Nano),
-		Payload: StartCrawlPayload{
+		Payload: contracts.StartCrawlPayload{
 			ArchiveID:      archiveID,
 			SeedURL:        admission.Submission.SeedURL,
 			MaxDepth:       *admission.Submission.MaxDepth,
@@ -214,7 +215,10 @@ func (r *DynamoArchiveRepository) ListStalled(
 		return nil, errors.New("stalled archive limit must be positive")
 	}
 
-	recoveries := []string{"PUBLISH", "COMPENSATE"}
+	recoveries := []string{
+		domain.DecisionPublish,
+		domain.DecisionCompensate,
+	}
 
 	archives := make(
 		[]domain.Archive,
@@ -294,12 +298,12 @@ func (r *DynamoArchiveRepository) ScheduleRecovery(
 
 func recoveryKey(archive domain.Archive) string {
 	if archive.Status == domain.StatusFinalizing && archive.Decision == domain.DecisionPublish {
-		return "PUBLISH"
+		return domain.DecisionPublish
 	}
 
 	if archive.Status == domain.StatusCompensating && archive.Decision == domain.DecisionCompensate {
-		return "COMPENSATE"
+		return domain.DecisionCompensate
 	}
 
-	return "NONE"
+	return domain.DecisionNone
 }

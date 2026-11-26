@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/lemuel-manske/castellani/services/coordinator/adapters/messaging/dispatcher"
 	"github.com/lemuel-manske/castellani/services/coordinator/adapters/messaging/rabbitmq"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 )
@@ -15,14 +14,10 @@ const (
 	workerRetryDelay = 2 * time.Second
 )
 
-func StartWorkers(
+func StartDispatchWorker(
 	ctx context.Context,
 	logger *slog.Logger,
-	dispatcher *dispatcher.Dispatcher,
-	consumer *rabbitmq.RabbitConsumer,
-	app *application.Application,
-	reconcileInterval time.Duration,
-	stalledWorkflowAge time.Duration,
+	dispatcher *application.OutboxDispatcher,
 ) {
 	go func() {
 		for ctx.Err() == nil {
@@ -49,7 +44,14 @@ func StartWorkers(
 			}
 		}
 	}()
+}
 
+func StartEventConsumerWorker(
+	ctx context.Context,
+	logger *slog.Logger,
+	app *application.Application,
+	consumer *rabbitmq.RabbitConsumer,
+) {
 	go func() {
 		for ctx.Err() == nil {
 			err := consumer.Consume(ctx, app.HandleEvent)
@@ -67,7 +69,15 @@ func StartWorkers(
 			}
 		}
 	}()
+}
 
+func StartReconcileWorker(
+	ctx context.Context,
+	logger *slog.Logger,
+	app *application.Application,
+	reconcileInterval time.Duration,
+	stalledWorkflowAge time.Duration,
+) {
 	go func() {
 		for ctx.Err() == nil {
 			reconciled, err := app.ReconcileStalled(ctx, stalledWorkflowAge)

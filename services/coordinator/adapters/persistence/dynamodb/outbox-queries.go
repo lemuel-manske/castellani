@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
+	"github.com/lemuel-manske/castellani/services/coordinator/topology"
 )
 
 const outboxClaimLimit = 50
@@ -27,7 +28,7 @@ func scanClaimableOutbox(
 ) (outboxPage, error) {
 	page, err := client.Scan(ctx, &dynamodb.ScanInput{
 		ExclusiveStartKey: cursor,
-		TableName:         aws.String(OutboxTable),
+		TableName:         aws.String(topology.OutboxTable),
 		Limit:             aws.Int32(outboxClaimLimit),
 		FilterExpression:  aws.String("#state = :pending OR (#state = :claimed AND leaseUntil < :now)"),
 		ExpressionAttributeNames: map[string]string{
@@ -66,7 +67,7 @@ func claimOutboxEntry(
 	expired int64,
 ) (application.Message, bool, error) {
 	updated, err := client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(OutboxTable),
+		TableName: aws.String(topology.OutboxTable),
 		Key: map[string]types.AttributeValue{
 			"messageId": &types.AttributeValueMemberS{
 				Value: id,
@@ -124,7 +125,7 @@ func confirmOutboxEntry(
 	message application.Message,
 ) error {
 	_, err := client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(OutboxTable),
+		TableName: aws.String(topology.OutboxTable),
 		Key: map[string]types.AttributeValue{
 			"messageId": &types.AttributeValueMemberS{
 				Value: message.ID,

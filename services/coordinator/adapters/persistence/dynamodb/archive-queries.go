@@ -12,7 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/lemuel-manske/castellani/services/coordinator/contracts"
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/topology"
 )
 
 const idempotencyRetention = 48 * time.Hour
@@ -49,7 +51,7 @@ func findAdmissionKey(
 	key string,
 ) (AdmissionKey, bool, error) {
 	response, err := client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(SubmissionsTable),
+		TableName:      aws.String(topology.SubmissionsTable),
 		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"idempotencyKey": &types.AttributeValueMemberS{
@@ -85,7 +87,7 @@ func getArchive(
 	id string,
 ) (domain.Archive, bool, error) {
 	response, err := client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(ArchivesTable),
+		TableName:      aws.String(topology.ArchivesTable),
 		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"archiveId": &types.AttributeValueMemberS{
@@ -113,7 +115,7 @@ func commitAdmission(
 	transaction := []types.TransactWriteItem{
 		{
 			Put: &types.Put{
-				TableName:           aws.String(SubmissionsTable),
+				TableName:           aws.String(topology.SubmissionsTable),
 				ConditionExpression: aws.String("attribute_not_exists(idempotencyKey)"),
 				Item: map[string]types.AttributeValue{
 					"idempotencyKey": &types.AttributeValueMemberS{
@@ -136,7 +138,7 @@ func commitAdmission(
 		},
 		{
 			Put: &types.Put{
-				TableName:           aws.String(ArchivesTable),
+				TableName:           aws.String(topology.ArchivesTable),
 				ConditionExpression: aws.String("attribute_not_exists(archiveId)"),
 				Item: map[string]types.AttributeValue{
 					"archiveId": &types.AttributeValueMemberS{
@@ -149,7 +151,7 @@ func commitAdmission(
 						Value: domain.DecisionNone,
 					},
 					"recoveryKey": &types.AttributeValueMemberS{
-						Value: "NONE",
+						Value: domain.DecisionNone,
 					},
 					"revision": &types.AttributeValueMemberN{
 						Value: "0",
@@ -192,7 +194,7 @@ func commitAdmission(
 		},
 		outboxPut(
 			input.MessageID,
-			StartCrawlType,
+			contracts.StartCrawlType,
 			input.Envelope,
 			input.Now,
 		),
@@ -273,12 +275,10 @@ func commitEvent(
 		},
 	}
 
-	// A condition on the monotonically increasing revision prevents
-	// concurrent replicas from making different decisions.
 	transaction := []types.TransactWriteItem{
 		{
 			Put: &types.Put{
-				TableName:           aws.String(InboxTable),
+				TableName:           aws.String(topology.InboxTable),
 				ConditionExpression: aws.String("attribute_not_exists(messageId)"),
 				Item: map[string]types.AttributeValue{
 					"messageId": &types.AttributeValueMemberS{
@@ -323,16 +323,16 @@ func commitEvent(
 		))
 	}
 
-	// Build an update using attribute aliases: several state fields are
-	// reserved in DynamoDB's expression language.
 	names := map[string]string{
 		"#revision": "revision",
 	}
+
 	values := map[string]types.AttributeValue{
 		":expected": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(input.Before.Revision),
 		},
 	}
+
 	keys := make(
 		[]string,
 		0,
@@ -360,7 +360,7 @@ func commitEvent(
 
 	transaction = append(transaction, types.TransactWriteItem{
 		Update: &types.Update{
-			TableName: aws.String(ArchivesTable),
+			TableName: aws.String(topology.ArchivesTable),
 			Key: map[string]types.AttributeValue{
 				"archiveId": &types.AttributeValueMemberS{
 					Value: input.Before.ID,
@@ -386,7 +386,7 @@ func inboxHasMessage(
 	messageID string,
 ) (bool, error) {
 	response, err := client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(InboxTable),
+		TableName:      aws.String(topology.InboxTable),
 		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"messageId": &types.AttributeValueMemberS{
@@ -419,7 +419,7 @@ func listStalledArchives(
 
 	for len(archives) < limit {
 		page, err := client.Query(ctx, &dynamodb.QueryInput{
-			TableName:              aws.String(ArchivesTable),
+			TableName:              aws.String(topology.ArchivesTable),
 			IndexName:              aws.String("recoveryKey-updatedAt-index"),
 			ExclusiveStartKey:      cursor,
 			Limit:                  aws.Int32(int32(limit - len(archives))),
@@ -474,7 +474,7 @@ func commitRecovery(
 			),
 			{
 				Update: &types.Update{
-					TableName: aws.String(ArchivesTable),
+					TableName: aws.String(topology.ArchivesTable),
 					Key: map[string]types.AttributeValue{
 						"archiveId": &types.AttributeValueMemberS{
 							Value: input.Archive.ID,
@@ -517,4 +517,37 @@ func commitRecovery(
 	})
 
 	return err
+}
+
+func outboxPut(
+	messageID, messageType string,
+	envelope []byte,
+	now time.Time,
+) types.TransactWriteItem {
+	return types.TransactWriteItem{
+		Put: &types.Put{
+			TableName:           aws.String(topology.OutboxTable),
+			ConditionExpression: aws.String("attribute_not_exists(messageId)"),
+			Item: map[string]types.AttributeValue{
+				"messageId": &types.AttributeValueMemberS{
+					Value: messageID,
+				},
+				"type": &types.AttributeValueMemberS{
+					Value: messageType,
+				},
+				"state": &types.AttributeValueMemberS{
+					Value: OutboxPending,
+				},
+				"envelope": &types.AttributeValueMemberS{
+					Value: string(envelope),
+				},
+				"createdAt": &types.AttributeValueMemberS{
+					Value: now.Format(time.RFC3339Nano),
+				},
+				"attempts": &types.AttributeValueMemberN{
+					Value: "0",
+				},
+			},
+		},
+	}
 }

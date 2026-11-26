@@ -108,7 +108,7 @@ func Apply(archive Archive, event Event) (Archive, []Effect, error) {
 			return archive, nil, nil
 		}
 
-		next.Replay.Status = "READY"
+		next.Replay.Status = ReplayReady
 
 		if next.Capture.Failed > 0 {
 			next.Status = StatusCompletedWithErrors
@@ -140,7 +140,7 @@ func Apply(archive Archive, event Event) (Archive, []Effect, error) {
 			return archive, nil, nil
 		}
 
-		next.Search.Status = "READY"
+		next.Search.Status = SearchReady
 
 	case EventSearchIndexingCompleted:
 		if event.ManifestDigest == "" || event.Indexed < 0 || event.Expected < 0 {
@@ -153,8 +153,9 @@ func Apply(archive Archive, event Event) (Archive, []Effect, error) {
 
 		next.Search.Indexed = event.Indexed
 		next.Search.Expected = event.Expected
-		if archive.Search.Status != "READY" {
-			next.Search.Status = "INDEXING"
+
+		if archive.Search.Status != SearchReady {
+			next.Search.Status = SearchIndexing
 		}
 
 	default:

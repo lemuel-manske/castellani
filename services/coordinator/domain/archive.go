@@ -14,17 +14,21 @@ import (
 
 const (
 	StatusAccepted            = "ACCEPTED"
-	StatusRunning             = "RUNNING"
-	StatusFinalizing          = "FINALIZING"
 	StatusCompensating        = "COMPENSATING"
 	StatusCompleted           = "COMPLETED"
 	StatusCompletedWithErrors = "COMPLETED_WITH_ERRORS"
 	StatusFailed              = "FAILED"
+	StatusFinalizing          = "FINALIZING"
+	StatusRunning             = "RUNNING"
 
 	DecisionNone = "NONE"
 
 	ReplayNotReady = "NOT_READY"
+	ReplayReady    = "READY"
+
+	SearchIndexing = "INDEXING"
 	SearchPending  = "PENDING"
+	SearchReady    = "READY"
 )
 
 type Submission struct {
@@ -39,46 +43,6 @@ type Submission struct {
 type ValidationError struct {
 	Field   string
 	Message string
-}
-
-func (e ValidationError) Error() string {
-	return e.Field + " " + e.Message
-}
-
-func (s Submission) Fingerprint() (string, error) {
-	if s.MaxDepth == nil || s.MaxPages == nil {
-		return "", errors.New("cannot fingerprint an invalid submission")
-	}
-
-	origins := append([]string(nil), s.AllowedOrigins...)
-
-	sort.Strings(origins)
-
-	payload := struct {
-		SeedURL        string   `json:"seedUrl"`
-		CollectionID   string   `json:"collectionId,omitempty"`
-		MaxDepth       int      `json:"maxDepth"`
-		MaxPages       int      `json:"maxPages"`
-		AllowedOrigins []string `json:"allowedOrigins,omitempty"`
-		AuthGeneration *int     `json:"authGeneration,omitempty"`
-	}{
-		SeedURL:        s.SeedURL,
-		CollectionID:   s.CollectionID,
-		MaxDepth:       *s.MaxDepth,
-		MaxPages:       *s.MaxPages,
-		AllowedOrigins: origins,
-		AuthGeneration: s.AuthGeneration,
-	}
-
-	data, err := json.Marshal(payload)
-
-	if err != nil {
-		return "", err
-	}
-
-	digest := sha256.Sum256(data)
-
-	return hex.EncodeToString(digest[:]), nil
 }
 
 type CaptureProgress struct {
@@ -114,6 +78,10 @@ type Archive struct {
 	PackageDigest          string
 	CaptureCompensated     bool
 	SearchCompensated      bool
+}
+
+func (e ValidationError) Error() string {
+	return e.Field + " " + e.Message
 }
 
 func (s Submission) Validate() error {
@@ -166,4 +134,40 @@ func (s Submission) Validate() error {
 	}
 
 	return nil
+}
+
+func (s Submission) Fingerprint() (string, error) {
+	if s.MaxDepth == nil || s.MaxPages == nil {
+		return "", errors.New("cannot fingerprint an invalid submission")
+	}
+
+	origins := append([]string(nil), s.AllowedOrigins...)
+
+	sort.Strings(origins)
+
+	payload := struct {
+		SeedURL        string   `json:"seedUrl"`
+		CollectionID   string   `json:"collectionId,omitempty"`
+		MaxDepth       int      `json:"maxDepth"`
+		MaxPages       int      `json:"maxPages"`
+		AllowedOrigins []string `json:"allowedOrigins,omitempty"`
+		AuthGeneration *int     `json:"authGeneration,omitempty"`
+	}{
+		SeedURL:        s.SeedURL,
+		CollectionID:   s.CollectionID,
+		MaxDepth:       *s.MaxDepth,
+		MaxPages:       *s.MaxPages,
+		AllowedOrigins: origins,
+		AuthGeneration: s.AuthGeneration,
+	}
+
+	data, err := json.Marshal(payload)
+
+	if err != nil {
+		return "", err
+	}
+
+	digest := sha256.Sum256(data)
+
+	return hex.EncodeToString(digest[:]), nil
 }

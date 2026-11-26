@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
+	"github.com/lemuel-manske/castellani/services/coordinator/topology"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -43,7 +44,7 @@ func (c *RabbitConsumer) Consume(
 	}
 
 	deliveries, err := channel.Consume(
-		CoordinatorQueue,
+		topology.CoordinatorQueue,
 		"",
 		false,
 		false,

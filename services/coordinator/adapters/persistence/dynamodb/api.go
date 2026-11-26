@@ -13,10 +13,6 @@ const (
 	OutboxClaimed   = "CLAIMED"
 	OutboxPending   = "PENDING"
 	OutboxPublished = "PUBLISHED"
-
-	StartCrawlType = "StartCrawl"
-
-	messageVersion = 1
 )
 
 type AdmissionKey struct {
@@ -24,30 +20,11 @@ type AdmissionKey struct {
 	fingerprint string
 }
 
-type StartCrawlEnvelope struct {
-	MessageID     string            `json:"messageId"`
-	CorrelationID string            `json:"correlationId"`
-	Type          string            `json:"type"`
-	Version       int               `json:"version"`
-	OccurredAt    string            `json:"occurredAt"`
-	Payload       StartCrawlPayload `json:"payload"`
-}
-
-type StartCrawlPayload struct {
-	ArchiveID      string   `json:"archiveId"`
-	SeedURL        string   `json:"seedUrl"`
-	MaxDepth       int      `json:"maxDepth"`
-	MaxPages       int      `json:"maxPages"`
-	CollectionID   string   `json:"collectionId,omitempty"`
-	AllowedOrigins []string `json:"allowedOrigins,omitempty"`
-	AuthGeneration *int     `json:"authGeneration,omitempty"`
-}
-
 type DynamoArchiveRepository struct {
 	client *dynamodb.Client
 }
 
-type DynamoOutbox struct {
+type DynamoOutboxRepository struct {
 	client *dynamodb.Client
 }
 
@@ -57,8 +34,8 @@ func NewDynamoArchiveRepository(client *dynamodb.Client) *DynamoArchiveRepositor
 	}
 }
 
-func NewDynamoOutbox(client *dynamodb.Client) *DynamoOutbox {
-	return &DynamoOutbox{
+func NewDynamoOutboxRepository(client *dynamodb.Client) *DynamoOutboxRepository {
+	return &DynamoOutboxRepository{
 		client: client,
 	}
 }

@@ -61,7 +61,7 @@ func run(logger *slog.Logger) error {
 		listener.Addr().String(),
 	)
 
-	built, err := assembly.NewComponents(
+	built, err := assembly.NewCoordinatorContext(
 		ctx,
 		config.region,
 		config.awsAccessKeyID,
@@ -74,11 +74,22 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	StartWorkers(
+	StartDispatchWorker(
 		ctx,
 		logger,
 		built.Dispatcher,
+	)
+
+	StartEventConsumerWorker(
+		ctx,
+		logger,
+		built.Application,
 		built.Consumer,
+	)
+
+	StartReconcileWorker(
+		ctx,
+		logger,
 		built.Application,
 		config.reconcileInterval,
 		config.stalledWorkflowAge,

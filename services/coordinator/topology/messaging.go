@@ -1,4 +1,4 @@
-package rabbitmq
+package topology
 
 const (
 	DeadExchange   = "castellani.dead"

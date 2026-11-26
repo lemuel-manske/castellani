@@ -9,26 +9,25 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awscredentials "github.com/aws/aws-sdk-go-v2/credentials"
 	awsdynamo "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/lemuel-manske/castellani/services/coordinator/adapters/messaging/dispatcher"
 	"github.com/lemuel-manske/castellani/services/coordinator/adapters/messaging/rabbitmq"
 	"github.com/lemuel-manske/castellani/services/coordinator/adapters/persistence/dynamodb"
 	"github.com/lemuel-manske/castellani/services/coordinator/application"
 )
 
-type Components struct {
+type CoordinatorContext struct {
 	Application *application.Application
-	Dispatcher  *dispatcher.Dispatcher
+	Dispatcher  *application.OutboxDispatcher
 	Consumer    *rabbitmq.RabbitConsumer
 }
 
-func NewComponents(
+func NewCoordinatorContext(
 	ctx context.Context,
 	awsRegion string,
 	awsAccessKeyID string,
 	awsSecretAccessKey string,
 	dynamoEndpoint string,
 	rabbitURL string,
-) (Components, error) {
+) (CoordinatorContext, error) {
 	awsConfig, err := awsconfig.LoadDefaultConfig(
 		ctx,
 		awsconfig.WithRegion(awsRegion),
@@ -42,7 +41,7 @@ func NewComponents(
 	)
 
 	if err != nil {
-		return Components{}, fmt.Errorf("load persistence configuration: %w", err)
+		return CoordinatorContext{}, fmt.Errorf("load persistence configuration: %w", err)
 	}
 
 	client := awsdynamo.NewFromConfig(awsConfig, func(options *awsdynamo.Options) {
@@ -57,9 +56,9 @@ func NewComponents(
 
 	publisher := rabbitmq.NewRabbitPublisher(rabbitURL)
 
-	return Components{
+	return CoordinatorContext{
 		Application: application.NewApplication(repository),
-		Dispatcher:  dispatcher.NewDispatcher(outbox, publisher),
+		Dispatcher:  application.NewOutboxDispatcher(outbox, publisher),
 		Consumer: rabbitmq.NewRabbitConsumer(
 			rabbitURL,
 			publisher,

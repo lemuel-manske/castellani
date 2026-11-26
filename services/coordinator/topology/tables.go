@@ -1,4 +1,4 @@
-package dynamodb
+package topology
 
 const (
 	ArchivesTable    = "coordinator_archives"
