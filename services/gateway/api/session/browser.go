@@ -27,6 +27,8 @@ type BrowserHandler struct {
 func NewBrowserHandler(app application.Application, loginOrigin url.URL) BrowserHandler {
 	proxy := httputil.NewSingleHostReverseProxy(&loginOrigin)
 
+	proxy.Director = nil
+
 	proxy.FlushInterval = -1
 
 	proxy.Rewrite = func(request *httputil.ProxyRequest) {

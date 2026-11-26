@@ -8,9 +8,13 @@ run:
 	go run .
 
 
-fmt:
-	$(MAKE) -C ../../codemods/go apply TARGET=../../services/coordinator
-
 check:
 	go vet ./...
 	go build ./...
+
+fmt:
+	$(MAKE) -C ../../codemods/go apply TARGET=../../services/coordinator
+
+
+test:
+	go test -v ./...
