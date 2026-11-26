@@ -1,10 +1,10 @@
 from types import SimpleNamespace
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from mypy_boto3_s3.client import S3Client
-import pytest
 from support.domain import seed_run, set_run_publication
 from support.s3 import put_object
 
@@ -20,7 +20,7 @@ def test_wacz_endpoint_streams_exact_requested_byte_range(
 ) -> None:
     archive_id = "archive-1"
     package_key = "packages/archive-1.wacz"
-    package = b"PK\x03\x04archive-payload"
+    package = b"PK\\x03\\x04archive-payload"
 
     seed_run(dynamodb)
     set_run_publication(dynamodb, package_key=package_key)
