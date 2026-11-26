@@ -44,7 +44,6 @@ def setup_s3(client: S3Client) -> None:
             client.create_bucket(Bucket=bucket)
 
 
-
 def cleanup_s3(client: S3Client) -> None:
     for bucket in BUCKETS:
         objects: list[dict[str, str]] = []
