@@ -39,7 +39,6 @@ class ArtifactReference:
     key: str
     sha256: str
     size_bytes: int
-    version_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.bucket or not self.key:
