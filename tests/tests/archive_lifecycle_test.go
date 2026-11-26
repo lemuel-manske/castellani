@@ -83,6 +83,48 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	require.Zero(t, archiveStatus.Capture.Pending)
 	require.Equal(t, "READY", archiveStatus.Replay.Status)
 
+	pagesResponse := testutil.Get(
+		t,
+		services.Gateway.BaseURL(),
+		fmt.Sprintf("/archives/%s/pages", accepted.ArchiveID),
+	)
+	require.Equal(t, http.StatusOK, pagesResponse.Status)
+
+	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
+	require.Len(t, pages.Items, 3)
+
+	expectedURLs := []string{
+		fixtureSiteURL + "/index.html",
+		fixtureSiteURL + "/about.html",
+		fixtureSiteURL + "/docs.html",
+	}
+
+	actualURLs := make([]string, 0, len(pages.Items))
+
+	for _, page := range pages.Items {
+		require.Equal(t, "CAPTURED", page.Status)
+		require.NotEmpty(t, page.SnapshotID)
+		actualURLs = append(actualURLs, page.URL)
+
+		snapshotResponse := testutil.Get(
+			t,
+			services.Gateway.BaseURL(),
+			fmt.Sprintf(
+				"/archives/%s/snapshots/%s",
+				accepted.ArchiveID,
+				page.SnapshotID,
+			),
+		)
+		require.Equal(t, http.StatusOK, snapshotResponse.Status)
+
+		snapshot := testutil.Decode[contracts.Snapshot](t, snapshotResponse)
+		require.Equal(t, accepted.ArchiveID, snapshot.ArchiveID)
+		require.Equal(t, page.SnapshotID, snapshot.SnapshotID)
+		require.Equal(t, page.URL, snapshot.URL)
+	}
+
+	require.ElementsMatch(t, expectedURLs, actualURLs)
+
 	waczPath := fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID)
 
 	headResponse := testutil.Send(
