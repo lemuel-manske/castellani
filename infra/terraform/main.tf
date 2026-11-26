@@ -311,22 +311,6 @@ resource "aws_s3_bucket" "archive_manifests" {
   force_destroy = true
 }
 
-resource "aws_s3_bucket_versioning" "archive_artifacts" {
-  bucket = aws_s3_bucket.archive_artifacts.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_versioning" "archive_manifests" {
-  bucket = aws_s3_bucket.archive_manifests.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
 resource "aws_s3_bucket_public_access_block" "archive_artifacts" {
   bucket = aws_s3_bucket.archive_artifacts.id
 
@@ -348,14 +332,6 @@ resource "aws_s3_bucket_public_access_block" "archive_manifests" {
 resource "aws_s3_bucket" "auth_profiles" {
   bucket        = "castellani-auth-profiles"
   force_destroy = true
-}
-
-resource "aws_s3_bucket_versioning" "auth_profiles" {
-  bucket = aws_s3_bucket.auth_profiles.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "auth_profiles" {
