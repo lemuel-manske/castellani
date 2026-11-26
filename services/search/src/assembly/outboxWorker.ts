@@ -4,7 +4,7 @@ import type { CompensationPublisher } from "../ports/compensation-publisher.js";
 import type { Outbox } from "../ports/outbox.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
-import { delay } from "./delay.js";
+import { delay } from "../utils/index.js";
 
 const DISPATCH_INTERVAL_MILLISECONDS = 500;
 const DISPATCH_ERROR_DELAY_MILLISECONDS = 2000;

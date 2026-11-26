@@ -3,7 +3,7 @@ import * as amqp from "amqplib";
 import { startPageCapturedConsumer } from "../adapters/messaging/rabbitmq/pageCapturedConsumer.js";
 import { startPublicationConsumer } from "../adapters/messaging/rabbitmq/publicationConsumer.js";
 
-import { delay } from "./delay.js";
+import { delay } from "../utils/index.js";
 
 import type {
   PageCapturedEvent,
