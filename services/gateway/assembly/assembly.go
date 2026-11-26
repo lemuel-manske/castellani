@@ -7,13 +7,14 @@ import (
 	"github.com/lemuel-manske/castellani/services/gateway/application"
 	"github.com/lemuel-manske/castellani/services/gateway/clients/capture"
 	"github.com/lemuel-manske/castellani/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/login"
 	"github.com/lemuel-manske/castellani/services/gateway/clients/search"
 )
 
 func NewApplication(
 	coordinatorClient *coordinator.Client,
 	captureClient *capture.Client,
-	loginClient *capture.Client,
+	loginClient *login.Client,
 	searchClient *search.Client,
 ) application.Application {
 	var coordinatorPort application.Coordinator

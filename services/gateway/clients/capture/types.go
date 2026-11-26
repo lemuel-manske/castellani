@@ -33,10 +33,6 @@ type Pagination struct {
 	Cursor string
 }
 
-type SessionRequest struct {
-	ArchiveID, TargetURL string
-}
-
 type Pages struct {
 	Items      []json.RawMessage `json:"items"`
 	NextCursor *string           `json:"nextCursor,omitempty"`
@@ -49,14 +45,6 @@ type Snapshot struct {
 	FinalURL    string `json:"finalUrl,omitempty"`
 	CapturedAt  string `json:"capturedAt"`
 	ContentType string `json:"contentType,omitempty"`
-}
-
-type Session struct {
-	SessionID      string `json:"sessionId"`
-	ArchiveID      string `json:"archiveId"`
-	Status         string `json:"status"`
-	ExpiresAt      string `json:"expiresAt"`
-	AuthGeneration *int   `json:"authGeneration,omitempty"`
 }
 
 type WACZOptions struct {

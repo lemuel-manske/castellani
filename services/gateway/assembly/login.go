@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/lemuel-manske/castellani/services/gateway/application"
-	"github.com/lemuel-manske/castellani/services/gateway/clients/capture"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/login"
 )
 
 type loginAdapter struct {
-	client *capture.Client
+	client *login.Client
 }
 
 func (a loginAdapter) CreateSession(
@@ -20,7 +20,7 @@ func (a loginAdapter) CreateSession(
 	result, err := a.client.CreateSession(
 		ctx,
 		key,
-		capture.SessionRequest{
+		login.SessionRequest{
 			ArchiveID: input.ArchiveID,
 			TargetURL: input.TargetURL,
 		},
@@ -62,7 +62,7 @@ func (a loginAdapter) UpdateSession(
 	return mapSession(result), nil
 }
 
-func mapSession(result capture.Session) application.Session {
+func mapSession(result login.Session) application.Session {
 	return application.Session{
 		SessionID:      result.SessionID,
 		ArchiveID:      result.ArchiveID,

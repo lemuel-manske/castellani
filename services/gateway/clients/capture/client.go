@@ -1,4 +1,4 @@
-// Package capture implements the Capture service client.
+// Package capture implements the Capture service client (capture perspective).
 package capture
 
 import (
@@ -105,6 +105,7 @@ func (c *Client) ListPages(
 
 func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) (Snapshot, error) {
 	target := c.origin
+
 	target.Path = common.ArchivePathPrefix +
 		url.PathEscape(archiveID) +
 		common.SnapshotPathSegment +
@@ -131,110 +132,6 @@ func (c *Client) GetSnapshot(ctx context.Context, archiveID, snapshotID string) 
 
 	if err := json.Unmarshal(data, &result); err != nil {
 		return Snapshot{}, ErrInvalidResponse
-	}
-
-	return result, nil
-}
-
-func (c *Client) CreateSession(
-	ctx context.Context,
-	key string,
-	session SessionRequest,
-	raw []byte,
-) (Session, error) {
-	target := c.origin
-	target.Path = common.SessionsPath
-
-	request, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		target.String(),
-		bytes.NewReader(raw),
-	)
-
-	if err != nil {
-		return Session{}, err
-	}
-
-	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-	request.Header.Set(httpx.HeaderIdempotencyKey, key)
-
-	data, err := c.execute(request, http.StatusCreated)
-
-	if err != nil {
-		return Session{}, err
-	}
-
-	var result Session
-
-	if err := json.Unmarshal(data, &result); err != nil {
-		return Session{}, ErrInvalidResponse
-	}
-
-	return result, nil
-}
-
-func (c *Client) GetSession(ctx context.Context, id string) (Session, error) {
-	target := c.origin
-	target.Path = common.SessionPathPrefix + url.PathEscape(id)
-
-	request, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		target.String(),
-		nil,
-	)
-
-	if err != nil {
-		return Session{}, err
-	}
-
-	data, err := c.execute(request, http.StatusOK)
-
-	if err != nil {
-		return Session{}, err
-	}
-
-	var result Session
-
-	if err := json.Unmarshal(data, &result); err != nil {
-		return Session{}, ErrInvalidResponse
-	}
-
-	return result, nil
-}
-
-func (c *Client) UpdateSession(
-	ctx context.Context,
-	id string,
-	raw []byte,
-) (Session, error) {
-	target := c.origin
-	target.Path = common.SessionPathPrefix + url.PathEscape(id)
-
-	request, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPut,
-		target.String(),
-		bytes.NewReader(raw),
-	)
-
-	if err != nil {
-		return Session{}, err
-	}
-
-	request.Header.Set(httpx.HeaderContentType, httpx.MediaTypeJSON)
-
-	data, err := c.execute(request, http.StatusOK)
-
-	if err != nil {
-		return Session{}, err
-	}
-
-	var result Session
-
-	if err := json.Unmarshal(data, &result); err != nil {
-		return Session{}, ErrInvalidResponse
 	}
 
 	return result, nil
@@ -355,10 +252,6 @@ func (c *Client) execute(request *http.Request, success int) (json.RawMessage, e
 	}
 
 	if response.StatusCode != success {
-		if response.StatusCode < http.StatusBadRequest {
-			return nil, ErrInvalidResponse
-		}
-
 		var problem httpx.Problem
 
 		if err := json.Unmarshal(data, &problem); err != nil {

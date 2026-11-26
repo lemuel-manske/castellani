@@ -15,6 +15,7 @@ import (
 	"github.com/lemuel-manske/castellani/services/gateway/assembly"
 	"github.com/lemuel-manske/castellani/services/gateway/clients/capture"
 	"github.com/lemuel-manske/castellani/services/gateway/clients/coordinator"
+	"github.com/lemuel-manske/castellani/services/gateway/clients/login"
 	"github.com/lemuel-manske/castellani/services/gateway/clients/search"
 )
 
@@ -26,8 +27,9 @@ const (
 )
 
 type GatewayServer struct {
-	http            *http.Server
-	ready           atomic.Bool
+	http  *http.Server
+	ready atomic.Bool
+
 	shutdownTimeout time.Duration
 }
 
@@ -86,10 +88,9 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 		cfg.upstreamTimeout,
 		cfg.streamTimeout,
 	)
-	loginClient := capture.NewClient(
+	loginClient := login.NewClient(
 		*loginURL,
 		cfg.upstreamTimeout,
-		cfg.streamTimeout,
 	)
 	searchClient := search.NewClient(*searchURL, cfg.upstreamTimeout)
 
@@ -105,7 +106,9 @@ func NewGatewayServer(cfg Config, logger *slog.Logger) *GatewayServer {
 	}
 
 	origins := map[string]api.Proxy{
-		api.LoginProxyKey: {Origin: *loginURL},
+		api.LoginProxyKey: {
+			Origin: *loginURL,
+		},
 	}
 
 	gateway.http = &http.Server{
