@@ -232,12 +232,6 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
 
         return await asyncio.to_thread(upload)
 
-    async def delete_package(self, reference: ArtifactReference) -> None:
-        def delete() -> None:
-            self.client.delete_object(Bucket=reference.bucket, Key=reference.key)
-
-        await asyncio.to_thread(delete)
-
     async def delete_archive_objects(self, archive_id: str) -> int:
         def delete() -> int:
             quoted = quote(archive_id, safe="")
