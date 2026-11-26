@@ -88,3 +88,31 @@ async def test_s3_artifact_store_rejects_files_outside_attempt_directory(
 
     with pytest.raises(ValueError):
         await store.persist_attempt(claim, directory, "snapshot-1", (outside,))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_s3_artifact_store_addresses_packages_by_content_digest(
+    tmp_path: Path,
+    s3: S3Client,
+) -> None:
+    store = S3ArtifactStore(s3)
+
+    first = tmp_path / "first.wacz"
+    first.write_bytes(b"first-package")
+    second = tmp_path / "second.wacz"
+    second.write_bytes(b"second-package")
+    duplicate = tmp_path / "duplicate.wacz"
+    duplicate.write_bytes(b"first-package")
+
+    first_reference = await store.persist_package(first, "archive-1", "a" * 64)
+    second_reference = await store.persist_package(second, "archive-1", "a" * 64)
+    duplicate_reference = await store.persist_package(duplicate, "archive-1", "a" * 64)
+
+    assert first_reference.key != second_reference.key
+    assert first_reference.key == duplicate_reference.key
+    assert first_reference.sha256 in first_reference.key
+    assert second_reference.sha256 in second_reference.key
+
+    assert read_object(s3, first_reference.bucket, first_reference.key) == b"first-package"
+    assert read_object(s3, second_reference.bucket, second_reference.key) == b"second-package"
