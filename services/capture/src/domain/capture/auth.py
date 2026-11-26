@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
 DEFAULT_AUTH_GENERATION = 0
 
@@ -19,7 +19,3 @@ class AuthContext:
     def __post_init__(self) -> None:
         if self.generation < 0:
             raise ValueError("auth generation must not be negative")
-
-
-class AuthContextStore(Protocol):
-    async def load(self, archive_id: str) -> AuthContext: ...

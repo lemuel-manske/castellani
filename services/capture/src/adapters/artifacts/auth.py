@@ -5,7 +5,7 @@ from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from domain.login import AuthProfileStore
+from ports.login import AuthProfileStore
 from topology.buckets import AUTH_PROFILE_BUCKET
 
 NONCE_BYTES = 12

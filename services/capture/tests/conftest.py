@@ -11,6 +11,8 @@ from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamo
 from support.recording import LocalSite, start_local_site
 from support.s3 import cleanup_s3, new_s3_client, setup_s3
 
+from config.environment import CAPTURE_RABBITMQ_URL
+
 
 @pytest.fixture
 def clock() -> Iterator[Clock]:
@@ -46,7 +48,7 @@ def dynamodb() -> Iterator[DynamoDBClient]:
 
 @pytest.fixture
 async def rabbitmq() -> AsyncIterator[AbstractRobustConnection]:
-    connection = await aio_pika.connect_robust(os.getenv("CAPTURE_RABBITMQ_URL"))
+    connection = await aio_pika.connect_robust(os.getenv(CAPTURE_RABBITMQ_URL))
 
     try:
         yield connection

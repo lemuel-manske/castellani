@@ -11,8 +11,8 @@ from domain.login import (
     DuplicateSessionRequest,
     SessionConflict,
     SessionStatus,
-    SessionStore,
 )
+from ports.login import SessionStore
 from topology.buckets import AUTH_PROFILE_BUCKET
 from utils.time import utc_now
 

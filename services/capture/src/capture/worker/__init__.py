@@ -1,12 +1,12 @@
-from domain.capture import AuthContextStore, CaptureAllocator, TaskRepository
-
-from .api import (
+from ports.capture import AuthContextStore, CaptureAllocator, TaskRepository
+from ports.worker import (
     ArtifactStore,
     CaptureArtifact,
     CaptureExecutor,
     CaptureRunner,
     LeaseLostError,
 )
+
 from .runner import ConcreteCaptureWorker
 
 

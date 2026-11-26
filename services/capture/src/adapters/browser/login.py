@@ -7,6 +7,7 @@ from typing import Any, cast
 from playwright.async_api import Browser, BrowserContext, Playwright, async_playwright
 
 from domain.login import BrowserEndpoint
+from ports.login import InteractiveBrowser
 from utils.web import is_safe_request_url, is_valid_url
 
 VIEWPORT_WIDTH = 1365
@@ -58,7 +59,7 @@ class LiveLoginSession:
         self.slot = slot
 
 
-class PlaywrightLoginBrowser:
+class PlaywrightLoginBrowser(InteractiveBrowser):
     def __init__(self, settings: LoginBrowserSettings) -> None:
         self.settings = settings
         self.sessions: dict[str, LiveLoginSession] = {}

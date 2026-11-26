@@ -5,6 +5,11 @@ from uuid import uuid4
 from .auth import DEFAULT_AUTH_GENERATION
 
 
+def new_snapshot_id() -> str:
+    """Create the immutable identity of one successfully captured page snapshot."""
+    return str(uuid4())
+
+
 @dataclass(frozen=True)
 class PageCapture:
     """The domain-relevant facts and discoveries from capturing one page."""
@@ -43,11 +48,6 @@ class ArtifactReference:
             raise ValueError("artifact sha256 must be a lowercase hexadecimal digest")
         if self.size_bytes < 0:
             raise ValueError("artifact size_bytes must not be negative")
-
-
-def new_snapshot_id() -> str:
-    """Create the immutable identity of one successfully captured page snapshot."""
-    return str(uuid4())
 
 
 @dataclass(frozen=True)

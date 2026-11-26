@@ -1,46 +1,19 @@
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import Awaitable, Callable
 from contextlib import aclosing
-from typing import Protocol
 
-from domain.capture import CrawlStarter, StartCrawl, is_supported_normalizer_version
-
-
-class StartCrawlMessage(Protocol):
-    """A validated StartCrawl delivery with broker-agnostic outcome operations."""
-
-    archive_id: str
-    seed_url: str
-    max_depth: int
-    max_pages: int
-    collection_id: str | None
-    allowed_origins: tuple[str, ...]
-    auth_generation: int | None
-    normalizer_version: str | None
-    retry_exhausted: bool
-
-    async def ack(self) -> None: ...
-
-    async def reject(self) -> None: ...
-
-    async def dead_letter(self) -> None: ...
-
-
-class StartCrawlConsumer(Protocol):
-    """Source of validated StartCrawl deliveries."""
-
-    def messages(
-        self,
-        ready: asyncio.Event | None = None,
-    ) -> AsyncGenerator[StartCrawlMessage]: ...
-
-    def stop(self) -> None: ...
+from domain.capture import StartCrawl, is_supported_normalizer_version
+from ports.messaging import StartCrawlConsumer
 
 
 class StartCrawlProcessor:
     """Drives validated StartCrawl deliveries through a crawl starter."""
 
-    def __init__(self, consumer: StartCrawlConsumer, starter: CrawlStarter) -> None:
+    def __init__(
+        self,
+        consumer: StartCrawlConsumer,
+        starter: Callable[[StartCrawl], Awaitable[None]],
+    ) -> None:
         self.consumer = consumer
         self.starter = starter
 

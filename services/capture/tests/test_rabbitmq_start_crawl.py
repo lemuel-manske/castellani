@@ -14,7 +14,8 @@ from support.domain import frontier_item, outbox_item, outbox_items, run_item
 from adapters.messaging.rabbitmq.consumer import RabbitMQStartCrawlConsumer
 from adapters.persistence.dynamodb.run import DynamoDBRunStarter
 from application.capture.start_crawls import StartCrawlProcessor
-from domain.capture import CrawlStarter, StartCrawl, identify_url
+from domain.capture import StartCrawl, identify_url
+from ports.capture import CrawlStarter
 from topology.messaging import (
     CAPTURE_DEAD_QUEUE,
     CAPTURE_PAGE_QUEUE,
@@ -249,7 +250,7 @@ async def purge_queues(channel: AbstractChannel) -> None:
         await queue.purge()
 
 
-class CountingStarter:
+class CountingStarter(CrawlStarter):
     def __init__(self, starter: CrawlStarter) -> None:
         self.starter = starter
         self.calls = 0

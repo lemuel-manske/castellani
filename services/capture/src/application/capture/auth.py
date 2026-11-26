@@ -1,5 +1,6 @@
-from domain.capture import DEFAULT_AUTH_GENERATION, AuthContext, AuthContextStore
-from domain.login import AuthProfileStore, SessionStore
+from domain.capture import DEFAULT_AUTH_GENERATION, AuthContext
+from ports.capture import AuthContextStore
+from ports.login import AuthProfileStore, SessionStore
 
 
 class StoredAuthContexts(AuthContextStore):

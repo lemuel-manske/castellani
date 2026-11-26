@@ -3,7 +3,6 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Protocol
 
 
 class SessionStatus(StrEnum):
@@ -74,38 +73,6 @@ class AuthProfileReference:
 class BrowserEndpoint:
     session_id: str
     vnc_origin: str
-
-
-class InteractiveBrowser(Protocol):
-    async def start(self, session_id: str, target_url: str) -> BrowserEndpoint: ...
-
-    async def storage_state(self, session_id: str) -> dict[str, Any]: ...
-
-    async def close(self, session_id: str) -> None: ...
-
-
-class SessionStore(Protocol):
-    async def create(self, session: AuthSession, key: str, fingerprint: str) -> None: ...
-
-    async def get(self, session_id: str) -> AuthSession | None: ...
-
-    async def find_by_request(self, key: str, fingerprint: str) -> str | None: ...
-
-    async def save(self, session: AuthSession) -> None: ...
-
-    async def reserve_generation(self, archive_id: str) -> int: ...
-
-    async def set_profile(self, archive_id: str, generation: int, key: str) -> None: ...
-
-    async def load_profile_reference(self, archive_id: str) -> AuthProfileReference | None: ...
-
-    async def reconcile_abandoned(self, manager_id: str) -> None: ...
-
-
-class AuthProfileStore(Protocol):
-    async def save(self, archive_id: str, generation: int, state: dict[str, Any]) -> str: ...
-
-    async def load(self, key: str) -> dict[str, Any]: ...
 
 
 def request_fingerprint(request: SessionRequest) -> str:

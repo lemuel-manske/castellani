@@ -1,5 +1,4 @@
 from .alloc import (
-    CaptureAllocator,
     CaptureReservation,
     CaptureReservationLostError,
     InvalidReservationRenewal,
@@ -7,7 +6,6 @@ from .alloc import (
 )
 from .archive import (
     ArchivePage,
-    ArchiveRetrieval,
     InvalidArchiveCursor,
     InvalidWACZRange,
     PageListing,
@@ -15,14 +13,9 @@ from .archive import (
     WACZObject,
     WACZRangeNotSatisfiable,
 )
-from .auth import (
-    DEFAULT_AUTH_GENERATION,
-    AuthContext,
-    AuthContextStore,
-    AuthGenerationChanged,
-)
+from .auth import DEFAULT_AUTH_GENERATION, AuthContext, AuthGenerationChanged
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
-from .crawl import CrawlFinalizer, CrawlStarter, StartCrawl
+from .crawl import StartCrawl
 from .discovery import DiscoveredPage, identify_discovered_pages
 from .manifest import (
     DEFAULT_NORMALIZER_VERSION,
@@ -31,7 +24,7 @@ from .manifest import (
     manifest_key,
     manifest_message_id,
 )
-from .outbox import OutboxLeaseLostError, OutboxMessage, OutboxRepository
+from .outbox import OutboxLeaseLostError, OutboxMessage
 from .package import (
     DECISION_COMPENSATE,
     DECISION_PUBLISH,
@@ -39,7 +32,6 @@ from .package import (
     PACKAGE_PREPARED,
     PACKAGE_PREPARING,
     REPLAY_READY,
-    ArchivePublicationRepository,
     CompensationDecision,
     InvalidArchiveDecision,
     PackageCommitRejected,
@@ -56,26 +48,19 @@ from .task import (
     PageTask,
     TaskClaim,
     TaskClaimLostError,
-    TaskRepository,
     new_attempt_id,
 )
 from .url_identity import InvalidURLIdentity, URLIdentity, identify_url
 
 __all__ = [
     "ArchivePage",
-    "ArchivePublicationRepository",
-    "ArchiveRetrieval",
     "ArtifactReference",
     "AuthContext",
-    "AuthContextStore",
     "AuthGenerationChanged",
-    "CaptureAllocator",
     "CaptureOutcome",
     "CaptureReservation",
     "CaptureReservationLostError",
     "CompensationDecision",
-    "CrawlFinalizer",
-    "CrawlStarter",
     "DECISION_COMPENSATE",
     "DECISION_PUBLISH",
     "DEFAULT_AUTH_GENERATION",
@@ -90,7 +75,6 @@ __all__ = [
     "MANIFEST_SCHEMA_VERSION",
     "OutboxLeaseLostError",
     "OutboxMessage",
-    "OutboxRepository",
     "PACKAGE_PENDING",
     "PACKAGE_PREPARED",
     "PACKAGE_PREPARING",
@@ -106,7 +90,6 @@ __all__ = [
     "StartCrawl",
     "TaskClaim",
     "TaskClaimLostError",
-    "TaskRepository",
     "URLIdentity",
     "WACZObject",
     "WACZRangeNotSatisfiable",

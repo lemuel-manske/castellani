@@ -7,7 +7,7 @@ from uuid import NAMESPACE_URL, uuid5
 from botocore.exceptions import ClientError
 
 from domain.capture import StartCrawl, identify_url
-from domain.capture.crawl import CrawlStarter
+from ports.capture import CrawlStarter
 
 from .error_handling import extract_cancellation_reasons, is_transaction_canceled
 from .queries.run import seed_run_transaction

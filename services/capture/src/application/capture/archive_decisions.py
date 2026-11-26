@@ -1,65 +1,18 @@
 import asyncio
-from collections.abc import AsyncIterator
-from typing import Protocol
 
 from domain.capture import (
-    ArchivePublicationRepository,
     CompensationDecision,
     InvalidArchiveDecision,
     PublicationDecision,
 )
-
-
-class ArchivePublicationMessage(Protocol):
-    archive_id: str
-    correlation_id: str
-    decision_version: int
-    package_digest: str
-    occurred_at: str
-    retry_exhausted: bool
-
-    async def ack(self) -> None: ...
-
-    async def reject(self) -> None: ...
-
-    async def dead_letter(self) -> None: ...
-
-
-class ArchiveCompensationMessage(Protocol):
-    archive_id: str
-    correlation_id: str
-    decision_version: int
-    reason_code: str
-    occurred_at: str
-    retry_exhausted: bool
-
-    async def ack(self) -> None: ...
-
-    async def reject(self) -> None: ...
-
-    async def dead_letter(self) -> None: ...
-
-
-class ArchivePublicationConsumer(Protocol):
-    def messages(
-        self,
-        ready: asyncio.Event | None = None,
-    ) -> AsyncIterator[ArchivePublicationMessage]: ...
-
-    def stop(self) -> None: ...
-
-
-class ArchiveCompensationConsumer(Protocol):
-    def messages(
-        self,
-        ready: asyncio.Event | None = None,
-    ) -> AsyncIterator[ArchiveCompensationMessage]: ...
-
-    def stop(self) -> None: ...
-
-
-class DecisionArtifacts(Protocol):
-    async def delete_archive_objects(self, archive_id: str) -> int: ...
+from ports.artifacts import DecisionArtifacts
+from ports.capture import ArchivePublicationRepository
+from ports.messaging import (
+    ArchiveCompensationConsumer,
+    ArchiveCompensationMessage,
+    ArchivePublicationConsumer,
+    ArchivePublicationMessage,
+)
 
 
 class ArchiveDecisionProcessor:

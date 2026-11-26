@@ -8,7 +8,6 @@ from uuid import uuid4
 from botocore.exceptions import ClientError
 
 from domain.capture import (
-    ArchivePublicationRepository,
     CompensationDecision,
     InvalidArchiveDecision,
     PackageCommitRejected,
@@ -19,6 +18,7 @@ from domain.capture import (
     archive_prepared_message_id,
     archive_published_message_id,
 )
+from ports.capture import ArchivePublicationRepository
 
 from .error_handling import (
     ConditionalWriteRejected,

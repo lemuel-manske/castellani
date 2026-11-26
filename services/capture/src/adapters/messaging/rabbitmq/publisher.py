@@ -1,7 +1,7 @@
 import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractRobustConnection
 
-from application.capture.outbox import MessagePublisher
+from ports.messaging import MessagePublisher
 from topology.messaging import (
     ARCHIVE_COMPENSATED_EVENT,
     ARCHIVE_PREPARED_EVENT,

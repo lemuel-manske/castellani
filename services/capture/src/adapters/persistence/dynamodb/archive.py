@@ -2,12 +2,12 @@ import asyncio
 from typing import Any
 
 from domain.capture import (
-    ArchiveRetrieval,
     PageListing,
     SnapshotReference,
     WACZObject,
     WACZRangeNotSatisfiable,
 )
+from ports.capture import ArchiveRetrieval
 from utils.http import http_last_modified, normalize_etag, parse_range
 from utils.io import stream_body
 

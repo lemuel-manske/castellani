@@ -8,7 +8,8 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from adapters.serialization import artifact_document, manifest_document
-from domain.capture import ArtifactReference, CrawlFinalizer, manifest_key, manifest_message_id
+from domain.capture import ArtifactReference, manifest_key, manifest_message_id
+from ports.capture import CrawlFinalizer
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
 
 from .error_handling import ConditionalWriteRejected, is_transaction_canceled

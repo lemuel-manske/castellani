@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Protocol
 
 
 def new_reservation_id(attempt_id: str) -> str:
@@ -54,13 +53,3 @@ class CaptureReservation:
             raise InvalidReservationRenewal(
                 "browser reservation renewal returned an invalid reservation"
             )
-
-
-class CaptureAllocator(Protocol):
-    """Controls the number of page captures running concurrently."""
-
-    async def reserve(self, attempt_id: str) -> CaptureReservation | None: ...
-
-    async def renew(self, reservation: CaptureReservation) -> CaptureReservation: ...
-
-    async def release(self, reservation: CaptureReservation) -> None: ...

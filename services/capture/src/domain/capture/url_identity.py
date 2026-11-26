@@ -144,3 +144,11 @@ def remove_last_segment(path: str) -> str:
     separator = path.rfind("/")
 
     return path[:separator] if separator >= 0 else ""
+
+
+__all__ = [
+    "InvalidURLIdentity",
+    "URLIdentity",
+    "URL_IDENTITY_VERSION",
+    "identify_url",
+]

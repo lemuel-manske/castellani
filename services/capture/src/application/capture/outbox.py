@@ -1,16 +1,10 @@
 import asyncio
 import logging
-from typing import Protocol
 
-from domain.capture import OutboxRepository
+from ports.capture import OutboxRepository
+from ports.messaging import MessagePublisher
 
 logger = logging.getLogger(__name__)
-
-
-class MessagePublisher(Protocol):
-    """Publishes an immutable message envelope to the broker."""
-
-    async def publish(self, message_id: str, message_type: str, envelope: bytes) -> None: ...
 
 
 class OutboxDispatcher:

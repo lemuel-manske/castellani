@@ -5,6 +5,11 @@ from boto3.session import Session
 from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 
+from config.environment import (
+    CAPTURE_AWS_ACCESS_KEY_ID,
+    CAPTURE_AWS_SECRET_ACCESS_KEY,
+    CAPTURE_S3_ENDPOINT_URL,
+)
 from topology.buckets import (
     ARCHIVE_ARTIFACTS_BUCKET,
     ARCHIVE_MANIFESTS_BUCKET,
@@ -23,10 +28,10 @@ DELETE_BATCH_SIZE = 1000
 def new_s3_client() -> S3Client:
     return Session().client(
         "s3",
-        endpoint_url=os.environ.get("CAPTURE_S3_ENDPOINT_URL"),
+        endpoint_url=os.environ.get(CAPTURE_S3_ENDPOINT_URL),
         region_name="us-east-1",
-        aws_access_key_id=os.environ.get("CAPTURE_AWS_ACCESS_KEY_ID", "minio"),
-        aws_secret_access_key=os.environ.get("CAPTURE_AWS_SECRET_ACCESS_KEY", "minio-secret"),
+        aws_access_key_id=os.environ.get(CAPTURE_AWS_ACCESS_KEY_ID, "minio"),
+        aws_secret_access_key=os.environ.get(CAPTURE_AWS_SECRET_ACCESS_KEY, "minio-secret"),
     )
 
 

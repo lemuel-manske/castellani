@@ -4,6 +4,8 @@ from boto3.session import Session
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from mypy_boto3_dynamodb.type_defs import CreateTableInputTypeDef
 
+from config.environment import CAPTURE_DYNAMODB_ENDPOINT_URL
+
 TABLES: tuple[CreateTableInputTypeDef, ...] = (
     {
         "TableName": "capture_snapshots",
@@ -89,7 +91,7 @@ TABLES: tuple[CreateTableInputTypeDef, ...] = (
 
 
 def new_dynamodb_client() -> DynamoDBClient:
-    endpoint_url = os.environ.get("CAPTURE_DYNAMODB_ENDPOINT_URL")
+    endpoint_url = os.environ.get(CAPTURE_DYNAMODB_ENDPOINT_URL)
 
     return Session().client(
         "dynamodb",

@@ -4,18 +4,21 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from domain.capture import (
-    AuthContextStore,
     AuthGenerationChanged,
-    CaptureAllocator,
     CaptureOutcome,
     CaptureReservation,
     TaskClaim,
-    TaskRepository,
     new_snapshot_id,
 )
+from ports.capture import AuthContextStore, CaptureAllocator, TaskRepository
+from ports.worker import (
+    ArtifactStore,
+    CaptureArtifact,
+    CaptureExecutor,
+    CaptureRunner,
+    LeaseLostError,
+)
 from utils.fn import awaitable, noop
-
-from .api import ArtifactStore, CaptureArtifact, CaptureExecutor, CaptureRunner, LeaseLostError
 
 
 class ConcreteCaptureWorker(CaptureRunner):

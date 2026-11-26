@@ -12,15 +12,16 @@ from aio_pika.abc import (
 )
 
 from adapters.messaging.contracts import validate_message
-from adapters.messaging.types import JSON
-from application.capture.archive_decisions import (
+from ports.messaging import (
     ArchiveCompensationConsumer,
     ArchiveCompensationMessage,
     ArchivePublicationConsumer,
     ArchivePublicationMessage,
+    PageTaskConsumer,
+    PageTaskMessage,
+    StartCrawlConsumer,
+    StartCrawlMessage,
 )
-from application.capture.page_tasks import PageTaskConsumer, PageTaskMessage
-from application.capture.start_crawls import StartCrawlConsumer, StartCrawlMessage
 from topology.messaging import (
     ARCHIVE_COMPENSATION_DECIDED_EVENT,
     ARCHIVE_PUBLICATION_DECIDED_EVENT,
@@ -37,6 +38,7 @@ from topology.messaging import (
     START_CRAWL_QUEUE,
     START_CRAWL_RETRY_QUEUE,
 )
+from utils.types import JSON
 
 
 @dataclass(frozen=True)

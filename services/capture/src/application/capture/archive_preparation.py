@@ -5,40 +5,15 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
 
 from adapters.serialization import artifact_references
 from capture.wacz import create_wacz, validate_wacz
-from domain.capture import (
-    ArchivePublicationRepository,
-    ArtifactReference,
-    PackageCommitRejected,
-    PendingPackage,
-    PreparedPackage,
-)
+from domain.capture import PackageCommitRejected, PendingPackage, PreparedPackage
+from ports.artifacts import PackageArtifacts
+from ports.capture import ArchivePublicationRepository
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
 
 logger = logging.getLogger(__name__)
-
-
-class PackageArtifacts(Protocol):
-    async def read_object(
-        self,
-        bucket: str,
-        key: str,
-        version_id: str | None = None,
-    ) -> tuple[bytes, ArtifactReference]: ...
-
-    async def download_artifact(self, reference: ArtifactReference, destination: Path) -> Path: ...
-
-    async def persist_package(
-        self,
-        path: Path,
-        archive_id: str,
-        manifest_digest: str,
-    ) -> ArtifactReference: ...
-
-    async def delete_package(self, archive_id: str, manifest_digest: str) -> None: ...
 
 
 class ArchivePackager:

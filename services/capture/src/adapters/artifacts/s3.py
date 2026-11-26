@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from capture.worker import ArtifactStore
 from domain.capture import ArtifactReference, TaskClaim, package_key
+from ports.artifacts import DecisionArtifacts, PackageArtifacts
+from ports.worker import ArtifactStore
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 
 DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
@@ -24,7 +25,7 @@ def file_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-class S3ArtifactStore(ArtifactStore):
+class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
     """Uploads attempt-scoped WARC artifacts to private, immutable S3 keys."""
 
     def __init__(

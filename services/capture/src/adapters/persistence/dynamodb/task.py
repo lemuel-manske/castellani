@@ -1,6 +1,6 @@
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
@@ -10,14 +10,13 @@ from domain.capture import (
     DEFAULT_AUTH_GENERATION,
     AuthGenerationChanged,
     CaptureOutcome,
-    CrawlFinalizer,
     DiscoveredPage,
     TaskClaim,
     TaskClaimLostError,
-    TaskRepository,
     identify_discovered_pages,
     new_attempt_id,
 )
+from ports.capture import TaskRepository
 
 from .error_handling import (
     ConditionalWriteRejected,
@@ -57,7 +56,7 @@ class DynamoDBTaskRepository(TaskRepository):
         client: Any,
         lease_duration: float,
         clock: Callable[[], float] = time.time,
-        on_closed: CrawlFinalizer | None = None,
+        on_closed: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         if lease_duration <= 0:
             raise ValueError("lease_duration must be positive")

@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -50,26 +49,3 @@ class WACZRangeNotSatisfiable(ValueError):
     def __init__(self, content_length: int) -> None:
         super().__init__("requested range is not satisfiable")
         self.content_length = content_length
-
-
-class ArchiveRetrieval(Protocol):
-    async def list_pages(
-        self,
-        archive_id: str,
-        limit: int,
-        cursor: str | None,
-    ) -> PageListing: ...
-
-    async def read_snapshot(
-        self,
-        archive_id: str,
-        snapshot_id: str,
-    ) -> SnapshotReference | None: ...
-
-    async def read_wacz(
-        self,
-        archive_id: str,
-        range_header: str | None,
-        if_range: str | None,
-        metadata_only: bool = False,
-    ) -> WACZObject | None: ...

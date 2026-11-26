@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import Protocol
 from uuid import uuid4
 
-from .auth import DEFAULT_AUTH_GENERATION
-from .capture import CaptureOutcome
+
+def new_attempt_id() -> str:
+    return str(uuid4())
 
 
 class TaskClaimLostError(RuntimeError):
@@ -12,10 +12,6 @@ class TaskClaimLostError(RuntimeError):
 
 class InvalidTaskClaimRenewal(ValueError):
     """Raised when a task claim renewal violates ownership or lease invariants."""
-
-
-def new_attempt_id() -> str:
-    return str(uuid4())
 
 
 @dataclass(frozen=True)
@@ -68,29 +64,3 @@ class TaskClaim:
             or renewed.lease_until <= max(self.lease_until, now)
         ):
             raise InvalidTaskClaimRenewal("task lease renewal returned an invalid claim")
-
-
-class TaskRepository(Protocol):
-    """Owns page-task persistence and the task's domain lifecycle."""
-
-    async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None: ...
-
-    async def renew(self, claim: TaskClaim) -> TaskClaim: ...
-
-    async def complete(
-        self,
-        outcome: CaptureOutcome,
-    ) -> None: ...
-
-    async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None: ...
-
-    async def release(self, claim: TaskClaim) -> None: ...
-
-    async def admit_discovered(
-        self,
-        claim: TaskClaim,
-        discovered_urls: tuple[str, ...],
-        auth_generation: int = DEFAULT_AUTH_GENERATION,
-    ) -> None:
-        """Durably account for discoveries before allowing parent completion."""
-        ...

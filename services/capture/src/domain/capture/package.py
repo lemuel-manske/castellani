@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Protocol
 from urllib.parse import quote
 from uuid import NAMESPACE_URL, uuid5
 
@@ -65,20 +64,6 @@ class InvalidArchiveDecision(ValueError):
 
 class PackageCommitRejected(RuntimeError):
     """Raised when a package cannot be committed to its run."""
-
-
-class ArchivePublicationRepository(Protocol):
-    async def claim_package(self, lease_duration: float) -> PendingPackage | None: ...
-
-    async def release_package(self, pending: PendingPackage) -> None: ...
-
-    async def prepare(self, prepared: PreparedPackage) -> None: ...
-
-    async def accept_publication(self, decision: PublicationDecision) -> None: ...
-
-    async def begin_compensation(self, decision: CompensationDecision) -> None: ...
-
-    async def complete_compensation(self, decision: CompensationDecision) -> None: ...
 
 
 def package_key(archive_id: str, manifest_digest: str) -> str:

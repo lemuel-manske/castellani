@@ -3,18 +3,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from domain.login import (
-    AuthProfileStore,
     AuthSession,
     DuplicateSessionRequest,
-    InteractiveBrowser,
     LoginUnavailable,
     SessionConflict,
     SessionNotFound,
     SessionRequest,
     SessionStatus,
-    SessionStore,
     request_fingerprint,
 )
+from ports.login import AuthProfileStore, InteractiveBrowser, SessionStore
 
 SESSION_ID_BYTES = 24
 

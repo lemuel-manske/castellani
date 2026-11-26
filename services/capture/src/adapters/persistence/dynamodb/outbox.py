@@ -7,7 +7,8 @@ from typing import Any, cast
 
 from botocore.exceptions import ClientError
 
-from domain.capture import OutboxLeaseLostError, OutboxMessage, OutboxRepository
+from domain.capture import OutboxLeaseLostError, OutboxMessage
+from ports.capture import OutboxRepository
 
 from .facilities import new_lease_token
 from .queries.outbox import (

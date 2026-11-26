@@ -1,38 +1,18 @@
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import Awaitable, Callable
 from contextlib import aclosing
-from typing import Protocol
 
-from capture.worker.api import CaptureRunner
-
-
-class PageTaskMessage(Protocol):
-    """A validated page-task delivery with broker-agnostic outcome operations."""
-
-    archive_id: str
-    url_key: str
-    retry_exhausted: bool
-
-    async def ack(self) -> None: ...
-    async def reject(self) -> None: ...
-    async def dead_letter(self) -> None: ...
-
-
-class PageTaskConsumer(Protocol):
-    """Source of validated page-task deliveries."""
-
-    def messages(
-        self,
-        ready: asyncio.Event | None = None,
-    ) -> AsyncGenerator[PageTaskMessage]: ...
-
-    def stop(self) -> None: ...
+from ports.messaging import PageTaskConsumer
 
 
 class PageTaskProcessor:
     """Drives validated page-task deliveries through a capture runner."""
 
-    def __init__(self, consumer: PageTaskConsumer, worker: CaptureRunner) -> None:
+    def __init__(
+        self,
+        consumer: PageTaskConsumer,
+        worker: Callable[[str, str], Awaitable[bool]],
+    ) -> None:
         self.consumer = consumer
         self.worker = worker
 

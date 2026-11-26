@@ -2,7 +2,24 @@ import os
 import uuid
 from dataclasses import dataclass, field
 
-from environment import auth_profile_key, positive_int, required, required_int
+from config.environment import (
+    CAPTURE_AWS_ACCESS_KEY_ID,
+    CAPTURE_AWS_REGION,
+    CAPTURE_AWS_SECRET_ACCESS_KEY,
+    CAPTURE_DYNAMODB_ENDPOINT_URL,
+    CAPTURE_LOGIN_DISPLAY_START,
+    CAPTURE_LOGIN_MAX_SESSIONS,
+    CAPTURE_LOGIN_NOVNC_ROOT,
+    CAPTURE_LOGIN_PORT,
+    CAPTURE_LOGIN_VNC_PORT_START,
+    CAPTURE_LOGIN_WEBSOCKIFY_PORT_START,
+    CAPTURE_S3_ENDPOINT_URL,
+    CAPTURE_SESSION_TTL_SECONDS,
+    auth_profile_key,
+    positive_int,
+    required,
+    required_int,
+)
 
 DEFAULT_SESSION_TTL_SECONDS = 1800
 DEFAULT_LOGIN_MAX_SESSIONS = 4
@@ -39,35 +56,35 @@ class LoginSettings:
     @classmethod
     def from_environment(cls) -> "LoginSettings":
         return cls(
-            port=required_int("CAPTURE_LOGIN_PORT"),
-            aws_region=required("CAPTURE_AWS_REGION"),
-            aws_access_key_id=required("CAPTURE_AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=required("CAPTURE_AWS_SECRET_ACCESS_KEY"),
-            dynamodb_endpoint_url=required("CAPTURE_DYNAMODB_ENDPOINT_URL"),
-            s3_endpoint_url=required("CAPTURE_S3_ENDPOINT_URL"),
+            port=required_int(CAPTURE_LOGIN_PORT),
+            aws_region=required(CAPTURE_AWS_REGION),
+            aws_access_key_id=required(CAPTURE_AWS_ACCESS_KEY_ID),
+            aws_secret_access_key=required(CAPTURE_AWS_SECRET_ACCESS_KEY),
+            dynamodb_endpoint_url=required(CAPTURE_DYNAMODB_ENDPOINT_URL),
+            s3_endpoint_url=required(CAPTURE_S3_ENDPOINT_URL),
             auth_profile_key=auth_profile_key(),
             session_ttl_seconds=positive_int(
-                "CAPTURE_SESSION_TTL_SECONDS",
+                CAPTURE_SESSION_TTL_SECONDS,
                 DEFAULT_SESSION_TTL_SECONDS,
             ),
             max_sessions=positive_int(
-                "CAPTURE_LOGIN_MAX_SESSIONS",
+                CAPTURE_LOGIN_MAX_SESSIONS,
                 DEFAULT_LOGIN_MAX_SESSIONS,
             ),
             display_start=positive_int(
-                "CAPTURE_LOGIN_DISPLAY_START",
+                CAPTURE_LOGIN_DISPLAY_START,
                 DEFAULT_LOGIN_DISPLAY_START,
             ),
             vnc_port_start=positive_int(
-                "CAPTURE_LOGIN_VNC_PORT_START",
+                CAPTURE_LOGIN_VNC_PORT_START,
                 DEFAULT_LOGIN_VNC_PORT_START,
             ),
             websockify_port_start=positive_int(
-                "CAPTURE_LOGIN_WEBSOCKIFY_PORT_START",
+                CAPTURE_LOGIN_WEBSOCKIFY_PORT_START,
                 DEFAULT_LOGIN_WEBSOCKIFY_PORT_START,
             ),
             novnc_root=os.getenv(
-                "CAPTURE_LOGIN_NOVNC_ROOT",
+                CAPTURE_LOGIN_NOVNC_ROOT,
                 DEFAULT_LOGIN_NOVNC_DIRECTORY,
             ),
         )

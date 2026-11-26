@@ -8,9 +8,8 @@ from jsonschema import FormatChecker
 from jsonschema.validators import validator_for
 from referencing import Registry, Resource
 
-from .types import JSON
-
-CONTRACT_DIR_ENV = "CAPTURE_CONTRACTS_DIR"
+from config.environment import CAPTURE_CONTRACTS_DIR
+from utils.types import JSON
 
 SCHEMA_DIRS = ("documents", "messages", "types")
 
@@ -69,7 +68,7 @@ def validators() -> dict[str, Any]:
 
 
 def schemas() -> dict[str, JSON]:
-    root = Path(os.environ[CONTRACT_DIR_ENV])
+    root = Path(os.environ[CAPTURE_CONTRACTS_DIR])
 
     paths: list[Path] = []
 

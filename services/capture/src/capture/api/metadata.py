@@ -2,10 +2,10 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from problem import problem
+from utils.types import JSON
 
 from .routes import ARCHIVE_PAGES_PATH, ARCHIVE_SNAPSHOT_PATH
 from .serialization import page_listing_json, snapshot_reference_json
-from .types import JSON
 
 router = APIRouter()
 

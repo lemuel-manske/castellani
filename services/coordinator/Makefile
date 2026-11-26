@@ -19,14 +19,12 @@ fmt:
 test-infra-up:
 	docker compose up -d --wait dynamodb rabbitmq
 
-
 test-infra-down:
 	docker compose down
 
 
 test-unit:
 	go test -v ./...
-
 
 test-integration:
 	COORDINATOR_AWS_REGION=us-east-1 \
@@ -36,6 +34,5 @@ test-integration:
 		COORDINATOR_RABBITMQ_URL=amqp://castellani:castellani@localhost:5672/ \
 		COORDINATOR_CONTRACTS_DIR=../../contracts \
 		go test -tags=integration -v ./...
-
 
 test: test-unit test-integration
