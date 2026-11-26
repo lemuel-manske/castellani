@@ -19,10 +19,7 @@ async function searchPublishedDocuments(
   publicationLedger: PublicationLedger,
   manifestLedger: ManifestLedger,
 ): Promise<PublishedSearchPage> {
-  const {
-    limit,
-    cursor,
-  } = input;
+  const { limit, cursor } = input;
 
   const query: SearchQuery = {
     ...input,

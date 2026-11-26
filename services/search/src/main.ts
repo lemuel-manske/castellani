@@ -1,5 +1,5 @@
 import { SearchSettings } from "./config.js";
-import { SearchRuntime } from "./assembly/runtime.js";
+import { SearchRuntime } from "./runtime.js";
 
 const shutdown = new AbortController();
 
