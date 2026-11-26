@@ -17,6 +17,7 @@ def test_artifact_references_reads_authorized_warcs() -> None:
                         "key": "capture-staging/archive-1/attempt-1/capture.warc.gz",
                         "sha256": "a" * 64,
                         "sizeBytes": 128,
+                        "versionId": "legacy-version",
                     }
                 ]
             }
