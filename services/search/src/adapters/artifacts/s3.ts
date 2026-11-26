@@ -12,9 +12,6 @@ function createS3ArtifactReader(client: S3Client): ArtifactObjectReader {
         new GetObjectCommand({
           Bucket: reference.bucket,
           Key: reference.key,
-          ...(reference.versionId === undefined
-            ? {}
-            : { VersionId: reference.versionId }),
         }),
       );
 
