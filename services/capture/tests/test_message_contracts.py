@@ -109,7 +109,6 @@ def test_message_contracts_validate_crawl_completed_with_shared_manifest_ref() -
                 "key": "manifests/archive-1/manifest.json",
                 "sha256": "a" * 64,
                 "sizeBytes": 128,
-                "versionId": "version-1",
             },
             "manifestDigest": "a" * 64,
             "seedSucceeded": True,
