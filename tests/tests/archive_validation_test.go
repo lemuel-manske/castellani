@@ -1,120 +1,167 @@
 package tests
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 	"testing"
 
+	"github.com/lemuel-manske/castellani/tests/internal/contracts"
+	"github.com/lemuel-manske/castellani/tests/internal/fixtures"
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
+	"github.com/lemuel-manske/castellani/tests/internal/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGateway_CreateArchiveRejectsUnsupportedContentType(t *testing.T) {
+func TestArchiveSubmission_RejectsMissingIdempotencyKey(t *testing.T) {
 	services := infra.Start(t)
 
-	request, err := http.NewRequest(
-		http.MethodPost,
-		services.Gateway.URL("/archives"),
-		strings.NewReader(`{"seedUrl":"https://example.com","maxDepth":1,"maxPages":10}`),
+	response := testutil.Post(
+		t,
+		services.Gateway.BaseURL(),
+		"/archives",
+		fixtures.ValidArchive,
+		map[string]string{
+			testutil.HeaderContentType: testutil.ContentTypeJSON,
+		},
 	)
-	require.NoError(t, err)
 
-	request.Header.Set("Idempotency-Key", "archive-test-0002")
-	request.Header.Set("Content-Type", "text/plain")
-
-	response, err := http.DefaultClient.Do(request)
-	require.NoError(t, err)
-
-	defer response.Body.Close()
-
-	require.Equal(t, http.StatusBadRequest, response.StatusCode)
-
-	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-
-	var problem Problem
-
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-
-	require.Equal(t, Problem{
-		Type:     "urn:distributed-web-archive:problem:content-type",
-		Title:    "Invalid Content Type",
-		Status:   http.StatusBadRequest,
-		Detail:   "Expected application/json.",
-		Instance: "/archives",
-	}, problem)
+	require.Equal(
+		t,
+		http.StatusBadRequest,
+		response.Status,
+	)
+	assert.Equal(
+		t,
+		testutil.ContentTypeProblem,
+		response.Header.Get(testutil.HeaderContentType),
+	)
+	assert.Equal(
+		t,
+		fixtures.InvalidIdempotencyKeyProblem(),
+		testutil.Decode[contracts.Problem](t, response),
+	)
 }
 
-func TestGateway_CreateArchiveRejectsMalformedJSON(t *testing.T) {
+func TestArchiveSubmission_RejectsShortIdempotencyKey(t *testing.T) {
 	services := infra.Start(t)
 
-	request, err := http.NewRequest(
-		http.MethodPost,
-		services.Gateway.URL("/archives"),
-		strings.NewReader(`{"seedUrl":`),
+	response := testutil.Post(
+		t,
+		services.Gateway.BaseURL(),
+		"/archives",
+		fixtures.ValidArchive,
+		map[string]string{
+			testutil.HeaderContentType:    testutil.ContentTypeJSON,
+			testutil.HeaderIdempotencyKey: fixtures.ShortIdempotencyKey,
+		},
 	)
-	require.NoError(t, err)
 
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", "archive-test-0003")
-
-	response, err := http.DefaultClient.Do(request)
-	require.NoError(t, err)
-
-	defer response.Body.Close()
-
-	require.Equal(t, http.StatusBadRequest, response.StatusCode)
-
-	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-
-	var problem Problem
-
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-
-	require.Equal(t, Problem{
-		Type:     "urn:distributed-web-archive:problem:invalid-json",
-		Title:    "Invalid Request",
-		Status:   http.StatusBadRequest,
-		Detail:   "Expected a valid archive JSON object.",
-		Instance: "/archives",
-	}, problem)
+	require.Equal(
+		t,
+		http.StatusBadRequest,
+		response.Status,
+	)
+	assert.Equal(
+		t,
+		testutil.ContentTypeProblem,
+		response.Header.Get(testutil.HeaderContentType),
+	)
+	assert.Equal(
+		t,
+		fixtures.InvalidIdempotencyKeyProblem(),
+		testutil.Decode[contracts.Problem](t, response),
+	)
 }
 
-func TestGateway_CreateArchiveRejectsInvalidSubmission(t *testing.T) {
+func TestArchiveSubmission_RejectsUnsupportedContentType(t *testing.T) {
 	services := infra.Start(t)
 
-	request, err := http.NewRequest(
-		http.MethodPost,
-		services.Gateway.URL("/archives"),
-		strings.NewReader(`{
-			"seedUrl": "https://example.com",
-			"maxDepth": -1,
-			"maxPages": 10
-		}`),
+	response := testutil.Post(
+		t,
+		services.Gateway.BaseURL(),
+		"/archives",
+		fixtures.ValidArchive,
+		map[string]string{
+			testutil.HeaderContentType:    "text/plain",
+			testutil.HeaderIdempotencyKey: fixtures.UnsupportedContentTypeIdempotencyKey,
+		},
 	)
-	require.NoError(t, err)
 
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", "archive-test-0004")
+	require.Equal(
+		t,
+		http.StatusBadRequest,
+		response.Status,
+	)
+	assert.Equal(
+		t,
+		testutil.ContentTypeProblem,
+		response.Header.Get(testutil.HeaderContentType),
+	)
+	assert.Equal(
+		t,
+		fixtures.InvalidContentTypeProblem(),
+		testutil.Decode[contracts.Problem](t, response),
+	)
+}
 
-	response, err := http.DefaultClient.Do(request)
-	require.NoError(t, err)
+func TestArchiveSubmission_RejectsMalformedJSON(t *testing.T) {
+	services := infra.Start(t)
 
-	defer response.Body.Close()
+	response := testutil.Post(
+		t,
+		services.Gateway.BaseURL(),
+		"/archives",
+		fixtures.MalformedArchive,
+		map[string]string{
+			testutil.HeaderContentType:    testutil.ContentTypeJSON,
+			testutil.HeaderIdempotencyKey: fixtures.MalformedJSONIdempotencyKey,
+		},
+	)
 
-	require.Equal(t, http.StatusUnprocessableEntity, response.StatusCode)
+	require.Equal(
+		t,
+		http.StatusBadRequest,
+		response.Status,
+	)
+	assert.Equal(
+		t,
+		testutil.ContentTypeProblem,
+		response.Header.Get(testutil.HeaderContentType),
+	)
+	assert.Equal(
+		t,
+		fixtures.InvalidJSONProblem(),
+		testutil.Decode[contracts.Problem](t, response),
+	)
+}
 
-	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
+func TestArchiveSubmission_RejectsInvalidRequest(t *testing.T) {
+	services := infra.Start(t)
 
-	var problem Problem
+	response := testutil.Post(
+		t,
+		services.Gateway.BaseURL(),
+		"/archives",
+		fixtures.InvalidArchive,
+		map[string]string{
+			testutil.HeaderContentType:    testutil.ContentTypeJSON,
+			testutil.HeaderIdempotencyKey: fixtures.InvalidSubmissionIdempotencyKey,
+		},
+	)
 
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-
-	require.Equal(t, Problem{
-		Type:     "urn:distributed-web-archive:problem:invalid-archive",
-		Title:    "Invalid Archive",
-		Status:   http.StatusUnprocessableEntity,
-		Detail:   "invalid submission: maxDepth must be a nonnegative integer",
-		Instance: "/archives",
-	}, problem)
+	require.Equal(
+		t,
+		http.StatusUnprocessableEntity,
+		response.Status,
+	)
+	assert.Equal(
+		t,
+		testutil.ContentTypeProblem,
+		response.Header.Get(testutil.HeaderContentType),
+	)
+	assert.Equal(
+		t,
+		fixtures.InvalidArchiveProblem(),
+		testutil.Decode[contracts.Problem](t, response),
+	)
 }

@@ -1,125 +1,52 @@
 package tests
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 	"testing"
 
+	"github.com/lemuel-manske/castellani/tests/internal/contracts"
+	"github.com/lemuel-manske/castellani/tests/internal/fixtures"
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
+	"github.com/lemuel-manske/castellani/tests/internal/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGateway_CreateArchiveRejectsMissingIdempotencyKey(t *testing.T) {
+func TestArchiveSubmission_AcceptsValidRequest(t *testing.T) {
 	services := infra.Start(t)
 
-	request, err := http.NewRequest(
-		http.MethodPost,
-		services.Gateway.URL("/archives"),
-		strings.NewReader("{}"),
+	response := testutil.Post(
+		t,
+		services.Gateway.BaseURL(),
+		"/archives",
+		fixtures.ValidArchive,
+		map[string]string{
+			testutil.HeaderContentType:    testutil.ContentTypeJSON,
+			testutil.HeaderIdempotencyKey: fixtures.AcceptedIdempotencyKey,
+		},
 	)
-	require.NoError(t, err)
 
-	request.Header.Set("Content-Type", "application/json")
-
-	response, err := http.DefaultClient.Do(request)
-	require.NoError(t, err)
-
-	defer response.Body.Close()
-
-	require.Equal(t, http.StatusBadRequest, response.StatusCode)
-
-	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-
-	var problem Problem
-
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-
-	require.NotEmpty(t, problem.Detail)
-
-	require.Equal(t, Problem{
-		Type:     "urn:distributed-web-archive:problem:idempotency-key",
-		Title:    "Invalid Idempotency Key",
-		Status:   http.StatusBadRequest,
-		Detail:   problem.Detail,
-		Instance: "/archives",
-	}, problem)
-}
-
-func TestGateway_CreateArchiveRejectsShortIdempotencyKey(t *testing.T) {
-	services := infra.Start(t)
-
-	request, err := http.NewRequest(
-		http.MethodPost,
-		services.Gateway.URL("/archives"),
-		strings.NewReader("{}"),
+	require.Equal(
+		t,
+		http.StatusAccepted,
+		response.Status,
 	)
-	require.NoError(t, err)
 
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", "short")
+	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
 
-	response, err := http.DefaultClient.Do(request)
-	require.NoError(t, err)
-
-	defer response.Body.Close()
-
-	require.Equal(t, http.StatusBadRequest, response.StatusCode)
-
-	require.Equal(t, "application/problem+json", response.Header.Get("Content-Type"))
-
-	var problem Problem
-
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&problem))
-
-	require.NotEmpty(t, problem.Detail)
-
-	require.Equal(t, Problem{
-		Type:     "urn:distributed-web-archive:problem:idempotency-key",
-		Title:    "Invalid Idempotency Key",
-		Status:   http.StatusBadRequest,
-		Detail:   problem.Detail,
-		Instance: "/archives",
-	}, problem)
-}
-
-func TestGateway_CreateArchiveAcceptsValidSubmission(t *testing.T) {
-	services := infra.Start(t)
-
-	request, err := http.NewRequest(
-		http.MethodPost,
-		services.Gateway.URL("/archives"),
-		strings.NewReader(`{
-			"seedUrl": "https://example.com",
-			"maxDepth": 1,
-			"maxPages": 10
-		}`),
+	assert.NotEmpty(t, accepted.ArchiveID)
+	assert.Equal(
+		t,
+		contracts.ArchiveAccepted{
+			ArchiveID: accepted.ArchiveID,
+			Status:    "ACCEPTED",
+			StatusURL: "/archives/" + accepted.ArchiveID,
+		},
+		accepted,
 	)
-	require.NoError(t, err)
-
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", "archive-test-0001")
-
-	response, err := http.DefaultClient.Do(request)
-	require.NoError(t, err)
-
-	defer response.Body.Close()
-
-	require.Equal(t, http.StatusAccepted, response.StatusCode)
-
-	require.Equal(t, "application/json", response.Header.Get("Content-Type"))
-
-	var accepted ArchiveAccepted
-
-	require.NoError(t, json.NewDecoder(response.Body).Decode(&accepted))
-
-	require.NotEmpty(t, accepted.ArchiveID)
-
-	require.Equal(t, ArchiveAccepted{
-		ArchiveID: accepted.ArchiveID,
-		Status:    "ACCEPTED",
-		StatusURL: "/archives/" + accepted.ArchiveID,
-	}, accepted)
-
-	require.Equal(t, accepted.StatusURL, response.Header.Get("Location"))
+	assert.Equal(
+		t,
+		accepted.StatusURL,
+		response.Header.Get(testutil.HeaderLocation),
+	)
 }

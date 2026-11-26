@@ -36,12 +36,22 @@ type Service struct {
 	password  string
 }
 
+func (s Service) BaseURL() string {
+	return s.baseURL
+}
+
 func (s Service) URL(path string) string {
 	return s.baseURL + path
 }
 
 func (s Service) HealthStatus(ctx context.Context) (int, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, s.healthURL, nil)
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		s.healthURL,
+		nil,
+	)
+
 	if err != nil {
 		return 0, err
 	}
@@ -51,6 +61,7 @@ func (s Service) HealthStatus(ctx context.Context) (int, error) {
 	}
 
 	response, err := httpClient.Do(request)
+
 	if err != nil {
 		return 0, err
 	}

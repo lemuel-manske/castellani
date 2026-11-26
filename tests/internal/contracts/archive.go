@@ -1,4 +1,5 @@
-package tests
+// Package contracts mirrors the public API shapes used by the end-to-end suite.
+package contracts
 
 type Problem struct {
 	Type     string `json:"type"`
