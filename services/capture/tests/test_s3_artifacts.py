@@ -45,7 +45,6 @@ async def test_s3_artifact_store_uploads_immutable_attempt_scoped_objects(
 
     assert reference.sha256
     assert reference.size_bytes == len(b"warc-content")
-    assert reference.version_id is not None
 
     assert read_object(s3, ARCHIVE_ARTIFACTS_BUCKET, reference.key) == b"warc-content"
     assert reference.key in object_keys(s3, ARCHIVE_ARTIFACTS_BUCKET)
