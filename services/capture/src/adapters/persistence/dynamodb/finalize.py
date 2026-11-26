@@ -58,7 +58,7 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
             body = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
 
             digest = hashlib.sha256(body).hexdigest()
-            key = manifest_key(archive_id)
+            key = manifest_key(archive_id, digest)
 
             self.s3_client.put_object(
                 Bucket=ARCHIVE_MANIFESTS_BUCKET,
@@ -67,18 +67,12 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
                 ContentType="application/json",
             )
 
-            metadata = self.s3_client.head_object(
-                Bucket=ARCHIVE_MANIFESTS_BUCKET,
-                Key=key,
-            )
-
             artifact = artifact_document(
                 ArtifactReference(
                     bucket=ARCHIVE_MANIFESTS_BUCKET,
                     key=key,
                     sha256=digest,
                     size_bytes=len(body),
-                    version_id=metadata.get("VersionId"),
                 )
             )
 
