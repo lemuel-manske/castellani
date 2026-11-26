@@ -77,6 +77,7 @@ class DynamoDBOutbox implements Outbox {
             "#state = :pending OR (#state = :claimed AND #leaseUntil < :now)",
           ExpressionAttributeNames: {
             "#state": "state",
+            "#leaseUntil": "leaseUntil",
           },
           ExpressionAttributeValues: {
             ":pending": PENDING,
@@ -106,6 +107,7 @@ class DynamoDBOutbox implements Outbox {
                 "SET #state = :claimed, leaseToken = :token, leaseUntil = :until ADD attempts :increment",
               ExpressionAttributeNames: {
                 "#state": "state",
+                "#leaseUntil": "leaseUntil",
               },
               ExpressionAttributeValues: {
                 ":pending": PENDING,

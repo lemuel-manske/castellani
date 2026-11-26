@@ -5,7 +5,7 @@ import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { createS3ArtifactReader } from "../adapters/artifacts/s3.js";
 import { createWarcCapturedPageReader } from "../adapters/artifacts/warc.js";
-import { createRabbitMQCompensationPublisher } from "../adapters/messaging/rabbitmq/compensationPublisher.js";
+import { createRabbitMQEventsPublisher } from "../adapters/messaging/rabbitmq/eventsPublisher.js";
 import { createOpenSearchDocumentReader } from "../adapters/search/opensearch-reader.js";
 import { DynamoDBIndexingLedger } from "../adapters/persistence/dynamodb/indexing-ledger.js";
 import { DynamoDBManifestLedger } from "../adapters/persistence/dynamodb/manifest-ledger.js";
@@ -23,6 +23,7 @@ import { CRAWL_COMPLETED_EVENT } from "../domain.js";
 import { processCrawlCompleted } from "../application/processCrawlCompleted.js";
 import { processPageCaptured } from "../application/processPageCaptured.js";
 import { processPublicationEvent } from "../application/processPublicationEvent.js";
+import { reportArchiveEvents } from "../application/reportArchiveEvents.js";
 import type { PublicationEvent } from "../application/types.js";
 
 import type { SearchSettings } from "./config.js";
@@ -82,7 +83,7 @@ class SearchRuntime {
 
     const documentWriter = createOpenSearchDocumentWriter(opensearch);
 
-    const compensationPublisher = createRabbitMQCompensationPublisher(
+    const eventsPublisher = createRabbitMQEventsPublisher(
       this.settings.rabbitmqUrl,
     );
 
@@ -98,8 +99,8 @@ class SearchRuntime {
         reconnectDelayMilliseconds: this.settings.reconnectDelayMilliseconds,
       },
       {
-        pageCaptured: (event) =>
-          processPageCaptured(
+        pageCaptured: async (event) => {
+          const result = await processPageCaptured(
             event,
             indexingLedger,
             capturedPageReader,
@@ -107,22 +108,48 @@ class SearchRuntime {
             this.settings.indexingLeaseDurationSeconds,
             this.settings.indexingMaxAttempts,
             publicationLedger,
-          ),
+          );
 
-        publicationEvent: (event: PublicationEvent) =>
-          event.type === CRAWL_COMPLETED_EVENT
-            ? processCrawlCompleted(
-                event,
-                artifactReader,
-                manifestLedger,
-                indexingLedger,
-                capturedPageReader,
-                documentWriter,
-                this.settings.indexingLeaseDurationSeconds,
-                this.settings.indexingMaxAttempts,
-                publicationLedger,
-              )
-            : processPublicationEvent(event, publicationLedger, documentWriter),
+          if (result.status === "COMPLETED") {
+            await reportArchiveEvents(
+              event.payload.archiveId,
+              indexingLedger,
+              manifestLedger,
+              publicationLedger,
+            );
+          }
+
+          return result;
+        },
+
+        publicationEvent: async (event: PublicationEvent) => {
+          if (event.type === CRAWL_COMPLETED_EVENT) {
+            await processCrawlCompleted(
+              event,
+              artifactReader,
+              manifestLedger,
+              indexingLedger,
+              capturedPageReader,
+              documentWriter,
+              this.settings.indexingLeaseDurationSeconds,
+              this.settings.indexingMaxAttempts,
+              publicationLedger,
+            );
+          } else {
+            await processPublicationEvent(
+              event,
+              publicationLedger,
+              documentWriter,
+            );
+          }
+
+          await reportArchiveEvents(
+            event.payload.archiveId,
+            indexingLedger,
+            manifestLedger,
+            publicationLedger,
+          );
+        },
       },
     );
 
@@ -140,7 +167,7 @@ class SearchRuntime {
         signal,
         outbox,
         documentWriter,
-        compensationPublisher,
+        eventsPublisher,
       ).catch((error: unknown) => {
         console.error("Search outbox worker stopped", error);
       });

@@ -1,19 +1,30 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import type { IndexingCompletion } from "../../../domain.js";
 import { PublicationConflictError } from "../../../domain/publication.js";
+
 import type {
   ArchiveManifest,
   ManifestLedger,
 } from "../../../ports/manifest-ledger.js";
+import type { OutboxEntry } from "../../../ports/outbox.js";
+
 import {
+  getArchiveManifest,
   getMetadata,
   getSnapshotDigest,
   putMetadata,
   putSnapshot,
+  recordIndexingCompletedTransaction,
 } from "./manifest-ledger-queries.js";
 import { isConditionalCheckFailure } from "./error-handling.js";
 
 class DynamoDBManifestLedger implements ManifestLedger {
   constructor(private readonly client: DynamoDBDocumentClient) {}
+
+  async get(archiveId: string): Promise<ArchiveManifest | undefined> {
+    return getArchiveManifest(this.client, archiveId);
+  }
 
   async record(manifest: ArchiveManifest, messageId: string): Promise<void> {
     if (
@@ -59,6 +70,27 @@ class DynamoDBManifestLedger implements ManifestLedger {
         throw new PublicationConflictError(
           "archive manifest changed concurrently; retry the operation",
         );
+      }
+    }
+  }
+
+  async recordIndexingCompleted(
+    completion: IndexingCompletion,
+    outboxEntry: OutboxEntry,
+  ): Promise<void> {
+    if (!completion.archiveId || !completion.manifestDigest) {
+      throw new Error("invalid indexing completion");
+    }
+
+    try {
+      await recordIndexingCompletedTransaction(
+        this.client,
+        completion,
+        outboxEntry,
+      );
+    } catch (error) {
+      if (!isConditionalCheckFailure(error)) {
+        throw error;
       }
     }
   }

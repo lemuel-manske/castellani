@@ -2,6 +2,7 @@ import type {
   CompensationDecision,
   PublicationFacts,
   PublicationIdentity,
+  SearchReadiness,
 } from "../domain.js";
 
 import type { OutboxEntry } from "./outbox.js";
@@ -22,6 +23,11 @@ interface PublicationLedger {
   recordCompensationDecision(
     decision: CompensationDecision,
     messageId: string,
+    outboxEntry: OutboxEntry,
+  ): Promise<void>;
+
+  recordSearchReady(
+    readiness: SearchReadiness,
     outboxEntry: OutboxEntry,
   ): Promise<void>;
 }

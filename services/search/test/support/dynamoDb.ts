@@ -49,6 +49,7 @@ function createDynamoDbTestSupport() {
 
   return {
     ledger,
+    outbox,
     publicationLedger,
     manifestLedger,
 

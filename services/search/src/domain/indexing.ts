@@ -59,6 +59,9 @@ function reconcileManifest(
 
   const missingSnapshotIds: string[] = [];
   let terminalCount = 0;
+  let indexedCount = 0;
+  let failedCount = 0;
+  let unsupportedCount = 0;
 
   for (const snapshotId of expected) {
     const outcome = ledger.get(snapshotId);
@@ -67,6 +70,14 @@ function reconcileManifest(
       missingSnapshotIds.push(snapshotId);
     } else if (isTerminalIndexingOutcome(outcome)) {
       terminalCount += 1;
+
+      if (outcome === "INDEXED") {
+        indexedCount += 1;
+      } else if (outcome === "FAILED") {
+        failedCount += 1;
+      } else {
+        unsupportedCount += 1;
+      }
     }
   }
 
@@ -77,6 +88,9 @@ function reconcileManifest(
   return {
     expectedCount: expected.size,
     terminalCount,
+    indexedCount,
+    failedCount,
+    unsupportedCount,
     missingSnapshotIds,
     unexpectedSnapshotIds,
     complete:

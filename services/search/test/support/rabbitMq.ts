@@ -18,11 +18,30 @@ import type {
 import { SEARCH_RABBITMQ_URL } from "./env.js";
 import { bufferJSON } from "../../src/utils.js";
 
+const COORDINATOR_QUEUE = "castellani.coordinator";
+
 function createRabbitMqTestSupport() {
   let connection: amqp.ChannelModel | undefined;
   let consumerChannel: amqp.ConfirmChannel | undefined;
   let publicationConsumerChannel: amqp.ConfirmChannel | undefined;
   let publisherChannel: amqp.ConfirmChannel | undefined;
+  let eventsChannel: amqp.ConfirmChannel | undefined;
+
+  const coordinatorEvents: Record<string, unknown>[] = [];
+  const coordinatorEventWaiters: {
+    type: string;
+    archiveId: string;
+    resolve: (event: Record<string, unknown> | undefined) => void;
+    timeout: NodeJS.Timeout;
+  }[] = [];
+
+  function isMatchingEvent(
+    event: Record<string, unknown>,
+    type: string,
+    archiveId: string,
+  ): boolean {
+    return event["type"] === type && event["correlationId"] === archiveId;
+  }
 
   const deadLetters: ConsumeMessage[] = [];
   const deadLetterWaiters: ((message: ConsumeMessage) => void)[] = [];
@@ -48,6 +67,42 @@ function createRabbitMqTestSupport() {
     waiter(message);
   }
 
+  function parseEvent(message: ConsumeMessage): Record<string, unknown> | null {
+    try {
+      const value: unknown = JSON.parse(message.content.toString("utf8"));
+
+      return typeof value === "object" && value !== null
+        ? (value as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function purgeQueues(): Promise<void> {
+    if (connection === undefined) {
+      return;
+    }
+
+    const cleanup = await connection.createChannel();
+
+    try {
+      await Promise.all(
+        [
+          PAGE_CAPTURED_TOPOLOGY.queue,
+          PAGE_CAPTURED_TOPOLOGY.retryQueue,
+          PAGE_CAPTURED_TOPOLOGY.deadLetterQueue,
+          PUBLICATION_TOPOLOGY.queue,
+          PUBLICATION_TOPOLOGY.retryQueue,
+          PUBLICATION_TOPOLOGY.deadLetterQueue,
+          COORDINATOR_QUEUE,
+        ].map((queue) => cleanup.purgeQueue(queue).catch(() => undefined)),
+      );
+    } finally {
+      await cleanup.close().catch(() => undefined);
+    }
+  }
+
   return {
     async setup(
       handleCapture: (event: PageCapturedEvent) => Promise<PageCapturedResult>,
@@ -59,6 +114,8 @@ function createRabbitMqTestSupport() {
       consumerChannel = await connection.createConfirmChannel();
       publicationConsumerChannel = await connection.createConfirmChannel();
       publisherChannel = await connection.createConfirmChannel();
+
+      await purgeQueues();
 
       await startPageCapturedConsumer(consumerChannel, handleCapture);
 
@@ -98,6 +155,79 @@ function createRabbitMqTestSupport() {
           );
         },
       );
+    },
+
+    async startEventsObserver(): Promise<void> {
+      if (connection === undefined) {
+        throw new Error("RabbitMQ integration environment is not initialized");
+      }
+
+      eventsChannel = await connection.createConfirmChannel();
+
+      await eventsChannel.purgeQueue(COORDINATOR_QUEUE);
+
+      await eventsChannel.consume(
+        COORDINATOR_QUEUE,
+        (message) => {
+          if (message === null) {
+            return;
+          }
+
+          const event = parseEvent(message);
+
+          if (event === null) {
+            return;
+          }
+
+          const index = coordinatorEventWaiters.findIndex((waiter) =>
+            isMatchingEvent(event, waiter.type, waiter.archiveId),
+          );
+
+          if (index < 0) {
+            coordinatorEvents.push(event);
+            return;
+          }
+
+          const [waiter] = coordinatorEventWaiters.splice(index, 1);
+
+          clearTimeout(waiter.timeout);
+          waiter.resolve(event);
+        },
+        { noAck: true },
+      );
+    },
+
+    nextEvent(
+      type: string,
+      archiveId: string,
+      timeoutMilliseconds = 10000,
+    ): Promise<Record<string, unknown> | undefined> {
+      const index = coordinatorEvents.findIndex((event) =>
+        isMatchingEvent(event, type, archiveId),
+      );
+
+      if (index >= 0) {
+        return Promise.resolve(coordinatorEvents.splice(index, 1)[0]);
+      }
+
+      return new Promise((resolve) => {
+        const waiter = {
+          type,
+          archiveId,
+          resolve,
+          timeout: setTimeout(() => {
+            const waiterIndex = coordinatorEventWaiters.indexOf(waiter);
+
+            if (waiterIndex >= 0) {
+              coordinatorEventWaiters.splice(waiterIndex, 1);
+            }
+
+            resolve(undefined);
+          }, timeoutMilliseconds),
+        };
+
+        coordinatorEventWaiters.push(waiter);
+      });
     },
 
     async publish(event: unknown): Promise<void> {
@@ -153,6 +283,7 @@ function createRabbitMqTestSupport() {
       }
 
       await publisherChannel?.close().catch(() => undefined);
+      await eventsChannel?.close().catch(() => undefined);
       await consumerChannel?.close().catch(() => undefined);
       await publicationConsumerChannel?.close().catch(() => undefined);
 
@@ -168,6 +299,7 @@ function createRabbitMqTestSupport() {
               PUBLICATION_TOPOLOGY.queue,
               PUBLICATION_TOPOLOGY.retryQueue,
               PUBLICATION_TOPOLOGY.deadLetterQueue,
+              COORDINATOR_QUEUE,
             ].map((queue) => cleanup.purgeQueue(queue).catch(() => undefined)),
           );
         } finally {

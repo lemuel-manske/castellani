@@ -1,7 +1,7 @@
 import * as amqp from "amqplib";
 
 import type { ClaimedOutboxMessage } from "../../../ports/outbox.js";
-import type { CompensationPublisher } from "../../../ports/compensation-publisher.js";
+import type { EventsPublisher } from "../../../ports/events-publisher.js";
 
 import { EVENTS_EXCHANGE } from "./topology.js";
 
@@ -11,9 +11,7 @@ function messageError(error: unknown, fallback: string): Error {
   return error instanceof Error ? error : new Error(fallback);
 }
 
-function createRabbitMQCompensationPublisher(
-  rabbitmqUrl: string,
-): CompensationPublisher {
+function createRabbitMQEventsPublisher(rabbitmqUrl: string): EventsPublisher {
   return {
     async publish(message: ClaimedOutboxMessage): Promise<void> {
       const connection = await amqp.connect(rabbitmqUrl);
@@ -30,7 +28,7 @@ function createRabbitMQCompensationPublisher(
 
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
-              reject(new Error("compensation publish confirmation timed out"));
+              reject(new Error("event publish confirmation timed out"));
             }, PUBLISH_TIMEOUT_MILLISECONDS);
 
             const published = channel.publish(
@@ -48,12 +46,12 @@ function createRabbitMQCompensationPublisher(
                 clearTimeout(timeout);
 
                 if (error) {
-                  reject(messageError(error, "compensation publish failed"));
+                  reject(messageError(error, "event publish failed"));
                   return;
                 }
 
                 if (returned) {
-                  reject(new Error("compensation message was unroutable"));
+                  reject(new Error("event message was unroutable"));
                   return;
                 }
 
@@ -63,7 +61,7 @@ function createRabbitMQCompensationPublisher(
 
             if (!published) {
               clearTimeout(timeout);
-              reject(new Error("compensation message was not accepted"));
+              reject(new Error("event message was not accepted"));
             }
           });
         } finally {
@@ -76,4 +74,4 @@ function createRabbitMQCompensationPublisher(
   };
 }
 
-export { createRabbitMQCompensationPublisher };
+export { createRabbitMQEventsPublisher };

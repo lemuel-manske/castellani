@@ -1,3 +1,7 @@
+import type { IndexingCompletion } from "../domain.js";
+
+import type { OutboxEntry } from "./outbox.js";
+
 interface ArchiveManifest {
   archiveId: string;
   manifestDigest: string;
@@ -6,7 +10,14 @@ interface ArchiveManifest {
 }
 
 interface ManifestLedger {
+  get(archiveId: string): Promise<ArchiveManifest | undefined>;
+
   record(manifest: ArchiveManifest, messageId: string): Promise<void>;
+
+  recordIndexingCompleted(
+    completion: IndexingCompletion,
+    outboxEntry: OutboxEntry,
+  ): Promise<void>;
 
   contains(
     archiveId: string,

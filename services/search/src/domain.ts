@@ -12,6 +12,8 @@ const ARCHIVE_PUBLISHED_EVENT = "ArchivePublished";
 const CRAWL_COMPLETED_EVENT = "CrawlCompleted";
 const PAGE_CAPTURED_EVENT = "PageCaptured";
 const SEARCH_COMPENSATED_EVENT = "SearchCompensated";
+const SEARCH_INDEXING_COMPLETED_EVENT = "SearchIndexingCompleted";
+const SEARCH_READY_EVENT = "SearchReady";
 
 interface PublicationIdentity {
   archiveId: string;
@@ -67,9 +69,27 @@ interface SnapshotLedgerEntry {
   outcome: IndexingOutcome;
 }
 
+interface IndexingCompletion {
+  archiveId: string;
+  manifestDigest: string;
+  expected: number;
+  indexed: number;
+  failed: number;
+  unsupported: number;
+}
+
+interface SearchReadiness {
+  archiveId: string;
+  decisionVersion: number;
+  manifestDigest: string;
+}
+
 interface ManifestReconciliation {
   expectedCount: number;
   terminalCount: number;
+  indexedCount: number;
+  failedCount: number;
+  unsupportedCount: number;
   missingSnapshotIds: string[];
   unexpectedSnapshotIds: string[];
   complete: boolean;
@@ -82,11 +102,14 @@ export {
   CRAWL_COMPLETED_EVENT,
   PAGE_CAPTURED_EVENT,
   SEARCH_COMPENSATED_EVENT,
+  SEARCH_INDEXING_COMPLETED_EVENT,
+  SEARCH_READY_EVENT,
 };
 
 export type {
   CompensationDecision,
   CompletionCrawl,
+  IndexingCompletion,
   IndexingOutcome,
   ManifestReconciliation,
   ManifestSnapshot,
@@ -94,6 +117,7 @@ export type {
   PublicationFacts,
   PublicationIdentity,
   SearchCompensationAck,
+  SearchReadiness,
   SnapshotLedgerEntry,
   TerminalIndexingOutcome,
 };

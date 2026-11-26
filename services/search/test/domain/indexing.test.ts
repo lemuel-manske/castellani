@@ -19,6 +19,9 @@ it("identifies work missing from the ledger when completion arrives first", () =
   expect(result).toEqual({
     expectedCount: 2,
     terminalCount: 1,
+    indexedCount: 1,
+    failedCount: 0,
+    unsupportedCount: 0,
     missingSnapshotIds: ["snapshot-2"],
     unexpectedSnapshotIds: [],
     complete: false,
@@ -33,6 +36,27 @@ it("counts each expected snapshot once and treats terminal failures as accounted
 
   expect(result.complete).toBe(true);
   expect(result.terminalCount).toBe(2);
+});
+
+it("counts indexed, failed, and unsupported outcomes separately", () => {
+  const result = reconcileManifest(
+    [
+      { snapshotId: "snapshot-1" },
+      { snapshotId: "snapshot-2" },
+      { snapshotId: "snapshot-3" },
+    ],
+    [
+      { snapshotId: "snapshot-1", outcome: "INDEXED" },
+      { snapshotId: "snapshot-2", outcome: "FAILED" },
+      { snapshotId: "snapshot-3", outcome: "UNSUPPORTED" },
+    ],
+  );
+
+  expect([
+    result.indexedCount,
+    result.failedCount,
+    result.unsupportedCount,
+  ]).toEqual([1, 1, 1]);
 });
 
 it("does not consider pending entries terminal", () => {

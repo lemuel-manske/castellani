@@ -4,9 +4,13 @@ import {
   ARCHIVE_PUBLISHED_EVENT,
   CRAWL_COMPLETED_EVENT,
   PAGE_CAPTURED_EVENT,
+  SEARCH_INDEXING_COMPLETED_EVENT,
+  SEARCH_READY_EVENT,
   type CompensationDecision,
   type CompletionCrawl,
+  type IndexingCompletion,
   type PublicationIdentity,
+  type SearchReadiness,
   type TerminalIndexingOutcome,
 } from "../domain.js";
 
@@ -44,6 +48,13 @@ type PageCapturedEvent = Event<
     warcArtifacts: ArtifactReference[];
   }
 >;
+
+type IndexingCompletedEvent = Event<
+  typeof SEARCH_INDEXING_COMPLETED_EVENT,
+  IndexingCompletion
+>;
+
+type SearchReadyEvent = Event<typeof SEARCH_READY_EVENT, SearchReadiness>;
 
 type PageCapturedResult =
   | {
@@ -100,11 +111,13 @@ interface PublishedSearchPage {
 
 export type {
   Event,
+  IndexingCompletedEvent,
   ManifestDocument,
   ManifestSnapshot,
   PageCapturedEvent,
   PageCapturedResult,
   PublicationEvent,
+  SearchReadyEvent,
   PublishedSearchPage,
   PublishedSearchResult,
   SearchPublishedDocumentsInput,

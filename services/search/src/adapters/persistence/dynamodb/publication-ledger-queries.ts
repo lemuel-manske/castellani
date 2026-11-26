@@ -9,17 +9,24 @@ import type {
   CompensationDecision,
   PublicationFacts,
   PublicationIdentity,
+  SearchReadiness,
 } from "../../../domain.js";
-import { emptyPublicationFacts } from "../../../domain/publication.js";
+import {
+  emptyPublicationFacts,
+  isPublicationAuthorized,
+  PublicationConflictError,
+} from "../../../domain/publication.js";
 
 import type { OutboxEntry } from "../../../ports/outbox.js";
 
-import { OUTBOX, PUBLICATION_LEDGER } from "./tables.js";
+import { putOutboxEntry } from "./outbox-queries.js";
+import { PUBLICATION_LEDGER } from "./tables.js";
 
 interface PublicationLedgerItem {
   publicationDecision?: string;
   replayPublication?: string;
   compensationDecision?: string;
+  searchReady?: string;
   processedMessageIds?: string[];
 }
 
@@ -134,23 +141,58 @@ async function recordCompensationDecisionTransaction(
             },
           },
         },
+        putOutboxEntry(outboxEntry),
+      ],
+    }),
+  );
+}
+
+async function recordSearchReadyTransaction(
+  client: DynamoDBDocumentClient,
+  readiness: SearchReadiness,
+  item: PublicationLedgerItem,
+  outboxEntry: OutboxEntry,
+): Promise<void> {
+  const facts = factsFromItem(item);
+  const decision = facts.publicationDecision;
+
+  if (
+    !isPublicationAuthorized(facts) ||
+    decision === null ||
+    decision.archiveId !== readiness.archiveId ||
+    decision.decisionVersion !== readiness.decisionVersion ||
+    item.publicationDecision === undefined ||
+    item.replayPublication === undefined
+  ) {
+    throw new PublicationConflictError(
+      "search readiness does not match authorized publication facts",
+    );
+  }
+
+  await client.send(
+    new TransactWriteCommand({
+      TransactItems: [
         {
-          Put: {
-            TableName: OUTBOX,
-            Item: {
-              messageId: outboxEntry.messageId,
-              correlationId: outboxEntry.correlationId,
-              type: outboxEntry.type,
-              occurredAt: outboxEntry.occurredAt,
-              envelope: outboxEntry.envelope,
-              cleanupRequired: outboxEntry.cleanupRequired,
-              state: "PENDING",
-              attempts: 0,
-              createdAt: outboxEntry.occurredAt,
+          Update: {
+            TableName: PUBLICATION_LEDGER,
+            Key: { archiveId: readiness.archiveId },
+            UpdateExpression: "SET #ready = :readiness",
+            ConditionExpression:
+              "attribute_not_exists(#compensation) AND #publication = :publication AND #replay = :replay AND attribute_not_exists(#ready)",
+            ExpressionAttributeNames: {
+              "#compensation": "compensationDecision",
+              "#publication": "publicationDecision",
+              "#replay": "replayPublication",
+              "#ready": "searchReady",
             },
-            ConditionExpression: "attribute_not_exists(messageId)",
+            ExpressionAttributeValues: {
+              ":publication": item.publicationDecision,
+              ":replay": item.replayPublication,
+              ":readiness": JSON.stringify(readiness),
+            },
           },
         },
+        putOutboxEntry(outboxEntry),
       ],
     }),
   );
@@ -213,4 +255,5 @@ export {
   recordCompensationDecisionTransaction,
   recordPublicationDecisionQuery,
   recordReplayPublishedQuery,
+  recordSearchReadyTransaction,
 };

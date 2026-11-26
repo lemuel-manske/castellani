@@ -2,6 +2,7 @@ import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type {
   CompensationDecision,
   PublicationIdentity,
+  SearchReadiness,
 } from "../../../domain.js";
 import {
   PublicationConflictError,
@@ -12,10 +13,12 @@ import {
 import type { Outbox, OutboxEntry } from "../../../ports/outbox.js";
 import type { PublicationLedger } from "../../../ports/publication-ledger.js";
 import {
+  getPublicationEntry,
   getPublicationFacts,
   recordCompensationDecisionTransaction,
   recordPublicationDecisionQuery,
   recordReplayPublishedQuery,
+  recordSearchReadyTransaction,
 } from "./publication-ledger-queries.js";
 import { isConditionalCheckFailure } from "./error-handling.js";
 
@@ -122,6 +125,30 @@ class DynamoDBPublicationLedger implements PublicationLedger {
         throw new PublicationConflictError(
           "compensation acknowledgement was not durably recorded",
         );
+      }
+    }
+  }
+
+  async recordSearchReady(
+    readiness: SearchReadiness,
+    outboxEntry: OutboxEntry,
+  ): Promise<void> {
+    const item = await getPublicationEntry(this.client, readiness.archiveId);
+
+    if (item === undefined) {
+      throw new PublicationConflictError("publication facts are missing");
+    }
+
+    try {
+      await recordSearchReadyTransaction(
+        this.client,
+        readiness,
+        item,
+        outboxEntry,
+      );
+    } catch (error) {
+      if (!isConditionalCheckFailure(error)) {
+        throw error;
       }
     }
   }

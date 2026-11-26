@@ -1,6 +1,6 @@
-import { dispatchCompensationOutbox } from "../application/dispatchCompensationOutbox.js";
+import { dispatchOutbox } from "../application/dispatchOutbox.js";
 
-import type { CompensationPublisher } from "../ports/compensation-publisher.js";
+import type { EventsPublisher } from "../ports/events-publisher.js";
 import type { Outbox } from "../ports/outbox.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
@@ -9,16 +9,16 @@ import { delay } from "./delay.js";
 const DISPATCH_INTERVAL_MILLISECONDS = 500;
 const DISPATCH_ERROR_DELAY_MILLISECONDS = 2000;
 
-/** Keeps draining durable compensation acknowledgements until shutdown. */
+/** Keeps draining durable outbox events until shutdown. */
 async function startOutboxWorker(
   signal: AbortSignal,
   outbox: Outbox,
   documentWriter: SearchDocumentWriter,
-  publisher: CompensationPublisher,
+  publisher: EventsPublisher,
 ): Promise<void> {
   while (!signal.aborted) {
     try {
-      const dispatched = await dispatchCompensationOutbox(
+      const dispatched = await dispatchOutbox(
         outbox,
         documentWriter,
         publisher,

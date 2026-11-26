@@ -1,6 +1,18 @@
-import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  TransactWriteCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import type { IndexingCompletion } from "../../../domain.js";
+
 import type { ArchiveManifest } from "../../../ports/manifest-ledger.js";
+import type { OutboxEntry } from "../../../ports/outbox.js";
+
+import { putOutboxEntry } from "./outbox-queries.js";
 import { MANIFEST_LEDGER } from "./tables.js";
 
 const METADATA_KEY = "!manifest";
@@ -9,6 +21,7 @@ interface ManifestMetadata {
   manifestDigest: string;
   collectionId: string;
   snapshotCount: number;
+  indexingCompleted?: string;
   processedMessageIds?: string[];
 }
 
@@ -69,6 +82,40 @@ async function putMetadata(
   );
 }
 
+async function recordIndexingCompletedTransaction(
+  client: DynamoDBDocumentClient,
+  completion: IndexingCompletion,
+  outboxEntry: OutboxEntry,
+): Promise<void> {
+  await client.send(
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: MANIFEST_LEDGER,
+            Key: {
+              archiveId: completion.archiveId,
+              snapshotId: METADATA_KEY,
+            },
+            UpdateExpression: "SET #completed = :completion",
+            ConditionExpression:
+              "attribute_exists(#digest) AND #digest = :digest AND attribute_not_exists(#completed)",
+            ExpressionAttributeNames: {
+              "#digest": "manifestDigest",
+              "#completed": "indexingCompleted",
+            },
+            ExpressionAttributeValues: {
+              ":digest": completion.manifestDigest,
+              ":completion": JSON.stringify(completion),
+            },
+          },
+        },
+        putOutboxEntry(outboxEntry),
+      ],
+    }),
+  );
+}
+
 async function getMetadata(
   client: DynamoDBDocumentClient,
   archiveId: string,
@@ -95,6 +142,46 @@ async function getMetadata(
     : null;
 }
 
+async function getArchiveManifest(
+  client: DynamoDBDocumentClient,
+  archiveId: string,
+): Promise<ArchiveManifest | undefined> {
+  const metadata = await getMetadata(client, archiveId);
+
+  if (metadata === null) {
+    return undefined;
+  }
+
+  const response = await client.send(
+    new QueryCommand({
+      TableName: MANIFEST_LEDGER,
+      KeyConditionExpression:
+        "archiveId = :archiveId AND begins_with(snapshotId, :prefix)",
+      ExpressionAttributeValues: {
+        ":archiveId": archiveId,
+        ":prefix": "snapshot#",
+      },
+      ConsistentRead: true,
+    }),
+  );
+
+  const snapshotIds = (response.Items ?? [])
+    .map((item): unknown => item["snapshotId"])
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.slice("snapshot#".length));
+
+  if (snapshotIds.length !== metadata.snapshotCount) {
+    throw new Error("archive manifest snapshot count mismatch");
+  }
+
+  return {
+    archiveId,
+    manifestDigest: metadata.manifestDigest,
+    collectionId: metadata.collectionId,
+    snapshotIds,
+  };
+}
+
 async function getSnapshotDigest(
   client: DynamoDBDocumentClient,
   archiveId: string,
@@ -113,4 +200,11 @@ async function getSnapshotDigest(
     : null;
 }
 
-export { getMetadata, getSnapshotDigest, putMetadata, putSnapshot };
+export {
+  getArchiveManifest,
+  getMetadata,
+  getSnapshotDigest,
+  putMetadata,
+  putSnapshot,
+  recordIndexingCompletedTransaction,
+};

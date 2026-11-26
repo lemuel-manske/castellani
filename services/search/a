@@ -1,0 +1,94 @@
+AssertionError: expected undefined to match object { …(5) }
+
+- Expected:
+{
+  "correlationId": "events-counts-1a07478f40e244dea90462777e854baa",
+  "messageId": "events-counts-1a07478f40e244dea90462777e854baa:events-digest-1a07478f40e244dea90462777e854baa",
+  "payload": {
+    "archiveId": "events-counts-1a07478f40e244dea90462777e854baa",
+    "expected": 3,
+    "failed": 1,
+    "indexed": 1,
+    "manifestDigest": "events-digest-1a07478f40e244dea90462777e854baa",
+    "unsupported": 1,
+  },
+  "type": "SearchIndexingCompleted",
+  "version": 1,
+}
+
++ Received:
+undefined
+
+ ❯ test/application/indexingEvents.integration.test.ts:114:4
+    112|   await expect(
+    113|     rabbitmq.nextEvent(SEARCH_INDEXING_COMPLETED_EVENT),
+    114|   ).resolves.toMatchObject({
+       |    ^
+    115|     messageId: `${archiveId}:${manifestDigest}`,
+    116|     correlationId: archiveId,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/application/indexingEvents.integration.test.ts > emits SearchReady only after matching publication and replay facts
+AssertionError: expected undefined to match object { …(5) }
+
+- Expected:
+{
+  "correlationId": "events-ready-c996b0f668054f4da13fdbf28bf88006",
+  "messageId": "events-ready-c996b0f668054f4da13fdbf28bf88006:2:events-ready-digest-c996b0f668054f4da13fdbf28bf88006",
+  "payload": {
+    "archiveId": "events-ready-c996b0f668054f4da13fdbf28bf88006",
+    "decisionVersion": 2,
+    "manifestDigest": "events-ready-digest-c996b0f668054f4da13fdbf28bf88006",
+  },
+  "type": "SearchReady",
+  "version": 1,
+}
+
++ Received:
+undefined
+
+ ❯ test/application/indexingEvents.integration.test.ts:191:55
+    189|   await application.drainOutbox();
+    190|
+    191|   await expect(rabbitmq.nextEvent(SEARCH_READY_EVENT)).resolves.toMatchObject({
+       |                                                       ^
+    192|     messageId: `${archiveId}:2:${manifestDigest}`,
+    193|     correlationId: archiveId,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/application/indexingEvents.integration.test.ts > reports completion when CrawlCompleted arrives before its page event
+AssertionError: expected undefined to match object { …(2) }
+
+- Expected:
+{
+  "correlationId": "events-late-21204000bbbf4d42a0606746414dc0af",
+  "payload": {
+    "archiveId": "events-late-21204000bbbf4d42a0606746414dc0af",
+    "expected": 1,
+    "failed": 0,
+    "indexed": 1,
+    "manifestDigest": "49055115dce2ce36e2ee61c705a3c0ca9d7c8fce5440989078ca67cb19eb9bca",
+    "unsupported": 0,
+  },
+}
+
++ Received:
+undefined
+
+ ❯ test/application/indexingEvents.integration.test.ts:295:4
+    293|   await expect(
+    294|     rabbitmq.nextEvent(SEARCH_INDEXING_COMPLETED_EVENT),
+    295|   ).resolves.toMatchObject({
+       |    ^
+    296|     correlationId: archiveId,
+    297|     payload: {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  3 failed | 7 passed (10)
+   Start at  19:12:49
+   Duration  55.99s (transform 671ms, setup 0ms, import 5.29s, tests 48.97s, environment 2ms)

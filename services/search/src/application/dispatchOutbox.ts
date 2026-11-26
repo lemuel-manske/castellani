@@ -1,14 +1,14 @@
-import type { CompensationPublisher } from "../ports/compensation-publisher.js";
+import type { EventsPublisher } from "../ports/events-publisher.js";
 import type { Outbox } from "../ports/outbox.js";
 import type { SearchDocumentWriter } from "../ports/search-index.js";
 
 const OUTBOX_LEASE_SECONDS = 30;
 
-/** Publishes one durable compensation acknowledgement after staged documents are gone. */
-async function dispatchCompensationOutbox(
+/** Publishes one durable outbox event after any required staged-document cleanup. */
+async function dispatchOutbox(
   outbox: Outbox,
   documentWriter: SearchDocumentWriter,
-  publisher: CompensationPublisher,
+  publisher: EventsPublisher,
 ): Promise<boolean> {
   const message = await outbox.claim(OUTBOX_LEASE_SECONDS);
 
@@ -32,4 +32,4 @@ async function dispatchCompensationOutbox(
   return true;
 }
 
-export { dispatchCompensationOutbox };
+export { dispatchOutbox };

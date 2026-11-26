@@ -8,9 +8,11 @@ import {
 } from "../../src/domain.js";
 import type { PublicationEvent } from "../../src/application/processPublicationEvent.js";
 import type { Event } from "../../src/application/types.js";
+import { dispatchOutbox as dispatchOutboxEvents } from "../../src/application/dispatchOutbox.js";
 import { processCrawlCompleted } from "../../src/application/processCrawlCompleted.js";
 import { processPageCaptured } from "../../src/application/processPageCaptured.js";
 import { processPublicationEvent } from "../../src/application/processPublicationEvent.js";
+import { reportArchiveEvents } from "../../src/application/reportArchiveEvents.js";
 import { searchPublishedDocuments } from "../../src/application/searchPublishedDocuments.js";
 import type {
   PageCapturedEvent,
@@ -20,6 +22,7 @@ import type {
 
 import type { SearchQuery } from "../../src/ports/search-reader.js";
 
+import { createRabbitMQEventsPublisher } from "../../src/adapters/messaging/rabbitmq/eventsPublisher.js";
 import { createOpenSearchDocumentReader } from "../../src/adapters/search/opensearch-reader.js";
 import { createOpenSearchDocumentWriter } from "../../src/adapters/search/opensearch.js";
 import { createS3ArtifactReader } from "../../src/adapters/artifacts/s3.js";
@@ -49,12 +52,26 @@ const artifactReader = createS3ArtifactReader(s3.client);
 const capturedPageReader = createWarcCapturedPageReader(artifactReader);
 const documentReader = createOpenSearchDocumentReader(opensearch.client);
 const documentWriter = createOpenSearchDocumentWriter(opensearch.client);
+const eventsPublisher = createRabbitMQEventsPublisher(
+  SEARCH_RABBITMQ_URL ?? "amqp://localhost",
+);
 
 const compensationDecisions: CompensationDecision[] = [];
 
+function report(archiveId: string): Promise<void> {
+  return reportArchiveEvents(
+    archiveId,
+    dynamodb.ledger,
+    dynamodb.manifestLedger,
+    dynamodb.publicationLedger,
+  );
+}
+
 const application = {
-  processPageCaptured(event: PageCapturedEvent): Promise<PageCapturedResult> {
-    return processPageCaptured(
+  async processPageCaptured(
+    event: PageCapturedEvent,
+  ): Promise<PageCapturedResult> {
+    const result = await processPageCaptured(
       event,
       dynamodb.ledger,
       capturedPageReader,
@@ -63,12 +80,18 @@ const application = {
       INDEXING_MAX_ATTEMPTS,
       dynamodb.publicationLedger,
     );
+
+    if (result.status === "COMPLETED") {
+      await report(event.payload.archiveId);
+    }
+
+    return result;
   },
 
-  processCrawlCompleted(
+  async processCrawlCompleted(
     event: Event<typeof CRAWL_COMPLETED_EVENT, CompletionCrawl>,
   ): Promise<void> {
-    return processCrawlCompleted(
+    await processCrawlCompleted(
       event,
       artifactReader,
       dynamodb.manifestLedger,
@@ -79,20 +102,40 @@ const application = {
       INDEXING_MAX_ATTEMPTS,
       dynamodb.publicationLedger,
     );
+
+    await report(event.payload.archiveId);
   },
 
-  processPublicationEvent(
+  async processPublicationEvent(
     event: Exclude<PublicationEvent, { type: typeof CRAWL_COMPLETED_EVENT }>,
   ): Promise<void> {
     if (event.type === ARCHIVE_COMPENSATION_DECIDED_EVENT) {
       compensationDecisions.push(event.payload);
     }
 
-    return processPublicationEvent(
+    await processPublicationEvent(
       event,
       dynamodb.publicationLedger,
       documentWriter,
     );
+
+    await report(event.payload.archiveId);
+  },
+
+  async drainOutbox(): Promise<void> {
+    while (
+      await dispatchOutboxEvents(
+        dynamodb.outbox,
+        documentWriter,
+        eventsPublisher,
+      )
+    ) {
+      // Drain every outbox entry recorded by the current test.
+    }
+  },
+
+  report(archiveId: string): Promise<void> {
+    return report(archiveId);
   },
 
   searchPublishedDocuments(input: SearchPublishedDocumentsInput) {
@@ -186,7 +229,10 @@ const integrations = {
   },
   rabbitmq: {
     endpoint: SEARCH_RABBITMQ_URL,
-    setup: () => rabbitmq.setup(receivePageCaptured, receivePublicationEvent),
+    setup: async () => {
+      await rabbitmq.setup(receivePageCaptured, receivePublicationEvent);
+      await rabbitmq.startEventsObserver();
+    },
     teardown: () => rabbitmq.teardown(),
   },
   s3: {
