@@ -42,6 +42,8 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, acceptedResponse)
 	require.NotEmpty(t, accepted.ArchiveID)
 	require.Equal(t, "ACCEPTED", accepted.Status)
+	require.Equal(t, "/archives/"+accepted.ArchiveID, accepted.StatusURL)
+	require.Equal(t, accepted.StatusURL, acceptedResponse.Header.Get(testutil.HeaderLocation))
 
 	var (
 		statusResponse testutil.Result
