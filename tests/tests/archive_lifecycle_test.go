@@ -103,7 +103,7 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	require.Equal(t, "application/wacz", waczResponse.Header.Get(testutil.HeaderContentType))
 	require.True(
 		t,
-		strings.HasPrefix(waczResponse.Body, "PK\\x03\\x04"),
+		strings.HasPrefix(waczResponse.Body, "\\x50\\x4b\\x03\\x04"),
 		"published WACZ should be a ZIP archive",
 	)
 }
