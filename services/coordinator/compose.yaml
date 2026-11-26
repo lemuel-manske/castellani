@@ -1,0 +1,39 @@
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:3.3.2
+
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8000'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+
+    environment:
+      RABBITMQ_DEFAULT_USER: castellani
+      RABBITMQ_DEFAULT_PASS: castellani
+
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ../../infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ../../infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmqctl -q list_queues name | grep -qx 'castellani.coordinator'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  rabbitmq-data:

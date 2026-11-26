@@ -52,7 +52,7 @@ func NewCoordinatorContext(
 
 	repository := dynamodb.NewDynamoArchiveRepository(client)
 
-	outbox := dynamodb.NewDynamoOutbox(client)
+	outbox := dynamodb.NewDynamoOutboxRepository(client)
 
 	publisher := rabbitmq.NewRabbitPublisher(rabbitURL)
 

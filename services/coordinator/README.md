@@ -10,6 +10,11 @@ Requires Go 1.25.4. From `services/coordinator`:
 - `make run`: start the Coordinator.
 - `make fmt`: apply repository Go formatting conventions.
 - `make check`: run static analysis and compile all packages without executing tests.
+- `make test-unit`: run unit tests without external infrastructure.
+- `make test-integration`: run integration tests against local DynamoDB and RabbitMQ. Start the services first with `make test-infra-up`.
+- `make test`: run unit and integration tests.
+- `make test-infra-up`: start local DynamoDB and RabbitMQ for integration tests.
+- `make test-infra-down`: stop the local test infrastructure.
 
 ## Configuration
 

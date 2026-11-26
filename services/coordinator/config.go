@@ -3,24 +3,11 @@ package main
 import (
 	"fmt"
 	"time"
+
+	env "github.com/lemuel-manske/castellani/services/coordinator/config"
 )
 
 const (
-	portEnvironment = "COORDINATOR_PORT"
-
-	regionEnvironment = "COORDINATOR_AWS_REGION"
-
-	accessKeyIDEnvironment     = "COORDINATOR_AWS_ACCESS_KEY_ID"
-	secretAccessKeyEnvironment = "COORDINATOR_AWS_SECRET_ACCESS_KEY"
-
-	shutdownEnvironment           = "COORDINATOR_SHUTDOWN_TIMEOUT"
-	reconcileIntervalEnvironment  = "COORDINATOR_RECONCILIATION_INTERVAL"
-	stalledWorkflowAgeEnvironment = "COORDINATOR_STALLED_WORKFLOW_AGE"
-
-	dynamoEndpointEnvironment = "COORDINATOR_DYNAMODB_ENDPOINT"
-
-	rabbitURLEnvironment = "COORDINATOR_RABBITMQ_URL"
-
 	defaultShutdownTimeout    = 10 * time.Second
 	defaultReconcileInterval  = 30 * time.Second
 	defaultStalledWorkflowAge = 2 * time.Minute
@@ -45,13 +32,13 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		stalledWorkflowAge: defaultStalledWorkflowAge,
 	}
 
-	config.port = getenv(portEnvironment)
+	config.port = getenv(env.PortEnvironment)
 
 	var err error
 
 	config.shutdownTimeout, err = getDurationSetting(
 		getenv,
-		shutdownEnvironment,
+		env.ShutdownEnvironment,
 		config.shutdownTimeout,
 	)
 
@@ -61,7 +48,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 
 	config.reconcileInterval, err = getDurationSetting(
 		getenv,
-		reconcileIntervalEnvironment,
+		env.ReconcileIntervalEnvironment,
 		config.reconcileInterval,
 	)
 
@@ -71,7 +58,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 
 	config.stalledWorkflowAge, err = getDurationSetting(
 		getenv,
-		stalledWorkflowAgeEnvironment,
+		env.StalledWorkflowAgeEnvironment,
 		config.stalledWorkflowAge,
 	)
 
@@ -79,20 +66,20 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 
-	config.region = getenv(regionEnvironment)
-	config.awsAccessKeyID = getenv(accessKeyIDEnvironment)
-	config.awsSecretAccessKey = getenv(secretAccessKeyEnvironment)
+	config.region = getenv(env.RegionEnvironment)
+	config.awsAccessKeyID = getenv(env.AccessKeyIDEnvironment)
+	config.awsSecretAccessKey = getenv(env.SecretAccessKeyEnvironment)
 
 	if config.awsAccessKeyID == "" {
-		return Config{}, fmt.Errorf("%s is required", accessKeyIDEnvironment)
+		return Config{}, fmt.Errorf("%s is required", env.AccessKeyIDEnvironment)
 	}
 
 	if config.awsSecretAccessKey == "" {
-		return Config{}, fmt.Errorf("%s is required", secretAccessKeyEnvironment)
+		return Config{}, fmt.Errorf("%s is required", env.SecretAccessKeyEnvironment)
 	}
 
-	config.dynamoEndpoint = getenv(dynamoEndpointEnvironment)
-	config.rabbitURL = getenv(rabbitURLEnvironment)
+	config.dynamoEndpoint = getenv(env.DynamoDBEndpointEnvironment)
+	config.rabbitURL = getenv(env.RabbitMQURLEnvironment)
 
 	return config, nil
 }
