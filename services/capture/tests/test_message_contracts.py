@@ -106,9 +106,10 @@ def test_message_contracts_validate_crawl_completed_with_shared_manifest_ref() -
             "archiveId": "archive-1",
             "manifest": {
                 "bucket": "castellani-archive-manifests",
-                "key": "manifests/archive-1/NaN.json",
+                "key": "manifests/archive-1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json",
                 "sha256": "a" * 64,
                 "sizeBytes": 128,
+                "versionId": "legacy-version",
             },
             "manifestDigest": "a" * 64,
             "seedSucceeded": True,
