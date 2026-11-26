@@ -141,7 +141,7 @@ def prepare_package_transaction(
                 "Key": {"archiveId": {"S": prepared.archive_id}},
                 "UpdateExpression": (
                     "SET #status = :prepared, #bucket = :bucket, #key = :key, "
-                    "#digest = :digest, #size = :size, #version = :version, "
+                    "#digest = :digest, #size = :size, "
                     "#manifest_digest = :manifest_digest REMOVE #lease, #owner"
                 ),
                 "ConditionExpression": (
@@ -158,7 +158,6 @@ def prepare_package_transaction(
                     "#key": "packageKey",
                     "#digest": "packageDigest",
                     "#size": "packageSizeBytes",
-                    "#version": "packageVersionId",
                     "#manifest_digest": "packageManifestDigest",
                     "#decision": "decision",
                     "#lease": "packageLeaseUntil",
@@ -174,7 +173,6 @@ def prepare_package_transaction(
                     ":key": {"S": artifact.key},
                     ":digest": {"S": artifact.sha256},
                     ":size": {"N": str(artifact.size_bytes)},
-                    ":version": {"S": artifact.version_id or ""},
                     ":manifest_digest": {"S": prepared.manifest_digest},
                 },
             }
