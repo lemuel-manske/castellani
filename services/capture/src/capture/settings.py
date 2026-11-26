@@ -28,6 +28,7 @@ DEFAULT_OUTBOX_LEASE_DURATION = 30.0
 DEFAULT_OUTBOX_POLL_INTERVAL = 0.5
 DEFAULT_OUTBOX_RETRY_DELAY = 5.0
 DEFAULT_ARTIFACT_DIRECTORY = "/tmp/castellani/capture"
+DEFAULT_ALLOW_PRIVATE_NETWORKS = False
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,8 @@ class CaptureSettings:
     outbox_retry_delay: float = DEFAULT_OUTBOX_RETRY_DELAY
 
     artifact_directory: str = DEFAULT_ARTIFACT_DIRECTORY
-    allow_private_networks: bool = False
+
+    allow_private_networks: bool = DEFAULT_ALLOW_PRIVATE_NETWORKS
 
     @classmethod
     def from_environment(cls) -> "CaptureSettings":
