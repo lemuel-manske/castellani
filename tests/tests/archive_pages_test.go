@@ -104,6 +104,8 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 		t,
 		"COMPLETED",
 		status.Status,
+		"archive status: %+v",
+		status,
 	)
 	require.Equal(
 		t,

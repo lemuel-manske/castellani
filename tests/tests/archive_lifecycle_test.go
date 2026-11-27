@@ -60,6 +60,8 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		t,
 		"COMPLETED",
 		status.Status,
+		"archive status: %+v",
+		status,
 	)
 	require.Equal(
 		t,

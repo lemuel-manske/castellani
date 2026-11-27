@@ -56,6 +56,8 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 		t,
 		"COMPLETED",
 		status.Status,
+		"archive status: %+v",
+		status,
 	)
 
 	waczResponse := testutil.Send(

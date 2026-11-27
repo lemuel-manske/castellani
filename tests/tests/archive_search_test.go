@@ -55,6 +55,8 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 		t,
 		"COMPLETED",
 		status.Status,
+		"archive status: %+v",
+		status,
 	)
 
 	searchPath := fmt.Sprintf(
