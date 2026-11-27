@@ -19,7 +19,8 @@ from domain.capture import (
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from utils.time import utc
 
-from ..values import number_from_item, optional_number, serialize_map
+from ..values import envelope_matches, number_from_item, optional_number
+from .common import fence_condition, outbox_put
 
 
 def claim_from_item(
@@ -171,6 +172,13 @@ def renew_task_transaction(
     lease_until: float,
     now: float,
 ) -> list[dict[str, Any]]:
+    condition, names, values = fence_condition(
+        attempt_id,
+        fence,
+        now,
+        lease_until,
+    )
+
     return [
         {
             "ConditionCheck": {
@@ -189,23 +197,9 @@ def renew_task_transaction(
                     "urlKey": {"S": url_key},
                 },
                 "UpdateExpression": "SET #lease = :lease",
-                "ConditionExpression": (
-                    "#state = :claimed AND #attempt = :attempt "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
-                "ExpressionAttributeNames": {
-                    "#state": "state",
-                    "#attempt": "attemptId",
-                    "#fence": "fence",
-                    "#lease": "leaseUntil",
-                },
-                "ExpressionAttributeValues": {
-                    ":claimed": {"S": "CLAIMED"},
-                    ":attempt": {"S": attempt_id},
-                    ":fence": {"N": str(fence)},
-                    ":lease": {"N": str(lease_until)},
-                    ":now": {"N": str(now)},
-                },
+                "ConditionExpression": condition,
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
             }
         },
     ]
@@ -355,7 +349,31 @@ def complete_task_transaction(
     if capture.content_type is not None:
         payload["contentType"] = capture.content_type
 
-    dynamodb_payload = serialize_map(payload)
+    condition, names, values = fence_condition(outcome.attempt_id, outcome.fence, now)
+
+    names.update(
+        {
+            "#snapshot": "snapshotId",
+            "#capture_url": "capturedUrl",
+            "#final_url": "finalUrl",
+            "#captured_at": "capturedAt",
+            "#redirects": "redirectChain",
+            "#artifacts": "warcArtifacts",
+            "#min_depth": "minDepth",
+        }
+    )
+    values.update(
+        {
+            ":completed": {"S": "COMPLETED"},
+            ":snapshot": {"S": outcome.snapshot_id},
+            ":capture_url": {"S": capture.requested_url},
+            ":final_url": {"S": capture.final_url},
+            ":captured_at": {"S": captured_at_text},
+            ":redirects": {"L": [{"S": url} for url in capture.redirect_chain]},
+            ":artifacts": {"L": artifacts},
+            ":min_depth": {"N": str(depth)},
+        }
+    )
 
     return [
         {
@@ -372,37 +390,9 @@ def complete_task_transaction(
                     "#artifacts = :artifacts, #min_depth = :min_depth "
                     "REMOVE #attempt, #lease"
                 ),
-                "ConditionExpression": (
-                    "#state = :claimed AND #attempt = :attempt "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
-                "ExpressionAttributeNames": {
-                    "#state": "state",
-                    "#attempt": "attemptId",
-                    "#fence": "fence",
-                    "#lease": "leaseUntil",
-                    "#snapshot": "snapshotId",
-                    "#capture_url": "capturedUrl",
-                    "#final_url": "finalUrl",
-                    "#captured_at": "capturedAt",
-                    "#redirects": "redirectChain",
-                    "#artifacts": "warcArtifacts",
-                    "#min_depth": "minDepth",
-                },
-                "ExpressionAttributeValues": {
-                    ":claimed": {"S": "CLAIMED"},
-                    ":completed": {"S": "COMPLETED"},
-                    ":attempt": {"S": outcome.attempt_id},
-                    ":fence": {"N": str(outcome.fence)},
-                    ":now": {"N": str(now)},
-                    ":snapshot": {"S": outcome.snapshot_id},
-                    ":capture_url": {"S": capture.requested_url},
-                    ":final_url": {"S": capture.final_url},
-                    ":captured_at": {"S": captured_at_text},
-                    ":redirects": {"L": [{"S": url} for url in capture.redirect_chain]},
-                    ":artifacts": {"L": artifacts},
-                    ":min_depth": {"N": str(depth)},
-                },
+                "ConditionExpression": condition,
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
             }
         },
         completion_run_update(outcome.archive_id, outcome.auth_generation, now, close),
@@ -414,24 +404,14 @@ def complete_task_transaction(
                 "ExpressionAttributeNames": {"#snapshot_id": "snapshotId"},
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": outcome.archive_id},
-                    "type": {"S": PAGE_CAPTURED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": dynamodb_payload},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=outcome.archive_id,
+            message_type=PAGE_CAPTURED_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -446,6 +426,7 @@ def admit_page_transaction(
     url_key = page.identity.url_key
     occurred_at = utc(datetime.fromtimestamp(now, UTC))
     payload: CapturePagePayload = {"archiveId": archive_id, "urlKey": url_key}
+    condition, names, values = fence_condition(claim.attempt_id, claim.fence, now)
 
     return [
         {
@@ -455,22 +436,9 @@ def admit_page_transaction(
                     "archiveId": {"S": archive_id},
                     "urlKey": {"S": claim.task.url_key},
                 },
-                "ConditionExpression": (
-                    "#state = :claimed AND #attempt = :attempt "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
-                "ExpressionAttributeNames": {
-                    "#state": "state",
-                    "#attempt": "attemptId",
-                    "#fence": "fence",
-                    "#lease": "leaseUntil",
-                },
-                "ExpressionAttributeValues": {
-                    ":claimed": {"S": "CLAIMED"},
-                    ":attempt": {"S": claim.attempt_id},
-                    ":fence": {"N": str(claim.fence)},
-                    ":now": {"N": str(now)},
-                },
+                "ConditionExpression": condition,
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
             }
         },
         {
@@ -521,24 +489,14 @@ def admit_page_transaction(
                 "ExpressionAttributeNames": {"#url_key": "urlKey"},
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": archive_id},
-                    "type": {"S": CAPTURE_PAGE_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=archive_id,
+            message_type=CAPTURE_PAGE_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -552,6 +510,8 @@ def release_task_transaction(
         "archiveId": claim.task.archive_id,
         "urlKey": claim.task.url_key,
     }
+    condition, names, values = fence_condition(claim.attempt_id, claim.fence, now)
+    values = {":pending": {"S": "PENDING"}, **values}
 
     return [
         {
@@ -571,43 +531,19 @@ def release_task_transaction(
                     "urlKey": {"S": claim.task.url_key},
                 },
                 "UpdateExpression": "SET #state = :pending REMOVE #attempt, #lease",
-                "ConditionExpression": (
-                    "#state = :claimed AND #attempt = :attempt "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
-                "ExpressionAttributeNames": {
-                    "#state": "state",
-                    "#attempt": "attemptId",
-                    "#fence": "fence",
-                    "#lease": "leaseUntil",
-                },
-                "ExpressionAttributeValues": {
-                    ":pending": {"S": "PENDING"},
-                    ":claimed": {"S": "CLAIMED"},
-                    ":attempt": {"S": claim.attempt_id},
-                    ":fence": {"N": str(claim.fence)},
-                    ":now": {"N": str(now)},
-                },
+                "ConditionExpression": condition,
+                "ExpressionAttributeNames": names,
+                "ExpressionAttributeValues": values,
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": claim.task.archive_id},
-                    "type": {"S": CAPTURE_PAGE_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=claim.task.archive_id,
+            message_type=CAPTURE_PAGE_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -623,19 +559,8 @@ def finish_task(
     now: float,
     close: bool = False,
 ) -> None:
-    names = {
-        "#state": "state",
-        "#attempt": "attemptId",
-        "#fence": "fence",
-        "#lease": "leaseUntil",
-    }
-    values: dict[str, Any] = {
-        ":claimed": {"S": "CLAIMED"},
-        ":attempt": {"S": attempt_id},
-        ":fence": {"N": str(fence)},
-        ":state": {"S": state},
-        ":now": {"N": str(now)},
-    }
+    condition, names, values = fence_condition(attempt_id, fence, now)
+    values[":state"] = {"S": state}
     update = "SET #state = :state REMOVE #attempt, #lease"
 
     if reason_code is not None and message is not None:
@@ -656,10 +581,7 @@ def finish_task(
                 "TableName": FRONTIER_TABLE,
                 "Key": {"archiveId": {"S": archive_id}, "urlKey": {"S": url_key}},
                 "UpdateExpression": update,
-                "ConditionExpression": (
-                    "#state = :claimed AND #attempt = :attempt "
-                    "AND #fence = :fence AND #lease > :now"
-                ),
+                "ConditionExpression": condition,
                 "ExpressionAttributeNames": names,
                 "ExpressionAttributeValues": values,
             }
@@ -675,24 +597,26 @@ def is_page_captured_message(
     archive_id: str,
     snapshot_id: str,
 ) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == PAGE_CAPTURED_EVENT
-        and item.get("correlationId", {}).get("S") == archive_id
-        and payload.get("archiveId", {}).get("S") == archive_id
-        and payload.get("snapshotId", {}).get("S") == snapshot_id
+    return envelope_matches(
+        item,
+        PAGE_CAPTURED_EVENT,
+        archive_id,
+        {
+            "archiveId": {"S": archive_id},
+            "snapshotId": {"S": snapshot_id},
+        },
     )
 
 
 def is_release_message(item: dict[str, Any], claim: TaskClaim) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("correlationId", {}).get("S") == claim.task.archive_id
-        and item.get("type", {}).get("S") == CAPTURE_PAGE_EVENT
-        and payload.get("archiveId", {}).get("S") == claim.task.archive_id
-        and payload.get("urlKey", {}).get("S") == claim.task.url_key
+    return envelope_matches(
+        item,
+        CAPTURE_PAGE_EVENT,
+        claim.task.archive_id,
+        {
+            "archiveId": {"S": claim.task.archive_id},
+            "urlKey": {"S": claim.task.url_key},
+        },
     )
 
 

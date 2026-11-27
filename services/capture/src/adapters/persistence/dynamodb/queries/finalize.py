@@ -3,9 +3,10 @@ from typing import Any
 from contracts.messages import CRAWL_COMPLETED_EVENT, CrawlCompletedPayload
 from contracts.types import ArtifactReferenceContract
 from domain.capture import PACKAGE_PENDING, identify_url
-from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
+from topology.tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
-from ..values import deserialize_attribute, serialize_map
+from ..values import envelope_matches, plain_attributes
+from .common import outbox_put
 
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
 _PAGE_SIZE = 100
@@ -58,10 +59,6 @@ def query_by_archive(
         request["ExclusiveStartKey"] = cursor
 
 
-def plain_attributes(item: dict[str, Any]) -> dict[str, Any]:
-    return {key: deserialize_attribute(value) for key, value in item.items()}
-
-
 def seed_succeeded(run: dict[str, Any], frontier: list[dict[str, Any]]) -> bool:
     seed_key = identify_url(run["seedUrl"]).url_key
 
@@ -75,13 +72,14 @@ def is_crawl_completed_message(
     archive_id: str,
     manifest_digest: str,
 ) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == CRAWL_COMPLETED_EVENT
-        and item.get("correlationId", {}).get("S") == archive_id
-        and payload.get("archiveId", {}).get("S") == archive_id
-        and payload.get("manifestDigest", {}).get("S") == manifest_digest
+    return envelope_matches(
+        item,
+        CRAWL_COMPLETED_EVENT,
+        archive_id,
+        {
+            "archiveId": {"S": archive_id},
+            "manifestDigest": {"S": manifest_digest},
+        },
     )
 
 
@@ -141,22 +139,12 @@ def finalize_transaction(
                 "ExpressionAttributeValues": values,
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": archive_id},
-                    "type": {"S": CRAWL_COMPLETED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=archive_id,
+            message_type=CRAWL_COMPLETED_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]

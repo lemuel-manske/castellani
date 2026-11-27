@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 from .error_handling import (
     ConditionalWriteRejected,
     extract_cancellation_reasons,
-    is_transaction_canceled,
+    raise_unless_transaction_canceled,
 )
 
 EXPONENTIAL_BACKOFF_ATTEMPTS = 5
@@ -35,8 +35,7 @@ def exponential_backoff_transact(
 
             return
         except ClientError as error:
-            if not is_transaction_canceled(error):
-                raise
+            raise_unless_transaction_canceled(error)
 
             codes = extract_cancellation_reasons(error)
 

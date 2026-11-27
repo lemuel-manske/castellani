@@ -9,7 +9,7 @@ from domain.capture import StartCrawl, identify_url
 from ports.capture import CrawlStarter
 from ports.clock import Clock
 
-from .error_handling import extract_cancellation_reasons, is_transaction_canceled
+from .error_handling import extract_cancellation_reasons, raise_unless_transaction_canceled
 from .queries.run import seed_run_transaction
 from .queries.task import read_run
 
@@ -42,8 +42,7 @@ class DynamoDBRunStarter(CrawlStarter):
                     TransactItems=seed_run_transaction(start, message_id, now),
                 )
             except ClientError as error:
-                if not is_transaction_canceled(error):
-                    raise
+                raise_unless_transaction_canceled(error)
 
                 if "ConditionalCheckFailed" not in extract_cancellation_reasons(error):
                     raise

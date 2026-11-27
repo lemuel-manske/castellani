@@ -21,9 +21,10 @@ from domain.capture import (
     PreparedPackage,
     PublicationDecision,
 )
-from topology.tables import OUTBOX_TABLE, RUNS_TABLE
+from topology.tables import RUNS_TABLE
 
-from ..values import optional_number, optional_string, serialize_map, string_from_item
+from ..values import envelope_matches, optional_number, optional_string, string_from_item
+from .common import outbox_put
 
 
 def pending_package_scan() -> dict[str, Any]:
@@ -177,24 +178,14 @@ def prepare_package_transaction(
                 },
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": prepared.archive_id},
-                    "type": {"S": ARCHIVE_PREPARED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=prepared.archive_id,
+            message_type=ARCHIVE_PREPARED_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -237,24 +228,14 @@ def publication_transaction(
                 },
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": decision.archive_id},
-                    "type": {"S": ARCHIVE_PUBLISHED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": decision.occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=decision.archive_id,
+            message_type=ARCHIVE_PUBLISHED_EVENT,
+            occurred_at=decision.occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -288,57 +269,50 @@ def compensation_transaction(
         "decisionVersion": decision.decision_version,
     }
 
-    return {
-        "Put": {
-            "TableName": OUTBOX_TABLE,
-            "Item": {
-                "messageId": {"S": message_id},
-                "correlationId": {"S": decision.archive_id},
-                "type": {"S": ARCHIVE_COMPENSATED_EVENT},
-                "version": {"N": "1"},
-                "occurredAt": {"S": decision.occurred_at},
-                "payload": {"M": serialize_map(payload)},
-                "status": {"S": "PENDING"},
-                "attempts": {"N": "0"},
-                "nextAttemptAt": {"N": str(now)},
-            },
-            "ConditionExpression": "attribute_not_exists(#message_id)",
-            "ExpressionAttributeNames": {"#message_id": "messageId"},
-        }
-    }
+    return outbox_put(
+        message_id=message_id,
+        correlation_id=decision.archive_id,
+        message_type=ARCHIVE_COMPENSATED_EVENT,
+        occurred_at=decision.occurred_at,
+        payload=payload,
+        now=now,
+    )
 
 
 def is_prepared_message(item: dict[str, Any], archive_id: str, digest: str) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == ARCHIVE_PREPARED_EVENT
-        and item.get("correlationId", {}).get("S") == archive_id
-        and payload.get("archiveId", {}).get("S") == archive_id
-        and payload.get("packageDigest", {}).get("S") == digest
+    return envelope_matches(
+        item,
+        ARCHIVE_PREPARED_EVENT,
+        archive_id,
+        {
+            "archiveId": {"S": archive_id},
+            "packageDigest": {"S": digest},
+        },
     )
 
 
 def is_published_message(item: dict[str, Any], decision: PublicationDecision) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == ARCHIVE_PUBLISHED_EVENT
-        and item.get("correlationId", {}).get("S") == decision.archive_id
-        and payload.get("archiveId", {}).get("S") == decision.archive_id
-        and payload.get("decisionVersion", {}).get("N") == str(decision.decision_version)
-        and payload.get("packageDigest", {}).get("S") == decision.package_digest
+    return envelope_matches(
+        item,
+        ARCHIVE_PUBLISHED_EVENT,
+        decision.archive_id,
+        {
+            "archiveId": {"S": decision.archive_id},
+            "decisionVersion": {"N": str(decision.decision_version)},
+            "packageDigest": {"S": decision.package_digest},
+        },
     )
 
 
 def is_compensated_message(item: dict[str, Any], decision: CompensationDecision) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == ARCHIVE_COMPENSATED_EVENT
-        and item.get("correlationId", {}).get("S") == decision.archive_id
-        and payload.get("archiveId", {}).get("S") == decision.archive_id
-        and payload.get("decisionVersion", {}).get("N") == str(decision.decision_version)
+    return envelope_matches(
+        item,
+        ARCHIVE_COMPENSATED_EVENT,
+        decision.archive_id,
+        {
+            "archiveId": {"S": decision.archive_id},
+            "decisionVersion": {"N": str(decision.decision_version)},
+        },
     )
 
 

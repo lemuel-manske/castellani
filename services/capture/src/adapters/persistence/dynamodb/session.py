@@ -16,7 +16,10 @@ from ports.login import SessionStore
 from topology.buckets import AUTH_PROFILE_BUCKET
 from utils.time import utc_now
 
-from .error_handling import is_conditional_failure, is_transaction_canceled
+from .error_handling import (
+    raise_unless_canceled_or_conditional,
+    raise_unless_conditional_failure,
+)
 from .queries.session import (
     create_session_transaction,
     fail_session,
@@ -62,10 +65,9 @@ class DynamoDBSessionStore(SessionStore):
                     updated_at,
                 )
             except ClientError as error:
-                if is_conditional_failure(error) or is_transaction_canceled(error):
-                    raise DuplicateSessionRequest from error
+                raise_unless_canceled_or_conditional(error)
 
-                raise
+                raise DuplicateSessionRequest from error
 
         await asyncio.to_thread(put)
 
@@ -95,10 +97,9 @@ class DynamoDBSessionStore(SessionStore):
             try:
                 update_session(self.client, session, updated_at)
             except ClientError as error:
-                if is_conditional_failure(error):
-                    raise SessionConflict from error
+                raise_unless_conditional_failure(error)
 
-                raise
+                raise SessionConflict from error
 
         await asyncio.to_thread(update)
 
@@ -122,10 +123,9 @@ class DynamoDBSessionStore(SessionStore):
                         utc_now(),
                     )
                 except ClientError as error:
-                    if is_conditional_failure(error):
-                        continue
+                    raise_unless_conditional_failure(error)
 
-                    raise
+                    continue
 
                 return generation
 
@@ -190,8 +190,7 @@ class DynamoDBSessionStore(SessionStore):
                             utc_now(),
                         )
                     except ClientError as error:
-                        if not is_conditional_failure(error):
-                            raise
+                        raise_unless_conditional_failure(error)
 
                 cursor = response.get("LastEvaluatedKey")
 

@@ -17,7 +17,7 @@ from ports.capture import CrawlFinalizer
 from ports.clock import Clock
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
 
-from .error_handling import ConditionalWriteRejected, is_transaction_canceled
+from .error_handling import ConditionalWriteRejected, raise_unless_transaction_canceled
 from .queries.finalize import (
     finalize_transaction,
     is_crawl_completed_message,
@@ -101,8 +101,7 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
             try:
                 self.client.transact_write_items(TransactItems=transaction)
             except ClientError as error:
-                if not is_transaction_canceled(error):
-                    raise
+                raise_unless_transaction_canceled(error)
 
                 current = read_run(self.client, archive_id)
 

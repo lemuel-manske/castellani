@@ -99,17 +99,7 @@ async def test_create_rejects_a_duplicate_request(
     await session_store.create(session, "request-1", "fingerprint-1")
 
     with pytest.raises(DuplicateSessionRequest):
-        session = AuthSession(
-            session_id="session-1",
-            archive_id="archive-1",
-            target_url="https://example.org/login",
-            status=SessionStatus.CREATED,
-            expires_at="2099-01-01T00:00:00Z",
-            manager_id="manager-1",
-            version=1,
-        )
-
-    await session_store.create(session, "request-1", "fingerprint-1")
+        await session_store.create(session, "request-1", "fingerprint-1")
 
 
 async def test_save_updates_the_session(

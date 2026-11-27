@@ -16,6 +16,7 @@ from domain.capture import (
 from ports.capture import OutboxRepository
 from ports.clock import Clock
 
+from .error_handling import is_conditional_failure
 from .facilities import new_lease_token
 from .queries.outbox import (
     claim_message,
@@ -74,7 +75,7 @@ class DynamoDBOutbox(OutboxRepository):
                     lease_until,
                 )
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if is_conditional_failure(error):
                     return None
 
                 raise
@@ -139,7 +140,7 @@ class DynamoDBOutbox(OutboxRepository):
                     self.clock(),
                 )
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if is_conditional_failure(error):
                     raise OutboxLeaseLostError("outbox message lease is no longer owned") from error
 
                 raise
@@ -164,7 +165,7 @@ class DynamoDBOutbox(OutboxRepository):
                     self.clock(),
                 )
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if is_conditional_failure(error):
                     raise OutboxLeaseLostError("outbox message lease is no longer owned") from error
 
                 raise

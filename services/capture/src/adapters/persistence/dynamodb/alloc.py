@@ -15,7 +15,7 @@ from domain.capture import (
 from ports.capture import CaptureAllocator
 from ports.clock import Clock
 
-from .error_handling import is_conditional_failure
+from .error_handling import raise_unless_conditional_failure
 from .queries.alloc import (
     read_slot,
     release_slot,
@@ -97,8 +97,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                         now,
                     )
                 except ClientError as error:
-                    if not is_conditional_failure(error):
-                        raise
+                    raise_unless_conditional_failure(error)
 
                     existing = read_slot(self.client, slot_id)
 
@@ -134,12 +133,11 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                     now,
                 )
             except ClientError as error:
-                if is_conditional_failure(error):
-                    raise CaptureReservationLostError(
-                        "browser capacity reservation is no longer owned"
-                    ) from error
+                raise_unless_conditional_failure(error)
 
-                raise
+                raise CaptureReservationLostError(
+                    "browser capacity reservation is no longer owned"
+                ) from error
 
             return reservation_from_item(reservation.slot_id, response["Attributes"])
 
@@ -156,7 +154,6 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                     reservation.fence,
                 )
             except ClientError as error:
-                if not is_conditional_failure(error):
-                    raise
+                raise_unless_conditional_failure(error)
 
         await asyncio.to_thread(release)

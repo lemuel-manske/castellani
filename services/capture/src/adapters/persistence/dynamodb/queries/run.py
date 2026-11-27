@@ -3,9 +3,9 @@ from typing import Any
 
 from contracts.messages import CAPTURE_PAGE_EVENT, CapturePagePayload
 from domain.capture import StartCrawl, identify_url
-from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE
+from topology.tables import FRONTIER_TABLE, RUNS_TABLE
 
-from ..values import serialize_map
+from .common import outbox_put
 
 
 def seed_run_transaction(
@@ -74,22 +74,12 @@ def seed_run_transaction(
                 "ExpressionAttributeNames": {"#url_key": "urlKey"},
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": start.archive_id},
-                    "type": {"S": CAPTURE_PAGE_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=start.archive_id,
+            message_type=CAPTURE_PAGE_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]

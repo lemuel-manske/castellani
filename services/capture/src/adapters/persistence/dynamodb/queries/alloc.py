@@ -4,6 +4,7 @@ from domain.capture import CaptureReservation
 from topology.tables import BROWSER_SLOTS_TABLE
 
 from ..values import number_from_item
+from .common import reservation_condition
 
 
 def read_slot(client: Any, slot_id: str) -> dict[str, Any] | None:
@@ -79,27 +80,21 @@ def renew_slot(
     lease_until: float,
     now: float,
 ) -> dict[str, Any]:
+    condition, names, values = reservation_condition(
+        attempt_id,
+        reservation_id,
+        fence,
+        now,
+        lease_until,
+    )
+
     return client.update_item(
         TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
         UpdateExpression="SET #lease = :lease",
-        ConditionExpression=(
-            "#owner = :attempt AND #reservation = :reservation "
-            "AND #fence = :fence AND #lease > :now"
-        ),
-        ExpressionAttributeNames={
-            "#owner": "ownerAttemptId",
-            "#reservation": "reservationId",
-            "#fence": "fence",
-            "#lease": "leaseUntil",
-        },
-        ExpressionAttributeValues={
-            ":attempt": {"S": attempt_id},
-            ":reservation": {"S": reservation_id},
-            ":fence": {"N": str(fence)},
-            ":lease": {"N": str(lease_until)},
-            ":now": {"N": str(now)},
-        },
+        ConditionExpression=condition,
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
         ReturnValues="ALL_NEW",
     )
 
@@ -111,22 +106,13 @@ def release_slot(
     reservation_id: str,
     fence: int,
 ) -> None:
+    condition, names, values = reservation_condition(attempt_id, reservation_id, fence)
+
     client.update_item(
         TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
         UpdateExpression="REMOVE #owner, #reservation, #lease",
-        ConditionExpression=(
-            "#owner = :attempt AND #reservation = :reservation AND #fence = :fence"
-        ),
-        ExpressionAttributeNames={
-            "#owner": "ownerAttemptId",
-            "#reservation": "reservationId",
-            "#lease": "leaseUntil",
-            "#fence": "fence",
-        },
-        ExpressionAttributeValues={
-            ":attempt": {"S": attempt_id},
-            ":reservation": {"S": reservation_id},
-            ":fence": {"N": str(fence)},
-        },
+        ConditionExpression=condition,
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=values,
     )
