@@ -9,7 +9,6 @@ import boto3
 from aio_pika.abc import AbstractRobustConnection
 
 from adapters.artifacts.s3 import S3ArtifactStore, S3AuthProfileStore
-from crawler.results import CaptureLimits
 from adapters.messaging.rabbitmq.consumer import (
     RabbitMQCompensationDecisionConsumer,
     RabbitMQPageTaskConsumer,
