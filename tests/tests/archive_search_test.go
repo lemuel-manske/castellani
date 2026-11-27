@@ -5,22 +5,12 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
-	"time"
-
+	
 	"github.com/lemuel-manske/castellani/tests/internal/contracts"
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
 	"github.com/lemuel-manske/castellani/tests/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
-
-type archiveSearchResponse struct {
-	Results []struct {
-		ArchiveID  string `json:"archiveId"`
-		SnapshotID string `json:"snapshotId"`
-		URL        string `json:"url"`
-		Snippet    string `json:"snippet"`
-	} `json:"results"`
-}
 
 // Feature: Archive search
 //
@@ -35,7 +25,7 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 
 	requestBody := fmt.Sprintf(
 		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		fixtureSiteURL+"/index.html",
+		"http://fixture-site/index.html",
 	)
 	response := testutil.Post(
 		t,
@@ -64,18 +54,20 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 		url.QueryEscape(accepted.ArchiveID),
 	)
 
-	search := testutil.Eventually(
+	var search contracts.SearchResults
+	require.Eventually(
 		t,
 		archiveTimeout,
 		500*time.Millisecond,
-		func() (archiveSearchResponse, bool) {
+		func() bool {
 			response := testutil.Get(t, services.Gateway.BaseURL(), searchPath)
 			if response.Status != http.StatusOK {
-				return archiveSearchResponse{}, false
+				return false
 			}
 
-			result := testutil.Decode[archiveSearchResponse](t, response)
-			return result, len(result.Results) > 0
+			result := testutil.Decode[contracts.SearchResults](t, response)
+			search = result
+			return len(result.Results) > 0
 		},
 		"search did not return results for archive %s",
 		accepted.ArchiveID,
