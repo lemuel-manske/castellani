@@ -68,6 +68,16 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 	require.Eventually(
 		t,
 		func() bool {
+			statusResponse := testutil.Get(
+				t,
+				services.Gateway.BaseURL(),
+				accepted.StatusURL,
+			)
+
+			if statusResponse.Status == http.StatusOK {
+				status = testutil.Decode[contracts.ArchiveStatus](t, statusResponse)
+			}
+
 			response := testutil.Get(
 				t,
 				services.Gateway.BaseURL(),
@@ -85,8 +95,11 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 		},
 		archiveTimeout,
 		500*time.Millisecond,
-		"search did not return results for archive %s",
+		"search did not return results for archive %s (search status: %s, indexed: %d, expected: %d)",
 		accepted.ArchiveID,
+		status.Search.Status,
+		status.Search.Indexed,
+		status.Search.Expected,
 	)
 
 	result := search.Results[0]
