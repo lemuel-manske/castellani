@@ -26,13 +26,13 @@ func WaitForArchiveTerminalState(
 				return false
 			}
 
-			status := Decode[contracts.ArchiveStatus](t, response)
+			status = Decode[contracts.ArchiveStatus](t, response)
 
 			switch status.Status {
 			case "COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED":
 				return true
 			default:
-				return contracts.ArchiveStatus{}, false
+				return false
 			}
 		},
 		timeout,
