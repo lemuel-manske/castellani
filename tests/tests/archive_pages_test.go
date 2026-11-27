@@ -12,11 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type archivePagesResponse struct {
-	Items      []contracts.PageOutcome `json:"items"`
-	NextCursor *string                 `json:"nextCursor"`
-}
-
 func requirePageSnapshot(
 	t *testing.T,
 	baseURL string,
@@ -60,7 +55,7 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 
 	requestBody := fmt.Sprintf(
 		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		fixtureSiteURL+"/index.html",
+		"http://fixture-site/index.html",
 	)
 	response := testutil.Post(
 		t,
@@ -91,7 +86,7 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	)
 	require.Equal(t, http.StatusOK, firstPage.Status)
 
-	first := testutil.Decode[archivePagesResponse](t, firstPage)
+	first := testutil.Decode[contracts.ArchivePages](t, firstPage)
 	require.Len(t, first.Items, 2)
 	require.NotNil(t, first.NextCursor)
 	require.NotEmpty(t, *first.NextCursor)
