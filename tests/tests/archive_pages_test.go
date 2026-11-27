@@ -17,6 +17,34 @@ type archivePagesResponse struct {
 	NextCursor *string                 `json:"nextCursor"`
 }
 
+func requirePageSnapshot(
+	t *testing.T,
+	baseURL string,
+	archiveID string,
+	page contracts.PageOutcome,
+) {
+	t.Helper()
+
+	require.Equal(t, "CAPTURED", page.Status)
+	require.NotEmpty(t, page.SnapshotID)
+
+	snapshotResponse := testutil.Get(
+		t,
+		baseURL,
+		fmt.Sprintf(
+			"/archives/%s/snapshots/%s",
+			archiveID,
+			url.PathEscape(page.SnapshotID),
+		),
+	)
+	require.Equal(t, http.StatusOK, snapshotResponse.Status)
+
+	snapshot := testutil.Decode[contracts.Snapshot](t, snapshotResponse)
+	require.Equal(t, archiveID, snapshot.ArchiveID)
+	require.Equal(t, page.SnapshotID, snapshot.SnapshotID)
+	require.Equal(t, page.URL, snapshot.URL)
+}
+
 // Feature: Archive pages
 //
 // Scenario: Paginate through all captured pages and retrieve their snapshots
@@ -83,31 +111,15 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	require.Len(t, second.Items, 1)
 	require.Nil(t, second.NextCursor)
 
-	pages := append(first.Items, second.Items...)
-	require.Len(t, pages, 3)
+	firstPageOne := first.Items[0]
+	firstPageTwo := first.Items[1]
+	secondPageOne := second.Items[0]
 
-	seenURLs := make(map[string]struct{}, len(pages))
-	for _, page := range pages {
-		require.Equal(t, "CAPTURED", page.Status)
-		require.NotEmpty(t, page.SnapshotID)
-		_, exists := seenURLs[page.URL]
-		require.False(t, exists, "duplicate page URL: %s", page.URL)
-		seenURLs[page.URL] = struct{}{}
+	require.NotEqual(t, firstPageOne.URL, firstPageTwo.URL)
+	require.NotEqual(t, firstPageOne.URL, secondPageOne.URL)
+	require.NotEqual(t, firstPageTwo.URL, secondPageOne.URL)
 
-		snapshotResponse := testutil.Get(
-			t,
-			services.Gateway.BaseURL(),
-			fmt.Sprintf(
-				"/archives/%s/snapshots/%s",
-				accepted.ArchiveID,
-				url.PathEscape(page.SnapshotID),
-			),
-		)
-		require.Equal(t, http.StatusOK, snapshotResponse.Status)
-
-		snapshot := testutil.Decode[contracts.Snapshot](t, snapshotResponse)
-		require.Equal(t, accepted.ArchiveID, snapshot.ArchiveID)
-		require.Equal(t, page.SnapshotID, snapshot.SnapshotID)
-		require.Equal(t, page.URL, snapshot.URL)
-	}
+	requirePageSnapshot(t, services.Gateway.BaseURL(), accepted.ArchiveID, firstPageOne)
+	requirePageSnapshot(t, services.Gateway.BaseURL(), accepted.ArchiveID, firstPageTwo)
+	requirePageSnapshot(t, services.Gateway.BaseURL(), accepted.ArchiveID, secondPageOne)
 }
