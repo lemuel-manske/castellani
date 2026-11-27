@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
@@ -34,6 +36,27 @@ type Service struct {
 	healthURL string
 	username  string
 	password  string
+	container testcontainers.Container
+}
+
+func (s Service) Logs(ctx context.Context) (string, error) {
+	reader, err := s.container.Logs(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+
+	const maxLogBytes = 64 * 1024
+	if len(content) > maxLogBytes {
+		content = content[len(content)-maxLogBytes:]
+	}
+
+	return string(content), nil
 }
 
 func (s Service) BaseURL() string {
@@ -96,5 +119,6 @@ func newService(
 		healthURL: baseURL + path,
 		username:  username,
 		password:  password,
+		container: container,
 	}
 }
