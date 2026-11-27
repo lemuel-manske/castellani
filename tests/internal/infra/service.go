@@ -2,13 +2,12 @@ package infra
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
-	"testing"
 	"time"
 
 	"github.com/docker/go-connections/nat"
-	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
@@ -71,7 +70,6 @@ func (s Service) HealthStatus(ctx context.Context) (int, error) {
 }
 
 func newService(
-	t *testing.T,
 	ctx context.Context,
 	stack compose.ComposeStack,
 	name string,
@@ -79,14 +77,18 @@ func newService(
 	path string,
 	username string,
 	password string,
-) Service {
-	t.Helper()
-
+) (Service, error) {
 	container, err := stack.ServiceContainer(ctx, name)
-	require.NoError(t, err)
+
+	if err != nil {
+		return Service{}, fmt.Errorf("resolve service %s: %w", name, err)
+	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
-	require.NoError(t, err)
+
+	if err != nil {
+		return Service{}, fmt.Errorf("resolve port %s for %s: %w", port, name, err)
+	}
 
 	baseURL := "http://" + net.JoinHostPort("localhost", mappedPort.Port())
 
@@ -96,5 +98,5 @@ func newService(
 		healthURL: baseURL + path,
 		username:  username,
 		password:  password,
-	}
+	}, nil
 }

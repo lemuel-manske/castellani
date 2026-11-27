@@ -34,7 +34,7 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 		requestBody,
 		map[string]string{
 			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: "archive-range-0001",
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("byte-range"),
 		},
 	)
 	require.Equal(

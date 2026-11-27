@@ -36,7 +36,7 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		requestBody,
 		map[string]string{
 			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: "archive-happy-path-0001",
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("happy-path"),
 		},
 	)
 

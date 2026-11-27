@@ -13,6 +13,8 @@ import (
 )
 
 func TestArchiveSubmission_RejectsMissingIdempotencyKey(t *testing.T) {
+	t.Parallel()
+
 	services := infra.Start(t)
 
 	response := testutil.Post(
@@ -43,6 +45,8 @@ func TestArchiveSubmission_RejectsMissingIdempotencyKey(t *testing.T) {
 }
 
 func TestArchiveSubmission_RejectsShortIdempotencyKey(t *testing.T) {
+	t.Parallel()
+
 	services := infra.Start(t)
 
 	response := testutil.Post(
@@ -74,6 +78,8 @@ func TestArchiveSubmission_RejectsShortIdempotencyKey(t *testing.T) {
 }
 
 func TestArchiveSubmission_RejectsUnsupportedContentType(t *testing.T) {
+	t.Parallel()
+
 	services := infra.Start(t)
 
 	response := testutil.Post(
@@ -83,7 +89,7 @@ func TestArchiveSubmission_RejectsUnsupportedContentType(t *testing.T) {
 		fixtures.ValidArchive,
 		map[string]string{
 			testutil.HeaderContentType:    "text/plain",
-			testutil.HeaderIdempotencyKey: fixtures.UnsupportedContentTypeIdempotencyKey,
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("unsupported-content-type"),
 		},
 	)
 
@@ -105,6 +111,8 @@ func TestArchiveSubmission_RejectsUnsupportedContentType(t *testing.T) {
 }
 
 func TestArchiveSubmission_RejectsMalformedJSON(t *testing.T) {
+	t.Parallel()
+
 	services := infra.Start(t)
 
 	response := testutil.Post(
@@ -114,7 +122,7 @@ func TestArchiveSubmission_RejectsMalformedJSON(t *testing.T) {
 		fixtures.MalformedArchive,
 		map[string]string{
 			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: fixtures.MalformedJSONIdempotencyKey,
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("malformed-json"),
 		},
 	)
 
@@ -136,6 +144,8 @@ func TestArchiveSubmission_RejectsMalformedJSON(t *testing.T) {
 }
 
 func TestArchiveSubmission_RejectsInvalidRequest(t *testing.T) {
+	t.Parallel()
+
 	services := infra.Start(t)
 
 	response := testutil.Post(
@@ -145,7 +155,7 @@ func TestArchiveSubmission_RejectsInvalidRequest(t *testing.T) {
 		fixtures.InvalidArchive,
 		map[string]string{
 			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: fixtures.InvalidSubmissionIdempotencyKey,
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("invalid-submission"),
 		},
 	)
 

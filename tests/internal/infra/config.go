@@ -1,14 +1,12 @@
 package infra
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -22,34 +20,39 @@ const (
 	terraformLockFile = ".terraform.lock.hcl"
 )
 
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-
-	_, file, _, ok := runtime.Caller(0)
-	require.True(
-		t,
-		ok,
-		"locate repository root",
-	)
-
-	return filepath.Join(
-		filepath.Dir(file),
-		"../../..",
-	)
+func keepStack() bool {
+	switch strings.ToLower(os.Getenv("CASTELLANI_E2E_KEEP_STACK")) {
+	case "1", "true":
+		return true
+	default:
+		return false
+	}
 }
 
-func prepareTerraform(t *testing.T, root string) string {
-	t.Helper()
+func repositoryRoot() (string, error) {
+	_, file, _, ok := runtime.Caller(0)
 
-	source := filepath.Join(
-		root,
-		"infra",
-		"terraform",
-	)
-	target := t.TempDir()
+	if !ok {
+		return "", fmt.Errorf("locate repository root")
+	}
+
+	return filepath.Join(filepath.Dir(file), "../../.."), nil
+}
+
+func prepareTerraform(root string) (string, error) {
+	target, err := terraformTarget()
+
+	if err != nil {
+		return "", err
+	}
+
+	source := filepath.Join(root, "infra", "terraform")
 
 	entries, err := os.ReadDir(source)
-	require.NoError(t, err)
+
+	if err != nil {
+		return "", fmt.Errorf("read terraform sources: %w", err)
+	}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -63,16 +66,30 @@ func prepareTerraform(t *testing.T, root string) string {
 		}
 
 		contents, err := os.ReadFile(filepath.Join(source, name))
-		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(
-			filepath.Join(target, name),
-			contents,
-			0o600,
-		))
+		if err != nil {
+			return "", fmt.Errorf("read terraform file %s: %w", name, err)
+		}
+
+		if err := os.WriteFile(filepath.Join(target, name), contents, 0o600); err != nil {
+			return "", fmt.Errorf("write terraform file %s: %w", name, err)
+		}
 	}
 
-	return target
+	return target, nil
+}
+
+func terraformTarget() (string, error) {
+	if keepStack() {
+		target := filepath.Join(
+			os.TempDir(),
+			fmt.Sprintf("castellani-e2e-terraform-%d", os.Getuid()),
+		)
+
+		return target, os.MkdirAll(target, 0o700)
+	}
+
+	return os.MkdirTemp("", "castellani-e2e-terraform-")
 }
 
 func stackEnvironment(terraformDir string) map[string]string {

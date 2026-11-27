@@ -1,29 +1,17 @@
 package infra
 
 import (
-	"testing"
+	"fmt"
 
-	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
-func newComposeStack(t *testing.T, composeFiles ...string) *compose.DockerCompose {
-	t.Helper()
+func newComposeStack(composeFiles ...string) (stack *compose.DockerCompose, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("create compose stack: %v", recovered)
+		}
+	}()
 
-	var (
-		stack *compose.DockerCompose
-		err   error
-	)
-
-	require.NotPanics(
-		t,
-		func() {
-			stack, err = compose.NewDockerComposeWith(compose.WithStackFiles(composeFiles...))
-		},
-		"Docker must be running to execute the e2e suite",
-	)
-
-	require.NoError(t, err)
-
-	return stack
+	return compose.NewDockerComposeWith(compose.WithStackFiles(composeFiles...))
 }

@@ -35,7 +35,7 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 		requestBody,
 		map[string]string{
 			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: "archive-search-happy-path-0001",
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("search-happy-path"),
 		},
 	)
 	require.Equal(

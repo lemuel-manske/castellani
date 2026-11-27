@@ -13,13 +13,7 @@ const (
 	InvalidArchive   = `{"seedUrl":"https://example.com","maxDepth":-1,"maxPages":10}`
 )
 
-const (
-	AcceptedIdempotencyKey               = "archive-accepted-0001"
-	ShortIdempotencyKey                  = "short"
-	UnsupportedContentTypeIdempotencyKey = "archive-content-type-0001"
-	MalformedJSONIdempotencyKey          = "archive-malformed-0001"
-	InvalidSubmissionIdempotencyKey      = "archive-invalid-0001"
-)
+const ShortIdempotencyKey = "short"
 
 func InvalidIdempotencyKeyProblem() contracts.Problem {
 	return contracts.Problem{

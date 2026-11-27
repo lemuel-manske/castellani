@@ -84,7 +84,7 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 		requestBody,
 		map[string]string{
 			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: "archive-pages-pagination-0001",
+			testutil.HeaderIdempotencyKey: services.IdempotencyKey("pages-pagination"),
 		},
 	)
 	require.Equal(

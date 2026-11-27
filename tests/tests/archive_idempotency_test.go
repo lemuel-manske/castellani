@@ -28,7 +28,7 @@ func TestArchiveAdmission_RepeatedSubmissionReturnsOriginalArchive(t *testing.T)
 	)
 	headers := map[string]string{
 		testutil.HeaderContentType:    testutil.ContentTypeJSON,
-		testutil.HeaderIdempotencyKey: "archive-idempotency-0001",
+		testutil.HeaderIdempotencyKey: services.IdempotencyKey("repeated-submission"),
 	}
 
 	firstResponse := testutil.Post(
