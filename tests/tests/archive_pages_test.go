@@ -102,7 +102,7 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	)
 	require.Equal(t, http.StatusOK, secondPage.Status)
 
-	second := testutil.Decode[archivePagesResponse](t, secondPage)
+	second := testutil.Decode[contracts.ArchivePages](t, secondPage)
 	require.Len(t, second.Items, 1)
 	require.Nil(t, second.NextCursor)
 
