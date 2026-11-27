@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"testing",
+	"testing"
 	"time"
 
 	"github.com/lemuel-manske/castellani/tests/internal/contracts"
