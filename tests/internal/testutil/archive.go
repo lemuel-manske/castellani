@@ -9,6 +9,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Eventually[T any](
+	t *testing.T,
+	timeout time.Duration,
+	interval time.Duration,
+	condition func() (T, bool),
+	message string,
+	args ...any,
+) T {
+	t.Helper()
+
+	var value T
+
+	require.Eventually(
+		t,
+		func() bool {
+			var ready bool
+			value, ready = condition()
+			return ready
+		},
+		timeout,
+		interval,
+		message,
+		args...,
+	)
+
+	return value
+}
+
 func WaitForArchiveTerminalState(
 	t *testing.T,
 	baseURL string,
@@ -17,33 +45,25 @@ func WaitForArchiveTerminalState(
 ) contracts.ArchiveStatus {
 	t.Helper()
 
-	var (
-		status       contracts.ArchiveStatus
-		lastResponse Result
-	)
-
-	require.Eventually(
+	return Eventually(
 		t,
-		func() bool {
-			lastResponse = Get(t, baseURL, statusURL)
-			if lastResponse.Status != http.StatusOK {
-				return false
+		timeout,
+		500*time.Millisecond,
+		func() (contracts.ArchiveStatus, bool) {
+			response := Get(t, baseURL, statusURL)
+			if response.Status != http.StatusOK {
+				return contracts.ArchiveStatus{}, false
 			}
 
-			status = Decode[contracts.ArchiveStatus](t, lastResponse)
+			status := Decode[contracts.ArchiveStatus](t, response)
 
 			switch status.Status {
 			case "COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED":
-				return true
+				return status, true
 			default:
-				return false
+				return contracts.ArchiveStatus{}, false
 			}
 		},
-		timeout,
-		500*time.Millisecond,
-		"archive did not reach a terminal state; last response: %s",
-		lastResponse.Body,
+		"archive did not reach a terminal state",
 	)
-
-	return status
 }
