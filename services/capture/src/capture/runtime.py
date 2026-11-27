@@ -31,7 +31,7 @@ from application.capture.archive_decisions import ArchiveDecisionProcessor
 from application.capture.archive_preparation import ArchivePackager
 from application.capture.page_tasks import PageTaskProcessor
 from application.capture.start_crawls import StartCrawlProcessor
-from capture.browser import CaptureLimits
+from .browser import CaptureLimits
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from topology.tables import CAPTURE_TABLES
 
