@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any, cast
 
 from crawler import is_safe_url, is_valid_url
-from playwright.async_api import Browser, BrowserContext, Playwright, async_playwright
 
 from domain.login import BrowserEndpoint
+from playwright.async_api import Browser, BrowserContext, Playwright, async_playwright
 from ports.login import InteractiveBrowser
 
 VIEWPORT_WIDTH = 1365
