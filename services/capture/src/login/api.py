@@ -21,8 +21,9 @@ def app() -> FastAPI:
 
 def create_app(runtime: LoginRuntime) -> FastAPI:
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
+    async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         await runtime.start()
+        application.state.manager = runtime.manager
 
         try:
             yield
@@ -32,7 +33,6 @@ def create_app(runtime: LoginRuntime) -> FastAPI:
     application = FastAPI(title="Castellani Capture Login", lifespan=lifespan)
 
     application.state.runtime = runtime
-    application.state.manager = runtime.manager
 
     @application.exception_handler(SessionNotFound)
     async def handle_not_found(_: Request, error: SessionNotFound) -> Response:
