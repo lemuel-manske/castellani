@@ -87,17 +87,34 @@ async def test_start_crawl_dead_letters_unsupported_normalizer_version(
     envelope = json.loads(start_crawl_envelope())
     envelope["payload"]["normalizerVersion"] = "v2"
 
+    dead = await channel.get_queue(CAPTURE_DEAD_QUEUE)
+    received_message: asyncio.Future[aio_pika.abc.AbstractIncomingMessage] = (
+        asyncio.get_running_loop().create_future()
+    )
+
+    async def receive_dead_letter(
+        message: aio_pika.abc.AbstractIncomingMessage,
+    ) -> None:
+        if not received_message.done():
+            received_message.set_result(message)
+
+    consumer_tag: str | None = None
+
     try:
+        consumer_tag = await dead.consume(receive_dead_letter)
+
         await publish(channel, json.dumps(envelope).encode())
 
-        dead = await channel.get_queue(CAPTURE_DEAD_QUEUE)
-
-        received = await dead.get(timeout=5, fail=True)
+        received = await asyncio.wait_for(received_message, timeout=5)
 
         assert json.loads(received.body)["payload"]["normalizerVersion"] == "v2"
-
         assert starter.calls == 0
+
+        await received.ack()
     finally:
+        if consumer_tag is not None:
+            await dead.cancel(consumer_tag)
+
         consumer.stop()
         await task
         await purge_queues(channel)
