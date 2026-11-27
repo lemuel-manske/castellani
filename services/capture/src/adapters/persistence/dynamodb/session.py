@@ -16,7 +16,7 @@ from ports.login import SessionStore
 from topology.buckets import AUTH_PROFILE_BUCKET
 from utils.time import utc_now
 
-from .error_handling import is_conditional_failure
+from .error_handling import is_conditional_failure, is_transaction_canceled
 from .queries.session import (
     create_session_transaction,
     fail_session,
@@ -62,7 +62,7 @@ class DynamoDBSessionStore(SessionStore):
                     updated_at,
                 )
             except ClientError as error:
-                if is_conditional_failure(error):
+                if is_conditional_failure(error) or is_transaction_canceled(error):
                     raise DuplicateSessionRequest from error
 
                 raise

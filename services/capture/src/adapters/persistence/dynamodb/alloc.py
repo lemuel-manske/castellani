@@ -7,6 +7,9 @@ from botocore.exceptions import ClientError
 from domain.capture import (
     CaptureReservation,
     CaptureReservationLostError,
+    InvalidAttemptId,
+    InvalidLeaseDuration,
+    InvalidSlotCount,
     new_reservation_id,
 )
 from ports.capture import CaptureAllocator
@@ -37,10 +40,10 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         clock: Clock = time.time,
     ) -> None:
         if slot_count < 1:
-            raise ValueError("slot_count must be positive")
+            raise InvalidSlotCount("slot_count must be positive")
 
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         self.client = client
 
@@ -52,7 +55,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
     async def reserve(self, attempt_id: str) -> CaptureReservation | None:
         if not attempt_id:
-            raise ValueError("attempt_id must not be empty")
+            raise InvalidAttemptId("attempt_id must not be empty")
 
         reservation_id = new_reservation_id(attempt_id)
 

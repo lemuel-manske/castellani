@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 from domain.capture import (
     CompensationDecision,
     InvalidArchiveDecision,
+    InvalidLeaseDuration,
     PackageCommitRejected,
     PendingPackage,
     PreparedPackage,
@@ -69,7 +70,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
 
     async def claim_package(self, lease_duration: float) -> PendingPackage | None:
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         def claim() -> PendingPackage | None:
             now = self.clock()

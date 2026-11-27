@@ -30,7 +30,6 @@ from application.capture.archive_preparation import ArchivePackager
 from application.capture.page_tasks import PageTaskProcessor
 from application.capture.start_crawls import StartCrawlProcessor
 from ports.login import AuthProfileCipher
-from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from topology.tables import CAPTURE_TABLES
 
 from .settings import CaptureSettings

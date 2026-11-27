@@ -7,7 +7,12 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from adapters.serialization import artifact_document, manifest_document
-from domain.capture import ArtifactReference, manifest_key, manifest_message_id
+from domain.capture import (
+    ArtifactReference,
+    CaptureRunMissing,
+    manifest_key,
+    manifest_message_id,
+)
 from ports.capture import CrawlFinalizer
 from ports.clock import Clock
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
@@ -43,7 +48,7 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
             run = read_run(self.client, archive_id)
 
             if run is None:
-                raise RuntimeError("Capture run disappeared during finalization")
+                raise CaptureRunMissing("Capture run disappeared during finalization")
 
             if (
                 run.get("admission", {}).get("S") != "CLOSED"

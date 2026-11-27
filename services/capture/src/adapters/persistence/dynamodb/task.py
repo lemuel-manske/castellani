@@ -10,7 +10,9 @@ from domain.capture import (
     DEFAULT_AUTH_GENERATION,
     AuthGenerationChanged,
     CaptureOutcome,
+    CaptureRunMissing,
     DiscoveredPage,
+    InvalidLeaseDuration,
     TaskClaim,
     TaskClaimLostError,
     identify_discovered_pages,
@@ -60,7 +62,7 @@ class DynamoDBTaskRepository(TaskRepository):
         on_closed: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         self.client = client
 
@@ -162,7 +164,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 run = read_run(self.client, outcome.archive_id)
 
                 if run is None:
-                    raise RuntimeError("Capture run disappeared during completion")
+                    raise CaptureRunMissing("Capture run disappeared during completion")
 
                 close = closes_run(run)
 
@@ -243,7 +245,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 run = read_run(self.client, claim.task.archive_id)
 
                 if run is None:
-                    raise RuntimeError("Capture run disappeared during failure")
+                    raise CaptureRunMissing("Capture run disappeared during failure")
 
                 close = closes_run(run)
 

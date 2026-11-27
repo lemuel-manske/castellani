@@ -1,12 +1,15 @@
 from .alloc import (
     CaptureReservation,
     CaptureReservationLostError,
+    InvalidAttemptId,
     InvalidReservationRenewal,
+    InvalidSlotCount,
     new_reservation_id,
 )
 from .archive import (
     ArchivePage,
     InvalidArchiveCursor,
+    InvalidPageLimit,
     InvalidWACZRange,
     PageListing,
     SnapshotReference,
@@ -15,8 +18,9 @@ from .archive import (
 )
 from .auth import DEFAULT_AUTH_GENERATION, AuthContext, AuthGenerationChanged
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
-from .crawl import StartCrawl
+from .crawl import CaptureRunMissing, StartCrawl
 from .discovery import DiscoveredPage, identify_discovered_pages
+from .lease import InvalidLeaseDuration
 from .manifest import (
     DEFAULT_NORMALIZER_VERSION,
     MANIFEST_SCHEMA_VERSION,
@@ -24,7 +28,7 @@ from .manifest import (
     manifest_key,
     manifest_message_id,
 )
-from .outbox import OutboxLeaseLostError, OutboxMessage
+from .outbox import InvalidRescheduleDelay, OutboxLeaseLostError, OutboxMessage
 from .package import (
     DECISION_COMPENSATE,
     DECISION_PUBLISH,
@@ -59,6 +63,7 @@ __all__ = [
     "CaptureOutcome",
     "CaptureReservation",
     "CaptureReservationLostError",
+    "CaptureRunMissing",
     "CompensationDecision",
     "DECISION_COMPENSATE",
     "DECISION_PUBLISH",
@@ -67,7 +72,12 @@ __all__ = [
     "DiscoveredPage",
     "InvalidArchiveCursor",
     "InvalidArchiveDecision",
+    "InvalidAttemptId",
+    "InvalidLeaseDuration",
+    "InvalidPageLimit",
     "InvalidReservationRenewal",
+    "InvalidRescheduleDelay",
+    "InvalidSlotCount",
     "InvalidTaskClaimRenewal",
     "InvalidURLIdentity",
     "InvalidWACZRange",

@@ -2,6 +2,7 @@ import asyncio
 from typing import Any
 
 from domain.capture import (
+    InvalidPageLimit,
     PageListing,
     SnapshotReference,
     WACZObject,
@@ -34,7 +35,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         cursor: str | None,
     ) -> PageListing:
         if limit < 1 or limit > MAX_PAGE_LIMIT:
-            raise ValueError("limit must be between 1 and 100")
+            raise InvalidPageLimit("limit must be between 1 and 100")
 
         def read() -> PageListing:
             return query_pages(self.client, archive_id, limit, cursor)

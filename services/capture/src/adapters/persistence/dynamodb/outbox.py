@@ -7,7 +7,12 @@ from typing import Any, cast
 
 from botocore.exceptions import ClientError
 
-from domain.capture import OutboxLeaseLostError, OutboxMessage
+from domain.capture import (
+    InvalidLeaseDuration,
+    InvalidRescheduleDelay,
+    OutboxLeaseLostError,
+    OutboxMessage,
+)
 from ports.capture import OutboxRepository
 from ports.clock import Clock
 
@@ -42,7 +47,7 @@ class DynamoDBOutbox(OutboxRepository):
 
     async def claim(self, lease_duration: float) -> OutboxMessage | None:
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         def try_claim(
             item: dict[str, Any],
@@ -143,7 +148,7 @@ class DynamoDBOutbox(OutboxRepository):
 
     async def reschedule(self, message: OutboxMessage, delay: float) -> None:
         if delay < 0:
-            raise ValueError("delay must not be negative")
+            raise InvalidRescheduleDelay("delay must not be negative")
 
         def reschedule() -> None:
             next_attempt_at = self.clock() + delay

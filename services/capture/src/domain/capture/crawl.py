@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 
 
+class CaptureRunMissing(RuntimeError):
+    """Raised when a crawl run that must exist cannot be found."""
+
+
 @dataclass(frozen=True)
 class StartCrawl:
     archive_id: str
