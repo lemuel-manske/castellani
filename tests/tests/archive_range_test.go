@@ -67,5 +67,5 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 		waczResponse.Header.Get("Content-Range"),
 	)
 	require.Equal(t, "application/wacz", waczResponse.Header.Get(testutil.HeaderContentType))
-	require.Equal(t, "\x50\x4b\x03\x04", waczResponse.Body)
+	require.Equal(t, zipPrefix, waczResponse.Body)
 }
