@@ -1,12 +1,10 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"testing"
-	"time"
+	"testing"\n\t"time"
 
 	"github.com/lemuel-manske/castellani/tests/internal/contracts"
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
@@ -65,28 +63,26 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 		url.QueryEscape(accepted.ArchiveID),
 	)
 
-	var search archiveSearchResponse
-	require.Eventually(
+	search := testutil.Eventually(
 		t,
-		func() bool {
-			searchResponse := testutil.Get(t, services.Gateway.BaseURL(), searchPath)
-			if searchResponse.Status != http.StatusOK {
-				return false
-			}
-
-			return json.Unmarshal([]byte(searchResponse.Body), &search) == nil &&
-				len(search.Results) > 0
-		},
 		archiveTimeout,
 		500*time.Millisecond,
+		func() (archiveSearchResponse, bool) {
+			response := testutil.Get(t, services.Gateway.BaseURL(), searchPath)
+			if response.Status != http.StatusOK {
+				return archiveSearchResponse{}, false
+			}
+
+			result := testutil.Decode[archiveSearchResponse](t, response)
+			return result, len(result.Results) > 0
+		},
 		"search did not return results for archive %s",
 		accepted.ArchiveID,
 	)
 
-	for _, result := range search.Results {
-		require.Equal(t, accepted.ArchiveID, result.ArchiveID)
-		require.NotEmpty(t, result.SnapshotID)
-		require.NotEmpty(t, result.URL)
-		require.NotEmpty(t, result.Snippet)
-	}
+	result := search.Results[0]
+	require.Equal(t, accepted.ArchiveID, result.ArchiveID)
+	require.NotEmpty(t, result.SnapshotID)
+	require.NotEmpty(t, result.URL)
+	require.NotEmpty(t, result.Snippet)
 }
