@@ -42,6 +42,27 @@ def optional_string(item: dict[str, Any], key: str) -> str | None:
     return value["S"] if value else None
 
 
+def optional_number_string(item: dict[str, Any], key: str) -> str | None:
+    value = item.get(key)
+
+    return value["N"] if value else None
+
+
+def envelope_matches(
+    item: dict[str, Any],
+    message_type: str,
+    archive_id: str,
+    payload: Mapping[str, Any],
+) -> bool:
+    stored = item.get("payload", {}).get("M", {})
+
+    return (
+        optional_string(item, "type") == message_type
+        and optional_string(item, "correlationId") == archive_id
+        and all(stored.get(key) == value for key, value in payload.items())
+    )
+
+
 def serialize_map(value: Mapping[str, object]) -> dict[str, Any]:
     return {key: serialize_attribute(item) for key, item in value.items()}
 
@@ -86,3 +107,7 @@ def deserialize_attribute(attribute: dict[str, Any]) -> Any:
         return [deserialize_attribute(value) for value in attribute["L"]]
 
     raise RuntimeError("DynamoDB record contains an unsupported attribute type")
+
+
+def plain_attributes(item: dict[str, Any]) -> dict[str, Any]:
+    return {key: deserialize_attribute(value) for key, value in item.items()}

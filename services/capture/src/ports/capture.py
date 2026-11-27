@@ -2,10 +2,13 @@ from abc import ABC, abstractmethod
 
 from domain.capture import (
     DEFAULT_AUTH_GENERATION,
+    ArtifactReference,
     AuthContext,
     CaptureOutcome,
     CaptureReservation,
     CompensationDecision,
+    ManifestFinalization,
+    ManifestSource,
     OutboxMessage,
     PageListing,
     PendingPackage,
@@ -14,7 +17,6 @@ from domain.capture import (
     SnapshotReference,
     StartCrawl,
     TaskClaim,
-    WACZObject,
 )
 
 
@@ -26,6 +28,14 @@ class CrawlStarter(ABC):
 class CrawlFinalizer(ABC):
     @abstractmethod
     async def __call__(self, archive_id: str) -> None: ...
+
+
+class ArchiveFinalizationRepository(ABC):
+    @abstractmethod
+    async def read_manifest_source(self, archive_id: str) -> ManifestSource | None: ...
+
+    @abstractmethod
+    async def commit_manifest(self, finalization: ManifestFinalization) -> None: ...
 
 
 class CaptureAllocator(ABC):
@@ -46,7 +56,7 @@ class AuthContextStore(ABC):
     async def load(self, archive_id: str) -> AuthContext: ...
 
 
-class ArchiveRetrieval(ABC):
+class ArchiveCatalog(ABC):
     @abstractmethod
     async def list_pages(
         self,
@@ -63,13 +73,7 @@ class ArchiveRetrieval(ABC):
     ) -> SnapshotReference | None: ...
 
     @abstractmethod
-    async def read_wacz(
-        self,
-        archive_id: str,
-        range_header: str | None,
-        if_range: str | None,
-        metadata_only: bool = False,
-    ) -> WACZObject | None: ...
+    async def read_package(self, archive_id: str) -> ArtifactReference | None: ...
 
 
 class OutboxRepository(ABC):

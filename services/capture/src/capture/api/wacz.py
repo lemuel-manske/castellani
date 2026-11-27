@@ -48,7 +48,7 @@ async def read_wacz(
     request: Request,
     metadata_only: bool,
 ) -> WACZObject | Response:
-    retrieval = request.app.state.runtime.archive_retrieval
+    retrieval = request.app.state.archive_retrieval
 
     result = await retrieval.read_wacz(
         archive_id,

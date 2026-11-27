@@ -19,9 +19,9 @@ async def live() -> dict[str, str]:
 
 @router.get(HEALTH_CHECK_READINESS_PATH)
 async def ready(request: Request) -> dict[str, str]:
-    runtime: CaptureRuntime | None = getattr(request.app.state, "runtime", None)
+    runtime: CaptureRuntime = request.app.state.runtime
 
-    if runtime is None or not runtime.ready:
+    if not runtime.ready:
         raise HTTPException(status_code=503, detail="Capture runtime is not ready")
 
     return {"status": "ok"}

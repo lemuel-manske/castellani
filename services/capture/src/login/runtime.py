@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 
 import boto3
 
-from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
-from adapters.browser.login import LoginBrowserSettings, PlaywrightLoginBrowser
+from adapters.artifacts.s3 import S3AuthProfileStore
+from adapters.browser.playwright import LoginBrowserSettings, PlaywrightLoginBrowser
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from application.login import LoginManager
+from ports.login import AuthProfileCipher
 from topology.tables import LOGIN_TABLES
 
 from .settings import LoginSettings
@@ -36,7 +37,8 @@ class LoginRuntime:
 
         self.dynamodb_client: DynamoDBClient | None = None
         self.s3_client: S3Client | None = None
-        self.manager: LoginManager | None = None
+
+        self._manager: LoginManager | None = None
 
         self._ready = False
 
@@ -45,11 +47,13 @@ class LoginRuntime:
         return self._ready
 
     @property
-    def login_manager(self) -> LoginManager:
-        if self.manager is None:
-            raise RuntimeError("login runtime has not started")
+    def manager(self) -> LoginManager:
+        if not self.ready:
+            raise RuntimeError("login runtime is not ready")
 
-        return self.manager
+        assert self._manager is not None
+
+        return self._manager
 
     async def start(self) -> None:
         if self._ready:
@@ -84,7 +88,7 @@ class LoginRuntime:
                 session_ttl_seconds=self.settings.session_ttl_seconds,
             )
 
-            profiles = EncryptedAuthProfileStore(
+            profiles = S3AuthProfileStore(
                 s3_client=self.s3_client,
                 cipher=AuthProfileCipher(self.settings.auth_profile_key),
             )
@@ -96,9 +100,11 @@ class LoginRuntime:
                 manager_id=self.settings.manager_id,
                 session_ttl_seconds=self.settings.session_ttl_seconds,
             )
+
             await manager.start()
 
-            self.manager = manager
+            self._manager = manager
+
             self._ready = True
         except Exception:
             await self.stop()
@@ -107,7 +113,7 @@ class LoginRuntime:
     async def stop(self) -> None:
         self._ready = False
 
-        self.manager = None
+        self._manager = None
 
         await self.browser.close_all()
 

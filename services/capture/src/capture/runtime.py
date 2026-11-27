@@ -8,9 +8,7 @@ import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
 
-from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
-from adapters.artifacts.s3 import S3ArtifactStore
-from adapters.browser.executor import BrowserPageExecutor
+from adapters.artifacts.s3 import S3ArtifactStore, S3AuthProfileStore
 from adapters.messaging.rabbitmq.consumer import (
     RabbitMQCompensationDecisionConsumer,
     RabbitMQPageTaskConsumer,
@@ -19,8 +17,8 @@ from adapters.messaging.rabbitmq.consumer import (
 )
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
-from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
-from adapters.persistence.dynamodb.finalize import DynamoDBManifestFinalizer
+from adapters.persistence.dynamodb.archive import DynamoDBArchiveCatalog
+from adapters.persistence.dynamodb.finalize import DynamoDBArchiveFinalizationRepository
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
 from adapters.persistence.dynamodb.publication import DynamoDBArchivePublicationRepository
 from adapters.persistence.dynamodb.run import DynamoDBRunStarter
@@ -28,10 +26,12 @@ from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application.capture import OutboxDispatcher, StoredAuthContexts
 from application.capture.archive_decisions import ArchiveDecisionProcessor
+from application.capture.archive_finalization import ArchiveManifestFinalizer
 from application.capture.archive_preparation import ArchivePackager
+from application.capture.archive_retrieval import ArchiveRetrieval
 from application.capture.page_tasks import PageTaskProcessor
 from application.capture.start_crawls import StartCrawlProcessor
-from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
+from ports.login import AuthProfileCipher
 from topology.tables import CAPTURE_TABLES
 
 from .settings import CaptureSettings
@@ -54,7 +54,6 @@ class CaptureRuntime:
 
         self.dynamodb_client: DynamoDBClient | None = None
         self.s3_client: S3Client | None = None
-        self.archive_retrieval: DynamoDBArchiveRetrieval | None = None
 
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
@@ -69,28 +68,22 @@ class CaptureRuntime:
         self.decisions_task: asyncio.Task[None] | None = None
         self.dispatcher_task: asyncio.Task[None] | None = None
 
+        self._archive_retrieval: ArchiveRetrieval | None = None
+
         self._ready = False
 
     @property
     def ready(self) -> bool:
-        return (
-            self._ready
-            and self.consumer_task is not None
-            and not self.consumer_task.done()
-            and self.start_consumer_task is not None
-            and not self.start_consumer_task.done()
-            and self.packaging_task is not None
-            and not self.packaging_task.done()
-            and self.decisions_task is not None
-            and not self.decisions_task.done()
-            and self.dispatcher_task is not None
-            and not self.dispatcher_task.done()
-        )
+        return self._ready
+
+    @property
+    def archive_retrieval(self) -> ArchiveRetrieval:
+        if self._archive_retrieval is None:
+            raise RuntimeError("CaptureRuntime is not ready")
+
+        return self._archive_retrieval
 
     async def start(self) -> None:
-        if self._ready:
-            raise RuntimeError("Capture runtime has already started")
-
         try:
             session = boto3.Session(
                 aws_access_key_id=self.settings.aws_access_key_id,
@@ -115,21 +108,27 @@ class CaptureRuntime:
                     TableName=table_name,
                 )
 
-            self.archive_retrieval = DynamoDBArchiveRetrieval(
-                client=self.dynamodb_client,
-                s3_client=self.s3_client,
-                artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
+            artifacts = S3ArtifactStore(
+                client=self.s3_client,
+                staging_root=Path(self.settings.artifact_directory),
             )
 
-            finalizer = DynamoDBManifestFinalizer(
-                client=self.dynamodb_client,
-                s3_client=self.s3_client,
+            catalog = DynamoDBArchiveCatalog(client=self.dynamodb_client)
+
+            self._archive_retrieval = ArchiveRetrieval(
+                catalog=catalog,
+                artifacts=artifacts,
+            )
+
+            finalizer = ArchiveManifestFinalizer(
+                repository=DynamoDBArchiveFinalizationRepository(client=self.dynamodb_client),
+                artifacts=artifacts,
             )
 
             task_repository = DynamoDBTaskRepository(
                 client=self.dynamodb_client,
                 lease_duration=self.settings.lease_duration,
-                on_closed=finalizer,
+                finalize=finalizer,
             )
 
             allocator = DynamoDBCaptureAllocator(
@@ -140,25 +139,15 @@ class CaptureRuntime:
 
             auth_contexts = StoredAuthContexts(
                 sessions=DynamoDBSessionStore(client=self.dynamodb_client),
-                profiles=EncryptedAuthProfileStore(
+                profiles=S3AuthProfileStore(
                     s3_client=self.s3_client,
                     cipher=AuthProfileCipher(self.settings.auth_profile_key),
                 ),
             )
 
-            artifacts = S3ArtifactStore(
-                client=self.s3_client,
-                staging_root=Path(self.settings.artifact_directory),
-            )
-
             worker = new_worker(
                 task_repository=task_repository,
                 capture_allocator=allocator,
-                executor=BrowserPageExecutor(
-                    CaptureLimits(
-                        allow_private_networks=self.settings.allow_private_networks,
-                    )
-                ),
                 artifacts=artifacts,
                 auth_contexts=auth_contexts,
             )
@@ -180,7 +169,7 @@ class CaptureRuntime:
                 ArchivePackager(
                     repository=publication_repository,
                     artifacts=artifacts,
-                    root=Path(self.settings.artifact_directory) / "packages",
+                    root=self.settings.packages_directory,
                     lease_duration=self.settings.outbox_lease_duration,
                     poll_interval=self.settings.outbox_poll_interval,
                 ).run(),
@@ -265,7 +254,7 @@ class CaptureRuntime:
     async def stop(self) -> None:
         self._ready = False
 
-        self.archive_retrieval = None
+        self._archive_retrieval = None
 
         if self.page_consumer is not None:
             self.page_consumer.stop()

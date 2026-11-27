@@ -11,7 +11,6 @@ from aio_pika.abc import (
     AbstractRobustConnection,
 )
 
-from adapters.messaging.contracts import validate_message
 from contracts.envelope import Envelope
 from contracts.messages import (
     ARCHIVE_COMPENSATION_DECIDED_EVENT,
@@ -23,6 +22,7 @@ from contracts.messages import (
     CapturePagePayload,
     StartCrawlPayload,
 )
+from contracts.validation import validate_message
 from ports.messaging import (
     ArchiveCompensationConsumer,
     ArchiveCompensationMessage,

@@ -1,9 +1,34 @@
 from dataclasses import dataclass
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
+
+TASK_PENDING = "PENDING"
+TASK_CLAIMED = "CLAIMED"
+TASK_WAITING_FOR_AUTH = "WAITING_FOR_AUTH"
+TASK_COMPLETED = "COMPLETED"
+TASK_FAILED = "FAILED"
 
 
 def new_attempt_id() -> str:
     return str(uuid4())
+
+
+def capture_page_message_id(archive_id: str, url_key: str) -> str:
+    return str(uuid5(NAMESPACE_URL, f"capture-page:{archive_id}:{url_key}"))
+
+
+def page_captured_message_id(archive_id: str, snapshot_id: str) -> str:
+    return str(uuid5(NAMESPACE_URL, f"page-captured:{archive_id}:{snapshot_id}"))
+
+
+def release_page_message_id(
+    archive_id: str,
+    url_key: str,
+    attempt_id: str,
+    fence: int,
+) -> str:
+    name = f"capture-page:{archive_id}:{url_key}:{attempt_id}:{fence}"
+
+    return str(uuid5(NAMESPACE_URL, name))
 
 
 class TaskClaimLostError(RuntimeError):

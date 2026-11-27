@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from adapters.serialization import artifact_document
 from contracts.messages import (
@@ -12,6 +14,7 @@ from contracts.messages import (
 from domain.capture import (
     DECISION_COMPENSATE,
     DECISION_PUBLISH,
+    MANIFEST_PUBLISHED,
     PACKAGE_PENDING,
     PACKAGE_PREPARED,
     PACKAGE_PREPARING,
@@ -21,9 +24,13 @@ from domain.capture import (
     PreparedPackage,
     PublicationDecision,
 )
-from topology.tables import OUTBOX_TABLE, RUNS_TABLE
+from topology.tables import RUNS_TABLE
 
-from ..values import optional_number, optional_string, serialize_map, string_from_item
+from ..values import envelope_matches, optional_number, optional_string, string_from_item
+from .common import outbox_put, transact_write_items, with_cursor
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
 def pending_package_scan() -> dict[str, Any]:
@@ -45,7 +52,7 @@ def pending_package_scan() -> dict[str, Any]:
             "#lease": "packageLeaseUntil",
         },
         "ExpressionAttributeValues": {
-            ":published": {"S": "PUBLISHED"},
+            ":published": {"S": MANIFEST_PUBLISHED},
             ":pending": {"S": PACKAGE_PENDING},
             ":preparing": {"S": PACKAGE_PREPARING},
             ":now": {"N": "0"},
@@ -91,7 +98,7 @@ def claim_package_update(
             "#owner": "packageLeaseOwner",
         },
         "ExpressionAttributeValues": {
-            ":published": {"S": "PUBLISHED"},
+            ":published": {"S": MANIFEST_PUBLISHED},
             ":pending": {"S": PACKAGE_PENDING},
             ":preparing": {"S": PACKAGE_PREPARING},
             ":lease": {"N": str(lease_until)},
@@ -164,7 +171,7 @@ def prepare_package_transaction(
                     "#owner": "packageLeaseOwner",
                 },
                 "ExpressionAttributeValues": {
-                    ":published": {"S": "PUBLISHED"},
+                    ":published": {"S": MANIFEST_PUBLISHED},
                     ":preparing": {"S": PACKAGE_PREPARING},
                     ":pending": {"S": PACKAGE_PENDING},
                     ":prepared": {"S": PACKAGE_PREPARED},
@@ -177,24 +184,14 @@ def prepare_package_transaction(
                 },
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": prepared.archive_id},
-                    "type": {"S": ARCHIVE_PREPARED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=prepared.archive_id,
+            message_type=ARCHIVE_PREPARED_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -237,24 +234,14 @@ def publication_transaction(
                 },
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": decision.archive_id},
-                    "type": {"S": ARCHIVE_PUBLISHED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": decision.occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=decision.archive_id,
+            message_type=ARCHIVE_PUBLISHED_EVENT,
+            occurred_at=decision.occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]
 
 
@@ -288,57 +275,50 @@ def compensation_transaction(
         "decisionVersion": decision.decision_version,
     }
 
-    return {
-        "Put": {
-            "TableName": OUTBOX_TABLE,
-            "Item": {
-                "messageId": {"S": message_id},
-                "correlationId": {"S": decision.archive_id},
-                "type": {"S": ARCHIVE_COMPENSATED_EVENT},
-                "version": {"N": "1"},
-                "occurredAt": {"S": decision.occurred_at},
-                "payload": {"M": serialize_map(payload)},
-                "status": {"S": "PENDING"},
-                "attempts": {"N": "0"},
-                "nextAttemptAt": {"N": str(now)},
-            },
-            "ConditionExpression": "attribute_not_exists(#message_id)",
-            "ExpressionAttributeNames": {"#message_id": "messageId"},
-        }
-    }
+    return outbox_put(
+        message_id=message_id,
+        correlation_id=decision.archive_id,
+        message_type=ARCHIVE_COMPENSATED_EVENT,
+        occurred_at=decision.occurred_at,
+        payload=payload,
+        now=now,
+    )
 
 
 def is_prepared_message(item: dict[str, Any], archive_id: str, digest: str) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == ARCHIVE_PREPARED_EVENT
-        and item.get("correlationId", {}).get("S") == archive_id
-        and payload.get("archiveId", {}).get("S") == archive_id
-        and payload.get("packageDigest", {}).get("S") == digest
+    return envelope_matches(
+        item,
+        ARCHIVE_PREPARED_EVENT,
+        archive_id,
+        {
+            "archiveId": {"S": archive_id},
+            "packageDigest": {"S": digest},
+        },
     )
 
 
 def is_published_message(item: dict[str, Any], decision: PublicationDecision) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == ARCHIVE_PUBLISHED_EVENT
-        and item.get("correlationId", {}).get("S") == decision.archive_id
-        and payload.get("archiveId", {}).get("S") == decision.archive_id
-        and payload.get("decisionVersion", {}).get("N") == str(decision.decision_version)
-        and payload.get("packageDigest", {}).get("S") == decision.package_digest
+    return envelope_matches(
+        item,
+        ARCHIVE_PUBLISHED_EVENT,
+        decision.archive_id,
+        {
+            "archiveId": {"S": decision.archive_id},
+            "decisionVersion": {"N": str(decision.decision_version)},
+            "packageDigest": {"S": decision.package_digest},
+        },
     )
 
 
 def is_compensated_message(item: dict[str, Any], decision: CompensationDecision) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == ARCHIVE_COMPENSATED_EVENT
-        and item.get("correlationId", {}).get("S") == decision.archive_id
-        and payload.get("archiveId", {}).get("S") == decision.archive_id
-        and payload.get("decisionVersion", {}).get("N") == str(decision.decision_version)
+    return envelope_matches(
+        item,
+        ARCHIVE_COMPENSATED_EVENT,
+        decision.archive_id,
+        {
+            "archiveId": {"S": decision.archive_id},
+            "decisionVersion": {"N": str(decision.decision_version)},
+        },
     )
 
 
@@ -365,21 +345,18 @@ def is_compensating_decision(item: dict[str, Any], decision: CompensationDecisio
 
 
 def scan_pending_packages(
-    client: Any,
+    client: DynamoDBClient,
     now: float,
     cursor: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     request = pending_package_scan()
     request["ExpressionAttributeValues"][":now"] = {"N": str(now)}
 
-    if cursor:
-        request["ExclusiveStartKey"] = cursor
-
-    return client.scan(**request)
+    return cast(dict[str, Any], client.scan(**with_cursor(request, cursor)))
 
 
 def claim_package(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     now: float,
     lease_until: float,
@@ -388,39 +365,40 @@ def claim_package(
     client.update_item(**claim_package_update(archive_id, now, lease_until, owner))
 
 
-def release_package(client: Any, archive_id: str, owner: str) -> None:
+def release_package(client: DynamoDBClient, archive_id: str, owner: str) -> None:
     client.update_item(**release_package_update(archive_id, owner))
 
 
 def prepare_package(
-    client: Any,
+    client: DynamoDBClient,
     prepared: PreparedPackage,
     message_id: str,
     occurred_at: str,
     now: float,
 ) -> None:
-    client.transact_write_items(
-        TransactItems=prepare_package_transaction(prepared, message_id, occurred_at, now)
+    transact_write_items(
+        client,
+        prepare_package_transaction(prepared, message_id, occurred_at, now),
     )
 
 
 def publish_package(
-    client: Any,
+    client: DynamoDBClient,
     decision: PublicationDecision,
     message_id: str,
     now: float,
 ) -> None:
-    client.transact_write_items(TransactItems=publication_transaction(decision, message_id, now))
+    transact_write_items(client, publication_transaction(decision, message_id, now))
 
 
-def begin_compensation(client: Any, decision: CompensationDecision) -> None:
+def begin_compensation(client: DynamoDBClient, decision: CompensationDecision) -> None:
     client.update_item(**compensation_update(decision))
 
 
 def complete_compensation(
-    client: Any,
+    client: DynamoDBClient,
     decision: CompensationDecision,
     message_id: str,
     now: float,
 ) -> None:
-    client.transact_write_items(TransactItems=[compensation_transaction(decision, message_id, now)])
+    transact_write_items(client, [compensation_transaction(decision, message_id, now)])

@@ -1,0 +1,52 @@
+[project]
+name = "castellani-crawler"
+version = "0.1.0"
+description = "Browser page capture and WARC recording primitives for Castellani."
+readme = "README.md"
+requires-python = "==3.13.5"
+dependencies = [
+    "httpx==0.28.1",
+    "playwright==1.51.0",
+    "pywb==2.11.1",
+    "selectolax==0.3.28",
+    "wacz==0.6.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.414",
+    "pytest==8.3.5",
+    "pytest-asyncio==0.25.3",
+    "ruff==0.11.2",
+    "warcio==1.8.2",
+]
+
+[tool.uv.build-backend]
+module-name = "crawler"
+
+[tool.castellani]
+name = "castellani@crawler"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: exercises the real browser, pywb recorder, and offline replay server",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

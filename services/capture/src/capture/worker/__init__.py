@@ -1,11 +1,5 @@
 from ports.capture import AuthContextStore, CaptureAllocator, TaskRepository
-from ports.worker import (
-    ArtifactStore,
-    CaptureArtifact,
-    CaptureExecutor,
-    CaptureRunner,
-    LeaseLostError,
-)
+from ports.worker import ArtifactStore, CaptureArtifact, CaptureRunner, LeaseLostError
 
 from .runner import ConcreteCaptureWorker
 
@@ -13,14 +7,12 @@ from .runner import ConcreteCaptureWorker
 def new_worker(
     task_repository: TaskRepository,
     capture_allocator: CaptureAllocator,
-    executor: CaptureExecutor,
     artifacts: ArtifactStore,
     auth_contexts: AuthContextStore,
 ) -> ConcreteCaptureWorker:
     return ConcreteCaptureWorker(
         task_repository=task_repository,
         capture_allocator=capture_allocator,
-        executor=executor,
         artifacts=artifacts,
         auth_contexts=auth_contexts,
     )
@@ -29,7 +21,6 @@ def new_worker(
 __all__ = [
     "ArtifactStore",
     "CaptureArtifact",
-    "CaptureExecutor",
     "CaptureRunner",
     "LeaseLostError",
     "new_worker",

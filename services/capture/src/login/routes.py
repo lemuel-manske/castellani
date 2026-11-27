@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -20,6 +20,7 @@ from domain.login import (
     SessionRequest,
     SessionStatus,
 )
+from login.runtime import LoginRuntime
 
 from .serialization import auth_session_json
 
@@ -59,18 +60,6 @@ FORWARDED_RESPONSE_HEADERS = (
 )
 
 
-class Runtime(Protocol):
-    @property
-    def ready(self) -> bool: ...
-
-    @property
-    def login_manager(self) -> LoginManager: ...
-
-    async def start(self) -> None: ...
-
-    async def stop(self) -> None: ...
-
-
 class CreateSessionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -94,7 +83,7 @@ async def live() -> dict[str, str]:
 
 @router.get(HEALTH_CHECK_READINESS_PATH)
 async def ready(request: Request) -> dict[str, str]:
-    runtime: Runtime = request.app.state.runtime
+    runtime: LoginRuntime = request.app.state.runtime
 
     if not runtime.ready:
         raise LoginUnavailable("login runtime is not ready")
@@ -113,7 +102,9 @@ async def create_session(
     if not valid_idempotency_key(key):
         raise SessionConflict("invalid idempotency key")
 
-    session = await manager(request).create(
+    login_manager: LoginManager = request.app.state.manager
+
+    session = await login_manager.create(
         SessionRequest(
             archive_id=body.archiveId,
             target_url=body.targetUrl,
@@ -128,7 +119,9 @@ async def create_session(
 async def get_session(session_id: str, request: Request) -> dict[str, object]:
     require_path_segment(session_id)
 
-    session = await manager(request).get(session_id)
+    login_manager: LoginManager = request.app.state.manager
+
+    session = await login_manager.get(session_id)
 
     return auth_session_json(session)
 
@@ -141,7 +134,9 @@ async def update_session(
 ) -> dict[str, object]:
     require_path_segment(session_id)
 
-    session = await manager(request).update(
+    login_manager: LoginManager = request.app.state.manager
+
+    session = await login_manager.update(
         session_id,
         SessionStatus(body.status),
     )
@@ -153,7 +148,9 @@ async def update_session(
 async def browser(session_id: str, request: Request) -> str:
     require_path_segment(session_id)
 
-    await manager(request).endpoint(session_id)
+    login_manager: LoginManager = request.app.state.manager
+
+    await login_manager.endpoint(session_id)
 
     return (WEB_DIRECTORY / "browser.html").read_text()
 
@@ -169,7 +166,10 @@ async def vnc_asset(
 ) -> Response:
     require_path_segment(session_id)
 
-    origin = await manager(request).endpoint(session_id)
+    login_manager: LoginManager = request.app.state.manager
+
+    origin = await login_manager.endpoint(session_id)
+
     target = f"{origin}/{asset_path}"
 
     async with httpx.AsyncClient(timeout=None) as client:
@@ -198,11 +198,15 @@ async def vnc_asset(
 
 @router.websocket(VNC_WEBSOCKET_PATH)
 async def vnc_websocket(websocket: WebSocket, session_id: str) -> None:
+    login_manager: LoginManager = websocket.app.state.manager
+
     try:
         require_path_segment(session_id)
-        origin = await manager(websocket).endpoint(session_id)
+
+        origin = await login_manager.endpoint(session_id)
     except (LoginUnavailable, SessionConflict, SessionNotFound, ValueError):
         await websocket.close(code=1008, reason="Session is not available")
+
         return
 
     target = urlsplit(origin)
@@ -270,12 +274,6 @@ async def vnc_websocket(websocket: WebSocket, session_id: str) -> None:
         WebSocketDisconnect,
     ):
         return
-
-
-def manager(scope: Request | WebSocket) -> LoginManager:
-    runtime: Runtime = scope.app.state.runtime
-
-    return runtime.login_manager
 
 
 def valid_idempotency_key(key: str | None) -> bool:

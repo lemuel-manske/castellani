@@ -2,19 +2,22 @@ FROM python:3.13.5-slim-bookworm AS build
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /uvx /bin/
 
-WORKDIR /app
+WORKDIR /app/services/capture
 
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
 
-COPY pyproject.toml uv.lock ./
+COPY services/capture/pyproject.toml services/capture/uv.lock ./
+COPY libs/crawler/pyproject.toml libs/crawler/README.md /app/libs/crawler/
+COPY libs/crawler/src /app/libs/crawler/src
 
 RUN uv sync --frozen --no-dev --no-install-project
 
 
 FROM python:3.13.5-slim-bookworm
 
-WORKDIR /app
+WORKDIR /app/services/capture
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
@@ -34,11 +37,11 @@ RUN /app/.venv/bin/playwright install --with-deps chromium && \
     install --directory --owner=capture --group=capture /tmp/castellani/capture && \
     install --directory --mode=1777 /tmp/.X11-unix
 
-COPY --chown=capture:capture src ./src
+COPY --chown=capture:capture services/capture/src ./src
 
 ENV HOME=/home/capture \
     PATH=/app/.venv/bin:$PATH \
-    PYTHONPATH=/app/src \
+    PYTHONPATH=/app/services/capture/src \
     PYTHONUNBUFFERED=1
 
 USER capture

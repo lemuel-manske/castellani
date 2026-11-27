@@ -5,6 +5,10 @@ from domain.capture import InvalidWACZRange
 
 
 def http_last_modified(value: datetime | None) -> str | None:
+    """
+    Converts a datetime to an HTTP Last-Modified header value in RFC 1123 format.
+    """
+
     if value is None:
         return None
 
@@ -17,10 +21,18 @@ def http_last_modified(value: datetime | None) -> str | None:
 
 
 def normalize_etag(value: str) -> str:
+    """
+    Normalizes an ETag value by removing the weak validator prefix and stripping quotes.
+    """
+
     return value.removeprefix("W/").strip('"')
 
 
 def parse_range(header: str, content_length: int) -> tuple[int, int | None]:
+    """
+    Parses a Range header and returns the start and end byte positions.
+    """
+
     if not header.startswith("bytes=") or "," in header:
         raise InvalidWACZRange
 

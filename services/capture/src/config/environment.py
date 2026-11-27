@@ -1,6 +1,7 @@
 import base64
 import binascii
 import os
+from pathlib import Path
 
 CAPTURE_ALLOW_PRIVATE_NETWORKS = "CAPTURE_ALLOW_PRIVATE_NETWORKS"
 CAPTURE_ARTIFACT_DIRECTORY = "CAPTURE_ARTIFACT_DIRECTORY"
@@ -80,6 +81,15 @@ def boolean(name: str, default: bool = False) -> bool:
         return False
 
     raise ValueError(f"{name} must be a boolean")
+
+
+def a_path(name: str, default: str) -> Path:
+    value = os.getenv(name, default)
+
+    if not value.strip():
+        raise ValueError(f"{name} must be non-empty")
+
+    return Path(value)
 
 
 def auth_profile_key() -> bytes:

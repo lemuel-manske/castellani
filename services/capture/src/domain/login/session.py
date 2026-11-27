@@ -62,6 +62,15 @@ class SessionRequest:
     archive_id: str
     target_url: str
 
+    def fingerprint(self) -> str:
+        payload = json.dumps(
+            {"archiveId": self.archive_id, "targetUrl": self.target_url},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+
+        return hashlib.sha256(payload.encode()).hexdigest()
+
 
 @dataclass(frozen=True)
 class AuthProfileReference:
@@ -73,13 +82,3 @@ class AuthProfileReference:
 class BrowserEndpoint:
     session_id: str
     vnc_origin: str
-
-
-def request_fingerprint(request: SessionRequest) -> str:
-    payload = json.dumps(
-        {"archiveId": request.archive_id, "targetUrl": request.target_url},
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-
-    return hashlib.sha256(payload.encode()).hexdigest()

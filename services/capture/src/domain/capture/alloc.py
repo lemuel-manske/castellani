@@ -8,8 +8,16 @@ def new_reservation_id(attempt_id: str) -> str:
     return f"browser-{digest}"
 
 
+class InvalidAttemptId(ValueError):
+    """Raised when a capture attempt identifier is empty."""
+
+
 class InvalidReservationRenewal(ValueError):
     """Raised when a reservation renewal violates ownership or lease invariants."""
+
+
+class InvalidSlotCount(ValueError):
+    """Raised when the configured browser slot count is not positive."""
 
 
 class CaptureReservationLostError(RuntimeError):
@@ -28,7 +36,7 @@ class CaptureReservation:
 
     def __post_init__(self) -> None:
         if not self.attempt_id:
-            raise ValueError("attempt_id must not be empty")
+            raise InvalidAttemptId("attempt_id must not be empty")
 
         if not self.reservation_id:
             raise ValueError("reservation_id must not be empty")

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError
 
@@ -16,7 +18,10 @@ from ports.login import SessionStore
 from topology.buckets import AUTH_PROFILE_BUCKET
 from utils.time import utc_now
 
-from .error_handling import is_conditional_failure
+from .error_handling import (
+    raise_unless_canceled_or_conditional,
+    raise_unless_conditional_failure,
+)
 from .queries.session import (
     create_session_transaction,
     fail_session,
@@ -30,12 +35,16 @@ from .queries.session import (
     update_session,
 )
 from .queries.task import read_run
+from .values import number_from_item, string_from_item
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 GENERATION_ATTEMPTS = 5
 
 
 class DynamoDBSessionStore(SessionStore):
-    def __init__(self, client: Any, session_ttl_seconds: int | None = None) -> None:
+    def __init__(self, client: DynamoDBClient, session_ttl_seconds: int | None = None) -> None:
         self.client = client
         self.session_ttl_seconds = session_ttl_seconds
 
@@ -62,10 +71,9 @@ class DynamoDBSessionStore(SessionStore):
                     updated_at,
                 )
             except ClientError as error:
-                if is_conditional_failure(error):
-                    raise DuplicateSessionRequest from error
+                raise_unless_canceled_or_conditional(error)
 
-                raise
+                raise DuplicateSessionRequest from error
 
         await asyncio.to_thread(put)
 
@@ -80,13 +88,15 @@ class DynamoDBSessionStore(SessionStore):
         if not item:
             return None
 
-        if int(item["expiresAtEpoch"]["N"]) <= datetime.now(UTC).timestamp():
+        expires_at = number_from_item(item, "expiresAtEpoch", "session request")
+
+        if expires_at <= datetime.now(UTC).timestamp():
             return None
 
-        if item["fingerprint"]["S"] != fingerprint:
+        if string_from_item(item, "fingerprint", "session request") != fingerprint:
             raise SessionConflict("idempotency key was reused with a different body")
 
-        return item["sessionId"]["S"]
+        return string_from_item(item, "sessionId", "session request")
 
     async def save(self, session: AuthSession) -> None:
         updated_at = utc_now()
@@ -95,10 +105,9 @@ class DynamoDBSessionStore(SessionStore):
             try:
                 update_session(self.client, session, updated_at)
             except ClientError as error:
-                if is_conditional_failure(error):
-                    raise SessionConflict from error
+                raise_unless_conditional_failure(error)
 
-                raise
+                raise SessionConflict from error
 
         await asyncio.to_thread(update)
 
@@ -110,7 +119,7 @@ class DynamoDBSessionStore(SessionStore):
                 if run is None:
                     raise SessionConflict("archive run does not exist")
 
-                current = int(run.get("authGeneration", {}).get("N", "0"))
+                current = int(number_from_item(run, "authGeneration", "capture run", default=0))
                 generation = current + 1
 
                 try:
@@ -122,10 +131,9 @@ class DynamoDBSessionStore(SessionStore):
                         utc_now(),
                     )
                 except ClientError as error:
-                    if is_conditional_failure(error):
-                        continue
+                    raise_unless_conditional_failure(error)
 
-                    raise
+                    continue
 
                 return generation
 
@@ -159,7 +167,7 @@ class DynamoDBSessionStore(SessionStore):
                 response = scan_sessions(self.client, cursor)
 
                 for item in response.get("Items", []):
-                    status = SessionStatus(item["status"]["S"])
+                    status = SessionStatus(string_from_item(item, "status", "auth session"))
 
                     if status not in ACTIVE_SESSION_STATUSES:
                         continue
@@ -190,8 +198,7 @@ class DynamoDBSessionStore(SessionStore):
                             utc_now(),
                         )
                     except ClientError as error:
-                        if not is_conditional_failure(error):
-                            raise
+                        raise_unless_conditional_failure(error)
 
                 cursor = response.get("LastEvaluatedKey")
 

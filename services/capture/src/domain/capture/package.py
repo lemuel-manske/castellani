@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from urllib.parse import quote
 from uuid import NAMESPACE_URL, uuid5
 
 from .capture import ArtifactReference
@@ -64,10 +63,6 @@ class InvalidArchiveDecision(ValueError):
 
 class PackageCommitRejected(RuntimeError):
     """Raised when a package cannot be committed to its run."""
-
-
-def package_key(archive_id: str, manifest_digest: str, package_digest: str) -> str:
-    return f"packages/{quote(archive_id, safe='')}/{manifest_digest}/{package_digest}.wacz"
 
 
 def archive_prepared_message_id(archive_id: str, manifest_digest: str) -> str:
