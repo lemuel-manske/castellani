@@ -9,7 +9,6 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
@@ -36,7 +35,6 @@ type Service struct {
 	username  string
 	password  string
 }
-
 
 func (s Service) BaseURL() string {
 	return s.baseURL
