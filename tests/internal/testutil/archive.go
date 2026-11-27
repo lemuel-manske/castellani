@@ -17,25 +17,28 @@ func WaitForArchiveTerminalState(
 ) contracts.ArchiveStatus {
 	t.Helper()
 
-	return Eventually(
+	var status contracts.ArchiveStatus
+	require.Eventually(
 		t,
-		timeout,
-		500*time.Millisecond,
-		func() (contracts.ArchiveStatus, bool) {
+		func() bool {
 			response := Get(t, baseURL, statusURL)
 			if response.Status != http.StatusOK {
-				return contracts.ArchiveStatus{}, false
+				return false
 			}
 
 			status := Decode[contracts.ArchiveStatus](t, response)
 
 			switch status.Status {
 			case "COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED":
-				return status, true
+				return true
 			default:
 				return contracts.ArchiveStatus{}, false
 			}
 		},
+		timeout,
+		500*time.Millisecond,
 		"archive did not reach a terminal state",
 	)
+
+	return status
 }
