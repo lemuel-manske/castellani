@@ -24,6 +24,28 @@ import (
 func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 	services := infra.Start(t)
 
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+
+		for name, service := range map[string]infra.Service{
+			"search":      services.Search,
+			"capture":     services.Capture,
+			"coordinator": services.Coordinator,
+			"rabbitmq":    services.RabbitMQ,
+			"opensearch":  services.OpenSearch,
+		} {
+			logs, err := service.Logs(t.Context())
+			if err != nil {
+				t.Logf("%s logs unavailable: %v", name, err)
+				continue
+			}
+
+			t.Logf("%s container logs (last 64 KiB):\\n%s", name, logs)
+		}
+	})
+
 	requestBody := fmt.Sprintf(
 		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
 		"http://fixture-site/index.html",
