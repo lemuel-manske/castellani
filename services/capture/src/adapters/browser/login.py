@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from crawler import is_safe_url, is_valid_url
 from playwright.async_api import Browser, BrowserContext, Playwright, async_playwright
 
 from domain.login import BrowserEndpoint
 from ports.login import InteractiveBrowser
-from utils.web import is_safe_request_url, is_valid_url
 
 VIEWPORT_WIDTH = 1365
 VIEWPORT_HEIGHT = 768
@@ -67,7 +67,7 @@ class PlaywrightLoginBrowser(InteractiveBrowser):
         self.lock = asyncio.Lock()
 
     async def start(self, session_id: str, target_url: str) -> BrowserEndpoint:
-        if not is_valid_url(target_url) or not await is_safe_request_url(target_url):
+        if not is_valid_url(target_url) or not await is_safe_url(target_url):
             raise ValueError("target URL is not safe for interactive navigation")
 
         async with self.lock:

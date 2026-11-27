@@ -1,0 +1,38 @@
+name: python @ libs/crawler
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: libs/crawler/.python-version
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: libs/crawler/uv.lock
+
+      - run: sudo apt-get update && sudo apt-get install --yes libnss3-tools
+
+      - run: make install
+        working-directory: libs/crawler
+
+      - run: uv run playwright install --with-deps chromium
+        working-directory: libs/crawler
+
+      - run: make check
+        working-directory: libs/crawler
+
+      - run: make test
+        working-directory: libs/crawler

@@ -2,13 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from capture.browser import (
-    CaptureFailureCode,
-    CaptureLimitExceeded,
-    InvalidCaptureURL,
-    capture_page,
-    extract_links,
-)
+from crawler.links import extract_links
+from crawler.page import capture_page
+from crawler.results import CaptureFailureCode, DiscoveredLinkLimitExceeded, InvalidCaptureURL
 
 
 @pytest.mark.asyncio
@@ -36,7 +32,7 @@ async def test_capture_rejects_malformed_http_urls(tmp_path: Path) -> None:
 def test_extract_links_rejects_excessive_discovery() -> None:
     html = '<a href="/one">One</a><a href="/two">Two</a>'
 
-    with pytest.raises(CaptureLimitExceeded, match="discovered-link limit") as error:
+    with pytest.raises(DiscoveredLinkLimitExceeded, match="discovered-link limit") as error:
         extract_links(html, "https://example.org/", max_links=1)
 
     assert error.value.reason_code == CaptureFailureCode.DISCOVERED_LINK_LIMIT_EXCEEDED

@@ -42,7 +42,7 @@ def is_valid_url(url: str) -> bool:
     return True
 
 
-async def is_safe_request_url(url: str, allow_private_networks: bool = False) -> bool:
+async def is_safe_url(url: str, allow_private_networks: bool = False) -> bool:
     """
     Reject unsafe destinations; production egress policy must enforce IPs too.
 
@@ -99,3 +99,12 @@ def is_pdf_content_type(content_type: str | None) -> bool:
     media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
 
     return media_type == "application/pdf"
+
+
+__all__ = [
+    "SCHEME_TO_PORT",
+    "is_valid_url",
+    "is_safe_url",
+    "is_html_content_type",
+    "is_pdf_content_type",
+]

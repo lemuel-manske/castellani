@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from capture.browser.recording import stop_process, wait_for_process
+from crawler.fn import stop_process, wait_for_process
 
 
 async def start_long_running_process(
@@ -39,7 +39,7 @@ async def test_stop_process_waits_until_child_exits() -> None:
 async def test_stop_process_kills_child_that_ignores_interrupt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("capture.browser.recording.PROCESS_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("crawler.fn.process.PROCESS_SHUTDOWN_TIMEOUT_SECONDS", 0.01)
     process = await start_long_running_process(
         "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); "
         "print('ready', flush=True); time.sleep(60)",
@@ -55,7 +55,7 @@ async def test_stop_process_kills_child_that_ignores_interrupt(
 async def test_cancellation_waits_for_process_shutdown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("capture.browser.recording.PROCESS_SHUTDOWN_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr("crawler.fn.process.PROCESS_SHUTDOWN_TIMEOUT_SECONDS", 0.05)
     process = await start_long_running_process(
         "import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN); "
         "print('ready', flush=True); time.sleep(60)",

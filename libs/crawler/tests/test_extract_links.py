@@ -1,4 +1,4 @@
-from capture.browser import extract_links
+from crawler.links import extract_links
 
 
 def test_extract_links_resolves_relative_urls() -> None:

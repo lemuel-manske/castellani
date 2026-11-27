@@ -3,17 +3,25 @@ import gzip
 from pathlib import Path
 
 import pytest
+from support.io import read_gzip_files
 from support.recording import DOWNLOAD, LocalSite
 
-from capture.browser import (
+from crawler.page import capture_page
+from crawler.recording import PyWBRecorder
+from crawler.results import (
+    BrowserCaptureResult,
     CaptureFailureCode,
     CaptureLimits,
     CaptureNavigationFailed,
-    capture_local_page,
-    capture_page,
 )
-from capture.browser.recording import PyWBRecorder
-from utils.io import read_gzip_files
+
+
+async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:
+    return await capture_page(
+        url,
+        output_dir,
+        limits=CaptureLimits(allow_private_networks=True),
+    )
 
 
 @pytest.mark.integration
@@ -35,7 +43,7 @@ async def test_capture_fails_when_navigation_response_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("capture.browser.page.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr("crawler.page.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
 
     with pytest.raises(CaptureNavigationFailed) as error:
         await capture_page(

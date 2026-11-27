@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from crawler.results import CaptureLimits
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from mypy_boto3_s3.client import S3Client
 from support.domain import (
@@ -25,7 +26,6 @@ from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application.capture import StoredAuthContexts
-from capture.browser import CaptureLimits
 from capture.worker.runner import ConcreteCaptureWorker
 
 LOCAL_LIMITS = CaptureLimits(allow_private_networks=True)
@@ -44,7 +44,7 @@ async def test_worker_discards_real_attempt_artifacts_after_capture_failure(
     seed_run(dynamodb)
     seed_frontier(dynamodb, url=f"{local_site.base_url}/slow")
 
-    monkeypatch.setattr("capture.browser.page.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr("crawler.page.DOWNLOAD_EVENT_TIMEOUT_SECONDS", 0.05)
 
     worker = new_worker(
         dynamodb,

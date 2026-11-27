@@ -3,11 +3,20 @@ from pathlib import Path
 
 import httpx
 import pytest
+from support.io import read_gzip_files
 from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
 
-from capture.browser import capture_local_page
-from capture.browser.recording import PyWBReplayServer
-from utils.io import read_gzip_files
+from crawler.page import capture_page
+from crawler.recording import PyWBReplayServer
+from crawler.results import BrowserCaptureResult, CaptureLimits
+
+
+async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:
+    return await capture_page(
+        url,
+        output_dir,
+        limits=CaptureLimits(allow_private_networks=True),
+    )
 
 
 @pytest.mark.integration
