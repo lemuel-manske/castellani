@@ -1,4 +1,6 @@
-from typing import Any, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from contracts.envelope import Envelope
 from topology.tables import OUTBOX_TABLE
@@ -11,12 +13,15 @@ from ..values import (
 )
 from .common import with_cursor
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 _OUTBOX_INDEX = "status-nextAttemptAt-index"
 _CLAIM_LIMIT = 50
 
 
 def query_due_messages(
-    client: Any,
+    client: DynamoDBClient,
     status: str,
     now: float,
     cursor: dict[str, Any] | None,
@@ -36,11 +41,11 @@ def query_due_messages(
         "Limit": _CLAIM_LIMIT,
     }
 
-    return client.query(**with_cursor(request, cursor))
+    return cast(dict[str, Any], client.query(**with_cursor(request, cursor)))
 
 
 def claim_message(
-    client: Any,
+    client: DynamoDBClient,
     message_id: str,
     status: str,
     claimed_status: str,
@@ -48,34 +53,37 @@ def claim_message(
     lease_token: str,
     lease_until: float,
 ) -> dict[str, Any]:
-    return client.update_item(
-        TableName=OUTBOX_TABLE,
-        Key={"messageId": {"S": message_id}},
-        ConditionExpression="#status = :status AND #next_attempt = :due_at",
-        UpdateExpression=(
-            "SET #status = :claimed, #lease_token = :lease_token, "
-            "#next_attempt = :lease_until ADD #attempts :one"
+    return cast(
+        dict[str, Any],
+        client.update_item(
+            TableName=OUTBOX_TABLE,
+            Key={"messageId": {"S": message_id}},
+            ConditionExpression="#status = :status AND #next_attempt = :due_at",
+            UpdateExpression=(
+                "SET #status = :claimed, #lease_token = :lease_token, "
+                "#next_attempt = :lease_until ADD #attempts :one"
+            ),
+            ExpressionAttributeNames={
+                "#status": "status",
+                "#next_attempt": "nextAttemptAt",
+                "#lease_token": "leaseToken",
+                "#attempts": "attempts",
+            },
+            ExpressionAttributeValues={
+                ":status": {"S": status},
+                ":due_at": {"N": due_at},
+                ":claimed": {"S": claimed_status},
+                ":lease_token": {"S": lease_token},
+                ":lease_until": {"N": str(lease_until)},
+                ":one": {"N": "1"},
+            },
+            ReturnValues="ALL_NEW",
         ),
-        ExpressionAttributeNames={
-            "#status": "status",
-            "#next_attempt": "nextAttemptAt",
-            "#lease_token": "leaseToken",
-            "#attempts": "attempts",
-        },
-        ExpressionAttributeValues={
-            ":status": {"S": status},
-            ":due_at": {"N": due_at},
-            ":claimed": {"S": claimed_status},
-            ":lease_token": {"S": lease_token},
-            ":lease_until": {"N": str(lease_until)},
-            ":one": {"N": "1"},
-        },
-        ReturnValues="ALL_NEW",
     )
 
 
 def confirm_message(
-    client: Any,
+    client: DynamoDBClient,
     message_id: str,
     lease_token: str,
     claimed_status: str,
@@ -107,7 +115,7 @@ def confirm_message(
 
 
 def reschedule_message(
-    client: Any,
+    client: DynamoDBClient,
     message_id: str,
     lease_token: str,
     claimed_status: str,

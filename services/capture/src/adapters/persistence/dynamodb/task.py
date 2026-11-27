@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
@@ -54,13 +56,16 @@ from .utils import (
 )
 from .values import number_from_item, optional_number, optional_string
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 
 class DynamoDBTaskRepository(TaskRepository):
     """Acquires and renews fenced page-task claims against the Capture frontier."""
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         lease_duration: float,
         clock: Clock = time.time,
         finalize: CrawlFinalizer | None = None,

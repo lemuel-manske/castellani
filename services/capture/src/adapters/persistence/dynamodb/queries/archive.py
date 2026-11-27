@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import base64
 import binascii
 import json
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from domain.capture import (
     TASK_CLAIMED,
@@ -19,6 +21,9 @@ from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 from ..values import optional_string, string_from_item
 from .common import with_cursor
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 PAGE_STATUSES = {
     TASK_PENDING: "PENDING",
     TASK_CLAIMED: "RUNNING",
@@ -31,7 +36,7 @@ MAX_PAGE_LIMIT = 100
 
 
 def query_pages(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     limit: int,
     cursor: str | None,
@@ -65,7 +70,7 @@ def query_pages(
 
 
 def read_snapshot(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     snapshot_id: str,
 ) -> SnapshotReference | None:

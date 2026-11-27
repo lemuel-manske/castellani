@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from adapters.serialization import artifact_reference
 from contracts.messages import CRAWL_COMPLETED_EVENT, CrawlCompletedPayload
@@ -20,11 +22,14 @@ from topology.tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from ..values import envelope_matches, optional_string, plain_attributes
 from .common import outbox_put, with_cursor
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
 _PAGE_SIZE = 100
 
 
-def query_snapshots(client: Any, archive_id: str) -> list[dict[str, Any]]:
+def query_snapshots(client: DynamoDBClient, archive_id: str) -> list[dict[str, Any]]:
     return query_by_archive(
         client,
         SNAPSHOTS_TABLE,
@@ -33,12 +38,12 @@ def query_snapshots(client: Any, archive_id: str) -> list[dict[str, Any]]:
     )
 
 
-def query_frontier(client: Any, archive_id: str) -> list[dict[str, Any]]:
+def query_frontier(client: DynamoDBClient, archive_id: str) -> list[dict[str, Any]]:
     return query_by_archive(client, FRONTIER_TABLE, archive_id)
 
 
 def query_by_archive(
-    client: Any,
+    client: DynamoDBClient,
     table: str,
     archive_id: str,
     index: str | None = None,

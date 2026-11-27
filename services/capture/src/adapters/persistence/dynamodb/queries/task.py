@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from adapters.serialization import artifact_document
 from contracts.messages import (
@@ -30,7 +32,10 @@ from ..values import (
     optional_number,
     string_from_item,
 )
-from .common import fence_condition, outbox_put
+from .common import fence_condition, outbox_put, transact_write_items
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
 def claim_from_item(
@@ -56,7 +61,7 @@ def claim_from_item(
         raise RuntimeError("DynamoDB returned an invalid page-task claim") from error
 
 
-def read_run(client: Any, archive_id: str) -> dict[str, Any] | None:
+def read_run(client: DynamoDBClient, archive_id: str) -> dict[str, Any] | None:
     response = client.get_item(
         TableName=RUNS_TABLE,
         Key={"archiveId": {"S": archive_id}},
@@ -68,7 +73,7 @@ def read_run(client: Any, archive_id: str) -> dict[str, Any] | None:
     return item if item else None
 
 
-def auth_generation_changed(client: Any, archive_id: str, expected: int) -> bool:
+def auth_generation_changed(client: DynamoDBClient, archive_id: str, expected: int) -> bool:
     run = read_run(client, archive_id)
 
     if run is None:
@@ -80,7 +85,7 @@ def auth_generation_changed(client: Any, archive_id: str, expected: int) -> bool
 
 
 def read_frontier(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     url_key: str,
 ) -> dict[str, Any] | None:
@@ -98,7 +103,7 @@ def read_frontier(
     return item if item else None
 
 
-def read_depth(client: Any, archive_id: str, url_key: str) -> int:
+def read_depth(client: DynamoDBClient, archive_id: str, url_key: str) -> int:
     item = read_frontier(
         client,
         archive_id,
@@ -111,7 +116,7 @@ def read_depth(client: Any, archive_id: str, url_key: str) -> int:
     return int(number_from_item(item, "depth", "page task", default=0))
 
 
-def read_outbox(client: Any, message_id: str) -> dict[str, Any] | None:
+def read_outbox(client: DynamoDBClient, message_id: str) -> dict[str, Any] | None:
     response = client.get_item(
         TableName=OUTBOX_TABLE,
         Key={"messageId": {"S": message_id}},
@@ -558,7 +563,7 @@ def release_task_transaction(
 
 
 def finish_task(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     url_key: str,
     attempt_id: str,
@@ -599,7 +604,7 @@ def finish_task(
         failure_run_update(archive_id, now, close),
     ]
 
-    client.transact_write_items(TransactItems=transaction)
+    transact_write_items(client, transaction)
 
 
 def is_page_captured_message(

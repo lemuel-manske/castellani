@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING
 
 from domain.capture import (
     DECISION_PUBLISH,
@@ -16,11 +18,14 @@ from .queries.archive import read_snapshot as read_snapshot_query
 from .queries.task import read_run
 from .values import optional_number, optional_string
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 
 class DynamoDBArchiveCatalog(ArchiveCatalog):
     """Reads archive metadata and the reference to its published package."""
 
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: DynamoDBClient) -> None:
         self.client = client
 
     async def list_pages(

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from botocore.exceptions import ClientError
 
@@ -35,11 +37,14 @@ from .queries.session import (
 from .queries.task import read_run
 from .values import number_from_item, string_from_item
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 GENERATION_ATTEMPTS = 5
 
 
 class DynamoDBSessionStore(SessionStore):
-    def __init__(self, client: Any, session_ttl_seconds: int | None = None) -> None:
+    def __init__(self, client: DynamoDBClient, session_ttl_seconds: int | None = None) -> None:
         self.client = client
         self.session_ttl_seconds = session_ttl_seconds
 

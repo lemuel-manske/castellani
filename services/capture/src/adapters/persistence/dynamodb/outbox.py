@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from botocore.exceptions import ClientError
 
@@ -27,6 +29,9 @@ from .queries.outbox import (
 from .utils import new_lease_token
 from .values import optional_number_string, optional_string
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
 OUTBOX_PUBLISHED = "PUBLISHED"
@@ -37,7 +42,7 @@ class DynamoDBOutbox(OutboxRepository):
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         clock: Clock = time.time,
         lease_token_factory: Callable[[], str] = new_lease_token,
     ) -> None:

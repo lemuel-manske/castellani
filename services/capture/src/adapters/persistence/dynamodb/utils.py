@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
@@ -9,6 +11,9 @@ from .error_handling import (
     extract_cancellation_reasons,
     raise_unless_transaction_canceled,
 )
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 EXPONENTIAL_BACKOFF_ATTEMPTS = 5
 
@@ -36,7 +41,7 @@ def transaction_request(
 
 
 def exponential_backoff_transact(
-    client: Any,
+    client: DynamoDBClient,
     items: list[dict[str, Any]],
     request_token: str | None,
 ) -> None:

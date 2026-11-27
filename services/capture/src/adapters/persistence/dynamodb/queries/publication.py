@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from adapters.serialization import artifact_document
 from contracts.messages import (
@@ -25,7 +27,10 @@ from domain.capture import (
 from topology.tables import RUNS_TABLE
 
 from ..values import envelope_matches, optional_number, optional_string, string_from_item
-from .common import outbox_put, with_cursor
+from .common import outbox_put, transact_write_items, with_cursor
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
 def pending_package_scan() -> dict[str, Any]:
@@ -340,18 +345,18 @@ def is_compensating_decision(item: dict[str, Any], decision: CompensationDecisio
 
 
 def scan_pending_packages(
-    client: Any,
+    client: DynamoDBClient,
     now: float,
     cursor: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     request = pending_package_scan()
     request["ExpressionAttributeValues"][":now"] = {"N": str(now)}
 
-    return client.scan(**with_cursor(request, cursor))
+    return cast(dict[str, Any], client.scan(**with_cursor(request, cursor)))
 
 
 def claim_package(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     now: float,
     lease_until: float,
@@ -360,39 +365,40 @@ def claim_package(
     client.update_item(**claim_package_update(archive_id, now, lease_until, owner))
 
 
-def release_package(client: Any, archive_id: str, owner: str) -> None:
+def release_package(client: DynamoDBClient, archive_id: str, owner: str) -> None:
     client.update_item(**release_package_update(archive_id, owner))
 
 
 def prepare_package(
-    client: Any,
+    client: DynamoDBClient,
     prepared: PreparedPackage,
     message_id: str,
     occurred_at: str,
     now: float,
 ) -> None:
-    client.transact_write_items(
-        TransactItems=prepare_package_transaction(prepared, message_id, occurred_at, now)
+    transact_write_items(
+        client,
+        prepare_package_transaction(prepared, message_id, occurred_at, now),
     )
 
 
 def publish_package(
-    client: Any,
+    client: DynamoDBClient,
     decision: PublicationDecision,
     message_id: str,
     now: float,
 ) -> None:
-    client.transact_write_items(TransactItems=publication_transaction(decision, message_id, now))
+    transact_write_items(client, publication_transaction(decision, message_id, now))
 
 
-def begin_compensation(client: Any, decision: CompensationDecision) -> None:
+def begin_compensation(client: DynamoDBClient, decision: CompensationDecision) -> None:
     client.update_item(**compensation_update(decision))
 
 
 def complete_compensation(
-    client: Any,
+    client: DynamoDBClient,
     decision: CompensationDecision,
     message_id: str,
     now: float,
 ) -> None:
-    client.transact_write_items(TransactItems=[compensation_transaction(decision, message_id, now)])
+    transact_write_items(client, [compensation_transaction(decision, message_id, now)])

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import ClientError
 
@@ -17,6 +19,7 @@ from ports.capture import ArchiveFinalizationRepository
 from ports.clock import Clock
 
 from .error_handling import ConditionalWriteRejected, raise_unless_transaction_canceled
+from .queries.common import transact_write_items
 from .queries.finalize import (
     finalize_transaction,
     is_crawl_completed_message,
@@ -29,13 +32,16 @@ from .queries.finalize import (
 from .queries.task import read_outbox, read_run
 from .values import optional_string
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 
 class DynamoDBArchiveFinalizationRepository(ArchiveFinalizationRepository):
     """Reads and commits the durable facts of a crawl manifest."""
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         clock: Clock = time.time,
     ) -> None:
         self.client = client
@@ -77,7 +83,7 @@ class DynamoDBArchiveFinalizationRepository(ArchiveFinalizationRepository):
             )
 
             try:
-                self.client.transact_write_items(TransactItems=transaction)
+                transact_write_items(self.client, transaction)
             except ClientError as error:
                 raise_unless_transaction_canceled(error)
 

@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from topology.tables import OUTBOX_TABLE
 
 from ..values import serialize_map
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+    from mypy_boto3_dynamodb.type_defs import TransactWriteItemTypeDef
 
 
 def with_cursor(
@@ -14,6 +20,10 @@ def with_cursor(
         return request
 
     return {**request, "ExclusiveStartKey": cursor}
+
+
+def transact_write_items(client: DynamoDBClient, items: list[dict[str, Any]]) -> None:
+    client.transact_write_items(TransactItems=cast("list[TransactWriteItemTypeDef]", items))
 
 
 def outbox_put(

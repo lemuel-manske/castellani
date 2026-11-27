@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from domain.capture import CaptureReservation
 from topology.tables import BROWSER_SLOTS_TABLE
@@ -6,8 +8,11 @@ from topology.tables import BROWSER_SLOTS_TABLE
 from ..values import number_from_item, string_from_item
 from .common import reservation_condition
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
-def read_slot(client: Any, slot_id: str) -> dict[str, Any] | None:
+
+def read_slot(client: DynamoDBClient, slot_id: str) -> dict[str, Any] | None:
     response = client.get_item(
         TableName=BROWSER_SLOTS_TABLE,
         Key={"slotId": {"S": slot_id}},
@@ -38,41 +43,44 @@ def reservation_from_item(slot_id: str, item: dict[str, Any]) -> CaptureReservat
 
 
 def reserve_slot(
-    client: Any,
+    client: DynamoDBClient,
     slot_id: str,
     attempt_id: str,
     reservation_id: str,
     lease_until: float,
     now: float,
 ) -> dict[str, Any]:
-    return client.update_item(
-        TableName=BROWSER_SLOTS_TABLE,
-        Key={"slotId": {"S": slot_id}},
-        UpdateExpression=(
-            "SET #owner = :attempt, #reservation = :reservation, "
-            "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one"
+    return cast(
+        dict[str, Any],
+        client.update_item(
+            TableName=BROWSER_SLOTS_TABLE,
+            Key={"slotId": {"S": slot_id}},
+            UpdateExpression=(
+                "SET #owner = :attempt, #reservation = :reservation, "
+                "#lease = :lease, #fence = if_not_exists(#fence, :zero) + :one"
+            ),
+            ConditionExpression="attribute_not_exists(#owner) OR #lease <= :now",
+            ExpressionAttributeNames={
+                "#owner": "ownerAttemptId",
+                "#reservation": "reservationId",
+                "#lease": "leaseUntil",
+                "#fence": "fence",
+            },
+            ExpressionAttributeValues={
+                ":attempt": {"S": attempt_id},
+                ":reservation": {"S": reservation_id},
+                ":lease": {"N": str(lease_until)},
+                ":now": {"N": str(now)},
+                ":zero": {"N": "0"},
+                ":one": {"N": "1"},
+            },
+            ReturnValues="ALL_NEW",
         ),
-        ConditionExpression="attribute_not_exists(#owner) OR #lease <= :now",
-        ExpressionAttributeNames={
-            "#owner": "ownerAttemptId",
-            "#reservation": "reservationId",
-            "#lease": "leaseUntil",
-            "#fence": "fence",
-        },
-        ExpressionAttributeValues={
-            ":attempt": {"S": attempt_id},
-            ":reservation": {"S": reservation_id},
-            ":lease": {"N": str(lease_until)},
-            ":now": {"N": str(now)},
-            ":zero": {"N": "0"},
-            ":one": {"N": "1"},
-        },
-        ReturnValues="ALL_NEW",
     )
 
 
 def renew_slot(
-    client: Any,
+    client: DynamoDBClient,
     slot_id: str,
     attempt_id: str,
     reservation_id: str,
@@ -88,19 +96,22 @@ def renew_slot(
         lease_until,
     )
 
-    return client.update_item(
-        TableName=BROWSER_SLOTS_TABLE,
-        Key={"slotId": {"S": slot_id}},
-        UpdateExpression="SET #lease = :lease",
-        ConditionExpression=condition,
-        ExpressionAttributeNames=names,
-        ExpressionAttributeValues=values,
-        ReturnValues="ALL_NEW",
+    return cast(
+        dict[str, Any],
+        client.update_item(
+            TableName=BROWSER_SLOTS_TABLE,
+            Key={"slotId": {"S": slot_id}},
+            UpdateExpression="SET #lease = :lease",
+            ConditionExpression=condition,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+            ReturnValues="ALL_NEW",
+        ),
     )
 
 
 def release_slot(
-    client: Any,
+    client: DynamoDBClient,
     slot_id: str,
     attempt_id: str,
     reservation_id: str,

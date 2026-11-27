@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from domain.capture import (
@@ -20,6 +22,10 @@ from utils.io import stream_body
 
 from .keys import archive_prefixes, package_key, staging_artifact_key
 
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
+    from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
+
 DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
 
 DELETE_BATCH_SIZE = 1000
@@ -35,19 +41,19 @@ def file_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-def delete_objects_by_prefix(client: Any, prefixes: tuple[str, ...]) -> int:
+def delete_objects_by_prefix(client: S3Client, prefixes: tuple[str, ...]) -> int:
     deleted = 0
     paginator = client.get_paginator("list_objects_v2")
 
     for prefix in prefixes:
-        objects: list[dict[str, str]] = []
+        objects: list[ObjectIdentifierTypeDef] = []
 
         for page in paginator.paginate(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Prefix=prefix):
-            objects.extend(
-                {"Key": item["Key"]}
-                for item in page.get("Contents", ())
-                if item.get("Key") is not None
-            )
+            for item in page.get("Contents", ()):
+                key = item.get("Key")
+
+                if key is not None:
+                    objects.append({"Key": key})
 
         for offset in range(0, len(objects), DELETE_BATCH_SIZE):
             batch = objects[offset : offset + DELETE_BATCH_SIZE]
@@ -73,7 +79,7 @@ class S3ArtifactStore(
 
     def __init__(
         self,
-        client: Any,
+        client: S3Client,
         staging_root: Path = DEFAULT_STAGING_ROOT,
     ) -> None:
         self.client = client

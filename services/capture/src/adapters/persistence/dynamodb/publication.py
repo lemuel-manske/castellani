@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import asyncio
 import time
 from dataclasses import replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
@@ -56,13 +58,16 @@ from .queries.publication import (
 )
 from .queries.task import read_outbox, read_run
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 
 class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
     """Durable run state for WACZ preparation and Coordinator decisions."""
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         clock: Clock = time.time,
     ) -> None:
         self.client = client

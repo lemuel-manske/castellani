@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from domain.login import AuthProfileReference, AuthSession, SessionStatus
 from topology.tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
@@ -10,6 +12,9 @@ from ..values import (
     string_from_item,
 )
 from .common import with_cursor
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
 def session_item(
@@ -69,7 +74,7 @@ def profile_reference_from_item(item: dict[str, Any]) -> AuthProfileReference | 
 
 
 def create_session_transaction(
-    client: Any,
+    client: DynamoDBClient,
     session: AuthSession,
     key: str,
     fingerprint: str,
@@ -105,7 +110,7 @@ def create_session_transaction(
     )
 
 
-def read_session(client: Any, session_id: str) -> dict[str, Any] | None:
+def read_session(client: DynamoDBClient, session_id: str) -> dict[str, Any] | None:
     response = client.get_item(
         TableName=SESSIONS_TABLE,
         Key={"sessionId": {"S": session_id}},
@@ -115,7 +120,7 @@ def read_session(client: Any, session_id: str) -> dict[str, Any] | None:
     return response.get("Item")
 
 
-def read_session_request(client: Any, key: str) -> dict[str, Any] | None:
+def read_session_request(client: DynamoDBClient, key: str) -> dict[str, Any] | None:
     response = client.get_item(
         TableName=SESSION_REQUESTS_TABLE,
         Key={"idempotencyKey": {"S": key}},
@@ -125,7 +130,7 @@ def read_session_request(client: Any, key: str) -> dict[str, Any] | None:
     return response.get("Item")
 
 
-def update_session(client: Any, session: AuthSession, updated_at: str) -> None:
+def update_session(client: DynamoDBClient, session: AuthSession, updated_at: str) -> None:
     names = {"#status": "status", "#version": "version", "#updated": "updatedAt"}
     values: dict[str, Any] = {
         ":status": {"S": str(session.status)},
@@ -166,7 +171,7 @@ def update_session(client: Any, session: AuthSession, updated_at: str) -> None:
 
 
 def update_generation(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     generation: int,
     current: int,
@@ -186,7 +191,7 @@ def update_generation(
 
 
 def update_profile(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     generation: int,
     key: str,
@@ -209,14 +214,14 @@ def update_profile(
     )
 
 
-def scan_sessions(client: Any, cursor: dict[str, Any] | None) -> dict[str, Any]:
+def scan_sessions(client: DynamoDBClient, cursor: dict[str, Any] | None) -> dict[str, Any]:
     request: dict[str, Any] = {"TableName": SESSIONS_TABLE}
 
-    return client.scan(**with_cursor(request, cursor))
+    return cast(dict[str, Any], client.scan(**with_cursor(request, cursor)))
 
 
 def fail_session(
-    client: Any,
+    client: DynamoDBClient,
     session: AuthSession,
     status: SessionStatus,
     reason: str,

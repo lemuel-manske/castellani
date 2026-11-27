@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import ClientError
 
@@ -26,6 +28,9 @@ from .queries.alloc import (
 )
 from .values import number_from_item, optional_string
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 DEFAULT_SLOT_COUNT = 10
 DEFAULT_LEASE_DURATION = 60
 
@@ -35,7 +40,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         slot_count: int = DEFAULT_SLOT_COUNT,
         lease_duration: float = DEFAULT_LEASE_DURATION,
         clock: Clock = time.time,

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import ClientError
 
@@ -9,8 +11,12 @@ from ports.capture import CrawlStarter
 from ports.clock import Clock
 
 from .error_handling import extract_cancellation_reasons, raise_unless_transaction_canceled
+from .queries.common import transact_write_items
 from .queries.run import seed_run_transaction
 from .queries.task import read_run
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
 class DynamoDBRunStarter(CrawlStarter):
@@ -18,7 +24,7 @@ class DynamoDBRunStarter(CrawlStarter):
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         clock: Clock = time.time,
     ) -> None:
         self.client = client
@@ -32,8 +38,9 @@ class DynamoDBRunStarter(CrawlStarter):
             message_id = capture_page_message_id(start.archive_id, identity.url_key)
 
             try:
-                self.client.transact_write_items(
-                    TransactItems=seed_run_transaction(start, message_id, now),
+                transact_write_items(
+                    self.client,
+                    seed_run_transaction(start, message_id, now),
                 )
             except ClientError as error:
                 raise_unless_transaction_canceled(error)
