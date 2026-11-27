@@ -54,7 +54,6 @@ class CaptureRuntime:
 
         self.dynamodb_client: DynamoDBClient | None = None
         self.s3_client: S3Client | None = None
-        self.archive_retrieval: ArchiveRetrieval | None = None
 
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
@@ -69,28 +68,22 @@ class CaptureRuntime:
         self.decisions_task: asyncio.Task[None] | None = None
         self.dispatcher_task: asyncio.Task[None] | None = None
 
+        self._archive_retrieval: ArchiveRetrieval | None = None
+
         self._ready = False
 
     @property
     def ready(self) -> bool:
-        return (
-            self._ready
-            and self.consumer_task is not None
-            and not self.consumer_task.done()
-            and self.start_consumer_task is not None
-            and not self.start_consumer_task.done()
-            and self.packaging_task is not None
-            and not self.packaging_task.done()
-            and self.decisions_task is not None
-            and not self.decisions_task.done()
-            and self.dispatcher_task is not None
-            and not self.dispatcher_task.done()
-        )
+        return self._ready
+
+    @property
+    def archive_retrieval(self) -> ArchiveRetrieval:
+        if self._archive_retrieval is None:
+            raise RuntimeError("CaptureRuntime is not ready")
+
+        return self._archive_retrieval
 
     async def start(self) -> None:
-        if self._ready:
-            raise RuntimeError("Capture runtime has already started")
-
         try:
             session = boto3.Session(
                 aws_access_key_id=self.settings.aws_access_key_id,
@@ -122,7 +115,7 @@ class CaptureRuntime:
 
             catalog = DynamoDBArchiveCatalog(client=self.dynamodb_client)
 
-            self.archive_retrieval = ArchiveRetrieval(
+            self._archive_retrieval = ArchiveRetrieval(
                 catalog=catalog,
                 artifacts=artifacts,
             )
@@ -261,7 +254,7 @@ class CaptureRuntime:
     async def stop(self) -> None:
         self._ready = False
 
-        self.archive_retrieval = None
+        self._archive_retrieval = None
 
         if self.page_consumer is not None:
             self.page_consumer.stop()

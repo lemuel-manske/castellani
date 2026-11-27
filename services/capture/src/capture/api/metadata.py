@@ -36,7 +36,7 @@ async def list_pages(archive_id: str, request: Request) -> JSON | Response:
                 "limit must be between 1 and 100",
             )
 
-    retrieval = request.app.state.runtime.archive_retrieval
+    retrieval = request.app.state.archive_retrieval
 
     listing = await retrieval.list_pages(
         archive_id,
@@ -53,7 +53,7 @@ async def get_snapshot(
     snapshot_id: str,
     request: Request,
 ) -> JSON | Response:
-    retrieval = request.app.state.runtime.archive_retrieval
+    retrieval = request.app.state.archive_retrieval
 
     snapshot = await retrieval.read_snapshot(archive_id, snapshot_id)
 
