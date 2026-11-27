@@ -63,11 +63,12 @@ class ConcreteCaptureWorker(CaptureRunner):
         capture_allocator: CaptureAllocator,
         artifacts: ArtifactStore,
         auth_contexts: AuthContextStore,
+        limits: CaptureLimits | None = None,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ) -> None:
         self.task_repository = task_repository
         self.capacity_allocator = capture_allocator
-        self.executor = CaptureExecutor()
+        self.executor = CaptureExecutor(limits=limits)
         self.artifacts = artifacts
         self.auth_contexts = auth_contexts
 

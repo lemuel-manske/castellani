@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
+from crawler.results import CaptureLimits
 
 from adapters.artifacts.s3 import S3ArtifactStore, S3AuthProfileStore
 from adapters.messaging.rabbitmq.consumer import (
@@ -150,6 +151,9 @@ class CaptureRuntime:
                 capture_allocator=allocator,
                 artifacts=artifacts,
                 auth_contexts=auth_contexts,
+                limits=CaptureLimits(
+                    allow_private_networks=self.settings.allow_private_networks,
+                ),
             )
 
             self.connection = cast(
