@@ -8,7 +8,12 @@ from support.recording import DOWNLOAD, LocalSite
 
 from crawler.page import capture_page
 from crawler.recording import PyWBRecorder
-from crawler.results import BrowserCaptureResult, CaptureLimits, CaptureFailureCode, CaptureNavigationFailed
+from crawler.results import (
+    BrowserCaptureResult,
+    CaptureFailureCode,
+    CaptureLimits,
+    CaptureNavigationFailed,
+)
 
 
 async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:

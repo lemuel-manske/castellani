@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from crawler import PyWBReplayServer
 from playwright.async_api import async_playwright
-
-from capture.browser.recording import PyWBReplayServer
 
 HOST = "127.0.0.1"
 

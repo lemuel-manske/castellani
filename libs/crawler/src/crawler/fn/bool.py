@@ -102,6 +102,7 @@ def is_pdf_content_type(content_type: str | None) -> bool:
 
 
 __all__ = [
+    "SCHEME_TO_PORT",
     "is_valid_url",
     "is_safe_url",
     "is_html_content_type",

@@ -1,6 +1,6 @@
 # libs/crawler
 
-Browser page capture and WARC recording primitives for Castellani. This is a standalone copy of the crawler mechanism currently kept in `services/capture/src/capture/browser`; the Capture service has not switched over to it yet.
+Browser page capture and WARC recording primitives for Castellani. The Capture service consumes this library for page execution, recording, and replay.
 
 Each capture owns its recording proxy, Chromium profile, and output directory. Scheduling, queueing, and artifact persistence remain in the consuming service.
 

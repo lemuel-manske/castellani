@@ -144,8 +144,8 @@ services:
 
   capture-worker:
     build:
-      context: ./services/capture
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/capture/Dockerfile
 
     command: ["/app/.venv/bin/uvicorn", "capture.api:app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
 
@@ -194,8 +194,8 @@ services:
 
   capture-login:
     build:
-      context: ./services/capture
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/capture/Dockerfile
 
     command: ["/app/.venv/bin/uvicorn", "login.api:app", "--factory", "--host", "0.0.0.0", "--port", "8010"]
 

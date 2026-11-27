@@ -3,11 +3,12 @@ from pathlib import Path
 
 import httpx
 import pytest
+from support.io import read_gzip_files
+from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
+
 from crawler.page import capture_page
 from crawler.recording import PyWBReplayServer
 from crawler.results import BrowserCaptureResult, CaptureLimits
-from support.io import read_gzip_files
-from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
 
 
 async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:
