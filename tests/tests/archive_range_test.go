@@ -25,7 +25,7 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 
 	requestBody := fmt.Sprintf(
 		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		fixtureSiteURL+"/index.html",
+		"http://fixture-site/index.html",
 	)
 	response := testutil.Post(
 		t,
