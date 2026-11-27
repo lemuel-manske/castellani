@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	fixtureSiteURL = "http://fixture-site"
 	archiveTimeout = 3 * time.Minute
 )
 
@@ -32,7 +31,7 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 
 	requestBody := fmt.Sprintf(
 		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		fixtureSiteURL+"/index.html",
+		"http://fixture-site/index.html",
 	)
 
 	response := testutil.Post(
