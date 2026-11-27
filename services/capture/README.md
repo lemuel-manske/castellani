@@ -1,6 +1,6 @@
 # Capture
 
-Capture executes page-level web captures for Castellani. Its distributed frontier remains the authority for URL admission, task ownership, retries, and crawl completion; browser execution does not schedule work independently.
+Capture executes page-level web captures for Castellani using `libs/crawler` for browser execution and WARC recording. Its distributed frontier remains the authority for URL admission, task ownership, retries, and crawl completion; browser execution does not schedule work independently.
 
 ## Development
 
@@ -20,7 +20,7 @@ Install the matching Playwright browser with `uv run playwright install chromium
 - `make test`: runs both unit and integration tests.
 - `make check`: run static analysis.
 
-The local recording prototype uses pywb as an HTTP(S) recording proxy. The runtime uses a durable RabbitMQ command queue and a DynamoDB-backed transactional outbox; publisher confirms are required before an outbox record is marked as published.
+The crawler library uses pywb as an HTTP(S) recording proxy. The runtime uses a durable RabbitMQ command queue and a DynamoDB-backed transactional outbox; publisher confirms are required before an outbox record is marked as published.
 
 ## Configuration
 

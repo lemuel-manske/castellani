@@ -19,3 +19,8 @@ class Template:
 
 def template(of: str) -> Template:
     return Template(of)
+
+
+__all__ = [
+    "template",
+]

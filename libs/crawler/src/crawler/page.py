@@ -1,13 +1,9 @@
 import asyncio
 import json
 import os
-import subprocess
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
 
 from playwright.async_api import (
     Download,
@@ -22,96 +18,35 @@ from playwright.async_api import (
 from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
-from selectolax.parser import HTMLParser
 
-from utils.tasks import complete_before_cancellation
-from utils.web import is_html_content_type, is_pdf_content_type, is_safe_request_url, is_valid_url
-
+from .fn import (
+    complete_before_cancellation,
+    is_html_content_type,
+    is_pdf_content_type,
+    is_safe_url,
+    is_valid_url,
+)
+from .links import extract_links
 from .recording import PyWBRecorder
+from .results import (
+    BrowserCaptureResult,
+    CaptureDownloadFailed,
+    CaptureLimits,
+    CaptureNavigationFailed,
+    CaptureRecordingFailed,
+    DocumentLimitExceeded,
+    InvalidCaptureURL,
+    RequestLimitExceeded,
+    UnsafeCaptureRequest,
+)
+from .utils import trust_certificate
 
-NAVIGATION_TIMEOUT_MILLISECONDS = 30_000
-NETWORK_IDLE_TIMEOUT_MILLISECONDS = 5_000
 VIEWPORT_WIDTH = 1365
 VIEWPORT_HEIGHT = 768
 
-DEFAULT_MAX_REQUESTS = 500
-DEFAULT_MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
-DEFAULT_MAX_DISCOVERED_LINKS = 1_000
-DEFAULT_ALLOW_PRIVATE_NETWORKS = False
-DOWNLOAD_EVENT_TIMEOUT_SECONDS = 2
-
-
-@dataclass(frozen=True)
-class CaptureLimits:
-    navigation_timeout_milliseconds: int = NAVIGATION_TIMEOUT_MILLISECONDS
-    network_idle_timeout_milliseconds: int = NETWORK_IDLE_TIMEOUT_MILLISECONDS
-    max_requests: int = DEFAULT_MAX_REQUESTS
-    max_document_bytes: int = DEFAULT_MAX_DOCUMENT_BYTES
-    max_discovered_links: int = DEFAULT_MAX_DISCOVERED_LINKS
-    allow_private_networks: bool = DEFAULT_ALLOW_PRIVATE_NETWORKS
-
-
 DEFAULT_LIMITS = CaptureLimits()
 
-
-@dataclass(frozen=True)
-class BrowserCaptureResult:
-    requested_url: str
-    final_url: str
-    redirect_chain: tuple[str, ...]
-    status_code: int | None
-    content_type: str | None
-    title: str
-    captured_at: datetime
-    discovered_urls: tuple[str, ...]
-    blocked_urls: tuple[str, ...]
-    warc_files: tuple[Path, ...]
-
-
-class CaptureFailureCode(StrEnum):
-    INVALID_URL = "invalid_url"
-    UNSAFE_REQUEST = "unsafe_request"
-    REQUEST_LIMIT_EXCEEDED = "request_limit_exceeded"
-    DOCUMENT_LIMIT_EXCEEDED = "document_limit_exceeded"
-    DISCOVERED_LINK_LIMIT_EXCEEDED = "discovered_link_limit_exceeded"
-    NAVIGATION_FAILED = "navigation_failed"
-    DOWNLOAD_FAILED = "download_failed"
-    RECORDING_FAILED = "recording_failed"
-
-
-class CaptureFailure(RuntimeError):
-    def __init__(self, reason_code: CaptureFailureCode, message: str) -> None:
-        super().__init__(message)
-
-        self.reason_code = reason_code
-
-
-class CaptureLimitExceeded(CaptureFailure):
-    pass
-
-
-class UnsafeCaptureRequest(CaptureFailure):
-    def __init__(self, message: str) -> None:
-        super().__init__(CaptureFailureCode.UNSAFE_REQUEST, message)
-
-
-class InvalidCaptureURL(ValueError):
-    reason_code = CaptureFailureCode.INVALID_URL
-
-
-class CaptureNavigationFailed(CaptureFailure):
-    def __init__(self, message: str) -> None:
-        super().__init__(CaptureFailureCode.NAVIGATION_FAILED, message)
-
-
-class CaptureDownloadFailed(CaptureFailure):
-    def __init__(self, message: str) -> None:
-        super().__init__(CaptureFailureCode.DOWNLOAD_FAILED, message)
-
-
-class CaptureRecordingFailed(CaptureFailure):
-    def __init__(self, message: str) -> None:
-        super().__init__(CaptureFailureCode.RECORDING_FAILED, message)
+DOWNLOAD_EVENT_TIMEOUT_SECONDS = 2
 
 
 class RequestGuard:
@@ -133,7 +68,7 @@ class RequestGuard:
             await route.abort()
             return
 
-        if not await is_safe_request_url(
+        if not await is_safe_url(
             request.url,
             allow_private_networks=self.limits.allow_private_networks,
         ):
@@ -143,6 +78,7 @@ class RequestGuard:
                 self.blocked_navigation_url = request.url
 
             await route.abort()
+
             return
 
         self.request_count += 1
@@ -150,8 +86,7 @@ class RequestGuard:
 
     def raise_if_rejected(self) -> None:
         if self.request_limit_exceeded:
-            raise CaptureLimitExceeded(
-                CaptureFailureCode.REQUEST_LIMIT_EXCEEDED,
+            raise RequestLimitExceeded(
                 f"capture exceeded the request limit of {self.limits.max_requests}",
             )
 
@@ -204,50 +139,6 @@ async def apply_storage_state(context: Any, state: dict[str, Any]) -> None:
     }})()"""
 
     await context.add_init_script(script=script)
-
-
-def extract_links(
-    html: str,
-    base_url: str,
-    max_links: int = DEFAULT_MAX_DISCOVERED_LINKS,
-) -> tuple[str, ...]:
-    document = HTMLParser(html)
-
-    discovered: dict[str, None] = {}
-
-    for anchor in document.css("a[href]"):
-        href = anchor.attributes.get("href", "")
-
-        if not href:
-            continue
-
-        href = href.strip()
-
-        try:
-            absolute_url = urljoin(base_url, href)
-        except ValueError:
-            continue
-
-        if not is_valid_url(absolute_url) or absolute_url in discovered:
-            continue
-
-        if len(discovered) >= max_links:
-            raise CaptureLimitExceeded(
-                CaptureFailureCode.DISCOVERED_LINK_LIMIT_EXCEEDED,
-                f"page exceeded the discovered-link limit of {max_links}",
-            )
-
-        discovered.setdefault(absolute_url, None)
-
-    return tuple(discovered)
-
-
-async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult:
-    return await capture_page(
-        url,
-        output_dir,
-        limits=CaptureLimits(allow_private_networks=True),
-    )
 
 
 async def capture_page(
@@ -424,9 +315,7 @@ async def capture_page(
                                 "page document exceeded the {limits.max_document_bytes}-byte limit"
                             )
 
-                            raise CaptureLimitExceeded(
-                                CaptureFailureCode.DOCUMENT_LIMIT_EXCEEDED, msg
-                            )
+                            raise DocumentLimitExceeded(msg)
 
                         html = await page.content()
                         title = await page.title()
@@ -473,50 +362,6 @@ async def capture_page(
     )
 
 
-async def trust_certificate(certificate_path: Path, browser_home: Path) -> None:
-    database_path = browser_home / ".pki" / "nssdb"
-    database_path.mkdir(parents=True, exist_ok=True)
-
-    database_uri = f"sql:{database_path}"
-
-    await asyncio.to_thread(
-        subprocess.run,
-        ["certutil", "-N", "-d", database_uri, "--empty-password"],
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
-
-    await asyncio.to_thread(
-        subprocess.run,
-        [
-            "certutil",
-            "-A",
-            "-d",
-            database_uri,
-            "-n",
-            "Castellani Capture Recorder",
-            "-t",
-            "C,,",
-            "-i",
-            str(certificate_path),
-        ],
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
-
 __all__ = [
-    "CaptureDownloadFailed",
-    "CaptureFailure",
-    "CaptureFailureCode",
-    "CaptureLimitExceeded",
-    "CaptureLimits",
-    "CaptureNavigationFailed",
-    "CaptureRecordingFailed",
-    "InvalidCaptureURL",
-    "UnsafeCaptureRequest",
-    "capture_local_page",
     "capture_page",
-    "extract_links",
 ]

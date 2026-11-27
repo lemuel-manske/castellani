@@ -1,21 +1,12 @@
 import asyncio
 import json
-import signal
-import socket
-from collections.abc import Callable
 from pathlib import Path
 
-import httpx
-
-from utils.tasks import complete_before_cancellation
-from utils.template import template
-
-HOST = "127.0.0.1"
+from .fn import available_port, stop_process, template, wait_for_http_response, wait_for_process
 
 COLLECTION_NAME = "capture"
 
-PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 10
-STARTUP_TIMEOUT_SECONDS = 15
+HOST = "127.0.0.1"
 
 RECORD_CONFIG_TEMPLATE = """
 collections_root: {{ROOT}}
@@ -39,92 +30,6 @@ archive_paths: archive
 index_paths: indexes
 framed_replay: false
 """
-
-
-def available_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind((HOST, 0))
-
-        return int(listener.getsockname()[1])
-
-
-async def wait_for_http_response(
-    process: asyncio.subprocess.Process,
-    url: str,
-    is_ready: Callable[[httpx.Response], bool],
-) -> httpx.Response:
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + STARTUP_TIMEOUT_SECONDS
-    last_response: httpx.Response | None = None
-    last_error: httpx.TransportError | None = None
-
-    async with httpx.AsyncClient(trust_env=False, timeout=1) as client:
-        while loop.time() < deadline:
-            if process.returncode is not None:
-                raise RuntimeError(
-                    f"pywb process exited before becoming ready (exit code {process.returncode})"
-                )
-
-            try:
-                response = await client.get(url)
-            except httpx.TransportError as error:
-                last_error = error
-            else:
-                last_response = response
-
-                if is_ready(response):
-                    return response
-
-            remaining = deadline - loop.time()
-
-            if remaining > 0:
-                await asyncio.sleep(min(0.1, remaining))
-
-    if last_response is not None:
-        raise TimeoutError(
-            f"pywb did not become ready at {url}; "
-            f"last response was HTTP {last_response.status_code}"
-        )
-
-    if last_error is not None:
-        raise TimeoutError(
-            f"pywb did not become ready at {url}; last connection error was {last_error}"
-        ) from last_error
-
-    raise TimeoutError(f"pywb did not become ready at {url}")
-
-
-async def wait_for_process(process: asyncio.subprocess.Process) -> int:
-    try:
-        return await process.wait()
-    except asyncio.CancelledError:
-        await stop_process(process)
-        raise
-
-
-async def stop_process(process: asyncio.subprocess.Process) -> None:
-    async def do_stop(process: asyncio.subprocess.Process) -> None:
-        try:
-            process.send_signal(signal.SIGINT)
-        except ProcessLookupError:
-            await process.wait()
-            return
-
-        try:
-            await asyncio.wait_for(
-                process.wait(),
-                timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS,
-            )
-        except TimeoutError:
-            if process.returncode is None:
-                process.kill()
-
-            await process.wait()
-
-    if process.returncode is not None:
-        return
-
-    await complete_before_cancellation(do_stop(process))
 
 
 class PyWBRecorder:
@@ -298,6 +203,7 @@ class PyWBReplayServer:
 
         if result != 0:
             raise RuntimeError("pywb could not reindex the recording collection")
+
 
 __all__ = [
     "PyWBRecorder",

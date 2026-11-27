@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from hashlib import sha256
 from urllib.parse import quote, urlsplit, urlunsplit
 
-from utils.web import SCHEME_TO_PORT, is_valid_url
+from crawler import is_valid_url
+from crawler.fn import SCHEME_TO_PORT
 
 URL_IDENTITY_VERSION = 1
 

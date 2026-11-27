@@ -77,7 +77,11 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: services/capture/uv.lock
+          cache-dependency-glob: |
+            services/capture/uv.lock
+            services/capture/pyproject.toml
+            libs/crawler/pyproject.toml
+            libs/crawler/uv.lock
 
       - run: sudo apt-get update && sudo apt-get install --yes libnss3-tools
 
