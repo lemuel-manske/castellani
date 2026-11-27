@@ -10,16 +10,16 @@ from domain.login import LoginUnavailable, SessionConflict, SessionNotFound
 from problem import problem
 from utils.fn import noop
 
-from .routes import Runtime, router
-from .runtime import LoginRuntime as ConcreteLoginRuntime
+from .routes import router
+from .runtime import LoginRuntime
 from .settings import LoginSettings
 
 
 def app() -> FastAPI:
-    return create_app(ConcreteLoginRuntime(LoginSettings.from_environment()))
+    return create_app(LoginRuntime(LoginSettings.from_environment()))
 
 
-def create_app(runtime: Runtime) -> FastAPI:
+def create_app(runtime: LoginRuntime) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         await runtime.start()
@@ -30,7 +30,9 @@ def create_app(runtime: Runtime) -> FastAPI:
             await runtime.stop()
 
     application = FastAPI(title="Castellani Capture Login", lifespan=lifespan)
+
     application.state.runtime = runtime
+    application.state.manager = runtime.manager
 
     @application.exception_handler(SessionNotFound)
     async def handle_not_found(_: Request, error: SessionNotFound) -> Response:

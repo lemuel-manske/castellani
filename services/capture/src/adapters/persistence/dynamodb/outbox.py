@@ -1,16 +1,24 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from botocore.exceptions import ClientError
 
-from domain.capture import OutboxLeaseLostError, OutboxMessage
+from domain.capture import (
+    InvalidLeaseDuration,
+    InvalidRescheduleDelay,
+    OutboxLeaseLostError,
+    OutboxMessage,
+)
 from ports.capture import OutboxRepository
+from ports.clock import Clock
 
-from .facilities import new_lease_token
+from .error_handling import is_conditional_failure
 from .queries.outbox import (
     claim_message,
     confirm_message,
@@ -18,6 +26,11 @@ from .queries.outbox import (
     query_due_messages,
     reschedule_message,
 )
+from .utils import new_lease_token
+from .values import optional_number_string, optional_string
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
@@ -29,8 +42,8 @@ class DynamoDBOutbox(OutboxRepository):
 
     def __init__(
         self,
-        client: Any,
-        clock: Callable[[], float] = time.time,
+        client: DynamoDBClient,
+        clock: Clock = time.time,
         lease_token_factory: Callable[[], str] = new_lease_token,
     ) -> None:
         self.client = client
@@ -41,15 +54,15 @@ class DynamoDBOutbox(OutboxRepository):
 
     async def claim(self, lease_duration: float) -> OutboxMessage | None:
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         def try_claim(
             item: dict[str, Any],
             status: str,
             now: float,
         ) -> OutboxMessage | None:
-            message_id = item.get("messageId", {}).get("S")
-            due_at = item.get("nextAttemptAt", {}).get("N")
+            message_id = optional_string(item, "messageId")
+            due_at = optional_number_string(item, "nextAttemptAt")
 
             if not message_id or due_at is None:
                 raise RuntimeError("DynamoDB returned an invalid outbox record")
@@ -68,7 +81,7 @@ class DynamoDBOutbox(OutboxRepository):
                     lease_until,
                 )
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if is_conditional_failure(error):
                     return None
 
                 raise
@@ -133,7 +146,7 @@ class DynamoDBOutbox(OutboxRepository):
                     self.clock(),
                 )
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if is_conditional_failure(error):
                     raise OutboxLeaseLostError("outbox message lease is no longer owned") from error
 
                 raise
@@ -142,7 +155,7 @@ class DynamoDBOutbox(OutboxRepository):
 
     async def reschedule(self, message: OutboxMessage, delay: float) -> None:
         if delay < 0:
-            raise ValueError("delay must not be negative")
+            raise InvalidRescheduleDelay("delay must not be negative")
 
         def reschedule() -> None:
             next_attempt_at = self.clock() + delay
@@ -158,7 +171,7 @@ class DynamoDBOutbox(OutboxRepository):
                     self.clock(),
                 )
             except ClientError as error:
-                if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if is_conditional_failure(error):
                     raise OutboxLeaseLostError("outbox message lease is no longer owned") from error
 
                 raise

@@ -5,6 +5,10 @@ class OutboxLeaseLostError(RuntimeError):
     """Raised when an outbox message is no longer owned by this dispatcher."""
 
 
+class InvalidRescheduleDelay(ValueError):
+    """Raised when an outbox message is rescheduled with a negative delay."""
+
+
 @dataclass(frozen=True)
 class OutboxMessage:
     """A durable message claimed for publication."""

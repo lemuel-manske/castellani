@@ -1,8 +1,8 @@
 import asyncio
-from collections.abc import Awaitable, Callable
 from contextlib import aclosing
 
 from ports.messaging import PageTaskConsumer
+from ports.worker import CaptureRunner
 
 
 class PageTaskProcessor:
@@ -11,7 +11,7 @@ class PageTaskProcessor:
     def __init__(
         self,
         consumer: PageTaskConsumer,
-        worker: Callable[[str, str], Awaitable[bool]],
+        worker: CaptureRunner,
     ) -> None:
         self.consumer = consumer
         self.worker = worker

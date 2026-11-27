@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await runtime.start()
 
     app.state.runtime = runtime
+    app.state.archive_retrieval = runtime.archive_retrieval
 
     try:
         yield

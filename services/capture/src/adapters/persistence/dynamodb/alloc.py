@@ -1,18 +1,24 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING
 
 from botocore.exceptions import ClientError
 
 from domain.capture import (
     CaptureReservation,
     CaptureReservationLostError,
+    InvalidAttemptId,
+    InvalidLeaseDuration,
+    InvalidReservationRenewal,
+    InvalidSlotCount,
     new_reservation_id,
 )
 from ports.capture import CaptureAllocator
+from ports.clock import Clock
 
-from .error_handling import is_conditional_failure
+from .error_handling import raise_unless_conditional_failure
 from .queries.alloc import (
     read_slot,
     release_slot,
@@ -20,7 +26,10 @@ from .queries.alloc import (
     reservation_from_item,
     reserve_slot,
 )
-from .values import number_from_item
+from .values import number_from_item, optional_string
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 DEFAULT_SLOT_COUNT = 10
 DEFAULT_LEASE_DURATION = 60
@@ -31,16 +40,16 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         slot_count: int = DEFAULT_SLOT_COUNT,
         lease_duration: float = DEFAULT_LEASE_DURATION,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
     ) -> None:
         if slot_count < 1:
-            raise ValueError("slot_count must be positive")
+            raise InvalidSlotCount("slot_count must be positive")
 
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         self.client = client
 
@@ -52,7 +61,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
     async def reserve(self, attempt_id: str) -> CaptureReservation | None:
         if not attempt_id:
-            raise ValueError("attempt_id must not be empty")
+            raise InvalidAttemptId("attempt_id must not be empty")
 
         reservation_id = new_reservation_id(attempt_id)
 
@@ -64,8 +73,8 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
                 if (
                     item is not None
-                    and item.get("ownerAttemptId", {}).get("S") == attempt_id
-                    and item.get("reservationId", {}).get("S") == reservation_id
+                    and optional_string(item, "ownerAttemptId") == attempt_id
+                    and optional_string(item, "reservationId") == reservation_id
                     and number_from_item(item, "leaseUntil", "browser slot") > self.clock()
                 ):
                     return reservation_from_item(slot_id, item)
@@ -94,15 +103,14 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                         now,
                     )
                 except ClientError as error:
-                    if not is_conditional_failure(error):
-                        raise
+                    raise_unless_conditional_failure(error)
 
                     existing = read_slot(self.client, slot_id)
 
                     if (
                         existing is not None
-                        and existing.get("ownerAttemptId", {}).get("S") == attempt_id
-                        and existing.get("reservationId", {}).get("S") == reservation_id
+                        and optional_string(existing, "ownerAttemptId") == attempt_id
+                        and optional_string(existing, "reservationId") == reservation_id
                         and number_from_item(existing, "leaseUntil", "browser slot") > self.clock()
                     ):
                         return reservation_from_item(slot_id, existing)
@@ -131,14 +139,22 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                     now,
                 )
             except ClientError as error:
-                if is_conditional_failure(error):
-                    raise CaptureReservationLostError(
-                        "browser capacity reservation is no longer owned"
-                    ) from error
+                raise_unless_conditional_failure(error)
 
-                raise
+                raise CaptureReservationLostError(
+                    "browser capacity reservation is no longer owned"
+                ) from error
 
-            return reservation_from_item(reservation.slot_id, response["Attributes"])
+            renewed = reservation_from_item(reservation.slot_id, response["Attributes"])
+
+            try:
+                reservation.verify_renewal(renewed, now)
+            except InvalidReservationRenewal as error:
+                raise CaptureReservationLostError(
+                    "browser capacity reservation renewal returned an invalid reservation"
+                ) from error
+
+            return renewed
 
         return await asyncio.to_thread(renew)
 
@@ -153,7 +169,6 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                     reservation.fence,
                 )
             except ClientError as error:
-                if not is_conditional_failure(error):
-                    raise
+                raise_unless_conditional_failure(error)
 
         await asyncio.to_thread(release)

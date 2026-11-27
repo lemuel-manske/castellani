@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from domain.capture import ArtifactReference
+from domain.capture import ArtifactReference, WACZObject
 
 
 class DecisionArtifacts(ABC):
     @abstractmethod
     async def delete_archive_objects(self, archive_id: str) -> int: ...
+
+
+class ManifestArtifacts(ABC):
+    @abstractmethod
+    async def persist_manifest(self, archive_id: str, body: bytes) -> ArtifactReference: ...
 
 
 class PackageArtifacts(ABC):
@@ -31,3 +36,14 @@ class PackageArtifacts(ABC):
         archive_id: str,
         manifest_digest: str,
     ) -> ArtifactReference: ...
+
+
+class WACZArtifacts(ABC):
+    @abstractmethod
+    async def read_wacz(
+        self,
+        reference: ArtifactReference,
+        range_header: str | None,
+        if_range: str | None,
+        metadata_only: bool = False,
+    ) -> WACZObject: ...

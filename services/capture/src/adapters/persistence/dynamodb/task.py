@@ -1,33 +1,37 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
-from typing import Any
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from botocore.exceptions import ClientError
 
 from domain.capture import (
+    ADMISSION_CLOSED,
+    ADMISSION_OPEN,
     DEFAULT_AUTH_GENERATION,
+    TASK_CLAIMED,
+    TASK_COMPLETED,
+    TASK_FAILED,
     AuthGenerationChanged,
     CaptureOutcome,
+    CaptureRunMissing,
     DiscoveredPage,
+    InvalidLeaseDuration,
+    InvalidTaskClaimRenewal,
     TaskClaim,
     TaskClaimLostError,
+    capture_page_message_id,
     identify_discovered_pages,
     new_attempt_id,
+    page_captured_message_id,
+    release_page_message_id,
 )
-from ports.capture import TaskRepository
+from ports.capture import CrawlFinalizer, TaskRepository
+from ports.clock import Clock
 
-from .error_handling import (
-    ConditionalWriteRejected,
-    is_conditional_failure,
-    is_transaction_canceled,
-)
-from .facilities import (
-    EXPONENTIAL_BACKOFF_ATTEMPTS,
-    EXPONENTIAL_BACKOFF_DELAY,
-    exponential_backoff_transact,
-)
+from .error_handling import ConditionalWriteRejected, raise_unless_canceled_or_conditional
 from .queries.task import (
     admit_page_transaction,
     auth_generation_changed,
@@ -45,7 +49,15 @@ from .queries.task import (
     release_task_transaction,
     renew_task_transaction,
 )
-from .values import number_from_item
+from .utils import (
+    EXPONENTIAL_BACKOFF_ATTEMPTS,
+    exponential_backoff,
+    exponential_backoff_transact,
+)
+from .values import number_from_item, optional_number, optional_string
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 
 class DynamoDBTaskRepository(TaskRepository):
@@ -53,20 +65,20 @@ class DynamoDBTaskRepository(TaskRepository):
 
     def __init__(
         self,
-        client: Any,
+        client: DynamoDBClient,
         lease_duration: float,
-        clock: Callable[[], float] = time.time,
-        on_closed: Callable[[str], Awaitable[None]] | None = None,
+        clock: Clock = time.time,
+        finalize: CrawlFinalizer | None = None,
     ) -> None:
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         self.client = client
 
         self.lease_duration = lease_duration
 
         self.clock = clock
-        self.on_closed = on_closed
+        self.finalize = finalize
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
         def do_claim():
@@ -92,7 +104,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 url_key,
             )
 
-            if item is None or item.get("attemptId", {}).get("S") != attempt_id:
+            if item is None or optional_string(item, "attemptId") != attempt_id:
                 return None
 
             return claim_from_item(archive_id, url_key, item)
@@ -137,8 +149,12 @@ class DynamoDBTaskRepository(TaskRepository):
                 item,
             )
 
-            if renewed.attempt_id != claim.attempt_id or renewed.fence != claim.fence:
-                raise TaskClaimLostError("page-task ownership changed after lease renewal")
+            try:
+                claim.verify_renewal(renewed, now)
+            except InvalidTaskClaimRenewal as error:
+                raise TaskClaimLostError(
+                    "page-task ownership changed after lease renewal"
+                ) from error
 
             return renewed
 
@@ -146,12 +162,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
     async def complete(self, outcome: CaptureOutcome) -> None:
         def do_complete() -> bool:
-            message_id = str(
-                uuid5(
-                    NAMESPACE_URL,
-                    f"page-captured:{outcome.archive_id}:{outcome.snapshot_id}",
-                )
-            )
+            message_id = page_captured_message_id(outcome.archive_id, outcome.snapshot_id)
 
             for _ in range(EXPONENTIAL_BACKOFF_ATTEMPTS):
                 now = self.clock()
@@ -161,7 +172,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 run = read_run(self.client, outcome.archive_id)
 
                 if run is None:
-                    raise RuntimeError("Capture run disappeared during completion")
+                    raise CaptureRunMissing("Capture run disappeared during completion")
 
                 close = closes_run(run)
 
@@ -186,8 +197,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
                     if (
                         existing is not None
-                        and existing.get("state", {}).get("S") == "COMPLETED"
-                        and existing.get("snapshotId", {}).get("S") == outcome.snapshot_id
+                        and optional_string(existing, "state") == TASK_COMPLETED
+                        and optional_string(existing, "snapshotId") == outcome.snapshot_id
                     ):
                         event = read_outbox(
                             self.client,
@@ -201,7 +212,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
                             return (
                                 current is not None
-                                and current.get("admission", {}).get("S") == "CLOSED"
+                                and optional_string(current, "admission") == ADMISSION_CLOSED
                             )
 
                     if auth_generation_changed(
@@ -217,11 +228,11 @@ class DynamoDBTaskRepository(TaskRepository):
 
                     if (
                         existing is not None
-                        and existing.get("state", {}).get("S") == "CLAIMED"
-                        and existing.get("attemptId", {}).get("S") == outcome.attempt_id
-                        and existing.get("fence", {}).get("N") == str(outcome.fence)
+                        and optional_string(existing, "state") == TASK_CLAIMED
+                        and optional_string(existing, "attemptId") == outcome.attempt_id
+                        and optional_number(existing, "fence") == outcome.fence
                         and current is not None
-                        and current.get("admission", {}).get("S") == "OPEN"
+                        and optional_string(current, "admission") == ADMISSION_OPEN
                     ):
                         continue
 
@@ -231,8 +242,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
         closed = await asyncio.to_thread(do_complete)
 
-        if closed and self.on_closed is not None:
-            await self.on_closed(outcome.archive_id)
+        if closed and self.finalize is not None:
+            await self.finalize(outcome.archive_id)
 
     async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
         def do_fail() -> bool:
@@ -242,7 +253,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 run = read_run(self.client, claim.task.archive_id)
 
                 if run is None:
-                    raise RuntimeError("Capture run disappeared during failure")
+                    raise CaptureRunMissing("Capture run disappeared during failure")
 
                 close = closes_run(run)
 
@@ -253,7 +264,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         claim.task.url_key,
                         claim.attempt_id,
                         claim.fence,
-                        "FAILED",
+                        TASK_FAILED,
                         reason_code,
                         message,
                         now,
@@ -262,8 +273,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
                     return close
                 except ClientError as error:
-                    if not (is_conditional_failure(error) or is_transaction_canceled(error)):
-                        raise
+                    raise_unless_canceled_or_conditional(error)
 
                     existing = read_frontier(
                         self.client,
@@ -274,14 +284,14 @@ class DynamoDBTaskRepository(TaskRepository):
 
                     if (
                         existing is not None
-                        and existing.get("state", {}).get("S") == "CLAIMED"
-                        and existing.get("attemptId", {}).get("S") == claim.attempt_id
-                        and existing.get("fence", {}).get("N") == str(claim.fence)
-                        and float(existing.get("leaseUntil", {}).get("N", "0")) > now
+                        and optional_string(existing, "state") == TASK_CLAIMED
+                        and optional_string(existing, "attemptId") == claim.attempt_id
+                        and optional_number(existing, "fence") == claim.fence
+                        and number_from_item(existing, "leaseUntil", "page task", default=0) > now
                         and current is not None
-                        and current.get("admission", {}).get("S") == "OPEN"
+                        and optional_string(current, "admission") == ADMISSION_OPEN
                     ):
-                        time.sleep(EXPONENTIAL_BACKOFF_DELAY * (2**attempt))
+                        exponential_backoff(attempt)
 
                         continue
 
@@ -291,8 +301,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
         closed = await asyncio.to_thread(do_fail)
 
-        if closed and self.on_closed is not None:
-            await self.on_closed(claim.task.archive_id)
+        if closed and self.finalize is not None:
+            await self.finalize(claim.task.archive_id)
 
     async def admit_discovered(
         self,
@@ -303,12 +313,7 @@ class DynamoDBTaskRepository(TaskRepository):
         def do_admit_discovered_page(page: DiscoveredPage) -> bool:
             now = self.clock()
 
-            message_id = str(
-                uuid5(
-                    NAMESPACE_URL,
-                    f"capture-page:{claim.task.archive_id}:{page.identity.url_key}",
-                )
-            )
+            message_id = capture_page_message_id(claim.task.archive_id, page.identity.url_key)
 
             archive_id = claim.task.archive_id
 
@@ -339,7 +344,7 @@ class DynamoDBTaskRepository(TaskRepository):
                 )
 
                 if existing is not None:
-                    stored_identity = existing.get("navigationUrl", {}).get("S")
+                    stored_identity = optional_string(existing, "navigationUrl")
 
                     if stored_identity != page.identity.navigation_url:
                         raise RuntimeError(
@@ -356,10 +361,10 @@ class DynamoDBTaskRepository(TaskRepository):
 
                 if (
                     parent is None
-                    or parent.get("state", {}).get("S") != "CLAIMED"
-                    or parent.get("attemptId", {}).get("S") != claim.attempt_id
-                    or parent.get("fence", {}).get("N") != str(claim.fence)
-                    or float(parent.get("leaseUntil", {}).get("N", "0")) <= now
+                    or optional_string(parent, "state") != TASK_CLAIMED
+                    or optional_string(parent, "attemptId") != claim.attempt_id
+                    or optional_number(parent, "fence") != claim.fence
+                    or number_from_item(parent, "leaseUntil", "page task", default=0) <= now
                 ):
                     raise TaskClaimLostError("parent page-task claim is no longer owned") from error
 
@@ -370,7 +375,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
                     raise RuntimeError(message) from error
 
-                if run.get("admission", {}).get("S") != "OPEN":
+                if optional_string(run, "admission") != ADMISSION_OPEN:
                     raise TaskClaimLostError("Capture run admission is closed") from error
 
                 maximum = number_from_item(run, "maxPages", "capture run")
@@ -390,7 +395,7 @@ class DynamoDBTaskRepository(TaskRepository):
             if run is None:
                 raise RuntimeError("Capture run does not exist")
 
-            if run.get("admission", {}).get("S") != "OPEN":
+            if optional_string(run, "admission") != ADMISSION_OPEN:
                 raise TaskClaimLostError("Capture run admission is closed")
 
             maximum = number_from_item(run, "maxPages", "capture run")
@@ -414,14 +419,11 @@ class DynamoDBTaskRepository(TaskRepository):
         def do_release():
             now = self.clock()
 
-            message_id = str(
-                uuid5(
-                    NAMESPACE_URL,
-                    (
-                        f"capture-page:{claim.task.archive_id}:{claim.task.url_key}:"
-                        f"{claim.attempt_id}:{claim.fence}"
-                    ),
-                )
+            message_id = release_page_message_id(
+                claim.task.archive_id,
+                claim.task.url_key,
+                claim.attempt_id,
+                claim.fence,
             )
 
             transaction = release_task_transaction(

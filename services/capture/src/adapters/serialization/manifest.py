@@ -6,59 +6,48 @@ from domain.capture import (
     DEFAULT_NORMALIZER_VERSION,
     MANIFEST_SCHEMA_VERSION,
     ArtifactReference,
+    ManifestSnapshot,
+    ManifestSource,
 )
 
 
-def manifest_document(
-    run: dict[str, Any],
-    snapshots: list[dict[str, Any]],
-    frontier: list[dict[str, Any]],
-) -> dict[str, Any]:
+def manifest_document(source: ManifestSource) -> dict[str, Any]:
     document: dict[str, Any] = {
         "schemaVersion": MANIFEST_SCHEMA_VERSION,
-        "archiveId": run["archiveId"],
-        "normalizerVersion": run.get("normalizerVersion") or DEFAULT_NORMALIZER_VERSION,
-        "seedUrl": run["seedUrl"],
-        "createdAt": run["closedAt"],
-        "snapshots": [snapshot_entry(item) for item in snapshots],
+        "archiveId": source.run.archive_id,
+        "normalizerVersion": source.run.normalizer_version or DEFAULT_NORMALIZER_VERSION,
+        "seedUrl": source.run.seed_url,
+        "createdAt": source.run.closed_at,
+        "snapshots": [snapshot_entry(item) for item in source.snapshots],
         "failedPages": [
-            {
-                "urlKey": item["urlKey"],
-                "reasonCode": item.get("failureReason") or "capture_failed",
-            }
-            for item in frontier
-            if item.get("state") == "FAILED"
+            {"urlKey": item.url_key, "reasonCode": item.reason_code} for item in source.failures
         ],
     }
 
-    collection_id = run.get("collectionId")
-
-    if collection_id is not None:
-        document["collectionId"] = collection_id
+    if source.run.collection_id is not None:
+        document["collectionId"] = source.run.collection_id
 
     return document
 
 
-def snapshot_entry(item: dict[str, Any]) -> dict[str, Any]:
+def snapshot_entry(item: ManifestSnapshot) -> dict[str, Any]:
     entry: dict[str, Any] = {
-        "snapshotId": item["snapshotId"],
-        "urlKey": item["urlKey"],
-        "url": item["url"],
-        "finalUrl": item["finalUrl"],
-        "capturedAt": item["capturedAt"],
-        "warcArtifacts": [
-            artifact_document(artifact_reference(ref)) for ref in item["warcArtifacts"]
-        ],
+        "snapshotId": item.snapshot_id,
+        "urlKey": item.url_key,
+        "url": item.url,
+        "finalUrl": item.final_url,
+        "capturedAt": item.captured_at,
+        "warcArtifacts": [artifact_document(reference) for reference in item.warc_artifacts],
     }
 
-    if "redirectChain" in item:
-        entry["redirectChain"] = item["redirectChain"]
+    if item.redirect_chain is not None:
+        entry["redirectChain"] = list(item.redirect_chain)
 
-    if "minDepth" in item:
-        entry["minDepth"] = item["minDepth"]
+    if item.min_depth is not None:
+        entry["minDepth"] = item.min_depth
 
-    if "contentType" in item:
-        entry["contentType"] = item["contentType"]
+    if item.content_type is not None:
+        entry["contentType"] = item.content_type
 
     return entry
 

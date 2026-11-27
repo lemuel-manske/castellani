@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 import base64
 import binascii
 import json
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from domain.capture import (
+    TASK_CLAIMED,
+    TASK_COMPLETED,
+    TASK_FAILED,
+    TASK_PENDING,
+    TASK_WAITING_FOR_AUTH,
     ArchivePage,
     InvalidArchiveCursor,
     PageListing,
@@ -12,20 +19,24 @@ from domain.capture import (
 from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 
 from ..values import optional_string, string_from_item
+from .common import with_cursor
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 PAGE_STATUSES = {
-    "PENDING": "PENDING",
-    "CLAIMED": "RUNNING",
-    "WAITING_FOR_AUTH": "WAITING_FOR_AUTH",
-    "COMPLETED": "CAPTURED",
-    "FAILED": "FAILED",
+    TASK_PENDING: "PENDING",
+    TASK_CLAIMED: "RUNNING",
+    TASK_WAITING_FOR_AUTH: "WAITING_FOR_AUTH",
+    TASK_COMPLETED: "CAPTURED",
+    TASK_FAILED: "FAILED",
 }
 
 MAX_PAGE_LIMIT = 100
 
 
 def query_pages(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     limit: int,
     cursor: str | None,
@@ -37,10 +48,9 @@ def query_pages(
         "Limit": limit + 1,
     }
 
-    if cursor is not None:
-        request["ExclusiveStartKey"] = decode_cursor(cursor, archive_id)
+    start_key = decode_cursor(cursor, archive_id) if cursor is not None else None
 
-    response = client.query(**request)
+    response = client.query(**with_cursor(request, start_key))
 
     rows = tuple(response.get("Items", ()))
     items = tuple(page_from_item(item) for item in rows[:limit])
@@ -60,7 +70,7 @@ def query_pages(
 
 
 def read_snapshot(
-    client: Any,
+    client: DynamoDBClient,
     archive_id: str,
     snapshot_id: str,
 ) -> SnapshotReference | None:
@@ -121,10 +131,10 @@ def decode_cursor(cursor: str, archive_id: str) -> dict[str, Any]:
 
     typed_key = cast(dict[str, Any], key)
 
-    if typed_key.get("archiveId", {}).get("S") != archive_id:
+    if optional_string(typed_key, "archiveId") != archive_id:
         raise InvalidArchiveCursor
 
-    if not isinstance(typed_key.get("urlKey", {}).get("S"), str):
+    if not isinstance(optional_string(typed_key, "urlKey"), str):
         raise InvalidArchiveCursor
 
     return typed_key

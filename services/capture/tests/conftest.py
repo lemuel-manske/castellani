@@ -6,32 +6,36 @@ import pytest
 from aio_pika.abc import AbstractRobustConnection
 from mypy_boto3_dynamodb.client import DynamoDBClient
 from mypy_boto3_s3.client import S3Client
-from support.clock import Clock
+from support.clock import SimpleClock
 from support.dynamodb import cleanup_dynamodb, new_dynamodb_client, setup_dynamodb
-from support.recording import LocalSite, start_local_site
 from support.s3 import cleanup_s3, new_s3_client, setup_s3
 
 from config.environment import CAPTURE_RABBITMQ_URL
 
+pytest_plugins = [
+    "fixtures.archive_retrieval",
+    "fixtures.capture_allocator",
+    "fixtures.crawl_starter",
+    "fixtures.deterministic_attempt_ids",
+    "fixtures.deterministic_lease_tokens",
+    "fixtures.deterministic_package_owners",
+    "fixtures.manifest_finalizer",
+    "fixtures.outbox_repository",
+    "fixtures.package_artifacts",
+    "fixtures.publication_repository",
+    "fixtures.session_store",
+    "fixtures.task_repository",
+]
+
 
 @pytest.fixture
-def clock() -> Iterator[Clock]:
-    clock = Clock()
+def clock() -> Iterator[SimpleClock]:
+    clock = SimpleClock()
 
     try:
         yield clock
     finally:
         clock.restart()
-
-
-@pytest.fixture
-def local_site() -> Iterator[LocalSite]:
-    site = start_local_site()
-
-    try:
-        yield site
-    finally:
-        site.stop()
 
 
 @pytest.fixture
@@ -66,13 +70,3 @@ def s3() -> Iterator[S3Client]:
         yield client
     finally:
         cleanup_s3(client)
-
-
-@pytest.fixture(autouse=True)
-def deterministic_attempt_ids(monkeypatch: pytest.MonkeyPatch) -> None:
-    from itertools import count
-
-    from adapters.persistence.dynamodb import task
-
-    identifiers = count(1)
-    monkeypatch.setattr(task, "new_attempt_id", lambda: f"attempt-{next(identifiers)}")

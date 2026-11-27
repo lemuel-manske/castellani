@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from collections.abc import Callable
 from dataclasses import replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
@@ -10,6 +11,7 @@ from botocore.exceptions import ClientError
 from domain.capture import (
     CompensationDecision,
     InvalidArchiveDecision,
+    InvalidLeaseDuration,
     PackageCommitRejected,
     PendingPackage,
     PreparedPackage,
@@ -19,11 +21,12 @@ from domain.capture import (
     archive_published_message_id,
 )
 from ports.capture import ArchivePublicationRepository
+from ports.clock import Clock
 
 from .error_handling import (
     ConditionalWriteRejected,
-    is_conditional_failure,
-    is_transaction_canceled,
+    raise_unless_conditional_failure,
+    raise_unless_transaction_canceled,
 )
 from .queries.publication import (
     begin_compensation as begin_compensation_query,
@@ -55,21 +58,24 @@ from .queries.publication import (
 )
 from .queries.task import read_outbox, read_run
 
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
+
 
 class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
     """Durable run state for WACZ preparation and Coordinator decisions."""
 
     def __init__(
         self,
-        client: Any,
-        clock: Callable[[], float] = time.time,
+        client: DynamoDBClient,
+        clock: Clock = time.time,
     ) -> None:
         self.client = client
         self.clock = clock
 
     async def claim_package(self, lease_duration: float) -> PendingPackage | None:
         if lease_duration <= 0:
-            raise ValueError("lease_duration must be positive")
+            raise InvalidLeaseDuration("lease_duration must be positive")
 
         def claim() -> PendingPackage | None:
             now = self.clock()
@@ -92,8 +98,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
                             owner,
                         )
                     except ClientError as error:
-                        if not is_conditional_failure(error):
-                            raise
+                        raise_unless_conditional_failure(error)
 
                         continue
 
@@ -111,8 +116,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
             try:
                 release_package_query(self.client, pending.archive_id, pending.lease_owner)
             except ClientError as error:
-                if not is_conditional_failure(error):
-                    raise
+                raise_unless_conditional_failure(error)
 
         await asyncio.to_thread(release)
 
@@ -132,8 +136,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
                     self.clock(),
                 )
             except ClientError as error:
-                if not is_transaction_canceled(error):
-                    raise
+                raise_unless_transaction_canceled(error)
 
                 current = read_run(self.client, prepared.archive_id)
                 outbox = read_outbox(self.client, message_id)
@@ -159,8 +162,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
             try:
                 publish_package_query(self.client, decision, message_id, self.clock())
             except ClientError as error:
-                if not is_transaction_canceled(error):
-                    raise
+                raise_unless_transaction_canceled(error)
 
                 current = read_run(self.client, decision.archive_id)
                 outbox = read_outbox(self.client, message_id)
@@ -184,8 +186,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
             try:
                 begin_compensation_query(self.client, decision)
             except ClientError as error:
-                if not is_conditional_failure(error):
-                    raise
+                raise_unless_conditional_failure(error)
 
                 current = read_run(self.client, decision.archive_id)
 
@@ -207,8 +208,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
             try:
                 complete_compensation_query(self.client, decision, message_id, self.clock())
             except ClientError as error:
-                if not is_transaction_canceled(error):
-                    raise
+                raise_unless_transaction_canceled(error)
 
                 outbox = read_outbox(self.client, message_id)
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/lemuel-manske/castellani/services/coordinator/contracts"
 	"github.com/lemuel-manske/castellani/services/coordinator/domain"
 	"github.com/lemuel-manske/castellani/services/coordinator/topology"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -121,7 +122,7 @@ func (c *RabbitConsumer) Consume(
 }
 
 func eventFromMessage(data []byte) (domain.Event, error) {
-	messageType, err := Validate(data)
+	messageType, err := contracts.Validate(data)
 
 	if err != nil || !slices.Contains(EventTypes, messageType) {
 		return domain.Event{}, domain.ErrInvalidEvent

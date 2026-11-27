@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
-from domain.capture import ArtifactReference, AuthContext, PageCapture, TaskClaim
+from domain.capture import ArtifactReference, PageCapture, TaskClaim
 
 
 class LeaseLostError(RuntimeError):
@@ -21,16 +21,6 @@ class CaptureArtifact:
     capture: PageCapture
     blocked_urls: tuple[str, ...]
     warc_files: tuple[Path, ...]
-
-
-class CaptureExecutor(ABC):
-    @abstractmethod
-    async def execute(
-        self,
-        url: str,
-        output_dir: Path,
-        auth_context: AuthContext,
-    ) -> CaptureArtifact: ...
 
 
 class ArtifactStore(ABC):

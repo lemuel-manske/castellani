@@ -36,9 +36,19 @@ class WACZObject:
     content_range: str | None
     partial: bool
 
+    async def consume(self) -> bytes:
+        if self.body is None:
+            raise RuntimeError("WACZ object has no body")
+
+        return b"".join([chunk async for chunk in self.body])
+
 
 class InvalidArchiveCursor(ValueError):
     pass
+
+
+class InvalidPageLimit(ValueError):
+    """Raised when a page listing limit is outside the supported range."""
 
 
 class InvalidWACZRange(ValueError):

@@ -1,6 +1,7 @@
 import base64
 import binascii
 import os
+from pathlib import Path
 
 CAPTURE_ARTIFACT_DIRECTORY = "CAPTURE_ARTIFACT_DIRECTORY"
 CAPTURE_AUTH_PROFILE_KEY = "CAPTURE_AUTH_PROFILE_KEY"
@@ -62,6 +63,15 @@ def positive_float(name: str, default: float) -> float:
         raise ValueError(f"{name} must be positive")
 
     return value
+
+
+def a_path(name: str, default: str) -> Path:
+    value = os.getenv(name, default)
+
+    if not value.strip():
+        raise ValueError(f"{name} must be non-empty")
+
+    return Path(value)
 
 
 def auth_profile_key() -> bytes:

@@ -1,17 +1,35 @@
-from typing import Any
+from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+from adapters.serialization import artifact_reference
 from contracts.messages import CRAWL_COMPLETED_EVENT, CrawlCompletedPayload
 from contracts.types import ArtifactReferenceContract
-from domain.capture import PACKAGE_PENDING, identify_url
-from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
+from domain.capture import (
+    MANIFEST_PENDING,
+    MANIFEST_PUBLISHED,
+    PACKAGE_PENDING,
+    TASK_COMPLETED,
+    TASK_FAILED,
+    ManifestFailure,
+    ManifestRun,
+    ManifestSnapshot,
+    ManifestSource,
+    identify_url,
+)
+from topology.tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
-from ..values import deserialize_attribute, serialize_map
+from ..values import envelope_matches, optional_string, plain_attributes
+from .common import outbox_put, with_cursor
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb.client import DynamoDBClient
 
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
 _PAGE_SIZE = 100
 
 
-def query_snapshots(client: Any, archive_id: str) -> list[dict[str, Any]]:
+def query_snapshots(client: DynamoDBClient, archive_id: str) -> list[dict[str, Any]]:
     return query_by_archive(
         client,
         SNAPSHOTS_TABLE,
@@ -20,12 +38,12 @@ def query_snapshots(client: Any, archive_id: str) -> list[dict[str, Any]]:
     )
 
 
-def query_frontier(client: Any, archive_id: str) -> list[dict[str, Any]]:
+def query_frontier(client: DynamoDBClient, archive_id: str) -> list[dict[str, Any]]:
     return query_by_archive(client, FRONTIER_TABLE, archive_id)
 
 
 def query_by_archive(
-    client: Any,
+    client: DynamoDBClient,
     table: str,
     archive_id: str,
     index: str | None = None,
@@ -44,9 +62,10 @@ def query_by_archive(
         request["ConsistentRead"] = True
 
     items: list[dict[str, Any]] = []
+    cursor: dict[str, Any] | None = None
 
     while True:
-        response = client.query(**request)
+        response = client.query(**with_cursor(request, cursor))
 
         items.extend(plain_attributes(item) for item in response.get("Items", []))
 
@@ -55,18 +74,57 @@ def query_by_archive(
         if not cursor:
             return items
 
-        request["ExclusiveStartKey"] = cursor
-
-
-def plain_attributes(item: dict[str, Any]) -> dict[str, Any]:
-    return {key: deserialize_attribute(value) for key, value in item.items()}
-
 
 def seed_succeeded(run: dict[str, Any], frontier: list[dict[str, Any]]) -> bool:
     seed_key = identify_url(run["seedUrl"]).url_key
 
     return any(
-        item.get("urlKey") == seed_key and item.get("state") == "COMPLETED" for item in frontier
+        item.get("urlKey") == seed_key and item.get("state") == TASK_COMPLETED for item in frontier
+    )
+
+
+def manifest_source(
+    run: dict[str, Any],
+    snapshots: list[dict[str, Any]],
+    frontier: list[dict[str, Any]],
+) -> ManifestSource:
+    return ManifestSource(
+        run=ManifestRun(
+            archive_id=str(run["archiveId"]),
+            seed_url=str(run["seedUrl"]),
+            closed_at=str(run["closedAt"]),
+            normalizer_version=run.get("normalizerVersion"),
+            collection_id=run.get("collectionId"),
+        ),
+        snapshots=tuple(snapshot_from_item(item) for item in snapshots),
+        failures=tuple(
+            failure for item in frontier if (failure := failure_from_item(item)) is not None
+        ),
+        seed_succeeded=seed_succeeded(run, frontier),
+    )
+
+
+def snapshot_from_item(item: dict[str, Any]) -> ManifestSnapshot:
+    return ManifestSnapshot(
+        snapshot_id=str(item["snapshotId"]),
+        url_key=str(item["urlKey"]),
+        url=str(item["url"]),
+        final_url=str(item["finalUrl"]),
+        captured_at=str(item["capturedAt"]),
+        warc_artifacts=tuple(artifact_reference(ref) for ref in item["warcArtifacts"]),
+        redirect_chain=tuple(item["redirectChain"]) if "redirectChain" in item else None,
+        min_depth=int(item["minDepth"]) if "minDepth" in item else None,
+        content_type=str(item["contentType"]) if "contentType" in item else None,
+    )
+
+
+def failure_from_item(item: dict[str, Any]) -> ManifestFailure | None:
+    if item.get("state") != TASK_FAILED:
+        return None
+
+    return ManifestFailure(
+        url_key=str(item["urlKey"]),
+        reason_code=str(item.get("failureReason") or "capture_failed"),
     )
 
 
@@ -75,20 +133,21 @@ def is_crawl_completed_message(
     archive_id: str,
     manifest_digest: str,
 ) -> bool:
-    payload = item.get("payload", {}).get("M", {})
-
-    return (
-        item.get("type", {}).get("S") == CRAWL_COMPLETED_EVENT
-        and item.get("correlationId", {}).get("S") == archive_id
-        and payload.get("archiveId", {}).get("S") == archive_id
-        and payload.get("manifestDigest", {}).get("S") == manifest_digest
+    return envelope_matches(
+        item,
+        CRAWL_COMPLETED_EVENT,
+        archive_id,
+        {
+            "archiveId": {"S": archive_id},
+            "manifestDigest": {"S": manifest_digest},
+        },
     )
 
 
 def is_published_manifest(item: dict[str, Any], digest: str) -> bool:
     return (
-        item.get("manifestStatus", {}).get("S") == "PUBLISHED"
-        and item.get("manifestDigest", {}).get("S") == digest
+        optional_string(item, "manifestStatus") == MANIFEST_PUBLISHED
+        and optional_string(item, "manifestDigest") == digest
     )
 
 
@@ -119,8 +178,8 @@ def finalize_transaction(
         "#digest": "manifestDigest",
     }
     values: dict[str, Any] = {
-        ":pending": {"S": "PENDING"},
-        ":published": {"S": "PUBLISHED"},
+        ":pending": {"S": MANIFEST_PENDING},
+        ":published": {"S": MANIFEST_PUBLISHED},
         ":key": {"S": artifact["key"]},
         ":digest": {"S": digest},
     }
@@ -141,22 +200,12 @@ def finalize_transaction(
                 "ExpressionAttributeValues": values,
             }
         },
-        {
-            "Put": {
-                "TableName": OUTBOX_TABLE,
-                "Item": {
-                    "messageId": {"S": message_id},
-                    "correlationId": {"S": archive_id},
-                    "type": {"S": CRAWL_COMPLETED_EVENT},
-                    "version": {"N": "1"},
-                    "occurredAt": {"S": occurred_at},
-                    "payload": {"M": serialize_map(payload)},
-                    "status": {"S": "PENDING"},
-                    "attempts": {"N": "0"},
-                    "nextAttemptAt": {"N": str(now)},
-                },
-                "ConditionExpression": "attribute_not_exists(#message_id)",
-                "ExpressionAttributeNames": {"#message_id": "messageId"},
-            }
-        },
+        outbox_put(
+            message_id=message_id,
+            correlation_id=archive_id,
+            message_type=CRAWL_COMPLETED_EVENT,
+            occurred_at=occurred_at,
+            payload=payload,
+            now=now,
+        ),
     ]

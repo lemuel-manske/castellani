@@ -1,7 +1,15 @@
+import json
+import os
 from abc import ABC, abstractmethod
 from typing import Any
 
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from domain.login import AuthProfileReference, AuthSession, BrowserEndpoint
+
+NONCE_BYTES = 12
+
+KEY_ENCODING = "utf-8"
 
 
 class InteractiveBrowser(ABC):
@@ -50,3 +58,29 @@ class AuthProfileStore(ABC):
 
     @abstractmethod
     async def load(self, key: str) -> dict[str, Any]: ...
+
+
+class AuthProfileCipher:
+    def __init__(self, key: bytes) -> None:
+        self.aead = AESGCM(key)
+
+    def encrypt(self, state: dict[str, Any]) -> bytes:
+        nonce = os.urandom(NONCE_BYTES)
+        payload = json.dumps(
+            state,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode(KEY_ENCODING)
+
+        return nonce + self.aead.encrypt(nonce, payload, None)
+
+    def decrypt(self, ciphertext: bytes) -> dict[str, Any]:
+        payload = self.aead.decrypt(
+            ciphertext[:NONCE_BYTES],
+            ciphertext[NONCE_BYTES:],
+            None,
+        )
+
+        result: dict[str, Any] = json.loads(payload.decode(KEY_ENCODING))
+
+        return result
