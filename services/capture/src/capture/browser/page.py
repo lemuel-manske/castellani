@@ -172,6 +172,40 @@ def extract_redirect_chain(request: Request) -> tuple[str, ...]:
     return tuple(reversed(chain))
 
 
+async def apply_storage_state(context: Any, state: dict[str, Any]) -> None:
+    cookies = state.get("cookies", [])
+
+    if cookies:
+        await context.add_cookies(cookies)
+
+    origins = state.get("origins", [])
+
+    if not origins:
+        return
+
+    payload = json.dumps(origins, separators=(",", ":"))
+
+    script = f"""(() => {{
+        const origins = {payload};
+
+        for (const entry of origins) {{
+            if (window.location.origin !== entry.origin) {{
+                continue;
+            }}
+
+            for (const item of entry.localStorage) {{
+                try {{
+                    window.localStorage.setItem(item.name, item.value);
+                }} catch (error) {{
+                    continue;
+                }}
+            }}
+        }}
+    }})()"""
+
+    await context.add_init_script(script=script)
+
+
 def extract_links(
     html: str,
     base_url: str,
@@ -214,40 +248,6 @@ async def capture_local_page(url: str, output_dir: Path) -> BrowserCaptureResult
         output_dir,
         limits=CaptureLimits(allow_private_networks=True),
     )
-
-
-async def apply_storage_state(context: Any, state: dict[str, Any]) -> None:
-    cookies = state.get("cookies", [])
-
-    if cookies:
-        await context.add_cookies(cookies)
-
-    origins = state.get("origins", [])
-
-    if not origins:
-        return
-
-    payload = json.dumps(origins, separators=(",", ":"))
-
-    script = f"""(() => {{
-        const origins = {payload};
-
-        for (const entry of origins) {{
-            if (window.location.origin !== entry.origin) {{
-                continue;
-            }}
-
-            for (const item of entry.localStorage) {{
-                try {{
-                    window.localStorage.setItem(item.name, item.value);
-                }} catch (error) {{
-                    continue;
-                }}
-            }}
-        }}
-    }})()"""
-
-    await context.add_init_script(script=script)
 
 
 async def capture_page(
@@ -505,3 +505,18 @@ async def trust_certificate(certificate_path: Path, browser_home: Path) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
+
+__all__ = [
+    "CaptureDownloadFailed",
+    "CaptureFailure",
+    "CaptureFailureCode",
+    "CaptureLimitExceeded",
+    "CaptureLimits",
+    "CaptureNavigationFailed",
+    "CaptureRecordingFailed",
+    "InvalidCaptureURL",
+    "UnsafeCaptureRequest",
+    "capture_local_page",
+    "capture_page",
+    "extract_links",
+]

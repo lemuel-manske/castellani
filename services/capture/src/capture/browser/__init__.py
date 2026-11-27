@@ -1,5 +1,3 @@
-from domain.capture import PageCapture
-
 from .page import (
     CaptureDownloadFailed,
     CaptureFailure,
@@ -13,8 +11,9 @@ from .page import (
     capture_local_page,
     capture_page,
     extract_links,
-    extract_redirect_chain,
 )
+
+from .recording import PyWBRecorder, PyWBReplayServer
 
 __all__ = [
     "CaptureDownloadFailed",
@@ -25,10 +24,10 @@ __all__ = [
     "CaptureNavigationFailed",
     "CaptureRecordingFailed",
     "InvalidCaptureURL",
-    "PageCapture",
+    "PyWBRecorder",
+    "PyWBReplayServer",
     "UnsafeCaptureRequest",
     "capture_local_page",
     "capture_page",
     "extract_links",
-    "extract_redirect_chain",
 ]

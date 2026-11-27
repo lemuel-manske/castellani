@@ -9,10 +9,11 @@ from capture.browser import (
     CaptureFailureCode,
     CaptureLimits,
     CaptureNavigationFailed,
+    PyWBRecorder,
     capture_local_page,
     capture_page,
 )
-from capture.browser.recording import PyWBRecorder
+
 from utils.io import read_gzip_files
 
 

@@ -10,6 +10,7 @@ from capture.wacz import create_wacz, validate_wacz
 def test_create_and_validate_wacz(tmp_path: Path) -> None:
     warc = tmp_path / "capture.warc.gz"
     warc.write_bytes(warc_bytes())
+
     package = tmp_path / "package.wacz"
 
     create_wacz([warc], package)
@@ -24,6 +25,7 @@ def test_create_and_validate_wacz(tmp_path: Path) -> None:
 def test_validate_wacz_rejects_missing_archive_entry(tmp_path: Path) -> None:
     warc = tmp_path / "capture.warc.gz"
     warc.write_bytes(warc_bytes())
+
     package = tmp_path / "package.wacz"
 
     create_wacz([warc], package)

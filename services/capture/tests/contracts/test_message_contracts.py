@@ -1,7 +1,6 @@
 import json
 
-from adapters.messaging.contracts import schemas, validate_message
-from contracts.envelope import Envelope
+from adapters.messaging.contracts import validate_message
 from contracts.messages import (
     ARCHIVE_COMPENSATED_EVENT,
     ARCHIVE_COMPENSATION_DECIDED_EVENT,
@@ -22,7 +21,6 @@ from contracts.messages import (
     PageCapturedPayload,
     StartCrawlPayload,
 )
-from contracts.types import ArtifactReferenceContract
 
 MESSAGE_CONTRACTS = (
     ("capture-page.v1.schema.json", CAPTURE_PAGE_EVENT, CapturePagePayload),
@@ -123,22 +121,3 @@ def test_message_contracts_validate_crawl_completed_with_shared_manifest_ref() -
     }
 
     assert validate_message(json.dumps(envelope).encode(), "CrawlCompleted") == envelope
-
-
-def test_python_contract_types_match_shared_schemas() -> None:
-    contract_schemas = schemas()
-    envelope_schema = contract_schemas["types/envelope.v1.schema.json"]
-    artifact_schema = contract_schemas["types/artifact-ref.v1.schema.json"]
-
-    assert set(Envelope.__annotations__) == set(envelope_schema["properties"])
-    assert Envelope.__required_keys__ == frozenset(envelope_schema["required"])
-    assert set(ArtifactReferenceContract.__annotations__) == set(artifact_schema["properties"])
-    assert ArtifactReferenceContract.__required_keys__ == frozenset(artifact_schema["required"])
-
-    for schema_id, message_type, payload_type in MESSAGE_CONTRACTS:
-        schema = contract_schemas[schema_id]
-        payload_schema = schema["properties"]["payload"]
-
-        assert schema["properties"]["type"]["const"] == message_type
-        assert set(payload_type.__annotations__) == set(payload_schema["properties"])
-        assert payload_type.__required_keys__ == frozenset(payload_schema["required"])

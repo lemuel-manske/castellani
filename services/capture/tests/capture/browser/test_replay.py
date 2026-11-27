@@ -5,8 +5,7 @@ import httpx
 import pytest
 from support.recording import DOWNLOAD, PDF, LocalSite, replay_page
 
-from capture.browser import capture_local_page
-from capture.browser.recording import PyWBReplayServer
+from capture.browser import capture_local_page, PyWBReplayServer
 from utils.io import read_gzip_files
 
 

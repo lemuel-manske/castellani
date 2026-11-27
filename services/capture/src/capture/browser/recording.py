@@ -103,29 +103,28 @@ async def wait_for_process(process: asyncio.subprocess.Process) -> int:
 
 
 async def stop_process(process: asyncio.subprocess.Process) -> None:
+    async def do_stop(process: asyncio.subprocess.Process) -> None:
+        try:
+            process.send_signal(signal.SIGINT)
+        except ProcessLookupError:
+            await process.wait()
+            return
+
+        try:
+            await asyncio.wait_for(
+                process.wait(),
+                timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            if process.returncode is None:
+                process.kill()
+
+            await process.wait()
+
     if process.returncode is not None:
         return
 
-    await complete_before_cancellation(_stop_process(process))
-
-
-async def _stop_process(process: asyncio.subprocess.Process) -> None:
-    try:
-        process.send_signal(signal.SIGINT)
-    except ProcessLookupError:
-        await process.wait()
-        return
-
-    try:
-        await asyncio.wait_for(
-            process.wait(),
-            timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS,
-        )
-    except TimeoutError:
-        if process.returncode is None:
-            process.kill()
-
-        await process.wait()
+    await complete_before_cancellation(do_stop(process))
 
 
 class PyWBRecorder:
@@ -299,3 +298,8 @@ class PyWBReplayServer:
 
         if result != 0:
             raise RuntimeError("pywb could not reindex the recording collection")
+
+__all__ = [
+    "PyWBRecorder",
+    "PyWBReplayServer",
+]
