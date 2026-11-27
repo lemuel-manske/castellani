@@ -85,19 +85,7 @@ func Send(
 	defer response.Body.Close()
 
 	data, err := io.ReadAll(response.Body)
-	require.NoErrorf(
-		t,
-		err,
-		"reading %s %s: status=%s content-length=%q content-range=%q content-type=%q transfer-encoding=%q bytes-read=%d",
-		method,
-		request.URL,
-		response.Status,
-		response.Header.Get("Content-Length"),
-		response.Header.Get("Content-Range"),
-		response.Header.Get("Content-Type"),
-		response.Header.Get("Transfer-Encoding"),
-		len(data),
-	)
+	require.NoError(t, err)
 
 	return Result{
 		Status: response.StatusCode,
