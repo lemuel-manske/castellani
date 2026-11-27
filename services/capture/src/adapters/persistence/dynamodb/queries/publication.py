@@ -12,6 +12,7 @@ from contracts.messages import (
 from domain.capture import (
     DECISION_COMPENSATE,
     DECISION_PUBLISH,
+    MANIFEST_PUBLISHED,
     PACKAGE_PENDING,
     PACKAGE_PREPARED,
     PACKAGE_PREPARING,
@@ -46,7 +47,7 @@ def pending_package_scan() -> dict[str, Any]:
             "#lease": "packageLeaseUntil",
         },
         "ExpressionAttributeValues": {
-            ":published": {"S": "PUBLISHED"},
+            ":published": {"S": MANIFEST_PUBLISHED},
             ":pending": {"S": PACKAGE_PENDING},
             ":preparing": {"S": PACKAGE_PREPARING},
             ":now": {"N": "0"},
@@ -92,7 +93,7 @@ def claim_package_update(
             "#owner": "packageLeaseOwner",
         },
         "ExpressionAttributeValues": {
-            ":published": {"S": "PUBLISHED"},
+            ":published": {"S": MANIFEST_PUBLISHED},
             ":pending": {"S": PACKAGE_PENDING},
             ":preparing": {"S": PACKAGE_PREPARING},
             ":lease": {"N": str(lease_until)},
@@ -165,7 +166,7 @@ def prepare_package_transaction(
                     "#owner": "packageLeaseOwner",
                 },
                 "ExpressionAttributeValues": {
-                    ":published": {"S": "PUBLISHED"},
+                    ":published": {"S": MANIFEST_PUBLISHED},
                     ":preparing": {"S": PACKAGE_PREPARING},
                     ":pending": {"S": PACKAGE_PENDING},
                     ":prepared": {"S": PACKAGE_PREPARED},

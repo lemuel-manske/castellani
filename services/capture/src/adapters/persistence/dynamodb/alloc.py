@@ -9,6 +9,7 @@ from domain.capture import (
     CaptureReservationLostError,
     InvalidAttemptId,
     InvalidLeaseDuration,
+    InvalidReservationRenewal,
     InvalidSlotCount,
     new_reservation_id,
 )
@@ -23,7 +24,7 @@ from .queries.alloc import (
     reservation_from_item,
     reserve_slot,
 )
-from .values import number_from_item
+from .values import number_from_item, optional_string
 
 DEFAULT_SLOT_COUNT = 10
 DEFAULT_LEASE_DURATION = 60
@@ -67,8 +68,8 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
                 if (
                     item is not None
-                    and item.get("ownerAttemptId", {}).get("S") == attempt_id
-                    and item.get("reservationId", {}).get("S") == reservation_id
+                    and optional_string(item, "ownerAttemptId") == attempt_id
+                    and optional_string(item, "reservationId") == reservation_id
                     and number_from_item(item, "leaseUntil", "browser slot") > self.clock()
                 ):
                     return reservation_from_item(slot_id, item)
@@ -103,8 +104,8 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
 
                     if (
                         existing is not None
-                        and existing.get("ownerAttemptId", {}).get("S") == attempt_id
-                        and existing.get("reservationId", {}).get("S") == reservation_id
+                        and optional_string(existing, "ownerAttemptId") == attempt_id
+                        and optional_string(existing, "reservationId") == reservation_id
                         and number_from_item(existing, "leaseUntil", "browser slot") > self.clock()
                     ):
                         return reservation_from_item(slot_id, existing)
@@ -139,7 +140,16 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
                     "browser capacity reservation is no longer owned"
                 ) from error
 
-            return reservation_from_item(reservation.slot_id, response["Attributes"])
+            renewed = reservation_from_item(reservation.slot_id, response["Attributes"])
+
+            try:
+                reservation.verify_renewal(renewed, now)
+            except InvalidReservationRenewal as error:
+                raise CaptureReservationLostError(
+                    "browser capacity reservation renewal returned an invalid reservation"
+                ) from error
+
+            return renewed
 
         return await asyncio.to_thread(renew)
 

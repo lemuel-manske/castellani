@@ -33,6 +33,7 @@ from .queries.session import (
     update_session,
 )
 from .queries.task import read_run
+from .values import number_from_item, string_from_item
 
 GENERATION_ATTEMPTS = 5
 
@@ -82,13 +83,15 @@ class DynamoDBSessionStore(SessionStore):
         if not item:
             return None
 
-        if int(item["expiresAtEpoch"]["N"]) <= datetime.now(UTC).timestamp():
+        expires_at = number_from_item(item, "expiresAtEpoch", "session request")
+
+        if expires_at <= datetime.now(UTC).timestamp():
             return None
 
-        if item["fingerprint"]["S"] != fingerprint:
+        if string_from_item(item, "fingerprint", "session request") != fingerprint:
             raise SessionConflict("idempotency key was reused with a different body")
 
-        return item["sessionId"]["S"]
+        return string_from_item(item, "sessionId", "session request")
 
     async def save(self, session: AuthSession) -> None:
         updated_at = utc_now()
@@ -111,7 +114,7 @@ class DynamoDBSessionStore(SessionStore):
                 if run is None:
                     raise SessionConflict("archive run does not exist")
 
-                current = int(run.get("authGeneration", {}).get("N", "0"))
+                current = int(number_from_item(run, "authGeneration", "capture run", default=0))
                 generation = current + 1
 
                 try:
@@ -159,7 +162,7 @@ class DynamoDBSessionStore(SessionStore):
                 response = scan_sessions(self.client, cursor)
 
                 for item in response.get("Items", []):
-                    status = SessionStatus(item["status"]["S"])
+                    status = SessionStatus(string_from_item(item, "status", "auth session"))
 
                     if status not in ACTIVE_SESSION_STATUSES:
                         continue

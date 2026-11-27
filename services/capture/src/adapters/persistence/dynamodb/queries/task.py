@@ -9,7 +9,12 @@ from contracts.messages import (
     PageCapturedPayload,
 )
 from domain.capture import (
+    ADMISSION_CLOSED,
+    ADMISSION_OPEN,
     DEFAULT_AUTH_GENERATION,
+    TASK_CLAIMED,
+    TASK_COMPLETED,
+    TASK_PENDING,
     ArtifactReference,
     CaptureOutcome,
     DiscoveredPage,
@@ -19,7 +24,12 @@ from domain.capture import (
 from topology.tables import FRONTIER_TABLE, OUTBOX_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 from utils.time import utc
 
-from ..values import envelope_matches, number_from_item, optional_number
+from ..values import (
+    envelope_matches,
+    number_from_item,
+    optional_number,
+    string_from_item,
+)
 from .common import fence_condition, outbox_put
 
 
@@ -32,17 +42,17 @@ def claim_from_item(
         task = PageTask(
             archive_id=archive_id,
             url_key=url_key,
-            url=item["url"]["S"],
-            depth=int(item["depth"]["N"]),
+            url=string_from_item(item, "url", "page task"),
+            depth=int(number_from_item(item, "depth", "page task")),
         )
 
         return TaskClaim(
             task=task,
-            attempt_id=item["attemptId"]["S"],
-            fence=int(item["fence"]["N"]),
-            lease_until=float(item["leaseUntil"]["N"]),
+            attempt_id=string_from_item(item, "attemptId", "page task"),
+            fence=int(number_from_item(item, "fence", "page task")),
+            lease_until=float(number_from_item(item, "leaseUntil", "page task")),
         )
-    except (KeyError, TypeError, ValueError) as error:
+    except (RuntimeError, TypeError, ValueError) as error:
         raise RuntimeError("DynamoDB returned an invalid page-task claim") from error
 
 
@@ -98,7 +108,7 @@ def read_depth(client: Any, archive_id: str, url_key: str) -> int:
     if item is None:
         raise RuntimeError("page-task disappeared before completion")
 
-    return int(item.get("depth", {}).get("N", "0"))
+    return int(number_from_item(item, "depth", "page task", default=0))
 
 
 def read_outbox(client: Any, message_id: str) -> dict[str, Any] | None:
@@ -127,7 +137,7 @@ def claim_task_transaction(
                 "Key": {"archiveId": {"S": archive_id}},
                 "ConditionExpression": "#admission = :open",
                 "ExpressionAttributeNames": {"#admission": "admission"},
-                "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                "ExpressionAttributeValues": {":open": {"S": ADMISSION_OPEN}},
             }
         },
         {
@@ -151,8 +161,8 @@ def claim_task_transaction(
                     "#fence": "fence",
                 },
                 "ExpressionAttributeValues": {
-                    ":pending": {"S": "PENDING"},
-                    ":claimed": {"S": "CLAIMED"},
+                    ":pending": {"S": TASK_PENDING},
+                    ":claimed": {"S": TASK_CLAIMED},
                     ":attempt": {"S": attempt_id},
                     ":lease": {"N": str(lease_until)},
                     ":now": {"N": str(now)},
@@ -186,7 +196,7 @@ def renew_task_transaction(
                 "Key": {"archiveId": {"S": archive_id}},
                 "ConditionExpression": "#admission = :open",
                 "ExpressionAttributeNames": {"#admission": "admission"},
-                "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                "ExpressionAttributeValues": {":open": {"S": ADMISSION_OPEN}},
             }
         },
         {
@@ -223,9 +233,9 @@ def _closure_expression(
     )
     values.update(
         {
-            ":closed": {"S": "CLOSED"},
+            ":closed": {"S": ADMISSION_CLOSED},
             ":closed_at": {"S": utc(datetime.fromtimestamp(now, UTC))},
-            ":pending": {"S": "PENDING"},
+            ":pending": {"S": TASK_PENDING},
         }
     )
 
@@ -245,7 +255,7 @@ def completion_run_update(
         "#auth_generation": "authGeneration",
     }
     values: dict[str, Any] = {
-        ":open": {"S": "OPEN"},
+        ":open": {"S": ADMISSION_OPEN},
         ":one": {"N": "1"},
         ":minus_one": {"N": "-1"},
         ":zero": {"N": "0"},
@@ -278,7 +288,7 @@ def failure_run_update(archive_id: str, now: float, close: bool) -> dict[str, An
         "#failed": "failedPages",
     }
     values: dict[str, Any] = {
-        ":open": {"S": "OPEN"},
+        ":open": {"S": ADMISSION_OPEN},
         ":one": {"N": "1"},
         ":minus_one": {"N": "-1"},
     }
@@ -364,7 +374,7 @@ def complete_task_transaction(
     )
     values.update(
         {
-            ":completed": {"S": "COMPLETED"},
+            ":completed": {"S": TASK_COMPLETED},
             ":snapshot": {"S": outcome.snapshot_id},
             ":capture_url": {"S": capture.requested_url},
             ":final_url": {"S": capture.final_url},
@@ -464,7 +474,7 @@ def admit_page_transaction(
                     "#auth_generation": "authGeneration",
                 },
                 "ExpressionAttributeValues": {
-                    ":open": {"S": "OPEN"},
+                    ":open": {"S": ADMISSION_OPEN},
                     ":zero": {"N": "0"},
                     ":one": {"N": "1"},
                     ":auth_generation": {"N": str(auth_generation)},
@@ -483,7 +493,7 @@ def admit_page_transaction(
                     "discoveryUrl": {"S": page.identity.discovery_url},
                     "identityVersion": {"N": "1"},
                     "depth": {"N": str(page.depth)},
-                    "state": {"S": "PENDING"},
+                    "state": {"S": TASK_PENDING},
                 },
                 "ConditionExpression": "attribute_not_exists(#url_key)",
                 "ExpressionAttributeNames": {"#url_key": "urlKey"},
@@ -511,7 +521,7 @@ def release_task_transaction(
         "urlKey": claim.task.url_key,
     }
     condition, names, values = fence_condition(claim.attempt_id, claim.fence, now)
-    values = {":pending": {"S": "PENDING"}, **values}
+    values = {":pending": {"S": TASK_PENDING}, **values}
 
     return [
         {
@@ -520,7 +530,7 @@ def release_task_transaction(
                 "Key": {"archiveId": {"S": claim.task.archive_id}},
                 "ConditionExpression": "#admission = :open",
                 "ExpressionAttributeNames": {"#admission": "admission"},
-                "ExpressionAttributeValues": {":open": {"S": "OPEN"}},
+                "ExpressionAttributeValues": {":open": {"S": ADMISSION_OPEN}},
             }
         },
         {

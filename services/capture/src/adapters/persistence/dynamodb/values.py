@@ -42,6 +42,12 @@ def optional_string(item: dict[str, Any], key: str) -> str | None:
     return value["S"] if value else None
 
 
+def optional_number_string(item: dict[str, Any], key: str) -> str | None:
+    value = item.get(key)
+
+    return value["N"] if value else None
+
+
 def envelope_matches(
     item: dict[str, Any],
     message_type: str,
@@ -51,8 +57,8 @@ def envelope_matches(
     stored = item.get("payload", {}).get("M", {})
 
     return (
-        item.get("type", {}).get("S") == message_type
-        and item.get("correlationId", {}).get("S") == archive_id
+        optional_string(item, "type") == message_type
+        and optional_string(item, "correlationId") == archive_id
         and all(stored.get(key) == value for key, value in payload.items())
     )
 

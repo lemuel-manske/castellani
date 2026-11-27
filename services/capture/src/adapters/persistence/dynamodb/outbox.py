@@ -25,6 +25,7 @@ from .queries.outbox import (
     query_due_messages,
     reschedule_message,
 )
+from .values import optional_number_string, optional_string
 
 OUTBOX_PENDING = "PENDING"
 OUTBOX_CLAIMED = "CLAIMED"
@@ -55,8 +56,8 @@ class DynamoDBOutbox(OutboxRepository):
             status: str,
             now: float,
         ) -> OutboxMessage | None:
-            message_id = item.get("messageId", {}).get("S")
-            due_at = item.get("nextAttemptAt", {}).get("N")
+            message_id = optional_string(item, "messageId")
+            due_at = optional_number_string(item, "nextAttemptAt")
 
             if not message_id or due_at is None:
                 raise RuntimeError("DynamoDB returned an invalid outbox record")

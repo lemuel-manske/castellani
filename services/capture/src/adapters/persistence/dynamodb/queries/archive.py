@@ -4,6 +4,11 @@ import json
 from typing import Any, cast
 
 from domain.capture import (
+    TASK_CLAIMED,
+    TASK_COMPLETED,
+    TASK_FAILED,
+    TASK_PENDING,
+    TASK_WAITING_FOR_AUTH,
     ArchivePage,
     InvalidArchiveCursor,
     PageListing,
@@ -14,11 +19,11 @@ from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 from ..values import optional_string, string_from_item
 
 PAGE_STATUSES = {
-    "PENDING": "PENDING",
-    "CLAIMED": "RUNNING",
-    "WAITING_FOR_AUTH": "WAITING_FOR_AUTH",
-    "COMPLETED": "CAPTURED",
-    "FAILED": "FAILED",
+    TASK_PENDING: "PENDING",
+    TASK_CLAIMED: "RUNNING",
+    TASK_WAITING_FOR_AUTH: "WAITING_FOR_AUTH",
+    TASK_COMPLETED: "CAPTURED",
+    TASK_FAILED: "FAILED",
 }
 
 MAX_PAGE_LIMIT = 100
@@ -121,10 +126,10 @@ def decode_cursor(cursor: str, archive_id: str) -> dict[str, Any]:
 
     typed_key = cast(dict[str, Any], key)
 
-    if typed_key.get("archiveId", {}).get("S") != archive_id:
+    if optional_string(typed_key, "archiveId") != archive_id:
         raise InvalidArchiveCursor
 
-    if not isinstance(typed_key.get("urlKey", {}).get("S"), str):
+    if not isinstance(optional_string(typed_key, "urlKey"), str):
         raise InvalidArchiveCursor
 
     return typed_key

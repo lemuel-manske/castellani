@@ -3,7 +3,12 @@ from typing import Any
 from domain.login import AuthProfileReference, AuthSession, SessionStatus
 from topology.tables import RUNS_TABLE, SESSION_REQUESTS_TABLE, SESSIONS_TABLE
 
-from ..values import optional_number, optional_string
+from ..values import (
+    number_from_item,
+    optional_number,
+    optional_string,
+    string_from_item,
+)
 
 
 def session_item(
@@ -38,13 +43,13 @@ def session_item(
 
 def session_from_item(item: dict[str, Any]) -> AuthSession:
     return AuthSession(
-        session_id=item["sessionId"]["S"],
-        archive_id=item["archiveId"]["S"],
-        target_url=item["targetUrl"]["S"],
-        status=SessionStatus(item["status"]["S"]),
-        expires_at=item["expiresAt"]["S"],
-        manager_id=item["managerId"]["S"],
-        version=int(item["version"]["N"]),
+        session_id=string_from_item(item, "sessionId", "auth session"),
+        archive_id=string_from_item(item, "archiveId", "auth session"),
+        target_url=string_from_item(item, "targetUrl", "auth session"),
+        status=SessionStatus(string_from_item(item, "status", "auth session")),
+        expires_at=string_from_item(item, "expiresAt", "auth session"),
+        manager_id=string_from_item(item, "managerId", "auth session"),
+        version=int(number_from_item(item, "version", "auth session")),
         auth_generation=optional_number(item, "authGeneration"),
         profile_key=optional_string(item, "profileKey"),
         vnc_origin=optional_string(item, "vncOrigin"),

@@ -2,6 +2,8 @@ import asyncio
 from typing import Any
 
 from domain.capture import (
+    DECISION_PUBLISH,
+    REPLAY_READY,
     InvalidPageLimit,
     PageListing,
     SnapshotReference,
@@ -62,10 +64,10 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         def read() -> WACZObject | None:
             run = read_run(self.client, archive_id)
 
-            if run is None or (optional_string(run, "decision") or "") != "PUBLISH":
+            if run is None or (optional_string(run, "decision") or "") != DECISION_PUBLISH:
                 return None
 
-            if (optional_string(run, "replayStatus") or "") != "READY":
+            if (optional_string(run, "replayStatus") or "") != REPLAY_READY:
                 return None
 
             key = optional_string(run, "packageKey") or ""

@@ -2,10 +2,16 @@ from typing import Any
 
 from contracts.messages import CRAWL_COMPLETED_EVENT, CrawlCompletedPayload
 from contracts.types import ArtifactReferenceContract
-from domain.capture import PACKAGE_PENDING, identify_url
+from domain.capture import (
+    MANIFEST_PENDING,
+    MANIFEST_PUBLISHED,
+    PACKAGE_PENDING,
+    TASK_COMPLETED,
+    identify_url,
+)
 from topology.tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
-from ..values import envelope_matches, plain_attributes
+from ..values import envelope_matches, optional_string, plain_attributes
 from .common import outbox_put
 
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
@@ -63,7 +69,7 @@ def seed_succeeded(run: dict[str, Any], frontier: list[dict[str, Any]]) -> bool:
     seed_key = identify_url(run["seedUrl"]).url_key
 
     return any(
-        item.get("urlKey") == seed_key and item.get("state") == "COMPLETED" for item in frontier
+        item.get("urlKey") == seed_key and item.get("state") == TASK_COMPLETED for item in frontier
     )
 
 
@@ -85,8 +91,8 @@ def is_crawl_completed_message(
 
 def is_published_manifest(item: dict[str, Any], digest: str) -> bool:
     return (
-        item.get("manifestStatus", {}).get("S") == "PUBLISHED"
-        and item.get("manifestDigest", {}).get("S") == digest
+        optional_string(item, "manifestStatus") == MANIFEST_PUBLISHED
+        and optional_string(item, "manifestDigest") == digest
     )
 
 
@@ -117,8 +123,8 @@ def finalize_transaction(
         "#digest": "manifestDigest",
     }
     values: dict[str, Any] = {
-        ":pending": {"S": "PENDING"},
-        ":published": {"S": "PUBLISHED"},
+        ":pending": {"S": MANIFEST_PENDING},
+        ":published": {"S": MANIFEST_PUBLISHED},
         ":key": {"S": artifact["key"]},
         ":digest": {"S": digest},
     }

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from contracts.messages import CAPTURE_PAGE_EVENT, CapturePagePayload
-from domain.capture import StartCrawl, identify_url
+from domain.capture import ADMISSION_OPEN, TASK_PENDING, StartCrawl, identify_url
 from topology.tables import FRONTIER_TABLE, RUNS_TABLE
 
 from .common import outbox_put
@@ -18,7 +18,7 @@ def seed_run_transaction(
 
     run_item: dict[str, Any] = {
         "archiveId": {"S": start.archive_id},
-        "admission": {"S": "OPEN"},
+        "admission": {"S": ADMISSION_OPEN},
         "seedUrl": {"S": start.seed_url},
         "maxDepth": {"N": str(start.max_depth)},
         "maxPages": {"N": str(start.max_pages)},
@@ -68,7 +68,7 @@ def seed_run_transaction(
                     "discoveryUrl": {"S": identity.discovery_url},
                     "identityVersion": {"N": "1"},
                     "depth": {"N": "0"},
-                    "state": {"S": "PENDING"},
+                    "state": {"S": TASK_PENDING},
                 },
                 "ConditionExpression": "attribute_not_exists(#url_key)",
                 "ExpressionAttributeNames": {"#url_key": "urlKey"},

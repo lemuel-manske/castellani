@@ -8,6 +8,9 @@ from botocore.exceptions import ClientError
 
 from adapters.serialization import artifact_document, manifest_document
 from domain.capture import (
+    ADMISSION_CLOSED,
+    MANIFEST_PENDING,
+    TASK_FAILED,
     ArtifactReference,
     CaptureRunMissing,
     manifest_key,
@@ -28,6 +31,7 @@ from .queries.finalize import (
     seed_succeeded,
 )
 from .queries.task import read_outbox, read_run
+from .values import optional_string
 
 
 class DynamoDBManifestFinalizer(CrawlFinalizer):
@@ -51,8 +55,8 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
                 raise CaptureRunMissing("Capture run disappeared during finalization")
 
             if (
-                run.get("admission", {}).get("S") != "CLOSED"
-                or run.get("manifestStatus", {}).get("S") != "PENDING"
+                optional_string(run, "admission") != ADMISSION_CLOSED
+                or optional_string(run, "manifestStatus") != MANIFEST_PENDING
             ):
                 return
 
@@ -95,7 +99,7 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
                 now=now,
                 seed_ok=seed_ok,
                 captured_count=len(snapshots),
-                failed_count=sum(1 for item in frontier if item.get("state") == "FAILED"),
+                failed_count=sum(1 for item in frontier if item.get("state") == TASK_FAILED),
             )
 
             try:

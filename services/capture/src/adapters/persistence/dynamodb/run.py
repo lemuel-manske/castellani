@@ -1,11 +1,10 @@
 import asyncio
 import time
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
 
 from botocore.exceptions import ClientError
 
-from domain.capture import StartCrawl, identify_url
+from domain.capture import StartCrawl, capture_page_message_id, identify_url
 from ports.capture import CrawlStarter
 from ports.clock import Clock
 
@@ -30,12 +29,7 @@ class DynamoDBRunStarter(CrawlStarter):
             now = self.clock()
 
             identity = identify_url(start.seed_url)
-            message_id = str(
-                uuid5(
-                    NAMESPACE_URL,
-                    f"capture-page:{start.archive_id}:{identity.url_key}",
-                )
-            )
+            message_id = capture_page_message_id(start.archive_id, identity.url_key)
 
             try:
                 self.client.transact_write_items(

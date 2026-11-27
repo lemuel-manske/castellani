@@ -18,7 +18,14 @@ from .archive import (
 )
 from .auth import DEFAULT_AUTH_GENERATION, AuthContext, AuthGenerationChanged
 from .capture import ArtifactReference, CaptureOutcome, PageCapture, new_snapshot_id
-from .crawl import CaptureRunMissing, StartCrawl
+from .crawl import (
+    ADMISSION_CLOSED,
+    ADMISSION_OPEN,
+    MANIFEST_PENDING,
+    MANIFEST_PUBLISHED,
+    CaptureRunMissing,
+    StartCrawl,
+)
 from .discovery import DiscoveredPage, identify_discovered_pages
 from .lease import InvalidLeaseDuration
 from .manifest import (
@@ -47,15 +54,25 @@ from .package import (
     archive_published_message_id,
 )
 from .task import (
+    TASK_CLAIMED,
+    TASK_COMPLETED,
+    TASK_FAILED,
+    TASK_PENDING,
+    TASK_WAITING_FOR_AUTH,
     InvalidTaskClaimRenewal,
     PageTask,
     TaskClaim,
     TaskClaimLostError,
+    capture_page_message_id,
     new_attempt_id,
+    page_captured_message_id,
+    release_page_message_id,
 )
 from .url_identity import InvalidURLIdentity, URLIdentity, identify_url
 
 __all__ = [
+    "ADMISSION_CLOSED",
+    "ADMISSION_OPEN",
     "ArchivePage",
     "ArtifactReference",
     "AuthContext",
@@ -81,6 +98,8 @@ __all__ = [
     "InvalidTaskClaimRenewal",
     "InvalidURLIdentity",
     "InvalidWACZRange",
+    "MANIFEST_PENDING",
+    "MANIFEST_PUBLISHED",
     "MANIFEST_SCHEMA_VERSION",
     "OutboxLeaseLostError",
     "OutboxMessage",
@@ -97,6 +116,11 @@ __all__ = [
     "REPLAY_READY",
     "SnapshotReference",
     "StartCrawl",
+    "TASK_CLAIMED",
+    "TASK_COMPLETED",
+    "TASK_FAILED",
+    "TASK_PENDING",
+    "TASK_WAITING_FOR_AUTH",
     "TaskClaim",
     "TaskClaimLostError",
     "URLIdentity",
@@ -105,6 +129,7 @@ __all__ = [
     "archive_compensated_message_id",
     "archive_prepared_message_id",
     "archive_published_message_id",
+    "capture_page_message_id",
     "identify_discovered_pages",
     "identify_url",
     "is_supported_normalizer_version",
@@ -113,4 +138,6 @@ __all__ = [
     "new_attempt_id",
     "new_reservation_id",
     "new_snapshot_id",
+    "page_captured_message_id",
+    "release_page_message_id",
 ]

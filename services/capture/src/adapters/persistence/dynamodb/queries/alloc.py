@@ -3,7 +3,7 @@ from typing import Any
 from domain.capture import CaptureReservation
 from topology.tables import BROWSER_SLOTS_TABLE
 
-from ..values import number_from_item
+from ..values import number_from_item, string_from_item
 from .common import reservation_condition
 
 
@@ -21,11 +21,11 @@ def read_slot(client: Any, slot_id: str) -> dict[str, Any] | None:
 
 def reservation_from_item(slot_id: str, item: dict[str, Any]) -> CaptureReservation:
     try:
-        attempt_id = item["ownerAttemptId"]["S"]
-        reservation_id = item["reservationId"]["S"]
+        attempt_id = string_from_item(item, "ownerAttemptId", "browser slot")
+        reservation_id = string_from_item(item, "reservationId", "browser slot")
         fence = int(number_from_item(item, "fence", "browser slot"))
         lease_until = number_from_item(item, "leaseUntil", "browser slot")
-    except (KeyError, TypeError, ValueError) as error:
+    except (RuntimeError, TypeError, ValueError) as error:
         raise RuntimeError("DynamoDB returned an invalid browser slot") from error
 
     return CaptureReservation(

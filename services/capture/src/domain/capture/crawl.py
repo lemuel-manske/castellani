@@ -1,5 +1,11 @@
 from dataclasses import dataclass
 
+ADMISSION_OPEN = "OPEN"
+ADMISSION_CLOSED = "CLOSED"
+
+MANIFEST_PENDING = "PENDING"
+MANIFEST_PUBLISHED = "PUBLISHED"
+
 
 class CaptureRunMissing(RuntimeError):
     """Raised when a crawl run that must exist cannot be found."""
