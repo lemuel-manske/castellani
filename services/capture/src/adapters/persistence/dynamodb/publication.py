@@ -1,6 +1,5 @@
 import asyncio
 import time
-from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 from uuid import uuid4
@@ -19,6 +18,7 @@ from domain.capture import (
     archive_published_message_id,
 )
 from ports.capture import ArchivePublicationRepository
+from ports.clock import Clock
 
 from .error_handling import (
     ConditionalWriteRejected,
@@ -62,7 +62,7 @@ class DynamoDBArchivePublicationRepository(ArchivePublicationRepository):
     def __init__(
         self,
         client: Any,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
     ) -> None:
         self.client = client
         self.clock = clock

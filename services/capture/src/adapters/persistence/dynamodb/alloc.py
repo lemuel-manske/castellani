@@ -1,6 +1,5 @@
 import asyncio
 import time
-from collections.abc import Callable
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -11,6 +10,7 @@ from domain.capture import (
     new_reservation_id,
 )
 from ports.capture import CaptureAllocator
+from ports.clock import Clock
 
 from .error_handling import is_conditional_failure
 from .queries.alloc import (
@@ -34,7 +34,7 @@ class DynamoDBCaptureAllocator(CaptureAllocator):
         client: Any,
         slot_count: int = DEFAULT_SLOT_COUNT,
         lease_duration: float = DEFAULT_LEASE_DURATION,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
     ) -> None:
         if slot_count < 1:
             raise ValueError("slot_count must be positive")

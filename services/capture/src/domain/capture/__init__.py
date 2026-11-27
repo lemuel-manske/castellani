@@ -41,7 +41,6 @@ from .package import (
     archive_compensated_message_id,
     archive_prepared_message_id,
     archive_published_message_id,
-    package_key,
 )
 from .task import (
     InvalidTaskClaimRenewal,
@@ -104,5 +103,4 @@ __all__ = [
     "new_attempt_id",
     "new_reservation_id",
     "new_snapshot_id",
-    "package_key",
 ]

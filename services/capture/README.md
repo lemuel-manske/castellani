@@ -1,6 +1,6 @@
 # Capture
 
-Capture executes page-level web captures for Castellani using `libs/crawler` for browser execution and WARC recording. Its distributed frontier remains the authority for URL admission, task ownership, retries, and crawl completion; browser execution does not schedule work independently.
+Capture executes page-level web captures for Castellani using `libs/crawler` for browser execution, WARC recording, and WACZ packaging. Its distributed frontier remains the authority for URL admission, task ownership, retries, and crawl completion; browser execution does not schedule work independently.
 
 ## Development
 

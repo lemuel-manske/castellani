@@ -8,9 +8,7 @@ import aio_pika
 import boto3
 from aio_pika.abc import AbstractRobustConnection
 
-from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
-from adapters.artifacts.s3 import S3ArtifactStore
-from adapters.browser.executor import BrowserPageExecutor
+from adapters.artifacts.s3 import S3ArtifactStore, S3AuthProfileStore
 from adapters.messaging.rabbitmq.consumer import (
     RabbitMQCompensationDecisionConsumer,
     RabbitMQPageTaskConsumer,
@@ -31,6 +29,7 @@ from application.capture.archive_decisions import ArchiveDecisionProcessor
 from application.capture.archive_preparation import ArchivePackager
 from application.capture.page_tasks import PageTaskProcessor
 from application.capture.start_crawls import StartCrawlProcessor
+from ports.login import AuthProfileCipher
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from topology.tables import CAPTURE_TABLES
 
@@ -118,7 +117,6 @@ class CaptureRuntime:
             self.archive_retrieval = DynamoDBArchiveRetrieval(
                 client=self.dynamodb_client,
                 s3_client=self.s3_client,
-                artifact_bucket=ARCHIVE_ARTIFACTS_BUCKET,
             )
 
             finalizer = DynamoDBManifestFinalizer(
@@ -140,7 +138,7 @@ class CaptureRuntime:
 
             auth_contexts = StoredAuthContexts(
                 sessions=DynamoDBSessionStore(client=self.dynamodb_client),
-                profiles=EncryptedAuthProfileStore(
+                profiles=S3AuthProfileStore(
                     s3_client=self.s3_client,
                     cipher=AuthProfileCipher(self.settings.auth_profile_key),
                 ),
@@ -154,7 +152,6 @@ class CaptureRuntime:
             worker = new_worker(
                 task_repository=task_repository,
                 capture_allocator=allocator,
-                executor=BrowserPageExecutor(),
                 artifacts=artifacts,
                 auth_contexts=auth_contexts,
             )
@@ -176,7 +173,7 @@ class CaptureRuntime:
                 ArchivePackager(
                     repository=publication_repository,
                     artifacts=artifacts,
-                    root=Path(self.settings.artifact_directory) / "packages",
+                    root=self.settings.packages_directory,
                     lease_duration=self.settings.outbox_lease_duration,
                     poll_interval=self.settings.outbox_poll_interval,
                 ).run(),

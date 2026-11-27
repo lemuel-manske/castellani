@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 
 import boto3
 
-from adapters.artifacts.auth import AuthProfileCipher, EncryptedAuthProfileStore
-from adapters.browser.login import LoginBrowserSettings, PlaywrightLoginBrowser
+from adapters.artifacts.s3 import S3AuthProfileStore
+from adapters.browser.playwright import LoginBrowserSettings, PlaywrightLoginBrowser
 from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from application.login import LoginManager
+from ports.login import AuthProfileCipher
 from topology.tables import LOGIN_TABLES
 
 from .settings import LoginSettings
@@ -84,7 +85,7 @@ class LoginRuntime:
                 session_ttl_seconds=self.settings.session_ttl_seconds,
             )
 
-            profiles = EncryptedAuthProfileStore(
+            profiles = S3AuthProfileStore(
                 s3_client=self.s3_client,
                 cipher=AuthProfileCipher(self.settings.auth_profile_key),
             )

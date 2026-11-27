@@ -5,10 +5,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from domain.capture import ArtifactReference, TaskClaim, package_key
+from domain.capture import ArtifactReference, TaskClaim
 from ports.artifacts import DecisionArtifacts, PackageArtifacts
 from ports.worker import ArtifactStore
 from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
+
+from .keys import archive_prefixes, package_key, staging_artifact_key
 
 DEFAULT_STAGING_ROOT = Path("/tmp/castellani/capture")
 
@@ -23,6 +25,33 @@ def file_digest(path: Path) -> str:
             digest.update(chunk)
 
     return digest.hexdigest()
+
+
+def delete_objects_by_prefix(client: Any, prefixes: tuple[str, ...]) -> int:
+    deleted = 0
+    paginator = client.get_paginator("list_objects_v2")
+
+    for prefix in prefixes:
+        objects: list[dict[str, str]] = []
+
+        for page in paginator.paginate(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Prefix=prefix):
+            objects.extend(
+                {"Key": item["Key"]}
+                for item in page.get("Contents", ())
+                if item.get("Key") is not None
+            )
+
+        for offset in range(0, len(objects), DELETE_BATCH_SIZE):
+            batch = objects[offset : offset + DELETE_BATCH_SIZE]
+
+            client.delete_objects(
+                Bucket=ARCHIVE_ARTIFACTS_BUCKET,
+                Delete={"Objects": batch, "Quiet": True},
+            )
+
+            deleted += len(batch)
+
+    return deleted
 
 
 class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
@@ -71,16 +100,7 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
                 if relative in (Path("."), Path("")):
                     raise ValueError("capture artifact must have a relative file name")
 
-                key = "/".join(
-                    (
-                        "capture-staging",
-                        quote(claim.task.archive_id, safe=""),
-                        quote(claim.task.url_key, safe=""),
-                        quote(claim.attempt_id, safe=""),
-                        quote(snapshot_id, safe=""),
-                        *(quote(part, safe="") for part in relative.parts),
-                    )
-                )
+                key = staging_artifact_key(claim, snapshot_id, relative)
 
                 if key in seen_keys:
                     raise ValueError(f"duplicate artifact key: {key}")
@@ -235,41 +255,9 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
 
     async def delete_archive_objects(self, archive_id: str) -> int:
         def delete() -> int:
-            quoted = quote(archive_id, safe="")
-
             return delete_objects_by_prefix(
                 self.client,
-                (
-                    f"capture-staging/{quoted}/",
-                    f"packages/{quoted}/",
-                ),
+                archive_prefixes(archive_id),
             )
 
         return await asyncio.to_thread(delete)
-
-
-def delete_objects_by_prefix(client: Any, prefixes: tuple[str, ...]) -> int:
-    deleted = 0
-    paginator = client.get_paginator("list_objects_v2")
-
-    for prefix in prefixes:
-        objects: list[dict[str, str]] = []
-
-        for page in paginator.paginate(Bucket=ARCHIVE_ARTIFACTS_BUCKET, Prefix=prefix):
-            objects.extend(
-                {"Key": item["Key"]}
-                for item in page.get("Contents", ())
-                if item.get("Key") is not None
-            )
-
-        for offset in range(0, len(objects), DELETE_BATCH_SIZE):
-            batch = objects[offset : offset + DELETE_BATCH_SIZE]
-
-            client.delete_objects(
-                Bucket=ARCHIVE_ARTIFACTS_BUCKET,
-                Delete={"Objects": batch, "Quiet": True},
-            )
-
-            deleted += len(batch)
-
-    return deleted

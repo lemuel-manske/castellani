@@ -4,8 +4,8 @@ from fastapi.responses import Response
 from problem import problem
 from utils.types import JSON
 
+from ..serialization import page_listing_json, snapshot_reference_json
 from .routes import ARCHIVE_PAGES_PATH, ARCHIVE_SNAPSHOT_PATH
-from .serialization import page_listing_json, snapshot_reference_json
 
 router = APIRouter()
 

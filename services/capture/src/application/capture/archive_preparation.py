@@ -2,18 +2,23 @@ import asyncio
 import logging
 import tempfile
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from crawler.wacz import create_wacz, validate_wacz
+
 from adapters.serialization import artifact_references
-from capture.wacz import create_wacz, validate_wacz
 from domain.capture import PendingPackage, PreparedPackage
 from ports.artifacts import PackageArtifacts
 from ports.capture import ArchivePublicationRepository
+from ports.clock import Clock
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_LEASE_DURATION = 60.0
+DEFAULT_POLL_INTERVAL = 0.5
 
 
 class ArchivePackager:
@@ -24,9 +29,9 @@ class ArchivePackager:
         repository: ArchivePublicationRepository,
         artifacts: PackageArtifacts,
         root: Path,
-        lease_duration: float = 60.0,
-        poll_interval: float = 0.5,
-        clock: Callable[[], float] = time.time,
+        lease_duration: float = DEFAULT_LEASE_DURATION,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        clock: Clock = time.time,
     ) -> None:
         if lease_duration <= 0:
             raise ValueError("lease_duration must be positive")
@@ -41,7 +46,22 @@ class ArchivePackager:
         self.poll_interval = poll_interval
         self.clock = clock
 
-    async def package_once(self) -> bool:
+    async def run(self) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+
+        while True:
+            try:
+                packaged = await self._package_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("archive packaging cycle failed")
+                packaged = False
+
+            if not packaged:
+                await asyncio.sleep(self.poll_interval)
+
+    async def _package_once(self) -> bool:
         pending = await self.repository.claim_package(self.lease_duration)
 
         if pending is None:
@@ -54,21 +74,6 @@ class ArchivePackager:
             raise
 
         return True
-
-    async def run(self) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
-
-        while True:
-            try:
-                packaged = await self.package_once()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("archive packaging cycle failed")
-                packaged = False
-
-            if not packaged:
-                await asyncio.sleep(self.poll_interval)
 
     async def _package(self, pending: PendingPackage) -> None:
         body, manifest_reference = await self.artifacts.read_object(

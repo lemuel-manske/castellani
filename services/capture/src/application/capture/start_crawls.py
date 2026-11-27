@@ -1,8 +1,8 @@
 import asyncio
-from collections.abc import Awaitable, Callable
 from contextlib import aclosing
 
 from domain.capture import StartCrawl, is_supported_normalizer_version
+from ports.capture import CrawlStarter
 from ports.messaging import StartCrawlConsumer
 
 
@@ -12,7 +12,7 @@ class StartCrawlProcessor:
     def __init__(
         self,
         consumer: StartCrawlConsumer,
-        starter: Callable[[StartCrawl], Awaitable[None]],
+        starter: CrawlStarter,
     ) -> None:
         self.consumer = consumer
         self.starter = starter

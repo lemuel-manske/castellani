@@ -3,22 +3,55 @@ import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from crawler import CaptureLimits, capture_page
+
 from domain.capture import (
+    AuthContext,
     AuthGenerationChanged,
     CaptureOutcome,
     CaptureReservation,
+    PageCapture,
     TaskClaim,
     new_snapshot_id,
 )
 from ports.capture import AuthContextStore, CaptureAllocator, TaskRepository
-from ports.worker import (
-    ArtifactStore,
-    CaptureArtifact,
-    CaptureExecutor,
-    CaptureRunner,
-    LeaseLostError,
-)
+from ports.worker import ArtifactStore, CaptureArtifact, CaptureRunner, LeaseLostError
 from utils.fn import awaitable, noop
+
+
+class CaptureExecutor:
+    """Executes a page capture and adapts its result to the worker artifact shape."""
+
+    def __init__(self, limits: CaptureLimits | None = None) -> None:
+        self.limits = limits or CaptureLimits()
+
+    async def execute(
+        self,
+        url: str,
+        output_dir: Path,
+        auth_context: AuthContext,
+    ) -> CaptureArtifact:
+        result = await capture_page(
+            url,
+            output_dir,
+            limits=self.limits,
+            storage_state=auth_context.storage_state,
+        )
+
+        return CaptureArtifact(
+            capture=PageCapture(
+                requested_url=result.requested_url,
+                final_url=result.final_url,
+                redirect_chain=result.redirect_chain,
+                status_code=result.status_code,
+                content_type=result.content_type,
+                title=result.title,
+                captured_at=result.captured_at,
+                discovered_urls=result.discovered_urls,
+            ),
+            blocked_urls=result.blocked_urls,
+            warc_files=result.warc_files,
+        )
 
 
 class ConcreteCaptureWorker(CaptureRunner):
@@ -28,14 +61,13 @@ class ConcreteCaptureWorker(CaptureRunner):
         self,
         task_repository: TaskRepository,
         capture_allocator: CaptureAllocator,
-        executor: CaptureExecutor,
         artifacts: ArtifactStore,
         auth_contexts: AuthContextStore,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ) -> None:
         self.task_repository = task_repository
         self.capacity_allocator = capture_allocator
-        self.executor = executor
+        self.executor = CaptureExecutor()
         self.artifacts = artifacts
         self.auth_contexts = auth_contexts
 

@@ -1,5 +1,5 @@
-import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from config.environment import (
     CAPTURE_ARTIFACT_DIRECTORY,
@@ -14,6 +14,7 @@ from config.environment import (
     CAPTURE_OUTBOX_RETRY_SECONDS,
     CAPTURE_RABBITMQ_URL,
     CAPTURE_S3_ENDPOINT_URL,
+    a_path,
     auth_profile_key,
     positive_float,
     positive_int,
@@ -26,6 +27,7 @@ DEFAULT_OUTBOX_LEASE_DURATION = 30.0
 DEFAULT_OUTBOX_POLL_INTERVAL = 0.5
 DEFAULT_OUTBOX_RETRY_DELAY = 5.0
 DEFAULT_ARTIFACT_DIRECTORY = "/tmp/castellani/capture"
+DEFAULT_PACKAGES_DIRECTORY = "/tmp/castellani/capture/packages"
 
 
 @dataclass(frozen=True)
@@ -50,10 +52,16 @@ class CaptureSettings:
     outbox_poll_interval: float = DEFAULT_OUTBOX_POLL_INTERVAL
     outbox_retry_delay: float = DEFAULT_OUTBOX_RETRY_DELAY
 
-    artifact_directory: str = DEFAULT_ARTIFACT_DIRECTORY
+    artifact_directory: Path = Path(DEFAULT_ARTIFACT_DIRECTORY)
+    packages_directory: Path = Path(DEFAULT_PACKAGES_DIRECTORY)
 
     @classmethod
     def from_environment(cls) -> "CaptureSettings":
+        artifact_dir = a_path(
+            CAPTURE_ARTIFACT_DIRECTORY,
+            DEFAULT_ARTIFACT_DIRECTORY,
+        )
+
         return cls(
             aws_region=required(CAPTURE_AWS_REGION),
             aws_access_key_id=required(CAPTURE_AWS_ACCESS_KEY_ID),
@@ -82,8 +90,6 @@ class CaptureSettings:
                 CAPTURE_OUTBOX_RETRY_SECONDS,
                 DEFAULT_OUTBOX_RETRY_DELAY,
             ),
-            artifact_directory=os.getenv(
-                CAPTURE_ARTIFACT_DIRECTORY,
-                DEFAULT_ARTIFACT_DIRECTORY,
-            ),
+            artifact_directory=artifact_dir,
+            packages_directory=Path(artifact_dir) / "packages",
         )

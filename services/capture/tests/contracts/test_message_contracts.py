@@ -1,6 +1,5 @@
 import json
 
-from adapters.messaging.contracts import validate_message
 from contracts.messages import (
     ARCHIVE_COMPENSATED_EVENT,
     ARCHIVE_COMPENSATION_DECIDED_EVENT,
@@ -21,6 +20,7 @@ from contracts.messages import (
     PageCapturedPayload,
     StartCrawlPayload,
 )
+from contracts.validation import validate_message
 
 MESSAGE_CONTRACTS = (
     ("capture-page.v1.schema.json", CAPTURE_PAGE_EVENT, CapturePagePayload),

@@ -17,6 +17,7 @@ from domain.capture import (
     new_attempt_id,
 )
 from ports.capture import TaskRepository
+from ports.clock import Clock
 
 from .error_handling import (
     ConditionalWriteRejected,
@@ -55,7 +56,7 @@ class DynamoDBTaskRepository(TaskRepository):
         self,
         client: Any,
         lease_duration: float,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
         on_closed: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         if lease_duration <= 0:

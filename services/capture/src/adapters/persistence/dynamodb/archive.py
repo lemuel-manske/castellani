@@ -8,6 +8,7 @@ from domain.capture import (
     WACZRangeNotSatisfiable,
 )
 from ports.capture import ArchiveRetrieval
+from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
 from utils.http import http_last_modified, normalize_etag, parse_range
 from utils.io import stream_body
 
@@ -22,11 +23,9 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
         self,
         client: Any,
         s3_client: Any,
-        artifact_bucket: str,
     ) -> None:
         self.client = client
         self.s3_client = s3_client
-        self.artifact_bucket = artifact_bucket
 
     async def list_pages(
         self,
@@ -73,7 +72,7 @@ class DynamoDBArchiveRetrieval(ArchiveRetrieval):
             if not key:
                 return None
 
-            bucket = optional_string(run, "packageBucket") or self.artifact_bucket
+            bucket = optional_string(run, "packageBucket") or ARCHIVE_ARTIFACTS_BUCKET
             request: dict[str, Any] = {"Bucket": bucket, "Key": key}
 
             head = self.s3_client.head_object(**request)

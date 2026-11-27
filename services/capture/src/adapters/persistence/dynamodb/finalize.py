@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import json
 import time
-from collections.abc import Callable
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -10,6 +9,7 @@ from botocore.exceptions import ClientError
 from adapters.serialization import artifact_document, manifest_document
 from domain.capture import ArtifactReference, manifest_key, manifest_message_id
 from ports.capture import CrawlFinalizer
+from ports.clock import Clock
 from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
 
 from .error_handling import ConditionalWriteRejected, is_transaction_canceled
@@ -32,7 +32,7 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
         self,
         client: Any,
         s3_client: Any,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
     ) -> None:
         self.client = client
         self.s3_client = s3_client

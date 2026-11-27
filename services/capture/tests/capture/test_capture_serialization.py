@@ -3,7 +3,6 @@ from capture.serialization import (
     page_listing_json,
     snapshot_reference_json,
 )
-
 from domain.capture import ArchivePage, PageListing, SnapshotReference
 
 

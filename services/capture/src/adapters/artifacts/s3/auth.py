@@ -1,51 +1,18 @@
 import asyncio
-import json
-import os
 from typing import Any
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-from ports.login import AuthProfileStore
+from ports.login import AuthProfileCipher, AuthProfileStore
 from topology.buckets import AUTH_PROFILE_BUCKET
 
-NONCE_BYTES = 12
 
-KEY_ENCODING = "utf-8"
-
-
-class AuthProfileCipher:
-    def __init__(self, key: bytes) -> None:
-        self.aead = AESGCM(key)
-
-    def encrypt(self, state: dict[str, Any]) -> bytes:
-        nonce = os.urandom(NONCE_BYTES)
-        payload = json.dumps(
-            state,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode(KEY_ENCODING)
-
-        return nonce + self.aead.encrypt(nonce, payload, None)
-
-    def decrypt(self, ciphertext: bytes) -> dict[str, Any]:
-        payload = self.aead.decrypt(
-            ciphertext[:NONCE_BYTES],
-            ciphertext[NONCE_BYTES:],
-            None,
-        )
-
-        result: dict[str, Any] = json.loads(payload.decode(KEY_ENCODING))
-
-        return result
-
-
-class EncryptedAuthProfileStore(AuthProfileStore):
+class S3AuthProfileStore(AuthProfileStore):
     def __init__(self, s3_client: Any, cipher: AuthProfileCipher) -> None:
         self.s3_client = s3_client
         self.cipher = cipher
 
     async def save(self, archive_id: str, generation: int, state: dict[str, Any]) -> str:
         key = f"auth-profiles/{archive_id}/generation-{generation}.json.enc"
+
         ciphertext = self.cipher.encrypt(state)
 
         def put() -> None:

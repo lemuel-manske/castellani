@@ -1,5 +1,4 @@
 from domain.login import AuthSession, SessionStatus
-
 from login.serialization import auth_session_json
 
 

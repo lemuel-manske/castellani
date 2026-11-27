@@ -7,6 +7,11 @@ from ports.messaging import MessagePublisher
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_LEASE_DURATION = 30.0
+DEFAULT_RETRY_DELAY = 5.0
+DEFAULT_POLL_INTERVAL = 0.5
+
+
 class OutboxDispatcher:
     """Delivers durable outbox messages and records their publication outcome."""
 
@@ -14,9 +19,9 @@ class OutboxDispatcher:
         self,
         outbox: OutboxRepository,
         publisher: MessagePublisher,
-        lease_duration: float = 30,
-        retry_delay: float = 5,
-        poll_interval: float = 0.5,
+        lease_duration: float = DEFAULT_LEASE_DURATION,
+        retry_delay: float = DEFAULT_RETRY_DELAY,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> None:
         if lease_duration <= 0:
             raise ValueError("lease_duration must be positive")
@@ -34,7 +39,20 @@ class OutboxDispatcher:
         self.retry_delay = retry_delay
         self.poll_interval = poll_interval
 
-    async def dispatch_once(self) -> bool:
+    async def run(self) -> None:
+        while True:
+            try:
+                dispatched = await self._dispatch_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("outbox dispatch cycle failed")
+                dispatched = False
+
+            if not dispatched:
+                await asyncio.sleep(self.poll_interval)
+
+    async def _dispatch_once(self) -> bool:
         message = await self.outbox.claim(self.lease_duration)
 
         if message is None:
@@ -56,16 +74,3 @@ class OutboxDispatcher:
         await self.outbox.confirm(message)
 
         return True
-
-    async def run(self) -> None:
-        while True:
-            try:
-                dispatched = await self.dispatch_once()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("outbox dispatch cycle failed")
-                dispatched = False
-
-            if not dispatched:
-                await asyncio.sleep(self.poll_interval)

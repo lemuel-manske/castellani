@@ -1,6 +1,5 @@
 import asyncio
 import time
-from collections.abc import Callable
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
@@ -8,6 +7,7 @@ from botocore.exceptions import ClientError
 
 from domain.capture import StartCrawl, identify_url
 from ports.capture import CrawlStarter
+from ports.clock import Clock
 
 from .error_handling import extract_cancellation_reasons, is_transaction_canceled
 from .queries.run import seed_run_transaction
@@ -20,7 +20,7 @@ class DynamoDBRunStarter(CrawlStarter):
     def __init__(
         self,
         client: Any,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
     ) -> None:
         self.client = client
         self.clock = clock

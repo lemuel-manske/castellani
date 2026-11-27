@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 
 from domain.capture import OutboxLeaseLostError, OutboxMessage
 from ports.capture import OutboxRepository
+from ports.clock import Clock
 
 from .facilities import new_lease_token
 from .queries.outbox import (
@@ -30,7 +31,7 @@ class DynamoDBOutbox(OutboxRepository):
     def __init__(
         self,
         client: Any,
-        clock: Callable[[], float] = time.time,
+        clock: Clock = time.time,
         lease_token_factory: Callable[[], str] = new_lease_token,
     ) -> None:
         self.client = client

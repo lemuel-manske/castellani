@@ -10,11 +10,26 @@ from domain.login import (
     SessionNotFound,
     SessionRequest,
     SessionStatus,
-    request_fingerprint,
 )
 from ports.login import AuthProfileStore, InteractiveBrowser, SessionStore
 
 SESSION_ID_BYTES = 24
+
+
+def replace_session(session: AuthSession, **changes: object) -> AuthSession:
+    values: dict[str, Any] = {
+        **session.__dict__,
+        "version": session.version + 1,
+        **changes,
+    }
+
+    return AuthSession(**values)
+
+
+def expires_at(ttl_seconds: int) -> str:
+    value = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
+
+    return value.isoformat().replace("+00:00", "Z")
 
 
 class LoginManager:
@@ -36,7 +51,7 @@ class LoginManager:
         await self.sessions.reconcile_abandoned(self.manager_id)
 
     async def create(self, request: SessionRequest, key: str) -> AuthSession:
-        fingerprint = request_fingerprint(request)
+        fingerprint = request.fingerprint()
 
         existing_id = await self.sessions.find_by_request(key, fingerprint)
 
@@ -83,7 +98,9 @@ class LoginManager:
                 status=SessionStatus.FAILED,
                 failure_reason="interactive browser could not start",
             )
+
             await self.sessions.save(failed)
+
             raise LoginUnavailable("interactive browser could not start") from error
 
         active = replace_session(
@@ -96,6 +113,7 @@ class LoginManager:
             await self.sessions.save(active)
         except Exception:
             await self.browser.close(session.session_id)
+
             raise
 
         return active
@@ -112,6 +130,7 @@ class LoginManager:
                 status=SessionStatus.EXPIRED,
                 failure_reason="session expired",
             )
+
             await self.sessions.save(expired)
             await self.browser.close(session_id)
 
@@ -149,12 +168,16 @@ class LoginManager:
             raise SessionConflict("session is not ready for completion")
 
         finalizing = replace_session(session, status=SessionStatus.FINALIZING)
+
         await self.sessions.save(finalizing)
 
         try:
             state: dict[str, Any] = await self.browser.storage_state(session_id)
+
             generation = await self.sessions.reserve_generation(session.archive_id)
+
             profile_key = await self.profiles.save(session.archive_id, generation, state)
+
             await self.sessions.set_profile(session.archive_id, generation, profile_key)
         except Exception as error:
             failed = replace_session(
@@ -162,8 +185,10 @@ class LoginManager:
                 status=SessionStatus.FAILED,
                 failure_reason="authentication state could not be stored",
             )
+
             await self.sessions.save(failed)
             await self.browser.close(session_id)
+
             raise LoginUnavailable("authentication state could not be stored") from error
 
         completed = replace_session(
@@ -172,6 +197,7 @@ class LoginManager:
             auth_generation=generation,
             profile_key=profile_key,
         )
+
         await self.sessions.save(completed)
         await self.browser.close(session_id)
 
@@ -187,23 +213,8 @@ class LoginManager:
             raise SessionConflict("session is already closed")
 
         cancelled = replace_session(session, status=SessionStatus.CANCELLED)
+
         await self.sessions.save(cancelled)
         await self.browser.close(session_id)
 
         return cancelled
-
-
-def replace_session(session: AuthSession, **changes: object) -> AuthSession:
-    values: dict[str, Any] = {
-        **session.__dict__,
-        "version": session.version + 1,
-        **changes,
-    }
-
-    return AuthSession(**values)
-
-
-def expires_at(ttl_seconds: int) -> str:
-    value = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
-
-    return value.isoformat().replace("+00:00", "Z")
