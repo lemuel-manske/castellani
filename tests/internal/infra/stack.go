@@ -4,6 +4,7 @@ package infra
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -78,11 +79,18 @@ func start(t *testing.T) Dependencies {
 	stack.WithEnv(stackEnvironment(terraformDir))
 
 	if err := stack.Up(ctx); err != nil {
-		require.NoError(
-			t,
-			err,
-			"start e2e services",
+		dumpServiceLogs(t, ctx, stack,
+			"ministack",
+			"rabbitmq",
+			"opensearch",
+			"provision",
+			"coordinator",
+			"capture-worker",
+			"capture-login",
+			"search",
+			"gateway",
 		)
+		require.NoError(t, err, "start e2e services")
 	}
 
 	services := Dependencies{
@@ -183,4 +191,40 @@ func start(t *testing.T) Dependencies {
 	t.Logf("service readiness: %s", time.Since(readinessStarted))
 
 	return services
+}
+
+// dumpServiceLogs captures logs from containers that Compose created before startup failed.
+func dumpServiceLogs(t *testing.T, ctx context.Context, stack *compose.DockerCompose, names ...string) {
+	t.Helper()
+
+	for _, name := range names {
+		container, err := stack.ServiceContainer(ctx, name)
+		if err != nil {
+			t.Logf("%s container unavailable: %v", name, err)
+			continue
+		}
+
+		reader, err := container.Logs(ctx)
+		if err != nil {
+			t.Logf("%s logs unavailable: %v", name, err)
+			continue
+		}
+
+		content, readErr := io.ReadAll(reader)
+		closeErr := reader.Close()
+		if readErr != nil {
+			t.Logf("%s logs could not be read: %v", name, readErr)
+			continue
+		}
+		if closeErr != nil {
+			t.Logf("%s log stream could not be closed: %v", name, closeErr)
+		}
+
+		const maxLogBytes = 64 * 1024
+		if len(content) > maxLogBytes {
+			content = content[len(content)-maxLogBytes:]
+		}
+
+		t.Logf("%s container logs (last 64 KiB):\n%s", name, content)
+	}
 }
