@@ -184,4 +184,3 @@ func start(t *testing.T) Dependencies {
 
 	return services
 }
-

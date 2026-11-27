@@ -24,7 +24,6 @@ import (
 func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 	services := infra.Start(t)
 
-
 	requestBody := fmt.Sprintf(
 		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
 		"http://fixture-site/index.html",
