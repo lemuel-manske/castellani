@@ -10,9 +10,12 @@
     "build",
     "dist"
   ],
+
   "pythonVersion": "3.13",
   "pythonPlatform": "All",
+
   "venvPath": ".",
   "venv": ".venv",
+
   "typeCheckingMode": "strict"
 }
