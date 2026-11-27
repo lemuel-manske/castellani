@@ -322,7 +322,9 @@ func wipeBucket(
 		require.NoError(t, err)
 
 		for _, object := range page.Contents {
-			objects = append(objects, s3types.ObjectIdentifier{Key: object.Key})
+			objects = append(objects, s3types.ObjectIdentifier{
+				Key: object.Key,
+			})
 		}
 	}
 

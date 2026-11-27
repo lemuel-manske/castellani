@@ -21,7 +21,12 @@ func WaitForArchiveTerminalState(
 	require.Eventually(
 		t,
 		func() bool {
-			response := Get(t, baseURL, statusURL)
+			response := Get(
+				t,
+				baseURL,
+				statusURL,
+			)
+
 			if response.Status != http.StatusOK {
 				return false
 			}

@@ -15,9 +15,13 @@ func newComposeStack(t *testing.T, composeFiles ...string) *compose.DockerCompos
 		err   error
 	)
 
-	require.NotPanics(t, func() {
-		stack, err = compose.NewDockerComposeWith(compose.WithStackFiles(composeFiles...))
-	}, "Docker must be running to execute the e2e suite")
+	require.NotPanics(
+		t,
+		func() {
+			stack, err = compose.NewDockerComposeWith(compose.WithStackFiles(composeFiles...))
+		},
+		"Docker must be running to execute the e2e suite",
+	)
 
 	require.NoError(t, err)
 

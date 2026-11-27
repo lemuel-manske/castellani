@@ -18,7 +18,7 @@ import (
 // Scenario: Search the snapshots of a published archive
 // Given an archive has completed successfully
 //
-// When a client searches for text present in the captured fixture
+// # When a client searches for text present in the captured fixture
 //
 // Then the search result references a snapshot in that archive
 func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
@@ -38,7 +38,11 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 			testutil.HeaderIdempotencyKey: "archive-search-happy-path-0001",
 		},
 	)
-	require.Equal(t, http.StatusAccepted, response.Status)
+	require.Equal(
+		t,
+		http.StatusAccepted,
+		response.Status,
+	)
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
 	status := testutil.WaitForArchiveTerminalState(
@@ -47,7 +51,11 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 		accepted.StatusURL,
 		archiveTimeout,
 	)
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	searchPath := fmt.Sprintf(
 		"/search?q=%s&archiveId=%s&limit=10",
@@ -56,26 +64,38 @@ func TestArchiveSearch_FindsPublishedSnapshot(t *testing.T) {
 	)
 
 	var search contracts.SearchResults
+
 	require.Eventually(
 		t,
-		archiveTimeout,
-		500*time.Millisecond,
 		func() bool {
-			response := testutil.Get(t, services.Gateway.BaseURL(), searchPath)
+			response := testutil.Get(
+				t,
+				services.Gateway.BaseURL(),
+				searchPath,
+			)
+
 			if response.Status != http.StatusOK {
 				return false
 			}
 
 			result := testutil.Decode[contracts.SearchResults](t, response)
 			search = result
+
 			return len(result.Results) > 0
 		},
+		archiveTimeout,
+		500*time.Millisecond,
 		"search did not return results for archive %s",
 		accepted.ArchiveID,
 	)
 
 	result := search.Results[0]
-	require.Equal(t, accepted.ArchiveID, result.ArchiveID)
+
+	require.Equal(
+		t,
+		accepted.ArchiveID,
+		result.ArchiveID,
+	)
 	require.NotEmpty(t, result.SnapshotID)
 	require.NotEmpty(t, result.URL)
 	require.NotEmpty(t, result.Snippet)

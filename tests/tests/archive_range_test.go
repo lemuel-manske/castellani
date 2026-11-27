@@ -17,7 +17,7 @@ import (
 // Scenario: Retrieve a byte range from a published WACZ
 // Given an archive has been successfully published
 //
-// When a client requests the first four bytes of its WACZ
+// # When a client requests the first four bytes of its WACZ
 //
 // Then the server returns the requested partial content
 func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
@@ -37,7 +37,11 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 			testutil.HeaderIdempotencyKey: "archive-range-0001",
 		},
 	)
-	require.Equal(t, http.StatusAccepted, response.Status)
+	require.Equal(
+		t,
+		http.StatusAccepted,
+		response.Status,
+	)
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
 	require.NotEmpty(t, accepted.ArchiveID)
@@ -48,7 +52,11 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 		accepted.StatusURL,
 		archiveTimeout,
 	)
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	waczResponse := testutil.Send(
 		t,
@@ -56,16 +64,30 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 		services.Gateway.BaseURL(),
 		fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID),
 		"",
-		map[string]string{"Range": "bytes=0-3"},
+		map[string]string{
+			"Range": "bytes=0-3",
+		},
 	)
 
-	require.Equal(t, http.StatusPartialContent, waczResponse.Status)
+	require.Equal(
+		t,
+		http.StatusPartialContent,
+		waczResponse.Status,
+	)
 	require.True(
 		t,
 		strings.HasPrefix(waczResponse.Header.Get("Content-Range"), "bytes 0-3/"),
 		"unexpected Content-Range: %q",
 		waczResponse.Header.Get("Content-Range"),
 	)
-	require.Equal(t, "application/wacz", waczResponse.Header.Get(testutil.HeaderContentType))
-	require.Equal(t, zipPrefix, waczResponse.Body)
+	require.Equal(
+		t,
+		"application/wacz",
+		waczResponse.Header.Get(testutil.HeaderContentType),
+	)
+	require.Equal(
+		t,
+		zipPrefix,
+		waczResponse.Body,
+	)
 }

@@ -16,7 +16,7 @@ import (
 // Scenario: Retry an archive submission with the same idempotency key
 // Given an archive submission has been accepted
 //
-// When the client retries the same submission with the same idempotency key
+// # When the client retries the same submission with the same idempotency key
 //
 // Then the original archive admission is returned
 func TestArchiveAdmission_RepeatedSubmissionReturnsOriginalArchive(t *testing.T) {
@@ -38,7 +38,11 @@ func TestArchiveAdmission_RepeatedSubmissionReturnsOriginalArchive(t *testing.T)
 		requestBody,
 		headers,
 	)
-	require.Equal(t, http.StatusAccepted, firstResponse.Status)
+	require.Equal(
+		t,
+		http.StatusAccepted,
+		firstResponse.Status,
+	)
 
 	firstAccepted := testutil.Decode[contracts.ArchiveAccepted](t, firstResponse)
 	require.NotEmpty(t, firstAccepted.ArchiveID)
@@ -50,8 +54,16 @@ func TestArchiveAdmission_RepeatedSubmissionReturnsOriginalArchive(t *testing.T)
 		requestBody,
 		headers,
 	)
-	require.Equal(t, http.StatusAccepted, retryResponse.Status)
+	require.Equal(
+		t,
+		http.StatusAccepted,
+		retryResponse.Status,
+	)
 
 	retryAccepted := testutil.Decode[contracts.ArchiveAccepted](t, retryResponse)
-	require.Equal(t, firstAccepted, retryAccepted)
+	require.Equal(
+		t,
+		firstAccepted,
+		retryAccepted,
+	)
 }

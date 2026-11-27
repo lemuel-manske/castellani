@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/lemuel-manske/castellani/tests/internal/contracts"
 	"github.com/lemuel-manske/castellani/tests/internal/infra"
@@ -18,7 +17,7 @@ import (
 // Scenario: Successfully publish an archive
 // Given the E2E stack and fixture website are running
 //
-// When a client requests an archive of the website
+// # When a client requests an archive of the website
 //
 // Then the archive completes with all expected pages captured
 // And its WACZ is available for retrieval
@@ -41,7 +40,11 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		},
 	)
 
-	require.Equal(t, http.StatusAccepted, response.Status)
+	require.Equal(
+		t,
+		http.StatusAccepted,
+		response.Status,
+	)
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
 	require.NotEmpty(t, accepted.ArchiveID)
@@ -53,10 +56,22 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		archiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
-	require.Equal(t, 3, status.Capture.Captured)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
+	require.Equal(
+		t,
+		3,
+		status.Capture.Captured,
+	)
 	require.Zero(t, status.Capture.Failed)
-	require.Equal(t, "READY", status.Replay.Status)
+	require.Equal(
+		t,
+		"READY",
+		status.Replay.Status,
+	)
 
 	waczResponse := testutil.Get(
 		t,
@@ -64,7 +79,11 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID),
 	)
 
-	require.Equal(t, http.StatusOK, waczResponse.Status)
+	require.Equal(
+		t,
+		http.StatusOK,
+		waczResponse.Status,
+	)
 	require.Equal(
 		t,
 		"application/wacz",

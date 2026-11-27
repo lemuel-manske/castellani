@@ -50,6 +50,7 @@ func waitForHealthy(ctx context.Context, service Service) error {
 
 	for {
 		status, lastErr = service.HealthStatus(ctx)
+
 		if lastErr == nil && status == http.StatusOK {
 			return nil
 		}

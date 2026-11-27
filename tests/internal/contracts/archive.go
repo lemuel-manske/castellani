@@ -16,11 +16,11 @@ type ArchiveAccepted struct {
 }
 
 type ArchiveStatus struct {
-	ArchiveID string           `json:"archiveId"`
-	Status    string           `json:"status"`
-	Capture   CaptureProgress  `json:"capture"`
-	Replay    ReplayProgress   `json:"replay"`
-	Search    SearchProgress   `json:"search"`
+	ArchiveID string          `json:"archiveId"`
+	Status    string          `json:"status"`
+	Capture   CaptureProgress `json:"capture"`
+	Replay    ReplayProgress  `json:"replay"`
+	Search    SearchProgress  `json:"search"`
 }
 
 type CaptureProgress struct {
