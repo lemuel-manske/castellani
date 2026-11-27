@@ -66,6 +66,7 @@ services:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
       interval: 5s
       timeout: 3s
+      start_period: 120s
       retries: 20
 
     restart: unless-stopped
