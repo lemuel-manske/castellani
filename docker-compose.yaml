@@ -44,10 +44,11 @@ services:
       - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
 
     healthcheck:
-      test: ["CMD-SHELL", "rabbitmqctl -q list_queues name | grep -qx 'castellani.capture.start'"]
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running && rabbitmqctl -q list_queues name | grep -Fq 'castellani.capture.start'"]
       interval: 5s
-      timeout: 5s
-      retries: 20
+      timeout: 15s
+      start_period: 30s
+      retries: 30
 
     restart: unless-stopped
 
