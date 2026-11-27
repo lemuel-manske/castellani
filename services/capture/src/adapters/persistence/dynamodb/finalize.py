@@ -1,54 +1,48 @@
 import asyncio
-import hashlib
-import json
 import time
 from typing import Any
 
 from botocore.exceptions import ClientError
 
-from adapters.serialization import artifact_document, manifest_document
+from adapters.serialization import artifact_document
 from domain.capture import (
     ADMISSION_CLOSED,
     MANIFEST_PENDING,
-    TASK_FAILED,
-    ArtifactReference,
     CaptureRunMissing,
-    manifest_key,
+    ManifestFinalization,
+    ManifestSource,
     manifest_message_id,
 )
-from ports.capture import CrawlFinalizer
+from ports.capture import ArchiveFinalizationRepository
 from ports.clock import Clock
-from topology.buckets import ARCHIVE_MANIFESTS_BUCKET
 
 from .error_handling import ConditionalWriteRejected, raise_unless_transaction_canceled
 from .queries.finalize import (
     finalize_transaction,
     is_crawl_completed_message,
     is_published_manifest,
+    manifest_source,
     plain_attributes,
     query_frontier,
     query_snapshots,
-    seed_succeeded,
 )
 from .queries.task import read_outbox, read_run
 from .values import optional_string
 
 
-class DynamoDBManifestFinalizer(CrawlFinalizer):
-    """Writes the immutable crawl manifest and durable completion outbox record."""
+class DynamoDBArchiveFinalizationRepository(ArchiveFinalizationRepository):
+    """Reads and commits the durable facts of a crawl manifest."""
 
     def __init__(
         self,
         client: Any,
-        s3_client: Any,
         clock: Clock = time.time,
     ) -> None:
         self.client = client
-        self.s3_client = s3_client
         self.clock = clock
 
-    async def __call__(self, archive_id: str) -> None:
-        def finalize() -> None:
+    async def read_manifest_source(self, archive_id: str) -> ManifestSource | None:
+        def read() -> ManifestSource | None:
             run = read_run(self.client, archive_id)
 
             if run is None:
@@ -58,48 +52,28 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
                 optional_string(run, "admission") != ADMISSION_CLOSED
                 or optional_string(run, "manifestStatus") != MANIFEST_PENDING
             ):
-                return
+                return None
 
-            plain_run = plain_attributes(run)
-            snapshots = query_snapshots(self.client, archive_id)
-            frontier = query_frontier(self.client, archive_id)
-            document = manifest_document(plain_run, snapshots, frontier)
-            body = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
-
-            digest = hashlib.sha256(body).hexdigest()
-            key = manifest_key(archive_id, digest)
-
-            self.s3_client.put_object(
-                Bucket=ARCHIVE_MANIFESTS_BUCKET,
-                Key=key,
-                Body=body,
-                ContentType="application/json",
+            return manifest_source(
+                plain_attributes(run),
+                query_snapshots(self.client, archive_id),
+                query_frontier(self.client, archive_id),
             )
 
-            artifact = artifact_document(
-                ArtifactReference(
-                    bucket=ARCHIVE_MANIFESTS_BUCKET,
-                    key=key,
-                    sha256=digest,
-                    size_bytes=len(body),
-                )
-            )
+        return await asyncio.to_thread(read)
 
-            now = self.clock()
-            occurred_at = plain_run["closedAt"]
-            message_id = manifest_message_id(archive_id)
-            seed_ok = seed_succeeded(plain_run, frontier)
-
+    async def commit_manifest(self, finalization: ManifestFinalization) -> None:
+        def commit() -> None:
             transaction = finalize_transaction(
-                archive_id=archive_id,
-                artifact=artifact,
-                digest=digest,
-                occurred_at=occurred_at,
-                message_id=message_id,
-                now=now,
-                seed_ok=seed_ok,
-                captured_count=len(snapshots),
-                failed_count=sum(1 for item in frontier if item.get("state") == TASK_FAILED),
+                archive_id=finalization.archive_id,
+                artifact=artifact_document(finalization.artifact),
+                digest=finalization.digest,
+                occurred_at=finalization.occurred_at,
+                message_id=manifest_message_id(finalization.archive_id),
+                now=self.clock(),
+                seed_ok=finalization.seed_succeeded,
+                captured_count=finalization.captured_count,
+                failed_count=finalization.failed_count,
             )
 
             try:
@@ -107,16 +81,21 @@ class DynamoDBManifestFinalizer(CrawlFinalizer):
             except ClientError as error:
                 raise_unless_transaction_canceled(error)
 
-                current = read_run(self.client, archive_id)
+                current = read_run(self.client, finalization.archive_id)
 
-                if current is not None and is_published_manifest(current, digest):
-                    existing = read_outbox(self.client, message_id)
+                if current is not None and is_published_manifest(current, finalization.digest):
+                    existing = read_outbox(
+                        self.client,
+                        manifest_message_id(finalization.archive_id),
+                    )
 
                     if existing is not None and is_crawl_completed_message(
-                        existing, archive_id, digest
+                        existing,
+                        finalization.archive_id,
+                        finalization.digest,
                     ):
                         return
 
                 raise ConditionalWriteRejected from error
 
-        await asyncio.to_thread(finalize)
+        await asyncio.to_thread(commit)

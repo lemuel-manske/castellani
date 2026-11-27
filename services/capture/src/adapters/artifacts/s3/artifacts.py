@@ -5,10 +5,18 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from domain.capture import ArtifactReference, TaskClaim
-from ports.artifacts import DecisionArtifacts, PackageArtifacts
+from domain.capture import (
+    ArtifactReference,
+    TaskClaim,
+    WACZObject,
+    WACZRangeNotSatisfiable,
+    manifest_key,
+)
+from ports.artifacts import DecisionArtifacts, ManifestArtifacts, PackageArtifacts, WACZArtifacts
 from ports.worker import ArtifactStore
-from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET
+from topology.buckets import ARCHIVE_ARTIFACTS_BUCKET, ARCHIVE_MANIFESTS_BUCKET
+from utils.http import http_last_modified, normalize_etag, parse_range
+from utils.io import stream_body
 
 from .keys import archive_prefixes, package_key, staging_artifact_key
 
@@ -54,7 +62,13 @@ def delete_objects_by_prefix(client: Any, prefixes: tuple[str, ...]) -> int:
     return deleted
 
 
-class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
+class S3ArtifactStore(
+    ArtifactStore,
+    DecisionArtifacts,
+    ManifestArtifacts,
+    PackageArtifacts,
+    WACZArtifacts,
+):
     """Uploads attempt-scoped WARC artifacts to private, immutable S3 keys."""
 
     def __init__(
@@ -65,6 +79,27 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
         self.client = client
 
         self.staging_root = staging_root
+
+    async def persist_manifest(self, archive_id: str, body: bytes) -> ArtifactReference:
+        def persist() -> ArtifactReference:
+            digest = hashlib.sha256(body).hexdigest()
+            key = manifest_key(archive_id, digest)
+
+            self.client.put_object(
+                Bucket=ARCHIVE_MANIFESTS_BUCKET,
+                Key=key,
+                Body=body,
+                ContentType="application/json",
+            )
+
+            return ArtifactReference(
+                bucket=ARCHIVE_MANIFESTS_BUCKET,
+                key=key,
+                sha256=digest,
+                size_bytes=len(body),
+            )
+
+        return await asyncio.to_thread(persist)
 
     async def create_attempt_directory(self, claim: TaskClaim) -> Path:
         directory = self.staging_root / quote(claim.attempt_id, safe="")
@@ -154,6 +189,68 @@ class S3ArtifactStore(ArtifactStore, PackageArtifacts, DecisionArtifacts):
         del claim
 
         await asyncio.to_thread(shutil.rmtree, directory, True)
+
+    async def read_wacz(
+        self,
+        reference: ArtifactReference,
+        range_header: str | None,
+        if_range: str | None,
+        metadata_only: bool = False,
+    ) -> WACZObject:
+        def read() -> WACZObject:
+            request: dict[str, Any] = {
+                "Bucket": reference.bucket,
+                "Key": reference.key,
+            }
+
+            head = self.client.head_object(**request)
+
+            etag = str(head["ETag"])
+            content_length = int(head["ContentLength"])
+            last_modified = head.get("LastModified")
+            if_range_matches = if_range is None or normalize_etag(if_range) == normalize_etag(etag)
+            requested = (
+                parse_range(range_header, content_length)
+                if range_header and if_range_matches
+                else None
+            )
+
+            if requested is None:
+                body = None if metadata_only else self.client.get_object(**request)["Body"]
+
+                return WACZObject(
+                    body=None if body is None else stream_body(body),
+                    content_length=content_length,
+                    etag=etag,
+                    last_modified=http_last_modified(last_modified),
+                    content_range=None,
+                    partial=False,
+                )
+
+            start, end = requested
+
+            if start >= content_length or start < 0:
+                raise WACZRangeNotSatisfiable(content_length)
+
+            end = min(end, content_length - 1) if end is not None else content_length - 1
+            body = None
+
+            if not metadata_only:
+                body = self.client.get_object(
+                    **request,
+                    Range=f"bytes={start}-{end}",
+                )["Body"]
+
+            return WACZObject(
+                body=None if body is None else stream_body(body),
+                content_length=end - start + 1,
+                etag=etag,
+                last_modified=http_last_modified(last_modified),
+                content_range=f"bytes {start}-{end}/{content_length}",
+                partial=True,
+            )
+
+        return await asyncio.to_thread(read)
 
     async def read_object(
         self,

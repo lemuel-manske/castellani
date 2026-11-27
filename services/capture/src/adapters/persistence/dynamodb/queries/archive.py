@@ -17,6 +17,7 @@ from domain.capture import (
 from topology.tables import FRONTIER_TABLE, SNAPSHOTS_TABLE
 
 from ..values import optional_string, string_from_item
+from .common import with_cursor
 
 PAGE_STATUSES = {
     TASK_PENDING: "PENDING",
@@ -42,10 +43,9 @@ def query_pages(
         "Limit": limit + 1,
     }
 
-    if cursor is not None:
-        request["ExclusiveStartKey"] = decode_cursor(cursor, archive_id)
+    start_key = decode_cursor(cursor, archive_id) if cursor is not None else None
 
-    response = client.query(**request)
+    response = client.query(**with_cursor(request, start_key))
 
     rows = tuple(response.get("Items", ()))
     items = tuple(page_from_item(item) for item in rows[:limit])

@@ -6,6 +6,16 @@ from topology.tables import OUTBOX_TABLE
 from ..values import serialize_map
 
 
+def with_cursor(
+    request: dict[str, Any],
+    cursor: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if cursor is None:
+        return request
+
+    return {**request, "ExclusiveStartKey": cursor}
+
+
 def outbox_put(
     message_id: str,
     correlation_id: str,

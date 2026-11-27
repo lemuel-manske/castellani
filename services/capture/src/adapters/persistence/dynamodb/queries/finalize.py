@@ -1,5 +1,6 @@
 from typing import Any
 
+from adapters.serialization import artifact_reference
 from contracts.messages import CRAWL_COMPLETED_EVENT, CrawlCompletedPayload
 from contracts.types import ArtifactReferenceContract
 from domain.capture import (
@@ -7,12 +8,17 @@ from domain.capture import (
     MANIFEST_PUBLISHED,
     PACKAGE_PENDING,
     TASK_COMPLETED,
+    TASK_FAILED,
+    ManifestFailure,
+    ManifestRun,
+    ManifestSnapshot,
+    ManifestSource,
     identify_url,
 )
 from topology.tables import FRONTIER_TABLE, RUNS_TABLE, SNAPSHOTS_TABLE
 
 from ..values import envelope_matches, optional_string, plain_attributes
-from .common import outbox_put
+from .common import outbox_put, with_cursor
 
 _SNAPSHOT_INDEX = "archiveId-capturedAt-index"
 _PAGE_SIZE = 100
@@ -51,9 +57,10 @@ def query_by_archive(
         request["ConsistentRead"] = True
 
     items: list[dict[str, Any]] = []
+    cursor: dict[str, Any] | None = None
 
     while True:
-        response = client.query(**request)
+        response = client.query(**with_cursor(request, cursor))
 
         items.extend(plain_attributes(item) for item in response.get("Items", []))
 
@@ -62,14 +69,57 @@ def query_by_archive(
         if not cursor:
             return items
 
-        request["ExclusiveStartKey"] = cursor
-
 
 def seed_succeeded(run: dict[str, Any], frontier: list[dict[str, Any]]) -> bool:
     seed_key = identify_url(run["seedUrl"]).url_key
 
     return any(
         item.get("urlKey") == seed_key and item.get("state") == TASK_COMPLETED for item in frontier
+    )
+
+
+def manifest_source(
+    run: dict[str, Any],
+    snapshots: list[dict[str, Any]],
+    frontier: list[dict[str, Any]],
+) -> ManifestSource:
+    return ManifestSource(
+        run=ManifestRun(
+            archive_id=str(run["archiveId"]),
+            seed_url=str(run["seedUrl"]),
+            closed_at=str(run["closedAt"]),
+            normalizer_version=run.get("normalizerVersion"),
+            collection_id=run.get("collectionId"),
+        ),
+        snapshots=tuple(snapshot_from_item(item) for item in snapshots),
+        failures=tuple(
+            failure for item in frontier if (failure := failure_from_item(item)) is not None
+        ),
+        seed_succeeded=seed_succeeded(run, frontier),
+    )
+
+
+def snapshot_from_item(item: dict[str, Any]) -> ManifestSnapshot:
+    return ManifestSnapshot(
+        snapshot_id=str(item["snapshotId"]),
+        url_key=str(item["urlKey"]),
+        url=str(item["url"]),
+        final_url=str(item["finalUrl"]),
+        captured_at=str(item["capturedAt"]),
+        warc_artifacts=tuple(artifact_reference(ref) for ref in item["warcArtifacts"]),
+        redirect_chain=tuple(item["redirectChain"]) if "redirectChain" in item else None,
+        min_depth=int(item["minDepth"]) if "minDepth" in item else None,
+        content_type=str(item["contentType"]) if "contentType" in item else None,
+    )
+
+
+def failure_from_item(item: dict[str, Any]) -> ManifestFailure | None:
+    if item.get("state") != TASK_FAILED:
+        return None
+
+    return ManifestFailure(
+        url_key=str(item["urlKey"]),
+        reason_code=str(item.get("failureReason") or "capture_failed"),
     )
 
 

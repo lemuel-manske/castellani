@@ -3,6 +3,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 
+from application.capture.archive_retrieval import ArchiveRetrieval
 from contracts.messages import CAPTURE_PAGE_EVENT
 from domain.capture import (
     ArchivePage,
@@ -14,7 +15,6 @@ from domain.capture import (
     identify_url,
 )
 from ports.capture import (
-    ArchiveRetrieval,
     CrawlStarter,
     OutboxRepository,
     TaskRepository,

@@ -25,7 +25,7 @@ from domain.capture import (
 from topology.tables import RUNS_TABLE
 
 from ..values import envelope_matches, optional_number, optional_string, string_from_item
-from .common import outbox_put
+from .common import outbox_put, with_cursor
 
 
 def pending_package_scan() -> dict[str, Any]:
@@ -347,10 +347,7 @@ def scan_pending_packages(
     request = pending_package_scan()
     request["ExpressionAttributeValues"][":now"] = {"N": str(now)}
 
-    if cursor:
-        request["ExclusiveStartKey"] = cursor
-
-    return client.scan(**request)
+    return client.scan(**with_cursor(request, cursor))
 
 
 def claim_package(

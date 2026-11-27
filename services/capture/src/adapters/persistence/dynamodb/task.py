@@ -1,6 +1,5 @@
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import uuid4
 
@@ -27,15 +26,10 @@ from domain.capture import (
     page_captured_message_id,
     release_page_message_id,
 )
-from ports.capture import TaskRepository
+from ports.capture import CrawlFinalizer, TaskRepository
 from ports.clock import Clock
 
 from .error_handling import ConditionalWriteRejected, raise_unless_canceled_or_conditional
-from .facilities import (
-    EXPONENTIAL_BACKOFF_ATTEMPTS,
-    exponential_backoff,
-    exponential_backoff_transact,
-)
 from .queries.task import (
     admit_page_transaction,
     auth_generation_changed,
@@ -53,6 +47,11 @@ from .queries.task import (
     release_task_transaction,
     renew_task_transaction,
 )
+from .utils import (
+    EXPONENTIAL_BACKOFF_ATTEMPTS,
+    exponential_backoff,
+    exponential_backoff_transact,
+)
 from .values import number_from_item, optional_number, optional_string
 
 
@@ -64,7 +63,7 @@ class DynamoDBTaskRepository(TaskRepository):
         client: Any,
         lease_duration: float,
         clock: Clock = time.time,
-        on_closed: Callable[[str], Awaitable[None]] | None = None,
+        finalize: CrawlFinalizer | None = None,
     ) -> None:
         if lease_duration <= 0:
             raise InvalidLeaseDuration("lease_duration must be positive")
@@ -74,7 +73,7 @@ class DynamoDBTaskRepository(TaskRepository):
         self.lease_duration = lease_duration
 
         self.clock = clock
-        self.on_closed = on_closed
+        self.finalize = finalize
 
     async def claim(self, archive_id: str, url_key: str) -> TaskClaim | None:
         def do_claim():
@@ -238,8 +237,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
         closed = await asyncio.to_thread(do_complete)
 
-        if closed and self.on_closed is not None:
-            await self.on_closed(outcome.archive_id)
+        if closed and self.finalize is not None:
+            await self.finalize(outcome.archive_id)
 
     async def fail(self, claim: TaskClaim, reason_code: str, message: str) -> None:
         def do_fail() -> bool:
@@ -297,8 +296,8 @@ class DynamoDBTaskRepository(TaskRepository):
 
         closed = await asyncio.to_thread(do_fail)
 
-        if closed and self.on_closed is not None:
-            await self.on_closed(claim.task.archive_id)
+        if closed and self.finalize is not None:
+            await self.finalize(claim.task.archive_id)
 
     async def admit_discovered(
         self,

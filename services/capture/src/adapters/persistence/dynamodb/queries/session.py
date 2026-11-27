@@ -9,6 +9,7 @@ from ..values import (
     optional_string,
     string_from_item,
 )
+from .common import with_cursor
 
 
 def session_item(
@@ -211,10 +212,7 @@ def update_profile(
 def scan_sessions(client: Any, cursor: dict[str, Any] | None) -> dict[str, Any]:
     request: dict[str, Any] = {"TableName": SESSIONS_TABLE}
 
-    if cursor:
-        request["ExclusiveStartKey"] = cursor
-
-    return client.scan(**request)
+    return client.scan(**with_cursor(request, cursor))
 
 
 def fail_session(

@@ -9,6 +9,7 @@ from ..values import (
     number_from_item,
     string_from_item,
 )
+from .common import with_cursor
 
 _OUTBOX_INDEX = "status-nextAttemptAt-index"
 _CLAIM_LIMIT = 50
@@ -35,10 +36,7 @@ def query_due_messages(
         "Limit": _CLAIM_LIMIT,
     }
 
-    if cursor is not None:
-        request["ExclusiveStartKey"] = cursor
-
-    return client.query(**request)
+    return client.query(**with_cursor(request, cursor))
 
 
 def claim_message(

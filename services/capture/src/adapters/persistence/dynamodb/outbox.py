@@ -17,7 +17,6 @@ from ports.capture import OutboxRepository
 from ports.clock import Clock
 
 from .error_handling import is_conditional_failure
-from .facilities import new_lease_token
 from .queries.outbox import (
     claim_message,
     confirm_message,
@@ -25,6 +24,7 @@ from .queries.outbox import (
     query_due_messages,
     reschedule_message,
 )
+from .utils import new_lease_token
 from .values import optional_number_string, optional_string
 
 OUTBOX_PENDING = "PENDING"

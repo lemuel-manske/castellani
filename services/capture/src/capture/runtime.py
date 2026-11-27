@@ -17,8 +17,8 @@ from adapters.messaging.rabbitmq.consumer import (
 )
 from adapters.messaging.rabbitmq.publisher import RabbitMQMessagePublisher
 from adapters.persistence.dynamodb.alloc import DynamoDBCaptureAllocator
-from adapters.persistence.dynamodb.archive import DynamoDBArchiveRetrieval
-from adapters.persistence.dynamodb.finalize import DynamoDBManifestFinalizer
+from adapters.persistence.dynamodb.archive import DynamoDBArchiveCatalog
+from adapters.persistence.dynamodb.finalize import DynamoDBArchiveFinalizationRepository
 from adapters.persistence.dynamodb.outbox import DynamoDBOutbox
 from adapters.persistence.dynamodb.publication import DynamoDBArchivePublicationRepository
 from adapters.persistence.dynamodb.run import DynamoDBRunStarter
@@ -26,7 +26,9 @@ from adapters.persistence.dynamodb.session import DynamoDBSessionStore
 from adapters.persistence.dynamodb.task import DynamoDBTaskRepository
 from application.capture import OutboxDispatcher, StoredAuthContexts
 from application.capture.archive_decisions import ArchiveDecisionProcessor
+from application.capture.archive_finalization import ArchiveManifestFinalizer
 from application.capture.archive_preparation import ArchivePackager
+from application.capture.archive_retrieval import ArchiveRetrieval
 from application.capture.page_tasks import PageTaskProcessor
 from application.capture.start_crawls import StartCrawlProcessor
 from ports.login import AuthProfileCipher
@@ -52,7 +54,7 @@ class CaptureRuntime:
 
         self.dynamodb_client: DynamoDBClient | None = None
         self.s3_client: S3Client | None = None
-        self.archive_retrieval: DynamoDBArchiveRetrieval | None = None
+        self.archive_retrieval: ArchiveRetrieval | None = None
 
         self.connection: AbstractRobustConnection | None = None
         self.publisher: RabbitMQMessagePublisher | None = None
@@ -113,20 +115,27 @@ class CaptureRuntime:
                     TableName=table_name,
                 )
 
-            self.archive_retrieval = DynamoDBArchiveRetrieval(
-                client=self.dynamodb_client,
-                s3_client=self.s3_client,
+            artifacts = S3ArtifactStore(
+                client=self.s3_client,
+                staging_root=Path(self.settings.artifact_directory),
             )
 
-            finalizer = DynamoDBManifestFinalizer(
-                client=self.dynamodb_client,
-                s3_client=self.s3_client,
+            catalog = DynamoDBArchiveCatalog(client=self.dynamodb_client)
+
+            self.archive_retrieval = ArchiveRetrieval(
+                catalog=catalog,
+                artifacts=artifacts,
+            )
+
+            finalizer = ArchiveManifestFinalizer(
+                repository=DynamoDBArchiveFinalizationRepository(client=self.dynamodb_client),
+                artifacts=artifacts,
             )
 
             task_repository = DynamoDBTaskRepository(
                 client=self.dynamodb_client,
                 lease_duration=self.settings.lease_duration,
-                on_closed=finalizer,
+                finalize=finalizer,
             )
 
             allocator = DynamoDBCaptureAllocator(
@@ -141,11 +150,6 @@ class CaptureRuntime:
                     s3_client=self.s3_client,
                     cipher=AuthProfileCipher(self.settings.auth_profile_key),
                 ),
-            )
-
-            artifacts = S3ArtifactStore(
-                client=self.s3_client,
-                staging_root=Path(self.settings.artifact_directory),
             )
 
             worker = new_worker(

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from application.capture.archive_retrieval import ArchiveRetrieval
 from domain.capture import (
     ArchivePage,
     ArtifactReference,
@@ -24,7 +25,6 @@ from domain.capture import (
 from ports.artifacts import PackageArtifacts
 from ports.capture import (
     ArchivePublicationRepository,
-    ArchiveRetrieval,
     CrawlFinalizer,
     CrawlStarter,
     TaskRepository,

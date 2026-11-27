@@ -1,5 +1,5 @@
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from domain.login import (
@@ -12,6 +12,7 @@ from domain.login import (
     SessionStatus,
 )
 from ports.login import AuthProfileStore, InteractiveBrowser, SessionStore
+from utils.time import utc_now
 
 SESSION_ID_BYTES = 24
 
@@ -24,12 +25,6 @@ def replace_session(session: AuthSession, **changes: object) -> AuthSession:
     }
 
     return AuthSession(**values)
-
-
-def expires_at(ttl_seconds: int) -> str:
-    value = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
-
-    return value.isoformat().replace("+00:00", "Z")
 
 
 class LoginManager:
@@ -68,7 +63,7 @@ class LoginManager:
             archive_id=request.archive_id,
             target_url=request.target_url,
             status=SessionStatus.CREATED,
-            expires_at=expires_at(self.session_ttl_seconds),
+            expires_at=utc_now(timedelta(self.session_ttl_seconds)),
             manager_id=self.manager_id,
             version=1,
         )
@@ -172,7 +167,7 @@ class LoginManager:
         await self.sessions.save(finalizing)
 
         try:
-            state: dict[str, Any] = await self.browser.storage_state(session_id)
+            state = await self.browser.storage_state(session_id)
 
             generation = await self.sessions.reserve_generation(session.archive_id)
 
