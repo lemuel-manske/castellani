@@ -13,10 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	archiveTimeout = 3 * time.Minute
-)
-
 // Feature: Archive lifecycle
 //
 // Scenario: Successfully publish an archive
@@ -76,7 +72,7 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	)
 	require.True(
 		t,
-		strings.HasPrefix(waczResponse.Body, "\x50\x4b\x03\x04"),
+		strings.HasPrefix(waczResponse.Body, zipPrefix),
 		"published WACZ should be a ZIP archive",
 	)
 }
