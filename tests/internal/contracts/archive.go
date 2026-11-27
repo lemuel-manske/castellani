@@ -40,7 +40,8 @@ type SearchProgress struct {
 }
 
 type ArchivePages struct {
-	Items []PageOutcome `json:"items"`
+	Items      []PageOutcome `json:"items"`
+	NextCursor *string       `json:"nextCursor"`
 }
 
 type PageOutcome struct {
@@ -53,4 +54,15 @@ type Snapshot struct {
 	ArchiveID  string `json:"archiveId"`
 	SnapshotID string `json:"snapshotId"`
 	URL        string `json:"url"`
+}
+
+type SearchResults struct {
+	Results []SearchResult `json:"results"`
+}
+
+type SearchResult struct {
+	ArchiveID  string `json:"archiveId"`
+	SnapshotID string `json:"snapshotId"`
+	URL        string `json:"url"`
+	Snippet    string `json:"snippet"`
 }
