@@ -30,14 +30,10 @@ from domain.capture import (
 from ports.capture import TaskRepository
 from ports.clock import Clock
 
-from .error_handling import (
-    ConditionalWriteRejected,
-    is_conditional_failure,
-    is_transaction_canceled,
-)
+from .error_handling import ConditionalWriteRejected, raise_unless_canceled_or_conditional
 from .facilities import (
     EXPONENTIAL_BACKOFF_ATTEMPTS,
-    EXPONENTIAL_BACKOFF_DELAY,
+    exponential_backoff,
     exponential_backoff_transact,
 )
 from .queries.task import (
@@ -273,8 +269,7 @@ class DynamoDBTaskRepository(TaskRepository):
 
                     return close
                 except ClientError as error:
-                    if not (is_conditional_failure(error) or is_transaction_canceled(error)):
-                        raise
+                    raise_unless_canceled_or_conditional(error)
 
                     existing = read_frontier(
                         self.client,
@@ -292,7 +287,7 @@ class DynamoDBTaskRepository(TaskRepository):
                         and current is not None
                         and optional_string(current, "admission") == ADMISSION_OPEN
                     ):
-                        time.sleep(EXPONENTIAL_BACKOFF_DELAY * (2**attempt))
+                        exponential_backoff(attempt)
 
                         continue
 

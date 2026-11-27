@@ -19,6 +19,22 @@ def new_lease_token() -> str:
     return str(uuid4())
 
 
+def exponential_backoff(attempt: int) -> None:
+    time.sleep(EXPONENTIAL_BACKOFF_DELAY * (2**attempt))
+
+
+def transaction_request(
+    items: list[dict[str, Any]],
+    request_token: str | None,
+) -> dict[str, Any]:
+    request: dict[str, Any] = {"TransactItems": items}
+
+    if request_token is not None:
+        request["ClientRequestToken"] = request_token
+
+    return request
+
+
 def exponential_backoff_transact(
     client: Any,
     items: list[dict[str, Any]],
@@ -26,12 +42,7 @@ def exponential_backoff_transact(
 ) -> None:
     for attempt in range(EXPONENTIAL_BACKOFF_ATTEMPTS):
         try:
-            request: dict[str, Any] = {"TransactItems": items}
-
-            if request_token is not None:
-                request["ClientRequestToken"] = request_token
-
-            client.transact_write_items(**request)
+            client.transact_write_items(**transaction_request(items, request_token))
 
             return
         except ClientError as error:
@@ -42,7 +53,7 @@ def exponential_backoff_transact(
             if "ConditionalCheckFailed" in codes:
                 raise ConditionalWriteRejected from error
 
-            if "TransactionConflict" not in codes or attempt == 4:
+            if "TransactionConflict" not in codes or attempt == EXPONENTIAL_BACKOFF_ATTEMPTS - 1:
                 raise
 
-            time.sleep(EXPONENTIAL_BACKOFF_DELAY * (2**attempt))
+            exponential_backoff(attempt)
