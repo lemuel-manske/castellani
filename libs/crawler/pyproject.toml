@@ -9,6 +9,7 @@ dependencies = [
     "playwright==1.51.0",
     "pywb==2.11.1",
     "selectolax==0.3.28",
+    "wacz==0.6.0",
 ]
 
 [build-system]
@@ -21,6 +22,7 @@ dev = [
     "pytest==8.3.5",
     "pytest-asyncio==0.25.3",
     "ruff==0.11.2",
+    "warcio==1.8.2",
 ]
 
 [tool.uv.build-backend]
