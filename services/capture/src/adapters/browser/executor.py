@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from capture.browser import CaptureLimits, capture_page
+from crawler import capture_page
+from crawler.results import CaptureLimits
+
 from domain.capture import AuthContext, PageCapture
 from ports.worker import CaptureArtifact, CaptureExecutor
 
