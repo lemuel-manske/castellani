@@ -13,31 +13,30 @@ import (
 
 // Feature: Archive admission
 //
-// Scenario: Retry an archive submission with the same idempotency key
-// Given an archive submission has been accepted
+// Scenario: Retrying a submission does not start another archive
+// Given an accepted archive request
 //
-// # When the client retries the same submission with the same idempotency key
+// # When the client retries that request with the same idempotency key
 //
 // Then the original archive admission is returned
 func TestArchiveAdmission_RepeatedSubmissionReturnsOriginalArchive(t *testing.T) {
 	services := infra.Start(t)
 
-	requestBody := fmt.Sprintf(
-		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		"http://fixture-site/index.html",
+	requestBody :=
+		`{"seedUrl":"http://fixture-site/index.html","maxDepth":1,"maxPages":3}`
+
+	headers := fmt.Sprintf(
+		`Content-Type: application/json; Idempotency-Key: %s`,
+		services.IdempotencyKey("repeated-submission"),
 	)
-	headers := map[string]string{
-		testutil.HeaderContentType:    testutil.ContentTypeJSON,
-		testutil.HeaderIdempotencyKey: services.IdempotencyKey("repeated-submission"),
-	}
 
 	firstResponse := testutil.Post(
 		t,
-		services.Gateway.BaseURL(),
-		"/archives",
+		services.Gateway.URL("/archives"),
 		requestBody,
 		headers,
 	)
+
 	require.Equal(
 		t,
 		http.StatusAccepted,
@@ -45,15 +44,16 @@ func TestArchiveAdmission_RepeatedSubmissionReturnsOriginalArchive(t *testing.T)
 	)
 
 	firstAccepted := testutil.Decode[contracts.ArchiveAccepted](t, firstResponse)
+
 	require.NotEmpty(t, firstAccepted.ArchiveID)
 
 	retryResponse := testutil.Post(
 		t,
-		services.Gateway.BaseURL(),
-		"/archives",
+		services.Gateway.URL("/archives"),
 		requestBody,
 		headers,
 	)
+
 	require.Equal(
 		t,
 		http.StatusAccepted,

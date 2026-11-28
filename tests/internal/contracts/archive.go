@@ -18,6 +18,7 @@ type ArchiveAccepted struct {
 type ArchiveStatus struct {
 	ArchiveID string          `json:"archiveId"`
 	Status    string          `json:"status"`
+	Decision  string          `json:"decision"`
 	Capture   CaptureProgress `json:"capture"`
 	Replay    ReplayProgress  `json:"replay"`
 	Search    SearchProgress  `json:"search"`
@@ -54,15 +55,21 @@ type Snapshot struct {
 	ArchiveID  string `json:"archiveId"`
 	SnapshotID string `json:"snapshotId"`
 	URL        string `json:"url"`
+	CapturedAt string `json:"capturedAt"`
 }
 
 type SearchResults struct {
-	Results []SearchResult `json:"results"`
+	Results    []SearchResult `json:"results"`
+	NextCursor *string        `json:"nextCursor"`
 }
 
 type SearchResult struct {
-	ArchiveID  string `json:"archiveId"`
-	SnapshotID string `json:"snapshotId"`
-	URL        string `json:"url"`
-	Snippet    string `json:"snippet"`
+	CollectionID string  `json:"collectionId,omitempty"`
+	ArchiveID    string  `json:"archiveId"`
+	SnapshotID   string  `json:"snapshotId"`
+	URL          string  `json:"url"`
+	CapturedAt   string  `json:"capturedAt"`
+	Title        string  `json:"title,omitempty"`
+	Snippet      string  `json:"snippet"`
+	Score        float64 `json:"score,omitempty"`
 }

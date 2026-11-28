@@ -14,29 +14,30 @@ import (
 
 // Feature: Archive delivery
 //
-// Scenario: Retrieve a byte range from a published WACZ
-// Given an archive has been successfully published
+// Scenario: Retrieving part of a published WACZ
+// Given a published archive
 //
 // # When a client requests the first four bytes of its WACZ
 //
-// Then the server returns the requested partial content
+// Then the package returns exactly the requested byte range
 func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 	services := infra.Start(t)
 
-	requestBody := fmt.Sprintf(
-		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		"http://fixture-site/index.html",
+	requestBody :=
+		`{"seedUrl":"http://fixture-site/index.html","maxDepth":1,"maxPages":3}`
+
+	headers := fmt.Sprintf(
+		`Content-Type: application/json; Idempotency-Key: %s`,
+		services.IdempotencyKey("byte-range"),
 	)
+
 	response := testutil.Post(
 		t,
-		services.Gateway.BaseURL(),
-		"/archives",
+		services.Gateway.URL("/archives"),
 		requestBody,
-		map[string]string{
-			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: services.IdempotencyKey("byte-range"),
-		},
+		headers,
 	)
+
 	require.Equal(
 		t,
 		http.StatusAccepted,
@@ -44,31 +45,27 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 	)
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
+
 	require.NotEmpty(t, accepted.ArchiveID)
 
 	status := testutil.WaitForArchiveTerminalState(
 		t,
-		services.Gateway.BaseURL(),
-		accepted.StatusURL,
-		archiveTimeout,
+		services.Gateway.URL(accepted.StatusURL),
+		ArchiveTimeout,
 	)
+
 	require.Equal(
 		t,
 		"COMPLETED",
 		status.Status,
-		"archive status: %+v",
-		status,
 	)
 
-	waczResponse := testutil.Send(
+	waczURL := fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID)
+
+	waczResponse := testutil.GetWithHeaders(
 		t,
-		http.MethodGet,
-		services.Gateway.BaseURL(),
-		fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID),
-		"",
-		map[string]string{
-			"Range": "bytes=0-3",
-		},
+		services.Gateway.URL(waczURL),
+		"Range: bytes=0-3",
 	)
 
 	require.Equal(
@@ -76,20 +73,21 @@ func TestArchiveDelivery_ReturnsWACZByteRange(t *testing.T) {
 		http.StatusPartialContent,
 		waczResponse.Status,
 	)
+
 	require.True(
 		t,
 		strings.HasPrefix(waczResponse.Header.Get("Content-Range"), "bytes 0-3/"),
-		"unexpected Content-Range: %q",
-		waczResponse.Header.Get("Content-Range"),
 	)
+
 	require.Equal(
 		t,
 		"application/wacz",
-		waczResponse.Header.Get(testutil.HeaderContentType),
+		waczResponse.Header.Get(HeaderContentType),
 	)
+
 	require.Equal(
 		t,
-		zipPrefix,
+		ZipPrefix,
 		waczResponse.Body,
 	)
 }

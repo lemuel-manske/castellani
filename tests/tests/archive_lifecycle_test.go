@@ -14,30 +14,29 @@ import (
 
 // Feature: Archive lifecycle
 //
-// Scenario: Successfully publish an archive
-// Given the E2E stack and fixture website are running
+// Scenario: Publishing an archive of a website
+// Given a website with linked pages
 //
-// # When a client requests an archive of the website
+// # When a client requests an archive of that website
 //
-// Then the archive completes with all expected pages captured
+// Then the archive completes with every discoverable page captured
 // And its WACZ is available for retrieval
 func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	services := infra.Start(t)
 
-	requestBody := fmt.Sprintf(
-		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		"http://fixture-site/index.html",
+	requestBody :=
+		`{"seedUrl":"http://fixture-site/index.html","maxDepth":1,"maxPages":3}`
+
+	headers := fmt.Sprintf(
+		`Content-Type: application/json; Idempotency-Key: %s`,
+		services.IdempotencyKey("happy-path"),
 	)
 
 	response := testutil.Post(
 		t,
-		services.Gateway.BaseURL(),
-		"/archives",
+		services.Gateway.URL("/archives"),
 		requestBody,
-		map[string]string{
-			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: services.IdempotencyKey("happy-path"),
-		},
+		headers,
 	)
 
 	require.Equal(
@@ -47,38 +46,40 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 	)
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
+
 	require.NotEmpty(t, accepted.ArchiveID)
 
 	status := testutil.WaitForArchiveTerminalState(
 		t,
-		services.Gateway.BaseURL(),
-		accepted.StatusURL,
-		archiveTimeout,
+		services.Gateway.URL(accepted.StatusURL),
+		ArchiveTimeout,
 	)
 
 	require.Equal(
 		t,
 		"COMPLETED",
 		status.Status,
-		"archive status: %+v",
-		status,
 	)
+
 	require.Equal(
 		t,
 		3,
 		status.Capture.Captured,
 	)
+
 	require.Zero(t, status.Capture.Failed)
+
 	require.Equal(
 		t,
 		"READY",
 		status.Replay.Status,
 	)
 
+	getURL := fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID)
+
 	waczResponse := testutil.Get(
 		t,
-		services.Gateway.BaseURL(),
-		fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID),
+		services.Gateway.URL(getURL),
 	)
 
 	require.Equal(
@@ -86,14 +87,16 @@ func TestArchiveLifecycle_CompletesSuccessfully(t *testing.T) {
 		http.StatusOK,
 		waczResponse.Status,
 	)
+
 	require.Equal(
 		t,
 		"application/wacz",
-		waczResponse.Header.Get(testutil.HeaderContentType),
+		waczResponse.Header.Get(HeaderContentType),
 	)
+
 	require.True(
 		t,
-		strings.HasPrefix(waczResponse.Body, zipPrefix),
+		strings.HasPrefix(waczResponse.Body, ZipPrefix),
 		"published WACZ should be a ZIP archive",
 	)
 }

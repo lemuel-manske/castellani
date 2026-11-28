@@ -14,7 +14,7 @@ import (
 
 func requirePageSnapshot(
 	t *testing.T,
-	baseURL string,
+	snapshotURL string,
 	archiveID string,
 	page contracts.PageOutcome,
 ) {
@@ -27,15 +27,8 @@ func requirePageSnapshot(
 	)
 	require.NotEmpty(t, page.SnapshotID)
 
-	snapshotResponse := testutil.Get(
-		t,
-		baseURL,
-		fmt.Sprintf(
-			"/archives/%s/snapshots/%s",
-			archiveID,
-			url.PathEscape(page.SnapshotID),
-		),
-	)
+	snapshotResponse := testutil.Get(t, snapshotURL)
+
 	require.Equal(
 		t,
 		http.StatusOK,
@@ -43,16 +36,19 @@ func requirePageSnapshot(
 	)
 
 	snapshot := testutil.Decode[contracts.Snapshot](t, snapshotResponse)
+
 	require.Equal(
 		t,
 		archiveID,
 		snapshot.ArchiveID,
 	)
+
 	require.Equal(
 		t,
 		page.SnapshotID,
 		snapshot.SnapshotID,
 	)
+
 	require.Equal(
 		t,
 		page.URL,
@@ -62,31 +58,32 @@ func requirePageSnapshot(
 
 // Feature: Archive pages
 //
-// Scenario: Paginate through all captured pages and retrieve their snapshots
-// Given an archive has completed with three captured pages
+// Scenario: Browsing every captured page of an archive
+// Given an archive with several captured pages
 //
-// # When a client lists the pages with a limit of two
+// # When a client lists the pages two at a time
 //
-// Then the response contains a cursor for the remaining page
+// Then the first response includes a cursor to the remaining pages
 // And following the cursor returns the final page without duplicates
 // And each captured page resolves to its committed snapshot
 func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	services := infra.Start(t)
 
-	requestBody := fmt.Sprintf(
-		`{"seedUrl":%q,"maxDepth":1,"maxPages":3}`,
-		"http://fixture-site/index.html",
+	requestBody :=
+		`{"seedUrl":"http://fixture-site/index.html","maxDepth":1,"maxPages":3}`
+
+	headers := fmt.Sprintf(
+		`Content-Type: application/json; Idempotency-Key: %s`,
+		services.IdempotencyKey("pages-pagination"),
 	)
+
 	response := testutil.Post(
 		t,
-		services.Gateway.BaseURL(),
-		"/archives",
+		services.Gateway.URL("/archives"),
 		requestBody,
-		map[string]string{
-			testutil.HeaderContentType:    testutil.ContentTypeJSON,
-			testutil.HeaderIdempotencyKey: services.IdempotencyKey("pages-pagination"),
-		},
+		headers,
 	)
+
 	require.Equal(
 		t,
 		http.StatusAccepted,
@@ -94,30 +91,32 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	)
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
+
 	status := testutil.WaitForArchiveTerminalState(
 		t,
-		services.Gateway.BaseURL(),
-		accepted.StatusURL,
-		archiveTimeout,
+		services.Gateway.URL(accepted.StatusURL),
+		ArchiveTimeout,
 	)
+
 	require.Equal(
 		t,
 		"COMPLETED",
 		status.Status,
-		"archive status: %+v",
-		status,
 	)
+
 	require.Equal(
 		t,
 		3,
 		status.Capture.Captured,
 	)
 
+	getURL := fmt.Sprintf("/archives/%s/pages?limit=2", accepted.ArchiveID)
+
 	firstPage := testutil.Get(
 		t,
-		services.Gateway.BaseURL(),
-		fmt.Sprintf("/archives/%s/pages?limit=2", accepted.ArchiveID),
+		services.Gateway.URL(getURL),
 	)
+
 	require.Equal(
 		t,
 		http.StatusOK,
@@ -125,6 +124,7 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	)
 
 	first := testutil.Decode[contracts.ArchivePages](t, firstPage)
+
 	require.Len(
 		t,
 		first.Items,
@@ -133,15 +133,16 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	require.NotNil(t, first.NextCursor)
 	require.NotEmpty(t, *first.NextCursor)
 
+	getURL = fmt.Sprintf("/archives/%s/pages?limit=2&cursor=%s",
+		accepted.ArchiveID,
+		url.QueryEscape(*first.NextCursor),
+	)
+
 	secondPage := testutil.Get(
 		t,
-		services.Gateway.BaseURL(),
-		fmt.Sprintf(
-			"/archives/%s/pages?limit=2&cursor=%s",
-			accepted.ArchiveID,
-			url.QueryEscape(*first.NextCursor),
-		),
+		services.Gateway.URL(getURL),
 	)
+
 	require.Equal(
 		t,
 		http.StatusOK,
@@ -149,6 +150,7 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	)
 
 	second := testutil.Decode[contracts.ArchivePages](t, secondPage)
+
 	require.Len(
 		t,
 		second.Items,
@@ -165,11 +167,13 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 		firstPageOne.URL,
 		firstPageTwo.URL,
 	)
+
 	require.NotEqual(
 		t,
 		firstPageOne.URL,
 		secondPageOne.URL,
 	)
+
 	require.NotEqual(
 		t,
 		firstPageTwo.URL,
@@ -178,19 +182,33 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 
 	requirePageSnapshot(
 		t,
-		services.Gateway.BaseURL(),
+		services.Gateway.URL(fmt.Sprintf(
+			"/archives/%s/snapshots/%s",
+			accepted.ArchiveID,
+			url.PathEscape(firstPageOne.SnapshotID),
+		)),
 		accepted.ArchiveID,
 		firstPageOne,
 	)
+
 	requirePageSnapshot(
 		t,
-		services.Gateway.BaseURL(),
+		services.Gateway.URL(fmt.Sprintf(
+			"/archives/%s/snapshots/%s",
+			accepted.ArchiveID,
+			url.PathEscape(firstPageTwo.SnapshotID),
+		)),
 		accepted.ArchiveID,
 		firstPageTwo,
 	)
+
 	requirePageSnapshot(
 		t,
-		services.Gateway.BaseURL(),
+		services.Gateway.URL(fmt.Sprintf(
+			"/archives/%s/snapshots/%s",
+			accepted.ArchiveID,
+			url.PathEscape(secondPageOne.SnapshotID),
+		)),
 		accepted.ArchiveID,
 		secondPageOne,
 	)
