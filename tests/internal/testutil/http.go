@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	ContentTypeJSON    = "application/json"
-	ContentTypeProblem = "application/problem+json"
-
-	HeaderContentType    = "Content-Type"
-	HeaderIdempotencyKey = "Idempotency-Key"
-	HeaderLocation       = "Location"
-)
-
 var client = &http.Client{
 	Timeout: 10 * time.Second,
 }
@@ -31,51 +22,91 @@ type Result struct {
 	Body   string
 }
 
-func Get(t *testing.T, baseURL, path string) Result {
+func Get(t *testing.T, url string) Result {
 	t.Helper()
+
+	emptyBody := ""
+	noHeaders := ""
 
 	return Send(
 		t,
 		http.MethodGet,
-		baseURL,
-		path,
-		"",
-		nil,
+		url,
+		emptyBody,
+		noHeaders,
+	)
+}
+
+func GetWithHeaders(
+	t *testing.T,
+	url string,
+	headers string,
+) Result {
+	t.Helper()
+
+	emptyBody := ""
+
+	return Send(
+		t,
+		http.MethodGet,
+		url,
+		emptyBody,
+		headers,
 	)
 }
 
 func Post(
 	t *testing.T,
-	baseURL, path, body string,
-	headers map[string]string,
+	url string,
+	body string,
+	headers string,
 ) Result {
 	t.Helper()
 
 	return Send(
 		t,
 		http.MethodPost,
-		baseURL,
-		path,
+		url,
 		body,
 		headers,
 	)
 }
 
+func Head(t *testing.T, url string) Result {
+	t.Helper()
+
+	emptyBody := ""
+	noHeaders := ""
+
+	return Send(
+		t,
+		http.MethodHead,
+		url,
+		emptyBody,
+		noHeaders,
+	)
+}
+
 func Send(
 	t *testing.T,
-	method, baseURL, path, body string,
-	headers map[string]string,
+	method string,
+	url string,
+	body string,
+	headers string,
 ) Result {
 	t.Helper()
 
 	request, err := http.NewRequest(
 		method,
-		baseURL+path,
+		url,
 		strings.NewReader(body),
 	)
+
 	require.NoError(t, err)
 
-	for name, value := range headers {
+	headersMap := asMap(headers)
+
+	for name, value := range headersMap {
 		request.Header.Set(name, value)
 	}
 
@@ -102,4 +133,33 @@ func Decode[T any](t *testing.T, result Result) T {
 	require.NoError(t, json.Unmarshal([]byte(result.Body), &value))
 
 	return value
+}
+
+func asMap(headers string) map[string]string {
+	result := make(map[string]string)
+
+	for line := range strings.SplitSeq(headers, ";") {
+		line = strings.TrimSpace(line)
+
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(
+			line,
+			":",
+			2,
+		)
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		name := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		result[name] = value
+	}
+
+	return result
 }

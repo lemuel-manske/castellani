@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from config.environment import (
+    CAPTURE_ALLOW_PRIVATE_NETWORKS,
     CAPTURE_ARTIFACT_DIRECTORY,
     CAPTURE_AWS_ACCESS_KEY_ID,
     CAPTURE_AWS_REGION,
@@ -16,6 +17,7 @@ from config.environment import (
     CAPTURE_S3_ENDPOINT_URL,
     a_path,
     auth_profile_key,
+    boolean,
     positive_float,
     positive_int,
     required,
@@ -26,6 +28,7 @@ DEFAULT_BROWSER_SLOT_COUNT = 10
 DEFAULT_OUTBOX_LEASE_DURATION = 30.0
 DEFAULT_OUTBOX_POLL_INTERVAL = 0.5
 DEFAULT_OUTBOX_RETRY_DELAY = 5.0
+DEFAULT_ALLOW_PRIVATE_NETWORKS = False
 DEFAULT_ARTIFACT_DIRECTORY = "/tmp/castellani/capture"
 DEFAULT_PACKAGES_DIRECTORY = "/tmp/castellani/capture/packages"
 
@@ -54,6 +57,8 @@ class CaptureSettings:
 
     artifact_directory: Path = Path(DEFAULT_ARTIFACT_DIRECTORY)
     packages_directory: Path = Path(DEFAULT_PACKAGES_DIRECTORY)
+
+    allow_private_networks: bool = DEFAULT_ALLOW_PRIVATE_NETWORKS
 
     @classmethod
     def from_environment(cls) -> "CaptureSettings":
@@ -92,4 +97,5 @@ class CaptureSettings:
             ),
             artifact_directory=artifact_dir,
             packages_directory=Path(artifact_dir) / "packages",
+            allow_private_networks=boolean(CAPTURE_ALLOW_PRIVATE_NETWORKS),
         )

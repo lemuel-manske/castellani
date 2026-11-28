@@ -3,6 +3,7 @@ import binascii
 import os
 from pathlib import Path
 
+CAPTURE_ALLOW_PRIVATE_NETWORKS = "CAPTURE_ALLOW_PRIVATE_NETWORKS"
 CAPTURE_ARTIFACT_DIRECTORY = "CAPTURE_ARTIFACT_DIRECTORY"
 CAPTURE_AUTH_PROFILE_KEY = "CAPTURE_AUTH_PROFILE_KEY"
 CAPTURE_AWS_ACCESS_KEY_ID = "CAPTURE_AWS_ACCESS_KEY_ID"
@@ -63,6 +64,23 @@ def positive_float(name: str, default: float) -> float:
         raise ValueError(f"{name} must be positive")
 
     return value
+
+
+def boolean(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    raise ValueError(f"{name} must be a boolean")
 
 
 def a_path(name: str, default: str) -> Path:

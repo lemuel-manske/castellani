@@ -8,35 +8,34 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
 var (
-	startMu sync.Mutex
-	shared  *Dependencies
-	stack   *compose.DockerCompose
+	startOnce    sync.Once
+	shared       Dependencies
+	startErr     error
+	stack        *compose.DockerCompose
+	terraformDir string
 )
 
-// Start returns the shared stack, starting it on first use and resetting it after each test.
-func Start(t *testing.T) Dependencies {
+// Start returns a test-scoped environment backed by the shared stack, starting it on first use.
+func Start(t *testing.T) TestEnv {
 	t.Helper()
 
-	startMu.Lock()
-	defer startMu.Unlock()
-
-	if shared == nil {
-		dependencies := start(t)
-		shared = &dependencies
-	}
-
-	t.Cleanup(func() {
-		shared.Reset(t)
+	startOnce.Do(func() {
+		startErr = start()
 	})
 
-	return *shared
+	require.NoError(
+		t,
+		startErr,
+		"start e2e services",
+	)
+
+	return newTestEnv(t, shared)
 }
 
 // Stop tears down the shared stack. Call it from TestMain after the suite completes.
@@ -53,107 +52,74 @@ func Stop() {
 		)
 	}
 
+	if terraformDir != "" {
+		os.RemoveAll(terraformDir)
+	}
+
 	stack = nil
+	terraformDir = ""
 }
 
-func start(t *testing.T) Dependencies {
-	t.Helper()
-
+func start() error {
 	ctx := context.Background()
 
-	root := repositoryRoot(t)
+	root, err := repositoryRoot()
 
-	terraformDir := prepareTerraform(t, root)
-
-	stack = newComposeStack(t, filepath.Join(root, "docker-compose.yaml"))
-
-	stack.WithEnv(stackEnvironment(terraformDir))
-
-	if err := stack.Up(ctx); err != nil {
-		require.NoError(
-			t,
-			err,
-			"start e2e services",
-		)
+	if err != nil {
+		return err
 	}
 
-	services := Dependencies{
-		MiniStack: newService(
-			t,
-			ctx,
-			stack,
-			"ministack",
-			"4566",
-			"/_ministack/health",
-			"",
-			"",
-		),
-		RabbitMQ: newService(
-			t,
-			ctx,
-			stack,
-			"rabbitmq",
-			"15672",
-			"/api/overview",
-			rabbitMQUsername,
-			rabbitMQPassword,
-		),
-		OpenSearch: newService(
-			t,
-			ctx,
-			stack,
-			"opensearch",
-			"9200",
-			"/_cluster/health",
-			"",
-			"",
-		),
-		Gateway: newService(
-			t,
-			ctx,
-			stack,
-			"gateway",
-			"8080",
-			"/health/ready",
-			"",
-			"",
-		),
-		Coordinator: newService(
-			t,
-			ctx,
-			stack,
-			"coordinator",
-			"8081",
-			"/health/ready",
-			"",
-			"",
-		),
-		Capture: newService(
-			t,
-			ctx,
-			stack,
-			"capture-worker",
-			"8000",
-			"/health/ready",
-			"",
-			"",
-		),
-		Search: newService(
-			t,
-			ctx,
-			stack,
-			"search",
-			"8082",
-			"/health/ready",
-			"",
-			"",
-		),
+	terraformDir, err = prepareTerraform(root)
+
+	if err != nil {
+		return fmt.Errorf("prepare terraform: %w", err)
 	}
+
+	currentStack, err := newComposeStack(
+		filepath.Join(root, "docker-compose.yaml"),
+		filepath.Join(
+			root,
+			"tests",
+			"compose.yaml",
+		),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	stack = currentStack
+
+	stackEnv, err := stackEnvironment(terraformDir)
+
+	if err != nil {
+		return fmt.Errorf("configure e2e ports: %w", err)
+	}
+
+	stack.WithEnv(stackEnv)
+
+	if err = stack.Up(ctx); err != nil {
+		return fmt.Errorf("start e2e services: %w", err)
+	}
+
+	services, err := resolveServices(ctx, stack)
+
+	if err != nil {
+		return err
+	}
+
+	captureWorkers, err := listServiceContainers(ctx, captureWorkerService)
+
+	if err != nil {
+		return err
+	}
+
+	services.CaptureWorkers = captureWorkers
+
+	shared = services
 
 	readinessCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
 	defer cancel()
-
-	readinessStarted := time.Now()
 
 	if err := waitForAllHealthy(
 		readinessCtx,
@@ -165,14 +131,66 @@ func start(t *testing.T) Dependencies {
 		services.Capture,
 		services.Search,
 	); err != nil {
-		require.NoError(
-			t,
-			err,
-			"wait for e2e services to become healthy",
-		)
+		return fmt.Errorf("wait for e2e services to become healthy: %w", err)
 	}
 
-	t.Logf("service readiness: %s", time.Since(readinessStarted))
+	if err := waitForContainerHealth(
+		readinessCtx,
+		captureWorkerService,
+		captureWorkerReplicaCount,
+	); err != nil {
+		return fmt.Errorf("wait for capture worker replicas: %w", err)
+	}
 
-	return services
+	if err := waitForQueueConsumers(
+		readinessCtx,
+		services.RabbitMQ,
+		capturePageQueue,
+		captureWorkerReplicaCount,
+	); err != nil {
+		return fmt.Errorf("wait for capture page consumers: %w", err)
+	}
+
+	return nil
+}
+
+func resolveServices(ctx context.Context, currentStack compose.ComposeStack) (Dependencies, error) {
+	var dependencies Dependencies
+
+	services := []struct {
+		target   *Service
+		name     string
+		port     string
+		path     string
+		username string
+		password string
+	}{
+		{&dependencies.MiniStack, ministackService, "4566", "/_ministack/health", "", ""},
+		{&dependencies.RabbitMQ, rabbitMQService, "15672", "/api/overview", rabbitMQUsername, rabbitMQPassword},
+		{&dependencies.OpenSearch, openSearchService, "9200", "/_cluster/health", "", ""},
+		{&dependencies.Gateway, gatewayService, "8080", "/health/ready", "", ""},
+		{&dependencies.Coordinator, coordinatorService, "8081", "/health/ready", "", ""},
+		{&dependencies.Capture, captureWorkerService, "8000", "/health/ready", "", ""},
+		{&dependencies.Search, searchService, "8082", "/health/ready", "", ""},
+	}
+
+	for _, service := range services {
+		resolved, err := newService(
+			ctx,
+			currentStack,
+			service.name,
+			service.port,
+			service.path,
+			service.username,
+			service.password,
+		)
+
+		if err != nil {
+			return Dependencies{}, err
+		}
+
+		*service.target = resolved
+	}
+
+	return dependencies, nil
 }

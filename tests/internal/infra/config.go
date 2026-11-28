@@ -1,17 +1,20 @@
 package infra
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 const (
+	e2eProjectName = "castellani-e2e"
+
+	captureWorkerReplicaCount = 3
+
 	rabbitMQUsername = "castellani"
 	rabbitMQPassword = "castellani"
 
@@ -22,34 +25,34 @@ const (
 	terraformLockFile = ".terraform.lock.hcl"
 )
 
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-
+func repositoryRoot() (string, error) {
 	_, file, _, ok := runtime.Caller(0)
-	require.True(
-		t,
-		ok,
-		"locate repository root",
-	)
 
-	return filepath.Join(
-		filepath.Dir(file),
-		"../../..",
-	)
+	if !ok {
+		return "", fmt.Errorf("locate repository root")
+	}
+
+	return filepath.Join(filepath.Dir(file), "../../.."), nil
 }
 
-func prepareTerraform(t *testing.T, root string) string {
-	t.Helper()
+func prepareTerraform(root string) (string, error) {
+	target, err := terraformTarget()
+
+	if err != nil {
+		return "", err
+	}
 
 	source := filepath.Join(
 		root,
 		"infra",
 		"terraform",
 	)
-	target := t.TempDir()
 
 	entries, err := os.ReadDir(source)
-	require.NoError(t, err)
+
+	if err != nil {
+		return "", fmt.Errorf("read terraform sources: %w", err)
+	}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -63,20 +66,37 @@ func prepareTerraform(t *testing.T, root string) string {
 		}
 
 		contents, err := os.ReadFile(filepath.Join(source, name))
-		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(
+		if err != nil {
+			return "", fmt.Errorf(
+				"read terraform file %s: %w",
+				name,
+				err,
+			)
+		}
+
+		if err := os.WriteFile(
 			filepath.Join(target, name),
 			contents,
 			0o600,
-		))
+		); err != nil {
+			return "", fmt.Errorf(
+				"write terraform file %s: %w",
+				name,
+				err,
+			)
+		}
 	}
 
-	return target
+	return target, nil
 }
 
-func stackEnvironment(terraformDir string) map[string]string {
-	return map[string]string{
+func terraformTarget() (string, error) {
+	return os.MkdirTemp("", "castellani-e2e-terraform-")
+}
+
+func stackEnvironment(terraformDir string) (map[string]string, error) {
+	env := map[string]string{
 		"AWS_REGION":               awsRegion,
 		"AWS_ACCESS_KEY_ID":        awsAccessKeyID,
 		"AWS_SECRET_ACCESS_KEY":    awsSecretAccessKey,
@@ -91,13 +111,55 @@ func stackEnvironment(terraformDir string) map[string]string {
 		"TERRAFORM_DIR":            terraformDir,
 		"TERRAFORM_UID":            strconv.Itoa(os.Getuid()),
 		"TERRAFORM_GID":            strconv.Itoa(os.Getgid()),
-		"MINISTACK_PORT":           "0",
-		"RABBITMQ_PORT":            "0",
-		"RABBITMQ_MANAGEMENT_PORT": "0",
-		"OPENSEARCH_PORT":          "0",
-		"GATEWAY_PORT":             "0",
-		"COORDINATOR_PORT":         "0",
 		"CAPTURE_PORT":             "0",
-		"SEARCH_PORT":              "0",
 	}
+
+	portNames := []string{
+		"MINISTACK_PORT",
+		"RABBITMQ_PORT",
+		"RABBITMQ_MANAGEMENT_PORT",
+		"OPENSEARCH_PORT",
+		"COORDINATOR_PORT",
+		"GATEWAY_PORT",
+		"SEARCH_PORT",
+	}
+
+	listeners := make(
+		[]net.Listener,
+		0,
+		len(portNames),
+	)
+	defer func() {
+		for _, listener := range listeners {
+			listener.Close()
+		}
+	}()
+
+	for _, name := range portNames {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+
+		if err != nil {
+			return nil, fmt.Errorf(
+				"reserve %s: %w",
+				name,
+				err,
+			)
+		}
+
+		listeners = append(listeners, listener)
+
+		_, port, err := net.SplitHostPort(listener.Addr().String())
+
+		if err != nil {
+			return nil, fmt.Errorf(
+				"resolve %s: %w",
+				name,
+				err,
+			)
+		}
+
+		env[name] = port
+	}
+
+	return env, nil
 }

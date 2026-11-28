@@ -2,13 +2,12 @@ package infra
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
-	"testing"
 	"time"
 
 	"github.com/docker/go-connections/nat"
-	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/compose"
 )
 
@@ -19,21 +18,24 @@ var httpClient = &http.Client{
 }
 
 type Dependencies struct {
-	MiniStack   Service
-	RabbitMQ    Service
-	OpenSearch  Service
-	Gateway     Service
-	Coordinator Service
-	Capture     Service
-	Search      Service
+	MiniStack      Service
+	RabbitMQ       Service
+	OpenSearch     Service
+	Gateway        Service
+	Coordinator    Service
+	Capture        Service
+	CaptureWorkers []Container
+	Search         Service
 }
 
 type Service struct {
-	name      string
-	baseURL   string
-	healthURL string
-	username  string
-	password  string
+	name       string
+	baseURL    string
+	healthURL  string
+	healthPath string
+	port       nat.Port
+	username   string
+	password   string
 }
 
 func (s Service) BaseURL() string {
@@ -71,7 +73,6 @@ func (s Service) HealthStatus(ctx context.Context) (int, error) {
 }
 
 func newService(
-	t *testing.T,
 	ctx context.Context,
 	stack compose.ComposeStack,
 	name string,
@@ -79,22 +80,37 @@ func newService(
 	path string,
 	username string,
 	password string,
-) Service {
-	t.Helper()
-
+) (Service, error) {
 	container, err := stack.ServiceContainer(ctx, name)
-	require.NoError(t, err)
+
+	if err != nil {
+		return Service{}, fmt.Errorf(
+			"resolve service %s: %w",
+			name,
+			err,
+		)
+	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
-	require.NoError(t, err)
+
+	if err != nil {
+		return Service{}, fmt.Errorf(
+			"resolve port %s for %s: %w",
+			port,
+			name,
+			err,
+		)
+	}
 
 	baseURL := "http://" + net.JoinHostPort("localhost", mappedPort.Port())
 
 	return Service{
-		name:      name,
-		baseURL:   baseURL,
-		healthURL: baseURL + path,
-		username:  username,
-		password:  password,
-	}
+		name:       name,
+		baseURL:    baseURL,
+		healthURL:  baseURL + path,
+		healthPath: path,
+		port:       nat.Port(port),
+		username:   username,
+		password:   password,
+	}, nil
 }

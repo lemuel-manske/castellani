@@ -1,6 +1,8 @@
 {
-  "include": ["src", "tests"],
-
+  "include": [
+    "src",
+    "tests"
+  ],
   "exclude": [
     ".venv",
     ".pytest_cache",
