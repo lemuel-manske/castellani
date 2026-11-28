@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -57,7 +58,7 @@ func queueConsumers(ctx context.Context, rabbitMQ Service, queue string) (int, e
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		rabbitMQ.URL("/api/queues/%2F/"+queue),
+		rabbitMQ.URL("/api/queues/"+url.PathEscape(rabbitMQVhost)+"/"+queue),
 		nil,
 	)
 

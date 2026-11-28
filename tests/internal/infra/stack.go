@@ -146,13 +146,13 @@ func resolveServices(ctx context.Context, currentStack compose.ComposeStack) (De
 		username string
 		password string
 	}{
-		{&dependencies.MiniStack, "ministack", "4566", "/_ministack/health", "", ""},
-		{&dependencies.RabbitMQ, "rabbitmq", "15672", "/api/overview", rabbitMQUsername, rabbitMQPassword},
-		{&dependencies.OpenSearch, "opensearch", "9200", "/_cluster/health", "", ""},
-		{&dependencies.Gateway, "gateway", "8080", "/health/ready", "", ""},
-		{&dependencies.Coordinator, "coordinator", "8081", "/health/ready", "", ""},
+		{&dependencies.MiniStack, ministackService, "4566", "/_ministack/health", "", ""},
+		{&dependencies.RabbitMQ, rabbitMQService, "15672", "/api/overview", rabbitMQUsername, rabbitMQPassword},
+		{&dependencies.OpenSearch, openSearchService, "9200", "/_cluster/health", "", ""},
+		{&dependencies.Gateway, gatewayService, "8080", "/health/ready", "", ""},
+		{&dependencies.Coordinator, coordinatorService, "8081", "/health/ready", "", ""},
 		{&dependencies.Capture, captureWorkerService, "8000", "/health/ready", "", ""},
-		{&dependencies.Search, "search", "8082", "/health/ready", "", ""},
+		{&dependencies.Search, searchService, "8082", "/health/ready", "", ""},
 	}
 
 	for _, service := range services {

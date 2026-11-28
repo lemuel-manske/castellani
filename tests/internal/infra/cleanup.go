@@ -21,25 +21,6 @@ import (
 
 const (
 	cleanupRequestTimeout = 30 * time.Second
-	searchIndexName       = "archive-pages-v1"
-
-	coordinatorArchivesTable    = "coordinator_archives"
-	coordinatorSubmissionsTable = "coordinator_submissions"
-	coordinatorOutboxTable      = "coordinator_outbox"
-	coordinatorInboxTable       = "coordinator_inbox"
-
-	captureRunsTable      = "capture_runs"
-	captureFrontierTable  = "capture_frontier"
-	captureOutboxTable    = "capture_outbox"
-	captureSnapshotsTable = "capture_snapshots"
-
-	searchIndexingLedgerTable    = "search_indexing_ledger"
-	searchPublicationLedgerTable = "search_publication_ledger"
-	searchOutboxTable            = "search_outbox"
-	searchManifestLedgerTable    = "search_manifest_ledger"
-
-	archiveArtifactsBucket = "castellani-archive-artifacts"
-	archiveManifestsBucket = "castellani-archive-manifests"
 )
 
 var (
