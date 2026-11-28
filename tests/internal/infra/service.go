@@ -28,11 +28,13 @@ type Dependencies struct {
 }
 
 type Service struct {
-	name      string
-	baseURL   string
-	healthURL string
-	username  string
-	password  string
+	name       string
+	baseURL    string
+	healthURL  string
+	healthPath string
+	port       nat.Port
+	username   string
+	password   string
 }
 
 func (s Service) BaseURL() string {
@@ -93,10 +95,12 @@ func newService(
 	baseURL := "http://" + net.JoinHostPort("localhost", mappedPort.Port())
 
 	return Service{
-		name:      name,
-		baseURL:   baseURL,
-		healthURL: baseURL + path,
-		username:  username,
-		password:  password,
+		name:       name,
+		baseURL:    baseURL,
+		healthURL:  baseURL + path,
+		healthPath: path,
+		port:       nat.Port(port),
+		username:   username,
+		password:   password,
 	}, nil
 }

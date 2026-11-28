@@ -53,6 +53,38 @@ func WaitForArchiveTerminalState(
 	return status
 }
 
+func WaitForArchiveStatus(
+	t *testing.T,
+	url string,
+	expected string,
+	timeout time.Duration,
+) contracts.ArchiveStatus {
+	t.Helper()
+
+	var status contracts.ArchiveStatus
+
+	require.Eventually(
+		t,
+		func() bool {
+			response := Get(t, url)
+
+			if response.Status != http.StatusOK {
+				return false
+			}
+
+			status = Decode[contracts.ArchiveStatus](t, response)
+
+			return status.Status == expected
+		},
+		timeout,
+		100*time.Millisecond,
+		"archive did not reach %s",
+		expected,
+	)
+
+	return status
+}
+
 func WaitForArchiveStatusProgression(
 	t *testing.T,
 	url string,

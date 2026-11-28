@@ -20,15 +20,6 @@ const (
 	terraformLockFile = ".terraform.lock.hcl"
 )
 
-func keepStack() bool {
-	switch strings.ToLower(os.Getenv("CASTELLANI_E2E_KEEP_STACK")) {
-	case "1", "true":
-		return true
-	default:
-		return false
-	}
-}
-
 func repositoryRoot() (string, error) {
 	_, file, _, ok := runtime.Caller(0)
 
@@ -80,15 +71,6 @@ func prepareTerraform(root string) (string, error) {
 }
 
 func terraformTarget() (string, error) {
-	if keepStack() {
-		target := filepath.Join(
-			os.TempDir(),
-			fmt.Sprintf("castellani-e2e-terraform-%d", os.Getuid()),
-		)
-
-		return target, os.MkdirAll(target, 0o700)
-	}
-
 	return os.MkdirTemp("", "castellani-e2e-terraform-")
 }
 

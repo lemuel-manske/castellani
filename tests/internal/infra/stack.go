@@ -40,14 +40,12 @@ func Stop() {
 		return
 	}
 
-	if !keepStack() {
-		if err := stack.Down(context.Background(), compose.RemoveVolumes(true)); err != nil {
-			fmt.Fprintf(os.Stderr, "stop e2e services: %v\n", err)
-		}
+	if err := stack.Down(context.Background(), compose.RemoveVolumes(true)); err != nil {
+		fmt.Fprintf(os.Stderr, "stop e2e services: %v\n", err)
+	}
 
-		if terraformDir != "" {
-			os.RemoveAll(terraformDir)
-		}
+	if terraformDir != "" {
+		os.RemoveAll(terraformDir)
 	}
 
 	stack = nil
@@ -81,7 +79,7 @@ func start() error {
 	stack = currentStack
 	stack.WithEnv(stackEnvironment(terraformDir))
 
-	if err := stack.Up(ctx); err != nil {
+	if err = stack.Up(ctx); err != nil {
 		return fmt.Errorf("start e2e services: %w", err)
 	}
 
