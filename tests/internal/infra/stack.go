@@ -77,7 +77,13 @@ func start() error {
 	}
 
 	stack = currentStack
-	stack.WithEnv(stackEnvironment(terraformDir))
+
+	stackEnv, err := stackEnvironment(terraformDir)
+	if err != nil {
+		return fmt.Errorf("configure e2e ports: %w", err)
+	}
+
+	stack.WithEnv(stackEnv)
 
 	if err = stack.Up(ctx); err != nil {
 		return fmt.Errorf("start e2e services: %w", err)

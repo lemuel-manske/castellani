@@ -18,33 +18,69 @@ const (
 var restartMu sync.Mutex
 
 // RestartService restarts a resolved service in place and waits for it to become healthy again.
-func (TestEnv) RestartService(t *testing.T, service Service) {
+func (e TestEnv) RestartService(t *testing.T, service Service) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), restartTimeout)
-	defer cancel()
-
-	require.NoError(t, restartService(ctx, service), "restart %s", service.name)
+	e.WithServiceStopped(t, service, func() {})
 }
 
-func restartService(ctx context.Context, service Service) error {
+// WithServiceStopped stops a service, runs during, and restores the service afterwards.
+func (TestEnv) WithServiceStopped(t *testing.T, service Service, during func()) {
+	t.Helper()
+
 	restartMu.Lock()
 	defer restartMu.Unlock()
 
-	container, err := stack.ServiceContainer(ctx, service.name)
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), restartTimeout)
+	defer stopCancel()
+
+	require.NoError(t, stopService(stopCtx, service), "stop %s", service.name)
+
+	defer func() {
+		startCtx, startCancel := context.WithTimeout(context.Background(), restartTimeout)
+		defer startCancel()
+
+		require.NoError(t, startService(startCtx, service), "start %s", service.name)
+	}()
+
+	during()
+}
+
+func stopService(ctx context.Context, service Service) error {
+	containers, err := listServiceContainers(ctx, service.name)
 
 	if err != nil {
-		return fmt.Errorf("resolve %s for restart: %w", service.name, err)
+		return fmt.Errorf("resolve %s for stop: %w", service.name, err)
 	}
 
-	stopTimeout := serviceStopTimeout
-
-	if err = container.Stop(ctx, &stopTimeout); err != nil {
-		return fmt.Errorf("stop %s: %w", service.name, err)
+	if len(containers) == 0 {
+		return fmt.Errorf("no %s containers found for stop", service.name)
 	}
 
-	if err = container.Start(ctx); err != nil {
-		return fmt.Errorf("start %s: %w", service.name, err)
+	for _, container := range containers {
+		if err := container.Stop(ctx, serviceStopTimeout); err != nil {
+			return fmt.Errorf("stop %s: %w", service.name, err)
+		}
+	}
+
+	return nil
+}
+
+func startService(ctx context.Context, service Service) error {
+	containers, err := listServiceContainers(ctx, service.name)
+
+	if err != nil {
+		return fmt.Errorf("resolve %s for start: %w", service.name, err)
+	}
+
+	if len(containers) == 0 {
+		return fmt.Errorf("no %s containers found for start", service.name)
+	}
+
+	for _, container := range containers {
+		if err = container.Start(ctx); err != nil {
+			return fmt.Errorf("start %s: %w", service.name, err)
+		}
 	}
 
 	restarted, err := newService(

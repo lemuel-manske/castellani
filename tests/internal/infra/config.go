@@ -2,6 +2,7 @@ package infra
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -78,8 +79,8 @@ func terraformTarget() (string, error) {
 	return os.MkdirTemp("", "castellani-e2e-terraform-")
 }
 
-func stackEnvironment(terraformDir string) map[string]string {
-	return map[string]string{
+func stackEnvironment(terraformDir string) (map[string]string, error) {
+	env := map[string]string{
 		"AWS_REGION":               awsRegion,
 		"AWS_ACCESS_KEY_ID":        awsAccessKeyID,
 		"AWS_SECRET_ACCESS_KEY":    awsSecretAccessKey,
@@ -94,13 +95,41 @@ func stackEnvironment(terraformDir string) map[string]string {
 		"TERRAFORM_DIR":            terraformDir,
 		"TERRAFORM_UID":            strconv.Itoa(os.Getuid()),
 		"TERRAFORM_GID":            strconv.Itoa(os.Getgid()),
-		"MINISTACK_PORT":           "0",
-		"RABBITMQ_PORT":            "0",
-		"RABBITMQ_MANAGEMENT_PORT": "0",
-		"OPENSEARCH_PORT":          "0",
-		"GATEWAY_PORT":             "0",
-		"COORDINATOR_PORT":         "0",
 		"CAPTURE_PORT":             "0",
-		"SEARCH_PORT":              "0",
 	}
+
+	portNames := []string{
+		"MINISTACK_PORT",
+		"RABBITMQ_PORT",
+		"RABBITMQ_MANAGEMENT_PORT",
+		"OPENSEARCH_PORT",
+		"COORDINATOR_PORT",
+		"GATEWAY_PORT",
+		"SEARCH_PORT",
+	}
+
+	listeners := make([]net.Listener, 0, len(portNames))
+	defer func() {
+		for _, listener := range listeners {
+			listener.Close()
+		}
+	}()
+
+	for _, name := range portNames {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return nil, fmt.Errorf("reserve %s: %w", name, err)
+		}
+
+		listeners = append(listeners, listener)
+
+		_, port, err := net.SplitHostPort(listener.Addr().String())
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s: %w", name, err)
+		}
+
+		env[name] = port
+	}
+
+	return env, nil
 }
