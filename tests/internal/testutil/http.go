@@ -37,7 +37,11 @@ func Get(t *testing.T, url string) Result {
 	)
 }
 
-func GetWithHeaders(t *testing.T, url string, headers string) Result {
+func GetWithHeaders(
+	t *testing.T,
+	url string,
+	headers string,
+) Result {
 	t.Helper()
 
 	emptyBody := ""
@@ -141,7 +145,11 @@ func asMap(headers string) map[string]string {
 			continue
 		}
 
-		parts := strings.SplitN(line, ":", 2)
+		parts := strings.SplitN(
+			line,
+			":",
+			2,
+		)
 
 		if len(parts) != 2 {
 			continue

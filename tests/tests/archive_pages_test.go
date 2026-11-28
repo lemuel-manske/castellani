@@ -133,7 +133,8 @@ func TestArchivePages_PaginatesCapturedPages(t *testing.T) {
 	require.NotNil(t, first.NextCursor)
 	require.NotEmpty(t, *first.NextCursor)
 
-	getURL = fmt.Sprintf("/archives/%s/pages?limit=2&cursor=%s",
+	getURL = fmt.Sprintf(
+		"/archives/%s/pages?limit=2&cursor=%s",
 		accepted.ArchiveID,
 		url.QueryEscape(*first.NextCursor),
 	)

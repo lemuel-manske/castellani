@@ -42,7 +42,11 @@ func prepareTerraform(root string) (string, error) {
 		return "", err
 	}
 
-	source := filepath.Join(root, "infra", "terraform")
+	source := filepath.Join(
+		root,
+		"infra",
+		"terraform",
+	)
 
 	entries, err := os.ReadDir(source)
 
@@ -64,11 +68,23 @@ func prepareTerraform(root string) (string, error) {
 		contents, err := os.ReadFile(filepath.Join(source, name))
 
 		if err != nil {
-			return "", fmt.Errorf("read terraform file %s: %w", name, err)
+			return "", fmt.Errorf(
+				"read terraform file %s: %w",
+				name,
+				err,
+			)
 		}
 
-		if err := os.WriteFile(filepath.Join(target, name), contents, 0o600); err != nil {
-			return "", fmt.Errorf("write terraform file %s: %w", name, err)
+		if err := os.WriteFile(
+			filepath.Join(target, name),
+			contents,
+			0o600,
+		); err != nil {
+			return "", fmt.Errorf(
+				"write terraform file %s: %w",
+				name,
+				err,
+			)
 		}
 	}
 
@@ -108,7 +124,11 @@ func stackEnvironment(terraformDir string) (map[string]string, error) {
 		"SEARCH_PORT",
 	}
 
-	listeners := make([]net.Listener, 0, len(portNames))
+	listeners := make(
+		[]net.Listener,
+		0,
+		len(portNames),
+	)
 	defer func() {
 		for _, listener := range listeners {
 			listener.Close()
@@ -117,15 +137,25 @@ func stackEnvironment(terraformDir string) (map[string]string, error) {
 
 	for _, name := range portNames {
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
+
 		if err != nil {
-			return nil, fmt.Errorf("reserve %s: %w", name, err)
+			return nil, fmt.Errorf(
+				"reserve %s: %w",
+				name,
+				err,
+			)
 		}
 
 		listeners = append(listeners, listener)
 
 		_, port, err := net.SplitHostPort(listener.Addr().String())
+
 		if err != nil {
-			return nil, fmt.Errorf("resolve %s: %w", name, err)
+			return nil, fmt.Errorf(
+				"resolve %s: %w",
+				name,
+				err,
+			)
 		}
 
 		env[name] = port

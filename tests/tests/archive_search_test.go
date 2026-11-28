@@ -125,7 +125,11 @@ func TestArchiveSearch_ResultsUseDocumentedSchema(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	results := testutil.WaitForArchiveSearchResults(
 		t,
@@ -137,9 +141,17 @@ func TestArchiveSearch_ResultsUseDocumentedSchema(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Len(t, results.Results, 1)
+	require.Len(
+		t,
+		results.Results,
+		1,
+	)
 
-	testutil.RequireSearchResultsSchema(t, results, 10)
+	testutil.RequireSearchResultsSchema(
+		t,
+		results,
+		10,
+	)
 }
 
 // Feature: Archive search
@@ -182,7 +194,11 @@ func TestArchiveSearch_UnfilteredQueryFindsPublishedPage(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	results := testutil.WaitForArchiveSearchResults(
 		t,

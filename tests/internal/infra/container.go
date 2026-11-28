@@ -38,7 +38,11 @@ func (c Container) HealthStatus(ctx context.Context) (string, error) {
 	inspect, err := dockerClient.ContainerInspect(ctx, c.id)
 
 	if err != nil {
-		return "", fmt.Errorf("inspect %s: %w", c.service, err)
+		return "", fmt.Errorf(
+			"inspect %s: %w",
+			c.service,
+			err,
+		)
 	}
 
 	if inspect.State == nil || inspect.State.Health == nil {
@@ -59,9 +63,13 @@ func (c Container) Stop(ctx context.Context, timeout time.Duration) error {
 
 	seconds := int(timeout / time.Second)
 
-	return dockerClient.ContainerStop(ctx, c.id, dockertypes.StopOptions{
+	return dockerClient.ContainerStop(
+		ctx,
+		c.id,
+		dockertypes.StopOptions{
 		Timeout: &seconds,
-	})
+	},
+	)
 }
 
 func (c Container) Start(ctx context.Context) error {
@@ -73,7 +81,11 @@ func (c Container) Start(ctx context.Context) error {
 
 	defer dockerClient.Close()
 
-	return dockerClient.ContainerStart(ctx, c.id, dockertypes.StartOptions{})
+	return dockerClient.ContainerStart(
+		ctx,
+		c.id,
+		dockertypes.StartOptions{},
+	)
 }
 
 func listServiceContainers(ctx context.Context, service string) ([]Container, error) {
@@ -94,10 +106,18 @@ func listServiceContainers(ctx context.Context, service string) ([]Container, er
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("list %s containers: %w", service, err)
+		return nil, fmt.Errorf(
+			"list %s containers: %w",
+			service,
+			err,
+		)
 	}
 
-	containers := make([]Container, 0, len(summaries))
+	containers := make(
+		[]Container,
+		0,
+		len(summaries),
+	)
 
 	for _, summary := range summaries {
 		containers = append(containers, Container{
@@ -109,7 +129,11 @@ func listServiceContainers(ctx context.Context, service string) ([]Container, er
 	return containers, nil
 }
 
-func waitForContainerHealth(ctx context.Context, service string, count int) error {
+func waitForContainerHealth(
+	ctx context.Context,
+	service string,
+	count int,
+) error {
 	ticker := time.NewTicker(readinessInterval)
 	defer ticker.Stop()
 
@@ -128,7 +152,11 @@ func waitForContainerHealth(ctx context.Context, service string, count int) erro
 				count,
 			)
 		} else {
-			lastErr = requireHealthyContainers(ctx, containers, count)
+			lastErr = requireHealthyContainers(
+				ctx,
+				containers,
+				count,
+			)
 		}
 
 		if lastErr == nil {
@@ -137,13 +165,22 @@ func waitForContainerHealth(ctx context.Context, service string, count int) erro
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("wait for %s replicas: %w; last error: %v", service, ctx.Err(), lastErr)
+			return fmt.Errorf(
+				"wait for %s replicas: %w; last error: %v",
+				service,
+				ctx.Err(),
+				lastErr,
+			)
 		case <-ticker.C:
 		}
 	}
 }
 
-func requireHealthyContainers(ctx context.Context, containers []Container, count int) error {
+func requireHealthyContainers(
+	ctx context.Context,
+	containers []Container,
+	count int,
+) error {
 	healthyCount := 0
 
 	for _, container := range containers {
@@ -159,7 +196,11 @@ func requireHealthyContainers(ctx context.Context, containers []Container, count
 	}
 
 	if healthyCount != count {
-		return fmt.Errorf("%d/%d containers are healthy", healthyCount, count)
+		return fmt.Errorf(
+			"%d/%d containers are healthy",
+			healthyCount,
+			count,
+		)
 	}
 
 	return nil

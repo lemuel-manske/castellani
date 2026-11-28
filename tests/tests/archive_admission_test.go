@@ -46,7 +46,11 @@ func TestArchive_DurableAdmission_IsImmediatelyReadable(t *testing.T) {
 
 	accepted := testutil.Decode[contracts.ArchiveAccepted](t, response)
 
-	require.Equal(t, "ACCEPTED", accepted.Status)
+	require.Equal(
+		t,
+		"ACCEPTED",
+		accepted.Status,
+	)
 	require.Equal(
 		t,
 		accepted.StatusURL,

@@ -21,11 +21,19 @@ var restartMu sync.Mutex
 func (e TestEnv) RestartService(t *testing.T, service Service) {
 	t.Helper()
 
-	e.WithServiceStopped(t, service, func() {})
+	e.WithServiceStopped(
+		t,
+		service,
+		func() {},
+	)
 }
 
 // WithServiceStopped stops a service, runs during, and restores the service afterwards.
-func (TestEnv) WithServiceStopped(t *testing.T, service Service, during func()) {
+func (TestEnv) WithServiceStopped(
+	t *testing.T,
+	service Service,
+	during func(),
+) {
 	t.Helper()
 
 	restartMu.Lock()
@@ -34,13 +42,23 @@ func (TestEnv) WithServiceStopped(t *testing.T, service Service, during func()) 
 	stopCtx, stopCancel := context.WithTimeout(context.Background(), restartTimeout)
 	defer stopCancel()
 
-	require.NoError(t, stopService(stopCtx, service), "stop %s", service.name)
+	require.NoError(
+		t,
+		stopService(stopCtx, service),
+		"stop %s",
+		service.name,
+	)
 
 	defer func() {
 		startCtx, startCancel := context.WithTimeout(context.Background(), restartTimeout)
 		defer startCancel()
 
-		require.NoError(t, startService(startCtx, service), "start %s", service.name)
+		require.NoError(
+			t,
+			startService(startCtx, service),
+			"start %s",
+			service.name,
+		)
 	}()
 
 	during()
@@ -50,7 +68,11 @@ func stopService(ctx context.Context, service Service) error {
 	containers, err := listServiceContainers(ctx, service.name)
 
 	if err != nil {
-		return fmt.Errorf("resolve %s for stop: %w", service.name, err)
+		return fmt.Errorf(
+			"resolve %s for stop: %w",
+			service.name,
+			err,
+		)
 	}
 
 	if len(containers) == 0 {
@@ -59,7 +81,11 @@ func stopService(ctx context.Context, service Service) error {
 
 	for _, container := range containers {
 		if err := container.Stop(ctx, serviceStopTimeout); err != nil {
-			return fmt.Errorf("stop %s: %w", service.name, err)
+			return fmt.Errorf(
+				"stop %s: %w",
+				service.name,
+				err,
+			)
 		}
 	}
 
@@ -70,7 +96,11 @@ func startService(ctx context.Context, service Service) error {
 	containers, err := listServiceContainers(ctx, service.name)
 
 	if err != nil {
-		return fmt.Errorf("resolve %s for start: %w", service.name, err)
+		return fmt.Errorf(
+			"resolve %s for start: %w",
+			service.name,
+			err,
+		)
 	}
 
 	if len(containers) == 0 {
@@ -79,7 +109,11 @@ func startService(ctx context.Context, service Service) error {
 
 	for _, container := range containers {
 		if err = container.Start(ctx); err != nil {
-			return fmt.Errorf("start %s: %w", service.name, err)
+			return fmt.Errorf(
+				"start %s: %w",
+				service.name,
+				err,
+			)
 		}
 	}
 
@@ -94,7 +128,11 @@ func startService(ctx context.Context, service Service) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("resolve %s after restart: %w", service.name, err)
+		return fmt.Errorf(
+			"resolve %s after restart: %w",
+			service.name,
+			err,
+		)
 	}
 
 	if restarted.baseURL != service.baseURL {

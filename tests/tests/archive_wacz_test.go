@@ -73,7 +73,11 @@ func TestArchive_Wacz_ContainsPublishedRecords(t *testing.T) {
 
 	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
 
-	require.Len(t, pages.Items, 3)
+	require.Len(
+		t,
+		pages.Items,
+		3,
+	)
 
 	waczURL := fmt.Sprintf("/archives/%s/wacz", accepted.ArchiveID)
 
@@ -94,7 +98,11 @@ func TestArchive_Wacz_ContainsPublishedRecords(t *testing.T) {
 
 	records := testutil.WaczRecords(t, waczResponse.Body)
 
-	testutil.RequireWarcRecordsForPages(t, records, pages.Items)
+	testutil.RequireWarcRecordsForPages(
+		t,
+		records,
+		pages.Items,
+	)
 }
 
 // Feature: Archive WACZ delivery

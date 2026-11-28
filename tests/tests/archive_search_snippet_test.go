@@ -53,7 +53,11 @@ func TestArchiveSearch_SnippetIsSafeHtml(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	search := testutil.WaitForArchiveSearchResults(
 		t,
@@ -69,8 +73,20 @@ func TestArchiveSearch_SnippetIsSafeHtml(t *testing.T) {
 
 	result := search.Results[0]
 
-	require.Equal(t, accepted.ArchiveID, result.ArchiveID)
-	require.Equal(t, "http://fixture-site/unsafe.html", result.URL)
+	require.Equal(
+		t,
+		accepted.ArchiveID,
+		result.ArchiveID,
+	)
+	require.Equal(
+		t,
+		"http://fixture-site/unsafe.html",
+		result.URL,
+	)
 
-	testutil.RequireSafeSnippet(t, result.Snippet, "unsafe")
+	testutil.RequireSafeSnippet(
+		t,
+		result.Snippet,
+		"unsafe",
+	)
 }

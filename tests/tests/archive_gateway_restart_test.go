@@ -54,7 +54,11 @@ func TestArchive_GatewayRestart_PreservesRun(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, accepted.ArchiveID, running.ArchiveID)
+	require.Equal(
+		t,
+		accepted.ArchiveID,
+		running.ArchiveID,
+	)
 
 	services.RestartService(t, services.Gateway)
 
@@ -64,7 +68,11 @@ func TestArchive_GatewayRestart_PreservesRun(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	results := testutil.WaitForArchiveSearchResults(
 		t,
@@ -78,5 +86,9 @@ func TestArchive_GatewayRestart_PreservesRun(t *testing.T) {
 
 	require.NotEmpty(t, results.Results)
 
-	testutil.RequireSearchResultsForArchive(t, results, accepted.ArchiveID)
+	testutil.RequireSearchResultsForArchive(
+		t,
+		results,
+		accepted.ArchiveID,
+	)
 }

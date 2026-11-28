@@ -58,7 +58,11 @@ func TestArchiveSearch_FiltersByCollection(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	results := testutil.WaitForArchiveSearchResults(
 		t,
@@ -73,7 +77,11 @@ func TestArchiveSearch_FiltersByCollection(t *testing.T) {
 
 	require.NotEmpty(t, results.Results)
 
-	testutil.RequireSearchResultsForArchive(t, results, accepted.ArchiveID)
+	testutil.RequireSearchResultsForArchive(
+		t,
+		results,
+		accepted.ArchiveID,
+	)
 
 	otherResponse := testutil.Get(
 		t,
@@ -136,7 +144,11 @@ func TestArchiveSearch_FiltersBySnapshot(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	pagesResponse := testutil.Get(
 		t,
@@ -153,7 +165,11 @@ func TestArchiveSearch_FiltersBySnapshot(t *testing.T) {
 
 	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
 
-	require.Len(t, pages.Items, 1)
+	require.Len(
+		t,
+		pages.Items,
+		1,
+	)
 
 	snapshotID := pages.Items[0].SnapshotID
 
@@ -167,9 +183,17 @@ func TestArchiveSearch_FiltersBySnapshot(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Len(t, results.Results, 1)
+	require.Len(
+		t,
+		results.Results,
+		1,
+	)
 
-	testutil.RequireSearchResultsForSnapshot(t, results, snapshotID)
+	testutil.RequireSearchResultsForSnapshot(
+		t,
+		results,
+		snapshotID,
+	)
 }
 
 // Feature: Archive search
@@ -213,7 +237,11 @@ func TestArchiveSearch_FiltersByCapturedFrom(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	scoped := testutil.WaitForArchiveSearchResults(
 		t,
@@ -251,7 +279,12 @@ func TestArchiveSearch_FiltersByCapturedFrom(t *testing.T) {
 
 	require.NotEmpty(t, results.Results)
 
-	testutil.RequireSearchCapturedAtWithin(t, results, from, to)
+	testutil.RequireSearchCapturedAtWithin(
+		t,
+		results,
+		from,
+		to,
+	)
 
 	excludedResponse := testutil.Get(
 		t,
@@ -315,7 +348,11 @@ func TestArchiveSearch_FiltersByCapturedTo(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
 
 	scoped := testutil.WaitForArchiveSearchResults(
 		t,
@@ -353,7 +390,12 @@ func TestArchiveSearch_FiltersByCapturedTo(t *testing.T) {
 
 	require.NotEmpty(t, results.Results)
 
-	testutil.RequireSearchCapturedAtWithin(t, results, from, to)
+	testutil.RequireSearchCapturedAtWithin(
+		t,
+		results,
+		from,
+		to,
+	)
 
 	excludedResponse := testutil.Get(
 		t,

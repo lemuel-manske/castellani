@@ -23,7 +23,11 @@ import (
 func TestArchive_CompetingConsumers_CaptureEachPageOnce(t *testing.T) {
 	services := infra.Start(t)
 
-	require.Len(t, services.CaptureWorkers, 3)
+	require.Len(
+		t,
+		services.CaptureWorkers,
+		3,
+	)
 
 	requestBody :=
 		`{"seedUrl":"http://fixture-site/index.html","maxDepth":1,"maxPages":3}`
@@ -54,8 +58,16 @@ func TestArchive_CompetingConsumers_CaptureEachPageOnce(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
-	require.Equal(t, 3, status.Capture.Captured)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
+	require.Equal(
+		t,
+		3,
+		status.Capture.Captured,
+	)
 	require.Zero(t, status.Capture.Failed)
 
 	getURL := fmt.Sprintf("/archives/%s/pages?limit=10", accepted.ArchiveID)
@@ -73,7 +85,11 @@ func TestArchive_CompetingConsumers_CaptureEachPageOnce(t *testing.T) {
 
 	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
 
-	require.Len(t, pages.Items, 3)
+	require.Len(
+		t,
+		pages.Items,
+		3,
+	)
 
 	testutil.RequireDistinctCapturedPages(t, pages.Items)
 

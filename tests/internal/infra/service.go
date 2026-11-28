@@ -84,13 +84,22 @@ func newService(
 	container, err := stack.ServiceContainer(ctx, name)
 
 	if err != nil {
-		return Service{}, fmt.Errorf("resolve service %s: %w", name, err)
+		return Service{}, fmt.Errorf(
+			"resolve service %s: %w",
+			name,
+			err,
+		)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return Service{}, fmt.Errorf("resolve port %s for %s: %w", port, name, err)
+		return Service{}, fmt.Errorf(
+			"resolve port %s for %s: %w",
+			port,
+			name,
+			err,
+		)
 	}
 
 	baseURL := "http://" + net.JoinHostPort("localhost", mappedPort.Port())

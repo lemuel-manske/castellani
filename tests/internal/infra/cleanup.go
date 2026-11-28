@@ -43,7 +43,11 @@ var (
 	}
 )
 
-func cleanupTestArchives(ctx context.Context, d Dependencies, runID string) error {
+func cleanupTestArchives(
+	ctx context.Context,
+	d Dependencies,
+	runID string,
+) error {
 	config, err := awsConfig()
 
 	if err != nil {
@@ -59,7 +63,11 @@ func cleanupTestArchives(ctx context.Context, d Dependencies, runID string) erro
 		options.UsePathStyle = true
 	})
 
-	archiveIDs, submissionKeys, err := listTestArchives(ctx, dynamoClient, runID)
+	archiveIDs, submissionKeys, err := listTestArchives(
+		ctx,
+		dynamoClient,
+		runID,
+	)
 
 	if err != nil {
 		return err
@@ -71,12 +79,28 @@ func cleanupTestArchives(ctx context.Context, d Dependencies, runID string) erro
 
 	var errs []error
 
-	errs = append(errs, deleteTestSubmissions(ctx, dynamoClient, submissionKeys))
+	errs = append(errs, deleteTestSubmissions(
+		ctx,
+		dynamoClient,
+		submissionKeys,
+	))
 
 	for _, archiveID := range archiveIDs {
-		errs = append(errs, deleteArchiveRows(ctx, dynamoClient, archiveID))
-		errs = append(errs, deleteArchiveObjects(ctx, s3Client, archiveID))
-		errs = append(errs, deleteArchiveDocuments(ctx, d.OpenSearch, archiveID))
+		errs = append(errs, deleteArchiveRows(
+			ctx,
+			dynamoClient,
+			archiveID,
+		))
+		errs = append(errs, deleteArchiveObjects(
+			ctx,
+			s3Client,
+			archiveID,
+		))
+		errs = append(errs, deleteArchiveDocuments(
+			ctx,
+			d.OpenSearch,
+			archiveID,
+		))
 	}
 
 	return errors.Join(errs...)
@@ -91,7 +115,9 @@ func listTestArchives(
 		TableName:        aws.String(coordinatorSubmissionsTable),
 		FilterExpression: aws.String("begins_with(idempotencyKey, :prefix)"),
 		ExpressionAttributeValues: map[string]dynamodbtypes.AttributeValue{
-			":prefix": &dynamodbtypes.AttributeValueMemberS{Value: runID + "-"},
+			":prefix": &dynamodbtypes.AttributeValueMemberS{
+				Value: runID + "-",
+			},
 		},
 		ProjectionExpression: aws.String("idempotencyKey, archiveId"),
 	})
@@ -135,15 +161,26 @@ func deleteTestSubmissions(
 		return nil
 	}
 
-	items := make([]map[string]dynamodbtypes.AttributeValue, 0, len(keys))
+	items := make(
+		[]map[string]dynamodbtypes.AttributeValue,
+		0,
+		len(keys),
+	)
 
 	for _, key := range keys {
 		items = append(items, map[string]dynamodbtypes.AttributeValue{
-			"idempotencyKey": &dynamodbtypes.AttributeValueMemberS{Value: key},
+			"idempotencyKey": &dynamodbtypes.AttributeValueMemberS{
+				Value: key,
+			},
 		})
 	}
 
-	return batchDelete(ctx, client, coordinatorSubmissionsTable, items)
+	return batchDelete(
+		ctx,
+		client,
+		coordinatorSubmissionsTable,
+		items,
+	)
 }
 
 func deleteArchiveRows(
@@ -154,7 +191,9 @@ func deleteArchiveRows(
 	var errs []error
 
 	values := map[string]dynamodbtypes.AttributeValue{
-		":archiveId": &dynamodbtypes.AttributeValueMemberS{Value: archiveID},
+		":archiveId": &dynamodbtypes.AttributeValueMemberS{
+			Value: archiveID,
+		},
 	}
 
 	for _, table := range archiveTables {
@@ -177,7 +216,11 @@ func deleteTableItems(
 	filter string,
 	values map[string]dynamodbtypes.AttributeValue,
 ) error {
-	keyNames, err := tableKeyNames(ctx, client, table)
+	keyNames, err := tableKeyNames(
+		ctx,
+		client,
+		table,
+	)
 
 	if err != nil {
 		return err
@@ -195,7 +238,11 @@ func deleteTableItems(
 		page, err := paginator.NextPage(ctx)
 
 		if err != nil {
-			return fmt.Errorf("scan %s: %w", table, err)
+			return fmt.Errorf(
+				"scan %s: %w",
+				table,
+				err,
+			)
 		}
 
 		for _, item := range page.Items {
@@ -209,7 +256,12 @@ func deleteTableItems(
 		}
 	}
 
-	return batchDelete(ctx, client, table, keys)
+	return batchDelete(
+		ctx,
+		client,
+		table,
+		keys,
+	)
 }
 
 func tableKeyNames(
@@ -222,10 +274,18 @@ func tableKeyNames(
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("describe %s: %w", table, err)
+		return nil, fmt.Errorf(
+			"describe %s: %w",
+			table,
+			err,
+		)
 	}
 
-	names := make([]string, 0, len(description.Table.KeySchema))
+	names := make(
+		[]string,
+		0,
+		len(description.Table.KeySchema),
+	)
 
 	for _, key := range description.Table.KeySchema {
 		names = append(names, aws.ToString(key.AttributeName))
@@ -245,7 +305,11 @@ func batchDelete(
 	for len(keys) > 0 {
 		size := min(len(keys), batchSize)
 
-		requests := make([]dynamodbtypes.WriteRequest, 0, size)
+		requests := make(
+			[]dynamodbtypes.WriteRequest,
+			0,
+			size,
+		)
 
 		for _, key := range keys[:size] {
 			requests = append(requests, dynamodbtypes.WriteRequest{
@@ -269,7 +333,11 @@ func batchDelete(
 			})
 
 			if err != nil {
-				return fmt.Errorf("delete items from %s: %w", table, err)
+				return fmt.Errorf(
+					"delete items from %s: %w",
+					table,
+					err,
+				)
 			}
 
 			requests = output.UnprocessedItems[table]
@@ -279,7 +347,11 @@ func batchDelete(
 	return nil
 }
 
-func deleteArchiveObjects(ctx context.Context, client *s3.Client, archiveID string) error {
+func deleteArchiveObjects(
+	ctx context.Context,
+	client *s3.Client,
+	archiveID string,
+) error {
 	quoted := url.QueryEscape(archiveID)
 
 	targets := []struct {
@@ -294,13 +366,23 @@ func deleteArchiveObjects(ctx context.Context, client *s3.Client, archiveID stri
 	var errs []error
 
 	for _, target := range targets {
-		errs = append(errs, deleteS3Prefix(ctx, client, target.bucket, target.prefix))
+		errs = append(errs, deleteS3Prefix(
+			ctx,
+			client,
+			target.bucket,
+			target.prefix,
+		))
 	}
 
 	return errors.Join(errs...)
 }
 
-func deleteS3Prefix(ctx context.Context, client *s3.Client, bucket string, prefix string) error {
+func deleteS3Prefix(
+	ctx context.Context,
+	client *s3.Client,
+	bucket string,
+	prefix string,
+) error {
 	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
@@ -312,7 +394,12 @@ func deleteS3Prefix(ctx context.Context, client *s3.Client, bucket string, prefi
 		page, err := paginator.NextPage(ctx)
 
 		if err != nil {
-			return fmt.Errorf("list %s/%s: %w", bucket, prefix, err)
+			return fmt.Errorf(
+				"list %s/%s: %w",
+				bucket,
+				prefix,
+				err,
+			)
 		}
 
 		for _, object := range page.Contents {
@@ -336,11 +423,21 @@ func deleteS3Prefix(ctx context.Context, client *s3.Client, bucket string, prefi
 		})
 
 		if err != nil {
-			return fmt.Errorf("delete %s/%s: %w", bucket, prefix, err)
+			return fmt.Errorf(
+				"delete %s/%s: %w",
+				bucket,
+				prefix,
+				err,
+			)
 		}
 
 		if len(output.Errors) > 0 {
-			return fmt.Errorf("delete %s/%s: %v", bucket, prefix, output.Errors)
+			return fmt.Errorf(
+				"delete %s/%s: %v",
+				bucket,
+				prefix,
+				output.Errors,
+			)
 		}
 
 		objects = objects[size:]
@@ -349,7 +446,11 @@ func deleteS3Prefix(ctx context.Context, client *s3.Client, bucket string, prefi
 	return nil
 }
 
-func deleteArchiveDocuments(ctx context.Context, search Service, archiveID string) error {
+func deleteArchiveDocuments(
+	ctx context.Context,
+	search Service,
+	archiveID string,
+) error {
 	body := strings.NewReader(fmt.Sprintf(`{"query":{"term":{"archiveId":%q}}}`, archiveID))
 
 	request, err := http.NewRequestWithContext(
@@ -368,7 +469,11 @@ func deleteArchiveDocuments(ctx context.Context, search Service, archiveID strin
 	response, err := cleanupHTTPClient.Do(request)
 
 	if err != nil {
-		return fmt.Errorf("delete search documents for %s: %w", archiveID, err)
+		return fmt.Errorf(
+			"delete search documents for %s: %w",
+			archiveID,
+			err,
+		)
 	}
 	defer response.Body.Close()
 

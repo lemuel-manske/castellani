@@ -42,7 +42,11 @@ func (e TestEnv) cleanup(t *testing.T) {
 
 	require.NoError(
 		t,
-		cleanupTestArchives(ctx, e.Dependencies, e.runID),
+		cleanupTestArchives(
+			ctx,
+			e.Dependencies,
+			e.runID,
+		),
 		"clean up test %s",
 		e.runID,
 	)

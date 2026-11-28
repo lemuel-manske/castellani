@@ -85,8 +85,16 @@ func TestArchive_Rearchiving_PreservesDistinctSnapshots(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", firstStatus.Status)
-	require.Equal(t, "COMPLETED", secondStatus.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		firstStatus.Status,
+	)
+	require.Equal(
+		t,
+		"COMPLETED",
+		secondStatus.Status,
+	)
 
 	firstPagesResponse := testutil.Get(
 		t,
@@ -117,8 +125,16 @@ func TestArchive_Rearchiving_PreservesDistinctSnapshots(t *testing.T) {
 	firstPages := testutil.Decode[contracts.ArchivePages](t, firstPagesResponse)
 	secondPages := testutil.Decode[contracts.ArchivePages](t, secondPagesResponse)
 
-	require.Len(t, firstPages.Items, 3)
-	require.Len(t, secondPages.Items, 3)
+	require.Len(
+		t,
+		firstPages.Items,
+		3,
+	)
+	require.Len(
+		t,
+		secondPages.Items,
+		3,
+	)
 
 	testutil.RequireDistinctCapturedPages(t, firstPages.Items)
 	testutil.RequireDistinctCapturedPages(t, secondPages.Items)
@@ -126,8 +142,16 @@ func TestArchive_Rearchiving_PreservesDistinctSnapshots(t *testing.T) {
 	firstPage := firstPages.Items[0]
 	secondPage := secondPages.Items[0]
 
-	require.Equal(t, firstPage.URL, secondPage.URL)
-	require.NotEqual(t, firstPage.SnapshotID, secondPage.SnapshotID)
+	require.Equal(
+		t,
+		firstPage.URL,
+		secondPage.URL,
+	)
+	require.NotEqual(
+		t,
+		firstPage.SnapshotID,
+		secondPage.SnapshotID,
+	)
 
 	firstSnapshot := testutil.Get(
 		t,
@@ -184,7 +208,11 @@ func TestArchive_Rearchiving_PreservesDistinctSnapshots(t *testing.T) {
 	)
 	require.NotEmpty(t, firstMetadata.CapturedAt)
 	require.NotEmpty(t, secondMetadata.CapturedAt)
-	require.NotEqual(t, firstMetadata.CapturedAt, secondMetadata.CapturedAt)
+	require.NotEqual(
+		t,
+		firstMetadata.CapturedAt,
+		secondMetadata.CapturedAt,
+	)
 
 	firstSearch := testutil.WaitForArchiveSearchResults(
 		t,

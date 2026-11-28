@@ -29,7 +29,11 @@ func Start(t *testing.T) TestEnv {
 		startErr = start()
 	})
 
-	require.NoError(t, startErr, "start e2e services")
+	require.NoError(
+		t,
+		startErr,
+		"start e2e services",
+	)
 
 	return newTestEnv(t, shared)
 }
@@ -41,7 +45,11 @@ func Stop() {
 	}
 
 	if err := stack.Down(context.Background(), compose.RemoveVolumes(true)); err != nil {
-		fmt.Fprintf(os.Stderr, "stop e2e services: %v\n", err)
+		fmt.Fprintf(
+			os.Stderr,
+			"stop e2e services: %v\n",
+			err,
+		)
 	}
 
 	if terraformDir != "" {
@@ -69,7 +77,11 @@ func start() error {
 
 	currentStack, err := newComposeStack(
 		filepath.Join(root, "docker-compose.yaml"),
-		filepath.Join(root, "tests", "compose.yaml"),
+		filepath.Join(
+			root,
+			"tests",
+			"compose.yaml",
+		),
 	)
 
 	if err != nil {
@@ -79,6 +91,7 @@ func start() error {
 	stack = currentStack
 
 	stackEnv, err := stackEnvironment(terraformDir)
+
 	if err != nil {
 		return fmt.Errorf("configure e2e ports: %w", err)
 	}

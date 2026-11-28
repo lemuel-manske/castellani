@@ -33,7 +33,10 @@ func TestArchive_OutboxDrainsAfterBrokerOutage(t *testing.T) {
 
 	var accepted contracts.ArchiveAccepted
 
-	services.WithServiceStopped(t, services.RabbitMQ, func() {
+	services.WithServiceStopped(
+		t,
+		services.RabbitMQ,
+		func() {
 		response := testutil.Post(
 			t,
 			services.Gateway.URL("/archives"),
@@ -48,7 +51,8 @@ func TestArchive_OutboxDrainsAfterBrokerOutage(t *testing.T) {
 		)
 
 		accepted = testutil.Decode[contracts.ArchiveAccepted](t, response)
-	})
+	},
+	)
 
 	status := testutil.WaitForArchiveTerminalState(
 		t,
@@ -56,8 +60,16 @@ func TestArchive_OutboxDrainsAfterBrokerOutage(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", status.Status)
-	require.Equal(t, 3, status.Capture.Captured)
+	require.Equal(
+		t,
+		"COMPLETED",
+		status.Status,
+	)
+	require.Equal(
+		t,
+		3,
+		status.Capture.Captured,
+	)
 	require.Zero(t, status.Capture.Failed)
 
 	getURL := fmt.Sprintf("/archives/%s/pages?limit=10", accepted.ArchiveID)
@@ -75,7 +87,11 @@ func TestArchive_OutboxDrainsAfterBrokerOutage(t *testing.T) {
 
 	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
 
-	require.Len(t, pages.Items, 3)
+	require.Len(
+		t,
+		pages.Items,
+		3,
+	)
 
 	testutil.RequireDistinctCapturedPages(t, pages.Items)
 

@@ -70,8 +70,16 @@ func TestArchive_Polling_ShowsLifecycleProgression(t *testing.T) {
 		progression.Ordered,
 	)
 
-	require.Equal(t, "PUBLISH", progression.Final.Decision)
-	require.Equal(t, "READY", progression.Final.Replay.Status)
+	require.Equal(
+		t,
+		"PUBLISH",
+		progression.Final.Decision,
+	)
+	require.Equal(
+		t,
+		"READY",
+		progression.Final.Replay.Status,
+	)
 
 	require.Equal(
 		t,

@@ -58,7 +58,11 @@ func TestArchive_CrawlLimit_AdmitsOnlyAllowedPages(t *testing.T) {
 		status.Status,
 	)
 
-	require.Equal(t, 2, status.Capture.Captured)
+	require.Equal(
+		t,
+		2,
+		status.Capture.Captured,
+	)
 
 	getURL := fmt.Sprintf("/archives/%s/pages?limit=10", accepted.ArchiveID)
 
@@ -75,7 +79,11 @@ func TestArchive_CrawlLimit_AdmitsOnlyAllowedPages(t *testing.T) {
 
 	pages := testutil.Decode[contracts.ArchivePages](t, pagesResponse)
 
-	require.Len(t, pages.Items, 2)
+	require.Len(
+		t,
+		pages.Items,
+		2,
+	)
 
 	testutil.RequireDistinctCapturedPages(t, pages.Items)
 }

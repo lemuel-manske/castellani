@@ -26,7 +26,11 @@ func waitForQueueConsumers(
 	var lastErr error
 
 	for {
-		consumers, err := queueConsumers(ctx, rabbitMQ, queue)
+		consumers, err := queueConsumers(
+			ctx,
+			rabbitMQ,
+			queue,
+		)
 
 		if err != nil {
 			lastErr = err
@@ -54,7 +58,11 @@ func waitForQueueConsumers(
 	}
 }
 
-func queueConsumers(ctx context.Context, rabbitMQ Service, queue string) (int, error) {
+func queueConsumers(
+	ctx context.Context,
+	rabbitMQ Service,
+	queue string,
+) (int, error) {
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
@@ -93,7 +101,11 @@ func queueConsumers(ctx context.Context, rabbitMQ Service, queue string) (int, e
 	var info queueInfo
 
 	if err := json.Unmarshal(data, &info); err != nil {
-		return 0, fmt.Errorf("decode queue %s: %w", queue, err)
+		return 0, fmt.Errorf(
+			"decode queue %s: %w",
+			queue,
+			err,
+		)
 	}
 
 	return info.Consumers, nil

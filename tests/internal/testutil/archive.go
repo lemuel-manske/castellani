@@ -126,6 +126,7 @@ func WaitForArchiveStatusProgression(
 			lastCaptured = status.Capture.Captured
 
 			lastObserved := progression.Observed[len(progression.Observed)-1]
+
 			if lastObserved != status.Status {
 				progression.Observed = append(progression.Observed, status.Status)
 			}
@@ -160,13 +161,21 @@ func RequireCapturedPageURLs(
 ) {
 	t.Helper()
 
-	actual := make([]string, 0, len(pages))
+	actual := make(
+		[]string,
+		0,
+		len(pages),
+	)
 
 	for _, page := range pages {
 		actual = append(actual, page.URL)
 	}
 
-	require.ElementsMatch(t, expected, actual)
+	require.ElementsMatch(
+		t,
+		expected,
+		actual,
+	)
 }
 
 func RequireDistinctCapturedPages(
@@ -179,9 +188,18 @@ func RequireDistinctCapturedPages(
 	seenSnapshotIDs := make(map[string]bool)
 
 	for _, page := range pages {
-		require.False(t, seenURLs[page.URL], "duplicate page URL: %s", page.URL)
+		require.False(
+			t,
+			seenURLs[page.URL],
+			"duplicate page URL: %s",
+			page.URL,
+		)
 
-		require.Equal(t, "CAPTURED", page.Status)
+		require.Equal(
+			t,
+			"CAPTURED",
+			page.Status,
+		)
 
 		require.False(
 			t,

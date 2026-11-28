@@ -17,7 +17,12 @@ func WaitForArchiveSearchResults(
 ) contracts.SearchResults {
 	t.Helper()
 
-	return WaitForArchiveSearchResultsAtLeast(t, url, timeout, 1)
+	return WaitForArchiveSearchResultsAtLeast(
+		t,
+		url,
+		timeout,
+		1,
+	)
 }
 
 func WaitForArchiveSearchResultsAtLeast(
@@ -60,7 +65,11 @@ func RequireSearchResultsSchema(
 ) {
 	t.Helper()
 
-	require.LessOrEqual(t, len(results.Results), limit)
+	require.LessOrEqual(
+		t,
+		len(results.Results),
+		limit,
+	)
 
 	for _, result := range results.Results {
 		require.NotEmpty(t, result.ArchiveID)
@@ -82,7 +91,11 @@ func RequireSearchResultsForArchive(
 	t.Helper()
 
 	for _, result := range results.Results {
-		require.Equal(t, archiveID, result.ArchiveID)
+		require.Equal(
+			t,
+			archiveID,
+			result.ArchiveID,
+		)
 	}
 }
 
@@ -94,7 +107,11 @@ func RequireSearchResultsForSnapshot(
 	t.Helper()
 
 	for _, result := range results.Results {
-		require.Equal(t, snapshotID, result.SnapshotID)
+		require.Equal(
+			t,
+			snapshotID,
+			result.SnapshotID,
+		)
 	}
 }
 
@@ -178,6 +195,14 @@ func RequireSafeSnippet(
 		strings.ToLower(snippet),
 		strings.ToLower(term),
 	)
-	require.NotContains(t, snippet, "<")
-	require.NotContains(t, strings.ToLower(snippet), "onerror")
+	require.NotContains(
+		t,
+		snippet,
+		"<",
+	)
+	require.NotContains(
+		t,
+		strings.ToLower(snippet),
+		"onerror",
+	)
 }

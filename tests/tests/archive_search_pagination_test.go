@@ -62,7 +62,11 @@ func TestArchiveSearch_PaginatesPublishedResults(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", firstStatus.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		firstStatus.Status,
+	)
 
 	secondResponse := testutil.Post(
 		t,
@@ -85,7 +89,11 @@ func TestArchiveSearch_PaginatesPublishedResults(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, "COMPLETED", secondStatus.Status)
+	require.Equal(
+		t,
+		"COMPLETED",
+		secondStatus.Status,
+	)
 
 	phrase := url.QueryEscape("unsafe-marker-phrase")
 
@@ -100,7 +108,11 @@ func TestArchiveSearch_PaginatesPublishedResults(t *testing.T) {
 		2,
 	)
 
-	require.Len(t, all.Results, 2)
+	require.Len(
+		t,
+		all.Results,
+		2,
+	)
 
 	first := testutil.WaitForArchiveSearchResults(
 		t,
@@ -112,7 +124,11 @@ func TestArchiveSearch_PaginatesPublishedResults(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Len(t, first.Results, 1)
+	require.Len(
+		t,
+		first.Results,
+		1,
+	)
 	require.NotNil(t, first.NextCursor)
 
 	secondURL := services.Gateway.URL(fmt.Sprintf(
@@ -128,8 +144,16 @@ func TestArchiveSearch_PaginatesPublishedResults(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Len(t, second.Results, 1)
-	require.NotEqual(t, first.Results[0].SnapshotID, second.Results[0].SnapshotID)
+	require.Len(
+		t,
+		second.Results,
+		1,
+	)
+	require.NotEqual(
+		t,
+		first.Results[0].SnapshotID,
+		second.Results[0].SnapshotID,
+	)
 	require.Contains(
 		t,
 		[]string{all.Results[0].SnapshotID, all.Results[1].SnapshotID},
@@ -147,5 +171,9 @@ func TestArchiveSearch_PaginatesPublishedResults(t *testing.T) {
 		ArchiveTimeout,
 	)
 
-	require.Equal(t, second, secondAgain)
+	require.Equal(
+		t,
+		second,
+		secondAgain,
+	)
 }
