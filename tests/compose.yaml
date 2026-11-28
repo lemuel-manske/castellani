@@ -12,6 +12,9 @@ services:
       retries: 15
 
   capture-worker:
+    deploy:
+      replicas: 3
+
     environment:
       CAPTURE_ALLOW_PRIVATE_NETWORKS: "true"
 

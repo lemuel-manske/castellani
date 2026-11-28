@@ -89,6 +89,14 @@ func start() error {
 		return err
 	}
 
+	captureWorkers, err := listServiceContainers(ctx, captureWorkerService)
+
+	if err != nil {
+		return err
+	}
+
+	services.CaptureWorkers = captureWorkers
+
 	shared = services
 
 	readinessCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
@@ -105,6 +113,23 @@ func start() error {
 		services.Search,
 	); err != nil {
 		return fmt.Errorf("wait for e2e services to become healthy: %w", err)
+	}
+
+	if err := waitForContainerHealth(
+		readinessCtx,
+		captureWorkerService,
+		captureWorkerReplicaCount,
+	); err != nil {
+		return fmt.Errorf("wait for capture worker replicas: %w", err)
+	}
+
+	if err := waitForQueueConsumers(
+		readinessCtx,
+		services.RabbitMQ,
+		capturePageQueue,
+		captureWorkerReplicaCount,
+	); err != nil {
+		return fmt.Errorf("wait for capture page consumers: %w", err)
 	}
 
 	return nil
@@ -126,7 +151,7 @@ func resolveServices(ctx context.Context, currentStack compose.ComposeStack) (De
 		{&dependencies.OpenSearch, "opensearch", "9200", "/_cluster/health", "", ""},
 		{&dependencies.Gateway, "gateway", "8080", "/health/ready", "", ""},
 		{&dependencies.Coordinator, "coordinator", "8081", "/health/ready", "", ""},
-		{&dependencies.Capture, "capture-worker", "8000", "/health/ready", "", ""},
+		{&dependencies.Capture, captureWorkerService, "8000", "/health/ready", "", ""},
 		{&dependencies.Search, "search", "8082", "/health/ready", "", ""},
 	}
 

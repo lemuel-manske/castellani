@@ -10,6 +10,12 @@ import (
 )
 
 const (
+	e2eProjectName = "castellani-e2e"
+
+	capturePageQueue          = "castellani.capture.page"
+	captureWorkerService      = "capture-worker"
+	captureWorkerReplicaCount = 3
+
 	rabbitMQUsername = "castellani"
 	rabbitMQPassword = "castellani"
 

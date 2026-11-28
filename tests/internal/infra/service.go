@@ -18,13 +18,14 @@ var httpClient = &http.Client{
 }
 
 type Dependencies struct {
-	MiniStack   Service
-	RabbitMQ    Service
-	OpenSearch  Service
-	Gateway     Service
-	Coordinator Service
-	Capture     Service
-	Search      Service
+	MiniStack      Service
+	RabbitMQ       Service
+	OpenSearch     Service
+	Gateway        Service
+	Coordinator    Service
+	Capture        Service
+	CaptureWorkers []Container
+	Search         Service
 }
 
 type Service struct {

@@ -13,5 +13,8 @@ func newComposeStack(composeFiles ...string) (stack *compose.DockerCompose, err 
 		}
 	}()
 
-	return compose.NewDockerComposeWith(compose.WithStackFiles(composeFiles...))
+	return compose.NewDockerComposeWith(
+		compose.StackIdentifier(e2eProjectName),
+		compose.WithStackFiles(composeFiles...),
+	)
 }

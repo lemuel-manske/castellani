@@ -21,3 +21,5 @@
 - Keep each scenario readable and focused on one behavior.
 
 - Restart a service only through `TestEnv.RestartService`; those tests stay serial and must not call Compose `Up` with `RunServices`, which narrows the shared project.
+
+- Treat the capture-worker replica count as a suite-wide constant; do not rescale it from individual tests.

@@ -153,6 +153,22 @@ func WaitForArchiveStatusProgression(
 	return progression
 }
 
+func RequireCapturedPageURLs(
+	t *testing.T,
+	pages []contracts.PageOutcome,
+	expected []string,
+) {
+	t.Helper()
+
+	actual := make([]string, 0, len(pages))
+
+	for _, page := range pages {
+		actual = append(actual, page.URL)
+	}
+
+	require.ElementsMatch(t, expected, actual)
+}
+
 func RequireDistinctCapturedPages(
 	t *testing.T,
 	pages []contracts.PageOutcome,
